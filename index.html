@@ -1,75 +1,281 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PTD Today — Daily Energy & Power News</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PTD Today | Power Transmission & Distribution Daily News</title>
+
+  <!-- SEO / Open Graph for the HOMEPAGE -->
+  <meta name="description" content="Daily headlines across power transmission & distribution, HV substations, protection & control, cables, grid modernization, policy, and more.">
+  <meta property="og:title" content="PTD Today — Daily Energy & Power News">
+  <meta property="og:description" content="Curated headlines across Power T&D, refreshed throughout the day.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ptdtoday.com/">
+  <meta property="og:image" content="https://ptdtoday.com/logo.svg">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' font-size='36' font-family='Georgia,serif'%3EPTD%3C/text%3E%3C/svg%3E">
+
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #fff;
-      color: #111;
+    :root{
+      --ink:#0c0c0c; --ink-2:#333; --ink-3:#666; --line:#e5e5e5; --bg:#fff;
+      --maxw:1220px; --col-gap:28px;
+      --accent:#0058ff;
     }
-    header {
-      padding: 20px;
-      border-bottom: 1px solid #e6e6e6;
-      font-size: 1.5rem;
-      font-weight: bold;
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-serif, Georgia, "Times New Roman", serif}
+    a{color:inherit}
+    .wrap{max-width:var(--maxw);margin:0 auto;padding:0 18px}
+    header{border-bottom:1px solid var(--line);padding:14px 0 10px;background:#fff;position:sticky;top:0;z-index:10}
+    .mast{display:flex;align-items:center;gap:14px}
+    .bolt{font-size:22px}
+    .name{font-size:28px;font-weight:700;letter-spacing:.2px}
+    .tag{font-size:13px;color:var(--ink-3)}
+    nav{margin-top:10px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 0}
+    nav .row{display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
+    nav .row a{color:var(--ink-2);text-decoration:none}
+    nav .row a:hover{text-decoration:underline}
+    .chip{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:11px;border:1px solid var(--line);padding:2px 8px;border-radius:12px;color:var(--ink-3)}
+    .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--line);background:#fafafa;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px}
+    .btn:hover{background:#f2f2f2}
+
+    /* ====== Layout (WSJ-style) ====== */
+    main{padding:18px 0 34px}
+    .grid{
+      display:grid;grid-template-columns:2fr 1fr;gap:var(--col-gap)
     }
-    main {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 20px;
-      padding: 20px;
+    /* Lead article (big) */
+    .lead h1{font-size:40px;line-height:1.1;margin:6px 0 8px}
+    .lead .dek{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink-2);font-size:16px;margin:10px 0 14px}
+    .lead .meta{font-family:ui-sans-serif;font-size:12px;color:var(--ink-3);margin:8px 0 14px}
+    .lead img{width:100%;max-height:480px;object-fit:cover;border:1px solid var(--line)}
+    .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .accent{color:var(--accent);text-decoration:none}
+    .accent:hover{text-decoration:underline}
+
+    /* Right column: index grid */
+    .cards{
+      display:grid;grid-template-columns:1fr;gap:22px
     }
-    .card {
-      border-bottom: 1px solid #e6e6e6;
-      padding-bottom: 16px;
-    }
-    .card h2 {
-      margin: 0 0 10px;
-      font-size: 1.2rem;
-    }
-    .card p {
-      margin: 0 0 8px;
-      color: #444;
-    }
-    .card a {
-      color: #0077cc;
-      text-decoration: none;
-      font-size: 0.9rem;
+    .card{border-top:1px solid var(--line);padding-top:14px}
+    .card h3{font-size:22px;line-height:1.16;margin:0 0 6px}
+    .card .dek{font-family:ui-sans-serif;color:var(--ink-2);font-size:14px;margin:6px 0 8px}
+    .card .meta{font-family:ui-sans-serif;color:var(--ink-3);font-size:12px;margin-top:4px}
+    .card .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+    .thumb{width:100%;max-height:160px;object-fit:cover;border:1px solid var(--line);margin:8px 0 6px;display:none}
+
+    /* Below the fold: two-column list like WSJ sections */
+    .below{margin-top:26px;border-top:2px solid var(--ink);padding-top:20px}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:var(--col-gap)}
+    .mini{border-top:1px solid var(--line);padding-top:12px}
+    .mini h4{font-size:18px;margin:0 0 4px}
+    .mini p{font-family:ui-sans-serif;color:var(--ink-2);font-size:14px;margin:0 0 4px}
+    .mini .meta{font-family:ui-sans-serif;color:var(--ink-3);font-size:12px}
+
+    footer{border-top:1px solid var(--line);padding:16px 0 36px;color:var(--ink-3);font-family:ui-sans-serif;font-size:12px}
+
+    @media (max-width:980px){
+      .grid{grid-template-columns:1fr}
+      .lead h1{font-size:34px}
+      .cards{grid-template-columns:1fr}
+      .two{grid-template-columns:1fr}
     }
   </style>
 </head>
 <body>
-  <header>⚡ PTD Today — Daily Energy & Power News</header>
-
-  <main>
-    <!-- Example news card -->
-    <div class="card">
-      <h2>Hitachi Energy, Grid United Advance North Plains Connector</h2>
-      <p>Hitachi Energy and Grid United have launched the next phase of a collaboration to link Eastern and Western grids.</p>
-      <a href="article.html?t=Hitachi+Energy+Connector&d=Hitachi+Energy+and+Grid+United+launch+new+grid+project.&u=https://www.utilitydive.com/news/doe-cancel-clean-energy-awards/801764&img=https://via.placeholder.com/600x400.png">Read more →</a>
+<header>
+  <div class="wrap">
+    <div class="mast">
+      <div class="bolt">⚡</div>
+      <div>
+        <div class="name">PTD Today — Daily Energy &amp; Power News</div>
+        <div class="tag">Curated coverage for grid, HV substations, protection &amp; control, cables, policy, and more.</div>
+      </div>
     </div>
+    <nav>
+      <div class="row">
+        <a href="#">Grid</a><a href="#">Substations</a><a href="#">Protection</a><a href="#">Cables</a>
+        <a href="#">HVDC</a><a href="#">Renewables</a><a href="#">Policy</a>
+        <span style="flex:1"></span>
+        <span class="chip" id="updated">Updated —</span>
+        <button class="btn" id="refresh">Refresh</button>
+      </div>
+    </nav>
+  </div>
+</header>
 
-    <div class="card">
-      <h2>Japan’s Nuclear Group Partners with newcleo</h2>
-      <p>Newcleo and the Japanese Atomic Energy Agency signed a collaboration agreement for next-gen reactor development.</p>
-      <a href="article.html?t=Japan+Nuclear+newcleo&d=Newcleo+and+JAEA+collaborate+on+next-gen+reactors.&u=https://www.world-nuclear-news.org/Articles/newcleo-Japan-reactor&img=https://via.placeholder.com/600x400.png">Read more →</a>
-    </div>
+<main class="wrap">
+  <section class="grid">
+    <!-- Big lead -->
+    <article class="lead" id="lead">
+      <h1 id="leadTitle">Loading…</h1>
+      <div class="dek" id="leadDek"></div>
+      <img id="leadImg" alt="Lead image" src="">
+      <div class="meta" id="leadMeta"></div>
+      <div class="tools">
+        <a id="leadOpen" class="btn" href="#">Open on PTD Today</a>
+        <button id="leadShare" class="btn">Share</button>
+        <a id="leadSource" class="btn" target="_blank" rel="noopener">Source</a>
+      </div>
+    </article>
 
-    <div class="card">
-      <h2>Xcel Plans New Gas-Fired Plants</h2>
-      <p>Xcel Energy is adding more natural gas-fired generation in Texas and New Mexico.</p>
-      <a href="article.html?t=Xcel+Gas-Fired+Plants&d=Xcel+Energy+adds+new+plants+in+Texas+and+New+Mexico.&u=https://www.utilitydive.com/news/xcel-new-plants&img=https://via.placeholder.com/600x400.png">Read more →</a>
-    </div>
+    <!-- Right column (WSJ-like stacked cards) -->
+    <section class="cards" id="cards"></section>
+  </section>
 
-    <div class="card">
-      <h2>What’s In a Name? A Truly Great Power Project</h2>
-      <p>SaskPower launches Great Plains Power Station to support rapid provincial growth.</p>
-      <a href="article.html?t=Great+Power+Project&d=SaskPower+adds+new+Great+Plains+Power+Station.&u=https://www.power-eng.com/news/saskpower-great-project&img=https://via.placeholder.com/600x400.png">Read more →</a>
-    </div>
-  </main>
+  <!-- Below the fold: two columns of minis -->
+  <section class="below">
+    <div class="two" id="twoCols"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">© 2025 PTD Today. Headlines link to their original publishers.</div>
+</footer>
+
+<script>
+/* ---------- Data & helpers ---------- */
+const FEEDS = [
+  "https://www.tdworld.com/rss",
+  "https://www.utilitydive.com/feeds/news/",
+  "https://feeds.reuters.com/reuters/energy",
+  "https://www.powermag.com/feed/",
+  "https://www.ieee-pes.org/feed/"
+];
+let shortMap = {}; // { originalLink: "slug" }
+
+const $ = (id)=>document.getElementById(id);
+const strip = (h)=>{ const d=document.createElement("div"); d.innerHTML=h; return d.textContent||d.innerText||""; };
+const ago = (date)=>{ const d=new Date(date); if(isNaN(d)) return ""; const s=(Date.now()-d)/1e3;
+  if(s<60) return "just now"; const m=Math.floor(s/60); if(m<60) return m+" min ago";
+  const h=Math.floor(m/60); if(h<24) return h+" h ago"; return Math.floor(h/24)+" d ago"; };
+
+async function loadShortMap(){
+  try{
+    const r=await fetch("data/shortlinks.json",{cache:"no-store"});
+    if(r.ok) shortMap = await r.json();
+  }catch(e){}
+}
+function internalURL(it){
+  const t=encodeURIComponent(it.title||""); const u=encodeURIComponent(it.link||"#");
+  const d=encodeURIComponent(strip(it.desc||"").slice(0,280));
+  const i=encodeURIComponent(it.img||""); const g=encodeURIComponent(it.tag||"news");
+  const p=encodeURIComponent(it.pubDate||"");
+  return `article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
+}
+function shareURL(it){
+  const slug = shortMap[it.link];
+  return slug ? `s/${slug}.html` : internalURL(it);
+}
+async function fetchRSS(url){
+  const prox="https://api.allorigins.win/raw?url="+encodeURIComponent(url);
+  const res=await fetch(prox); if(!res.ok) return [];
+  const text=await res.text(); const xml=new DOMParser().parseFromString(text,"text/xml");
+  return [...xml.querySelectorAll("item")].map(item=>{
+    const title=item.querySelector("title")?.textContent?.trim()||"";
+    const link=item.querySelector("link")?.textContent?.trim()||"#";
+    const pubDate=item.querySelector("pubDate")?.textContent||"";
+    const desc=item.querySelector("description")?.textContent||"";
+    const enc=item.querySelector("content\\:encoded")?.textContent||"";
+    const imgMatch=(enc||desc).match(/<img[^>]+src=["']([^"']+)["']/i);
+    const img=imgMatch?imgMatch[1]:"";
+    const k=(title+" "+desc).toLowerCase();
+    let tag="grid";
+    if(k.includes("substation")||k.includes("switchgear")) tag="substation";
+    else if(k.includes("relay")||k.includes("protection")||k.includes("iec")) tag="protection";
+    else if(k.includes("cable")||k.includes("hvdc")||k.includes("xlpe")) tag="cable";
+    else if(k.includes("policy")||k.includes("tariff")||k.includes("regulat")) tag="policy";
+    else if(k.includes("data center")||k.includes("datacenter")) tag="datacenter";
+    else if(k.includes("renewable")||k.includes("solar")||k.includes("wind")) tag="renewable";
+    return {title,link,pubDate,desc, img, tag};
+  });
+}
+async function getItems(){
+  const sets=await Promise.allSettled(FEEDS.map(fetchRSS));
+  const items=[]; for(const s of sets){ if(s.status==="fulfilled") items.push(...s.value); }
+  // de-dupe by link
+  const seen=new Set(); const uniq=[]; for(const it of items){ if(!seen.has(it.link)){ seen.add(it.link); uniq.push(it); } }
+  uniq.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
+  return uniq.slice(0,36);
+}
+
+/* ---------- Render ---------- */
+function renderLead(it){
+  $("leadTitle").textContent = it.title;
+  $("leadDek").textContent   = strip(it.desc).slice(0,240);
+  $("leadImg").src = it.img || "https://placehold.co/1200x650/png?text=PTD+Today";
+  $("leadMeta").textContent  = `${it.tag.toUpperCase()} • ${it.pubDate?ago(it.pubDate):""}`;
+  $("leadOpen").href   = internalURL(it);
+  $("leadSource").href = it.link;
+  $("leadShare").onclick = ()=>{
+    const u = (location.origin + "/" + shareURL(it)).replace(/\/+/g,"/");
+    if(navigator.share){ navigator.share({title:it.title, text: strip(it.desc).slice(0,160), url:u}).catch(()=>{}); }
+    else window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(u), "_blank");
+  };
+  // clicking image/title opens internal
+  $("leadTitle").onclick = ()=>location.href = internalURL(it);
+  $("leadImg").style.cursor="pointer";
+  $("leadImg").onclick = ()=>location.href = internalURL(it);
+}
+function renderCards(items){
+  const el=$("cards"); el.innerHTML="";
+  items.forEach(it=>{
+    const div=document.createElement("article");
+    div.className="card";
+    const internal = internalURL(it);
+    const share    = shareURL(it);
+    div.innerHTML = `
+      <h3><a href="${internal}">${it.title}</a></h3>
+      <img class="thumb" src="${it.img || ""}" alt="" ${it.img ? "" : "style='display:none'"} />
+      <div class="dek">${strip(it.desc).slice(0,160)}</div>
+      <div class="meta"><span class="chip">${it.tag}</span> · ${it.pubDate?ago(it.pubDate):""}</div>
+      <div class="row">
+        <a class="btn" href="${internal}">Open on PTD Today</a>
+        <button class="btn share">Share</button>
+        <a class="btn" href="${it.link}" target="_blank" rel="noopener">Source</a>
+      </div>
+    `;
+    div.querySelector(".share").onclick = ()=>{
+      const url=(location.origin + "/" + share).replace(/\/+/g,"/");
+      if(navigator.share){ navigator.share({title:it.title, text: strip(it.desc).slice(0,160), url:url}).catch(()=>{}); }
+      else window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(url),"_blank");
+    };
+    el.appendChild(div);
+  });
+}
+function renderTwoCols(items){
+  const el=$("twoCols"); el.innerHTML="";
+  const left  = items.filter((_,i)=>i%2===0);
+  const right = items.filter((_,i)=>i%2===1);
+  const col = (arr)=>{
+    const sec=document.createElement("div");
+    arr.forEach(it=>{
+      const a=document.createElement("article");
+      a.className="mini";
+      a.innerHTML = `
+        <h4><a href="${internalURL(it)}">${it.title}</a></h4>
+        <p>${strip(it.desc).slice(0,120)}</p>
+        <div class="meta"><span class="chip">${it.tag}</span> · ${it.pubDate?ago(it.pubDate):""}</div>
+      `;
+      sec.appendChild(a);
+    });
+    return sec;
+  };
+  el.appendChild(col(left));
+  el.appendChild(col(right));
+}
+
+async function main(){
+  await loadShortMap();
+  const items = await getItems();
+  if(!items.length){ $("leadTitle").textContent="No news available."; return; }
+  renderLead(items[0]);
+  renderCards(items.slice(1,9));
+  renderTwoCols(items.slice(9,25));
+  $("updated").textContent = "Updated — " + new Date().toLocaleString();
+}
+$("refresh").onclick = main;
+main();
+</script>
 </body>
 </html>
