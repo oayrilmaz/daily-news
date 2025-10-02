@@ -78,4 +78,3 @@ def collect():
                     if not published_dt.tzinfo: 
                         published_dt = published_dt.replace(tzinfo=timezone.utc)
                 except Exception:
-                    published_dt =_
