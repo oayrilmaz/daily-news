@@ -4,45 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Daily News</title>
-
-  <!-- Basic typography -->
   <style>
     :root { --max: 980px; --border:#dcdcdc; --muted:#555; }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #f7f7f7;
-      color: #111;
-      font-family: Georgia, "Times New Roman", serif;
-    }
-
-    header { text-align: center; padding: 24px 12px 10px; }
-    .short-title { margin: 0; font-size: 42px; font-weight: 700; }
-    .long-title  { margin: 6px 0 0; font-size: 18px; color: #666; font-weight: 400; }
-
-    main { max-width: var(--max); margin: 20px auto; padding: 0 16px; }
-    .news-item {
-      background: #fff; border: 1px solid var(--border);
-      padding: 14px 16px; margin: 14px 0;
-    }
-    .news-item h3 {
-      margin: 0 0 8px; font-size: 20px; font-weight: 700; line-height: 1.3;
-    }
-    .news-item h3 a { color: #000; text-decoration: none; }
-    .news-item h3 a:hover { text-decoration: underline; }
-    .meta { font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .4px; }
-    .summary { margin: 0; font-size: 14px; line-height: 1.5; color: #333; }
-
-    .sponsors { text-align: center; margin: 28px 0 8px; }
-    .dot-grid { display: inline-grid; grid-template-columns: repeat(2, 72px); gap: 16px; }
-    .dot {
-      width: 72px; height: 72px; border: 2px solid #000; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center; font-weight: 700;
-    }
-
-    footer {
-      text-align: center; margin: 14px 0 40px; color:#444; font-size: 15px;
-    }
+    body { margin:0; background:#f7f7f7; color:#111; font-family: Georgia, "Times New Roman", serif; }
+    header { text-align:center; padding:24px 12px 10px; }
+    .short-title { margin:0; font-size:42px; font-weight:700; }
+    .long-title  { margin:6px 0 0; font-size:18px; color:#666; font-weight:400; }
+    main { max-width:var(--max); margin:20px auto; padding:0 16px; }
+    h2.section { font-size:20px; margin:24px 0 10px; font-weight:700; }
+    .stamp { font-size:12px; color:#666; margin:0 0 12px; }
+    .news-item { background:#fff; border:1px solid var(--border); padding:14px 16px; margin:12px 0; }
+    .news-item h3 { margin:0 0 8px; font-size:20px; font-weight:700; line-height:1.3; }
+    .news-item h3 a { color:#000; text-decoration:none; }
+    .news-item h3 a:hover { text-decoration:underline; }
+    .meta { font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }
+    .summary { margin:0; font-size:14px; line-height:1.5; color:#333; }
+    .sponsors { text-align:center; margin:28px 0 8px; }
+    .dot-grid { display:inline-grid; grid-template-columns:repeat(2, 72px); gap:16px; }
+    .dot { width:72px; height:72px; border:2px solid #000; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; }
+    footer { text-align:center; margin:14px 0 40px; color:#444; font-size:15px; }
     footer a { color:#0b3d91; }
   </style>
 </head>
@@ -52,8 +33,16 @@
     <h2 class="long-title">Power Transmission &amp; Distribution Daily News</h2>
   </header>
 
-  <main id="feed">
-    <p>Loading today’s headlines…</p>
+  <main>
+    <!-- Latest -->
+    <h2 class="section">Latest (auto-updates every 3 hours)</h2>
+    <div id="stamp-latest" class="stamp"></div>
+    <div id="latest"><p>Loading…</p></div>
+
+    <!-- Trending -->
+    <h2 class="section">Trending today</h2>
+    <div id="stamp-trend" class="stamp"></div>
+    <div id="trending"><p>Loading…</p></div>
   </main>
 
   <section class="sponsors" aria-label="Sponsors">
@@ -64,42 +53,50 @@
   </section>
 
   <footer>
-    For sponsorship inquiries, contact: <a href="mailto:consultliftpro@hotmail.com">consultliftpro@hotmail.com</a>
+    For sponsorship inquiries: <a href="mailto:consultliftpro@hotmail.com">consultliftpro@hotmail.com</a>
   </footer>
 
   <script>
-    (async () => {
-      const feed = document.getElementById('feed');
-      try {
-        const res = await fetch('data/top.json?cachebust=' + Date.now());
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-
-        // Expecting structure: { generated_at_readable: "...", items: [ {title,url,source,published,summary} ] }
-        const items = Array.isArray(data.items) ? data.items : [];
-        if (items.length === 0) {
-          feed.innerHTML = '<p>No headlines available yet.</p>';
-          return;
-        }
-
-        feed.innerHTML = '';
-        for (const x of items) {
-          const div = document.createElement('div');
-          div.className = 'news-item';
-          const published = x.published ? new Date(x.published) : null;
-          const niceDate = published ? published.toLocaleString() : '';
-          div.innerHTML = `
-            <h3><a href="${x.url}" target="_blank" rel="noopener">${x.title}</a></h3>
-            <div class="meta">${x.source || ''}${niceDate ? ' — ' + niceDate : ''}</div>
-            <p class="summary">${x.summary ? x.summary : ''}</p>
-          `;
-          feed.appendChild(div);
-        }
-      } catch (err) {
-        console.error('Load error:', err);
-        feed.innerHTML = "<p>Could not load today's headlines.</p>";
+    function renderList(target, items) {
+      target.innerHTML = "";
+      if (!items || items.length === 0) {
+        target.innerHTML = "<p>No headlines available yet.</p>";
+        return;
       }
-    })();
+      items.forEach(x => {
+        const div = document.createElement("div");
+        div.className = "news-item";
+        const published = x.published ? new Date(x.published) : null;
+        const niceDate = published ? published.toLocaleString() : "";
+        div.innerHTML = `
+          <h3><a href="${x.url}" target="_blank" rel="noopener">${x.title}</a></h3>
+          <div class="meta">${x.source || ""}${niceDate ? " — " + niceDate : ""}</div>
+          <p class="summary">${x.summary ? x.summary : ""}</p>
+        `;
+        target.appendChild(div);
+      });
+    }
+
+    async function loadFeed(jsonPath, listEl, stampEl) {
+      try {
+        const res = await fetch(jsonPath + "?cachebust=" + Date.now());
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        renderList(listEl, data.items);
+        stampEl.textContent = data.generated_at_readable ? ("Updated " + data.generated_at_readable) : "";
+      } catch (e) {
+        console.error(e);
+        listEl.innerHTML = "<p>Could not load today’s headlines.</p>";
+      }
+    }
+
+    const latestEl = document.getElementById("latest");
+    const trendEl  = document.getElementById("trending");
+    const stampL   = document.getElementById("stamp-latest");
+    const stampT   = document.getElementById("stamp-trend");
+
+    loadFeed("data/top.json", latestEl, stampL);
+    loadFeed("data/trending.json", trendEl, stampT);
   </script>
 </body>
 </html>
