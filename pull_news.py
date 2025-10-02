@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import os, re, json, hashlib, urllib.parse, time
-from datetime import datetime, timezone
 from html import unescape
+from datetime import datetime
 
 import feedparser
 from bs4 import BeautifulSoup
 
-# ------------------ CONFIG ------------------
+# ---------- Config ----------
 FEEDS = [
     "https://www.tdworld.com/rss",
     "https://www.utilitydive.com/feeds/news/",
@@ -14,20 +14,18 @@ FEEDS = [
     "https://www.powermag.com/feed/",
     "https://www.ieee-pes.org/feed/"
 ]
-
-SHORT_DIR = "s"                        # where short HTML pages live
-LOOKUP_JSON = "data/shortlinks.json"   # original-link -> slug
-TOP_JSON = "data/top.json"             # optional list for debugging/other uses
-SITE_ORIGIN = "https://ptdtoday.com"   # used in generated short pages
-# -------------------------------------------
+SITE = "https://ptdtoday.com"
+SHORT_DIR = "s"
+LOOKUP_JSON = "data/shortlinks.json"
+TOP_JSON = "data/top.json"
+# ----------------------------
 
 def ensure_dir(p):
     if not os.path.isdir(p):
         os.makedirs(p, exist_ok=True)
 
 def strip_html(x):
-    if not x: return ""
-    return BeautifulSoup(x, "lxml").get_text(" ", strip=True)
+    return BeautifulSoup(x or "", "lxml").get_text(" ", strip=True)
 
 def find_img(html):
     if not html: return ""
@@ -39,34 +37,26 @@ def tag_for(title, desc):
     k = (title + " " + desc).lower()
     if any(w in k for w in ["substation","switchgear"]): return "substation"
     if any(w in k for w in ["relay","protection","iec"]): return "protection"
-    if any(w in k for w in ["cable","hvdc","xlpe"]): return "cable"
+    if any(w in k for w in ["cable","xlpe"]): return "cable"
+    if "hvdc" in k: return "hvdc"
     if any(w in k for w in ["policy","tariff","regulat"]): return "policy"
-    if any(w in k for w in ["data center","datacenter"]): return "datacenter"
     if any(w in k for w in ["renewable","solar","wind"]): return "renewable"
     return "grid"
 
 def fetch_items():
-    items = []
+    items=[]
     for url in FEEDS:
         f = feedparser.parse(url)
         for e in f.entries:
-            title = unescape(getattr(e, "title", "")).strip()
-            link  = getattr(e, "link", "").strip()
-            desc  = getattr(e, "summary", "") or getattr(e, "description", "")
-            desc  = unescape(desc)
+            title = unescape(getattr(e,"title","")).strip()
+            link  = getattr(e,"link","").strip()
+            if not title or not link: continue
+            desc = unescape(getattr(e,"summary","") or getattr(e,"description",""))
             content = ""
-            if hasattr(e, "content") and e.content:
+            if hasattr(e,"content") and e.content:
                 content = e.content[0].value or ""
             img = find_img(content) or find_img(desc)
-            pub = ""
-            if getattr(e, "published", ""):
-                pub = e.published
-            elif getattr(e, "updated", ""):
-                pub = e.updated
-
-            if not title or not link:
-                continue
-
+            pub = getattr(e, "published", "") or getattr(e, "updated", "")
             items.append({
                 "title": title,
                 "link": link,
@@ -75,53 +65,47 @@ def fetch_items():
                 "tag": tag_for(title, desc),
                 "pubDate": pub
             })
-    # de-dup by link, keep first (usually the newest sort later)
-    seen = set()
-    dedup = []
+    # de-dup by link, newest first
+    seen=set(); uniq=[]
     for it in items:
         if it["link"] in seen: continue
-        seen.add(it["link"]); dedup.append(it)
-
-    # sort newest first where possible
+        seen.add(it["link"]); uniq.append(it)
     def sort_key(it):
         try:
             return time.mktime(feedparser._parse_date(it["pubDate"]))
         except Exception:
             return 0
-    dedup.sort(key=sort_key, reverse=True)
-    return dedup[:60]   # cap
+    uniq.sort(key=sort_key, reverse=True)
+    return uniq[:60]
 
-def slugify(title, link):
-    base = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:40]
-    h = hashlib.blake2b(link.encode('utf-8'), digest_size=4).hexdigest()  # 8 chars
-    return f"{base}-{h}" if base else h
+def slug6(link:str)->str:
+    """Short 6-hex slug from link (stable)."""
+    return hashlib.blake2b(link.encode("utf-8"), digest_size=3).hexdigest()  # 6 hex chars
 
-def og_escape(s):
-    return (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").strip()
+def esc(s): return (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
-def build_article_url(it):
+def internal_article_url(it):
     t = urllib.parse.quote(it["title"], safe="")
     u = urllib.parse.quote(it["link"],  safe="")
     d = urllib.parse.quote(it["desc"],  safe="")
     i = urllib.parse.quote(it["img"] or "", safe="")
     g = urllib.parse.quote(it["tag"],  safe="")
     p = urllib.parse.quote(it["pubDate"] or "", safe="")
-    return f"{SITE_ORIGIN}/article.html?t={t}&u={u}&d={d}&i={i}&g={g}&p={p}"
+    return f"{SITE}/article.html?t={t}&u={u}&d={d}&i={i}&g={g}&p={p}"
 
-def build_short_page(slug, it):
-    og_title = og_escape(it["title"]) or "PTD Today"
-    og_desc  = og_escape(it["desc"])[:220]
-    og_img   = it["img"] if (it["img"] and it["img"].startswith("http")) else f"{SITE_ORIGIN}/logo.svg"
-    og_url   = f"{SITE_ORIGIN}/s/{slug}.html"
-    target   = build_article_url(it)
-
-    html = f"""<!DOCTYPE html><html lang="en"><head>
+def short_html(slug, it):
+    og_title = esc(it["title"]) or "PTD Today"
+    og_desc  = esc(it["desc"])[:220]
+    og_img   = it["img"] if (it["img"] and it["img"].startswith("http")) else f"{SITE}/logo.svg"
+    url_self = f"{SITE}/s/{slug}.html"
+    target   = internal_article_url(it)
+    return f"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
 <title>{og_title}</title>
 <meta property="og:title" content="{og_title}">
 <meta property="og:description" content="{og_desc}">
 <meta property="og:image" content="{og_img}">
-<meta property="og:url" content="{og_url}">
+<meta property="og:url" content="{url_self}">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
 <meta http-equiv="refresh" content="0; url={target}">
@@ -129,17 +113,16 @@ def build_short_page(slug, it):
 </head><body>
 <p>Redirecting to <a href="{target}">PTD Today</a>…</p>
 </body></html>"""
-    return html
 
 def build_shortlinks(items):
     ensure_dir(SHORT_DIR)
     ensure_dir(os.path.dirname(LOOKUP_JSON))
-    lookup = {}
+    lookup={}
     for it in items:
-        slug = slugify(it["title"], it["link"])
+        slug = slug6(it["link"])
         lookup[it["link"]] = slug
         with open(os.path.join(SHORT_DIR, f"{slug}.html"), "w", encoding="utf-8") as f:
-            f.write(build_short_page(slug, it))
+            f.write(short_html(slug, it))
     with open(LOOKUP_JSON, "w", encoding="utf-8") as f:
         json.dump(lookup, f, ensure_ascii=False, indent=2)
 
@@ -152,7 +135,7 @@ def main():
     items = fetch_items()
     write_top(items)
     build_shortlinks(items)
-    print(f"Generated {len(items)} items, shortlinks in /s, lookup at {LOOKUP_JSON}")
+    print(f"Built {len(items)} items; shortlinks in /s; lookup at {LOOKUP_JSON}")
 
 if __name__ == "__main__":
     main()
