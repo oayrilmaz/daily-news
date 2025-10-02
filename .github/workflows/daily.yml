@@ -1,17 +1,13 @@
 name: Daily Energy Headlines
 
 on:
-  # Runs every day at 10:30 UTC (≈ 6:30 AM Eastern during DST)
   schedule:
-    - cron: "30 10 * * *"
-  # Keep the manual button in Actions → “Run workflow”
+    - cron: "30 10 * * *"   # ~6:30 AM Eastern during DST
   workflow_dispatch: {}
 
-# Let this workflow push the generated files back to your repo
 permissions:
   contents: write
 
-# Avoid overlapping runs
 concurrency:
   group: daily-energy-headlines
   cancel-in-progress: true
@@ -25,14 +21,11 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       - name: Install dependencies
         run: |
@@ -49,3 +42,4 @@ jobs:
           git add data/top.json data/linkedin.txt
           git commit -m "daily: update headlines" || echo "No changes to commit"
           git push
+          
