@@ -1,63 +1,111 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8">
   <title>Daily Energy & Grid News</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#0b0f14;color:#e9eef5}
-    header,footer{background:#0e141b;border-bottom:1px solid #1e2a38}
-    .wrap{max-width:860px;margin:0 auto;padding:16px}
-    h1{margin:0;font-size:1.6rem}
-    .date{color:#9fb3c8;margin-top:6px}
-    .item{border:1px solid #1e2a38;background:#0e141b;border-radius:12px;padding:16px;margin:14px 0}
-    .item h2{margin:0 0 6px;font-size:1.12rem;line-height:1.35}
-    .meta{font-size:.9rem;color:#9fb3c8;margin:6px 0 10px}
-    a{color:#7cc4ff;text-decoration:none}
-    a:hover{text-decoration:underline}
-    .small{font-size:.9rem;color:#9fb3c8}
-    .box{border:1px dashed #2b3b52;border-radius:10px;padding:12px;margin-top:10px}
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #111;
+      color: #f0f0f0;
+    }
+    header {
+      background: #222;
+      padding: 20px;
+      text-align: center;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5em;
+    }
+    header p {
+      font-size: 0.9em;
+      color: #aaa;
+    }
+    .wrap {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+    .item {
+      background: #1c1c1c;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+    }
+    .item h2 {
+      margin: 0 0 5px;
+      font-size: 1.1em;
+    }
+    .item a {
+      color: #4db8ff;
+      text-decoration: none;
+    }
+    .item a:hover {
+      text-decoration: underline;
+    }
+    .meta {
+      font-size: 0.8em;
+      color: #bbb;
+      margin-bottom: 10px;
+    }
+    .footer {
+      text-align: center;
+      font-size: 0.9em;
+      margin: 40px 0;
+      color: #aaa;
+    }
+    .footer a {
+      color: #4db8ff;
+    }
   </style>
 </head>
 <body>
-  <header><div class="wrap">
-    <h1>Daily Energy &amp; Grid News</h1>
-    <div class="date" id="datestamp">Loading…</div>
-  </div></header>
+  <header>
+    <h1>Daily Energy & Grid News</h1>
+    <p id="datastamp">Loading…</p>
+  </header>
 
-  <main class="wrap" id="feed"></main>
+  <main class="wrap" id="feed">Loading headlines…</main>
 
-  <footer><div class="wrap small">
-    <div>Tip: copy the <a href="data/linkedin.txt" target="_blank">LinkedIn post</a>
- each morning.</div>
-  </div></footer>
+  <div class="footer">
+    Tip: copy the 
+    <a href="data/linkedin.txt" target="_blank">LinkedIn post</a>
+    each morning.
+  </div>
 
   <script>
     (async () => {
       try {
-        const r = await fetch('data/top.json?cachebust=' + Date.now());
+        const r = await fetch("data/top.json?cachebust=" + Date.now());
         const data = await r.json();
-        document.getElementById('datestamp').textContent = data.generated_at_readable || '';
-        const feed = document.getElementById('feed');
-        feed.innerHTML = '';
+        document.getElementById("datastamp").textContent =
+          data.generated_at_readable || "";
+
+        const feed = document.getElementById("feed");
+        feed.innerHTML = "";
 
         data.items.forEach(x => {
-          const div = document.createElement('div');
-          div.className = 'item';
+          const div = document.createElement("div");
+          div.className = "item";
           div.innerHTML = `
-            <h2><a href="${x.url}" rel="noopener" target="_blank">${x.title}</a></h2>
-            <div class="meta">${x.source} • ${new Date(x.published).toLocaleString()}</div>
-            <p>${x.summary || ''}</p>
+            <h2><a href="${x.url}" target="_blank">${x.title}</a></h2>
+            <div class="meta">${x.source} – ${new Date(x.published).toLocaleString()}</div>
+            <p>${x.summary || ""}</p>
           `;
           feed.appendChild(div);
         });
 
-        const box = document.createElement('div');
-        box.className = 'box';
-        box.innerHTML = `Want the LinkedIn text? <a href="/data/linkedin.txt" target="_blank">Open linkedin.txt</a>`;
-        feed.appendChild(box);
-      } catch(e) {
-        document.getElementById('feed').innerHTML = '<p>Could not load today’s headlines.</p>';
+        if (data.items.length === 0) {
+          feed.innerHTML = "<p>No headlines available yet.</p>";
+        }
+      } catch (e) {
+        document.getElementById("feed").innerHTML =
+          "<p>Could not load today’s headlines.</p>";
       }
     })();
   </script>
