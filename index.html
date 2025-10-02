@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>PTD Daily News</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Power Transmission & Distribution Daily News – daily updates on energy, power grids, AI datacenters, renewables, and more.">
+  <title>PTD Daily News</title>
   <style>
     body {
-      font-family: Georgia, 'Times New Roman', Times, serif;
-      background-color: #f9f9f9;
+      font-family: Georgia, "Times New Roman", serif;
+      background: #f9f9f9;
       margin: 0;
       padding: 0;
       color: #111;
@@ -16,145 +15,124 @@
 
     header {
       text-align: center;
-      padding: 25px 10px 10px;
-      border-bottom: 1px solid #ddd;
+      margin: 30px 10px;
     }
 
-    header h1 {
+    .short-title {
       font-size: 36px;
+      font-weight: 700;
       margin: 0;
-      font-weight: bold;
     }
 
-    header h2 {
-      font-size: 18px;
-      margin: 5px 0 0 0;
-      font-weight: normal;
-      color: #444;
-    }
-
-    .timestamp {
-      text-align: center;
-      font-size: 14px;
-      color: #666;
-      margin: 10px 0;
+    .long-title {
+      font-size: 16px;
+      font-weight: 400;
+      margin: 5px 0 0;
+      color: #555;
     }
 
     main {
       max-width: 800px;
       margin: 20px auto;
-      padding: 0 20px;
+      padding: 0 15px;
     }
 
     .article {
-      border-bottom: 1px solid #ddd;
-      padding: 15px 0;
-    }
-
-    .article:last-child {
-      border-bottom: none;
+      background: #fff;
+      border: 1px solid #ddd;
+      padding: 15px;
+      margin-bottom: 20px;
     }
 
     .article h3 {
+      margin: 0 0 10px;
       font-size: 20px;
+      font-weight: 700;
+      color: #000;
+    }
+
+    .article p {
       margin: 0;
-      font-weight: bold;
-      color: #003366;
-    }
-
-    .article h3 a {
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .article h3 a:hover {
-      text-decoration: underline;
-    }
-
-    .meta {
-      font-size: 13px;
-      color: #777;
-      margin: 4px 0 8px;
-    }
-
-    .summary {
-      font-size: 15px;
-      color: #222;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
     }
 
     footer {
       text-align: center;
+      margin: 30px 0;
       font-size: 14px;
-      padding: 20px;
-      margin-top: 30px;
-      border-top: 1px solid #ddd;
       color: #555;
     }
 
-    .sponsor-spots {
+    .sponsor-area {
+      margin: 20px 0;
       display: flex;
       justify-content: center;
       gap: 20px;
-      margin: 20px 0;
     }
 
-    .circle {
+    .sponsor-circle {
       width: 60px;
       height: 60px;
-      border: 1px solid #333;
+      border: 2px solid #000;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
       font-weight: bold;
-      color: #333;
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>PTD Daily News</h1>
-    <h2>Power Transmission & Distribution Daily News</h2>
+    <h1 class="short-title">PTD Daily News</h1>
+    <h2 class="long-title">Power Transmission & Distribution Daily News</h2>
   </header>
 
-  <div class="timestamp" id="timestamp"></div>
-
-  <main id="news">
-    <p>Loading news...</p>
+  <main id="news-container">
+    <p>Loading today’s headlines...</p>
   </main>
 
+  <div class="sponsor-area">
+    <div class="sponsor-circle">S1</div>
+    <div class="sponsor-circle">S2</div>
+  </div>
+
   <footer>
-    <div class="sponsor-spots">
-      <div class="circle">S1</div>
-      <div class="circle">S2</div>
-    </div>
-    <p>For sponsorship inquiries, contact: <a href="mailto:consultliftpro@hotmail.com">consultliftpro@hotmail.com</a></p>
+    For sponsorship inquiries, contact: 
+    <a href="mailto:consultliftpro@hotmail.com">consultliftpro@hotmail.com</a>
   </footer>
 
   <script>
     async function loadNews() {
-      const newsContainer = document.getElementById('news');
-      const timestamp = document.getElementById('timestamp');
       try {
-        const res = await fetch('news.json');
-        const articles = await res.json();
-        timestamp.textContent = new Date().toISOString().slice(0,16).replace("T"," ");
-        newsContainer.innerHTML = "";
-        articles.forEach(article => {
-          const div = document.createElement('div');
-          div.className = 'article';
-          div.innerHTML = `
-            <h3><a href="${article.link}" target="_blank">${article.title}</a></h3>
-            <div class="meta">${article.source} – ${article.published}</div>
-            <div class="summary">${article.summary}</div>
+        const response = await fetch('news.json');
+        const news = await response.json();
+        const container = document.getElementById('news-container');
+        container.innerHTML = '';
+
+        if (news.length === 0) {
+          container.innerHTML = '<p>No headlines available today.</p>';
+          return;
+        }
+
+        news.forEach(item => {
+          const article = document.createElement('div');
+          article.className = 'article';
+          article.innerHTML = `
+            <h3><a href="${item.link}" target="_blank">${item.title}</a></h3>
+            <p>${item.summary || ''}</p>
           `;
-          newsContainer.appendChild(div);
+          container.appendChild(article);
         });
       } catch (e) {
-        newsContainer.innerHTML = "<p>Could not load today's headlines.</p>";
+        document.getElementById('news-container').innerHTML = 
+          '<p>Could not load today’s headlines.</p>';
       }
     }
+
     loadNews();
   </script>
 </body>
