@@ -1,102 +1,447 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PTD Daily News</title>
+
+  <title>PTD Today | Power Transmission & Distribution Daily News</title>
+  <meta name="description" content="PTD Today delivers the latest headlines, insights, and updates across power transmission & distribution, HV substations, grid modernization, and energy technology." />
+  <meta name="theme-color" content="#ffffff" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="PTD Today | Power Transmission & Distribution Daily News" />
+  <meta property="og:description" content="Daily and near real-time headlines across T&D, HV substations, grid modernization, and energy technology." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://ptdtoday.com/" />
+
+  <!-- Favicons (optional) -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' font-size='36' font-family='Georgia,serif'%3EPTD%3C/text%3E%3C/svg%3E">
+
   <style>
-    :root { --max: 980px; --border:#dcdcdc; --muted:#555; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:#f7f7f7; color:#111; font-family: Georgia, "Times New Roman", serif; }
-    header { text-align:center; padding:24px 12px 10px; }
-    .short-title { margin:0; font-size:42px; font-weight:700; }
-    .long-title  { margin:6px 0 0; font-size:18px; color:#666; font-weight:400; }
-    main { max-width:var(--max); margin:20px auto; padding:0 16px; }
-    h2.section { font-size:20px; margin:24px 0 10px; font-weight:700; }
-    .stamp { font-size:12px; color:#666; margin:0 0 12px; }
-    .news-item { background:#fff; border:1px solid var(--border); padding:14px 16px; margin:12px 0; }
-    .news-item h3 { margin:0 0 8px; font-size:20px; font-weight:700; line-height:1.3; }
-    .news-item h3 a { color:#000; text-decoration:none; }
-    .news-item h3 a:hover { text-decoration:underline; }
-    .meta { font-size:12px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.4px; }
-    .summary { margin:0; font-size:14px; line-height:1.5; color:#333; }
-    .sponsors { text-align:center; margin:28px 0 8px; }
-    .dot-grid { display:inline-grid; grid-template-columns:repeat(2, 72px); gap:16px; }
-    .dot { width:72px; height:72px; border:2px solid #000; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; }
-    footer { text-align:center; margin:14px 0 40px; color:#444; font-size:15px; }
-    footer a { color:#0b3d91; }
+    :root{
+      --ink:#111;
+      --ink-2:#333;
+      --ink-3:#555;
+      --line:#e5e5e5;
+      --bg:#fff;
+      --accent:#000; /* keep monochrome */
+      --maxw:1150px;
+    }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);}
+    body{
+      font-family: "Helvetica Neue", Arial, system-ui, -apple-system, Segoe UI, Roboto, "Liberation Sans", sans-serif;
+      line-height:1.5;
+    }
+    /* “WSJ-like” feel: serif headlines, crisp body, tight leading and generous whitespace */
+    .serif{font-family: Georgia, "Times New Roman", Times, serif;}
+    .wrap{max-width:var(--maxw); margin:0 auto; padding:0 16px;}
+
+    /* Masthead */
+    header{
+      border-bottom:1px solid var(--line);
+      padding:18px 0 10px;
+    }
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+    }
+    .brand{
+      display:flex; align-items:center; gap:14px;
+    }
+    .brand-mark{
+      width:44px; height:44px; border:2px solid var(--ink); border-radius:50%;
+      display:grid; place-items:center; font-weight:700; letter-spacing:0.5px;
+      font-family: Georgia, serif;
+    }
+    .brand-title{
+      font-size:34px; letter-spacing:0.5px; font-weight:700; color:var(--ink); text-transform:uppercase;
+      font-family: Georgia, "Times New Roman", Times, serif;
+    }
+    .brand-sub{
+      font-size:13px; color:var(--ink-3); margin-top:2px;
+    }
+    /* Tiny sponsor circles (S1, S2) — boxed area but minimal, no colors */
+    .sponsor-mini{
+      display:flex; align-items:center; gap:10px;
+    }
+    .pill{
+      width:40px; height:40px; border:1.5px solid var(--ink); border-radius:50%;
+      display:grid; place-items:center; font-weight:700; font-family: Georgia, serif;
+    }
+    .sponsor-line{
+      font-size:12px; color:var(--ink-3); text-align:right;
+    }
+
+    nav{
+      border-top:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+      padding:8px 0;
+      margin-top:10px;
+      font-size:13px;
+      color:var(--ink-2);
+    }
+    nav .row{
+      display:flex; gap:14px; flex-wrap:wrap;
+    }
+    nav a{
+      color:inherit; text-decoration:none; padding:4px 0;
+    }
+    nav a:hover{ text-decoration:underline; }
+
+    /* Layout */
+    .grid{
+      display:grid; gap:22px; grid-template-columns: 1.6fr 1fr;
+      padding:20px 0 28px;
+    }
+    .lead{
+      border-right:1px solid var(--line); padding-right:22px;
+    }
+    .lead h1{
+      font-size:40px; line-height:1.1; margin:8px 0 8px; font-weight:700;
+    }
+    .lead .dek{
+      font-size:17px; color:var(--ink-2); margin-bottom:14px;
+      font-family: Georgia, serif;
+    }
+    .meta{
+      font-size:12px; color:var(--ink-3); margin-bottom:16px;
+    }
+    .lead img{
+      width:100%; height: auto; display:block; border:1px solid var(--line);
+    }
+
+    .cards{
+      display:grid; gap:18px; grid-template-columns:1fr 1fr;
+    }
+    .card{
+      border-top:1px solid var(--line); padding-top:12px;
+    }
+    .card h3{
+      font-family: Georgia, serif; font-size:20px; line-height:1.18; margin:6px 0;
+    }
+    .card p{ font-size:14px; color:var(--ink-2); margin:6px 0 8px; }
+    .card a{ color:var(--ink); text-decoration:none; }
+    .card a:hover{ text-decoration:underline; }
+
+    /* Sidebar */
+    .sidebar section{
+      border-bottom:1px solid var(--line);
+      padding-bottom:14px; margin-bottom:14px;
+    }
+    .sidebar h4{
+      font-family: Georgia, serif; margin:0 0 8px; font-size:18px;
+    }
+    .list{
+      list-style:none; margin:0; padding:0; font-size:14px;
+    }
+    .list li{ padding:8px 0; border-top:1px solid var(--line); }
+    .list a{ color:var(--ink); text-decoration:none; }
+    .list a:hover{ text-decoration:underline; }
+    .chip{
+      font-size:11px; border:1px solid var(--line); padding:2px 6px; border-radius:10px; color:var(--ink-3);
+    }
+
+    /* Tools row */
+    .tools{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:6px 0 0;
+    }
+    button.min{
+      appearance:none; border:1px solid var(--line); background:#fafafa; color:var(--ink);
+      font-size:12px; padding:6px 10px; border-radius:6px; cursor:pointer;
+    }
+    button.min:hover{ background:#f2f2f2; }
+
+    footer{
+      border-top:1px solid var(--line);
+      padding:18px 0 40px; font-size:12px; color:var(--ink-3);
+    }
+    .muted{ color:var(--ink-3); }
+
+    @media (max-width: 900px){
+      .grid{ grid-template-columns:1fr; }
+      .lead{ border-right:none; padding-right:0; }
+      .cards{ grid-template-columns:1fr; }
+      .brand-title{ font-size:28px; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1 class="short-title">PTD Daily News</h1>
-    <h2 class="long-title">Power Transmission &amp; Distribution Daily News</h2>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <div class="brand-mark">PTD</div>
+          <div>
+            <div class="brand-title serif">PTD Today</div>
+            <div class="brand-sub">Power Transmission &amp; Distribution Daily News</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="sponsor-mini">
+            <div class="pill">S1</div>
+            <div class="pill">S2</div>
+          </div>
+          <div class="sponsor-line">Sponsored content</div>
+        </div>
+      </div>
+
+      <nav>
+        <div class="row">
+          <a href="#">Grid &amp; HV</a>
+          <a href="#">Substations</a>
+          <a href="#">Protection</a>
+          <a href="#">Switchgear</a>
+          <a href="#">Cables</a>
+          <a href="#">Renewables</a>
+          <a href="#">Data Centers</a>
+          <a href="#">Policy &amp; Tariffs</a>
+          <a href="#">Jobs</a>
+          <span class="tools">
+            <button class="min" id="refreshNow">Refresh Now</button>
+            <span class="chip" id="lastUpdated">Updated: —</span>
+            <span class="chip">Auto: 3h</span>
+          </span>
+        </div>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <!-- Latest -->
-    <h2 class="section">Latest (auto-updates every 3 hours)</h2>
-    <div id="stamp-latest" class="stamp"></div>
-    <div id="latest"><p>Loading…</p></div>
+  <main class="wrap">
+    <div class="grid">
+      <!-- Lead column -->
+      <div class="lead">
+        <article id="lead">
+          <div class="meta serif">Top Story</div>
+          <h1 class="serif" id="leadTitle">Latest in Transmission &amp; Distribution</h1>
+          <p class="dek" id="leadDek">Daily coverage of grid projects, HV substations, cable systems, protection &amp; control, and energy policy shaping tomorrow’s networks.</p>
+          <img id="leadImg" alt="Lead image" src="https://placehold.co/1200x650/png?text=PTD+Today" />
+          <div class="meta" id="leadMeta">Published —</div>
+        </article>
 
-    <!-- Trending -->
-    <h2 class="section">Trending today</h2>
-    <div id="stamp-trend" class="stamp"></div>
-    <div id="trending"><p>Loading…</p></div>
+        <section style="margin-top:22px">
+          <div class="cards" id="storyGrid">
+            <!-- auto stories here -->
+          </div>
+        </section>
+      </div>
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <section>
+          <h4>Most Read</h4>
+          <ol class="list" id="mostRead">
+            <!-- populated from localStorage clicks -->
+          </ol>
+        </section>
+
+        <section>
+          <h4>Quick Filters</h4>
+          <div class="tools">
+            <button class="min" data-filter="grid">Grid</button>
+            <button class="min" data-filter="substation">Substations</button>
+            <button class="min" data-filter="protection">Protection</button>
+            <button class="min" data-filter="cable">Cables</button>
+            <button class="min" data-filter="policy">Policy</button>
+            <button class="min" data-filter="datacenter">Data Centers</button>
+            <button class="min" data-filter="renewable">Renewables</button>
+            <button class="min" id="clearFilter">All</button>
+          </div>
+        </section>
+
+        <section>
+          <h4>About</h4>
+          <p class="muted">PTD Today delivers concise coverage across Power T&amp;D — refreshed daily (and typically every 3 hours).</p>
+        </section>
+      </aside>
+    </div>
   </main>
 
-  <section class="sponsors" aria-label="Sponsors">
-    <div class="dot-grid">
-      <div class="dot" title="Sponsor 1">S1</div>
-      <div class="dot" title="Sponsor 2">S2</div>
-    </div>
-  </section>
-
   <footer>
-    For sponsorship inquiries: <a href="mailto:consultliftpro@hotmail.com">consultliftpro@hotmail.com</a>
+    <div class="wrap">
+      <div>© 2025 PTD Today. All rights reserved.</div>
+      <div class="muted">Headlines sourced from public publisher RSS feeds; links open to original sources.</div>
+    </div>
   </footer>
 
   <script>
-    function renderList(target, items) {
-      target.innerHTML = "";
-      if (!items || items.length === 0) {
-        target.innerHTML = "<p>No headlines available yet.</p>";
-        return;
+    /**
+     * NEWS ENGINE (client-side)
+     * - Pulls from selected RSS feeds using a CORS-friendly proxy (allorigins)
+     * - Merges, sorts by date, fills lead + grid
+     * - Auto refresh every 3 hours
+     * - Tracks "Most Read" by click (localStorage)
+     *
+     * Note: Some publishers may block client-side CORS. If any feed doesn’t load,
+     * run the same fetch through a tiny serverless proxy (Node/Cloudflare Workers).
+     */
+
+    const FEEDS = [
+      // Feel free to add/remove:
+      "https://www.tdworld.com/rss",                  // T&D World
+      "https://www.utilitydive.com/feeds/news/",      // Utility Dive: Power
+      "https://feeds.reuters.com/reuters/energy",     // Reuters Energy
+      "https://www.powermag.com/feed/",               // POWER Magazine
+      "https://www.ieee-pes.org/feed/"                // IEEE PES (general updates)
+    ];
+
+    const state = {
+      filter: null,
+      items: []
+    };
+
+    const el = (id)=>document.getElementById(id);
+
+    function timeAgo(date){
+      const d = new Date(date);
+      if (isNaN(d)) return "";
+      const diff = (Date.now() - d.getTime())/1000;
+      if (diff < 60) return "just now";
+      const m = Math.floor(diff/60);
+      if (m < 60) return m + " min ago";
+      const h = Math.floor(m/60);
+      if (h < 24) return h + " h ago";
+      const days = Math.floor(h/24);
+      return days + " d ago";
+    }
+
+    async function fetchRSS(url){
+      const prox = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+      const res = await fetch(prox);
+      if (!res.ok) throw new Error("Feed error " + url);
+      const text = await res.text();
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, "text/xml");
+      const items = [...xml.querySelectorAll("item")].map(item=>{
+        const title = item.querySelector("title")?.textContent?.trim() || "";
+        const link = item.querySelector("link")?.textContent?.trim() || "#";
+        const pubDate = item.querySelector("pubDate")?.textContent || item.querySelector("dc\\:date")?.textContent || "";
+        const desc = item.querySelector("description")?.textContent || "";
+        const content = item.querySelector("content\\:encoded")?.textContent || "";
+        // pull first image if present
+        const imgMatch = (content || desc).match(/<img[^>]+src=["']([^"']+)["']/i);
+        const img = imgMatch ? imgMatch[1] : null;
+
+        // naive tag inference by keywords
+        const cats = (item.querySelectorAll("category") || []);
+        const tags = [...cats].map(c=>c.textContent.toLowerCase());
+        const k = (title + " " + desc).toLowerCase();
+        const inferred = [];
+        if (k.includes("substation") || k.includes("gis") || k.includes("switchgear")) inferred.push("substation");
+        if (k.includes("line") || k.includes("transmission") || k.includes("hv") || k.includes("ohl")) inferred.push("grid");
+        if (k.includes("relay") || k.includes("protection") || k.includes("iec") || k.includes("iec 61850")) inferred.push("protection");
+        if (k.includes("cable") || k.includes("xlpe") || k.includes("hvdc")) inferred.push("cable");
+        if (k.includes("policy") || k.includes("tariff") || k.includes("fta") || k.includes("regulat")) inferred.push("policy");
+        if (k.includes("data center") || k.includes("datacenter")) inferred.push("datacenter");
+        if (k.includes("renewable") || k.includes("solar") || k.includes("wind")) inferred.push("renewable");
+
+        return {
+          title, link, pubDate, desc, img,
+          tag: (tags[0] || inferred[0] || "grid")
+        };
+      });
+      return items;
+    }
+
+    async function fetchAll(){
+      const batches = await Promise.allSettled(FEEDS.map(fetchRSS));
+      const items = [];
+      for (const b of batches){
+        if (b.status === "fulfilled") items.push(...b.value);
       }
-      items.forEach(x => {
+      // sort by date desc
+      items.sort((a,b)=> new Date(b.pubDate) - new Date(a.pubDate));
+      state.items = items.slice(0, 24);
+      render();
+      el("lastUpdated").textContent = "Updated: " + new Date().toLocaleString();
+    }
+
+    function render(){
+      // apply filter
+      const items = state.filter ? state.items.filter(i => i.tag === state.filter) : state.items;
+
+      // Lead
+      if (items[0]){
+        el("leadTitle").textContent = items[0].title || "PTD Today";
+        el("leadDek").textContent = strip(items[0].desc).slice(0,180) || "Latest updates across power T&D.";
+        el("leadImg").src = items[0].img || "https://placehold.co/1200x650/png?text=PTD+Today";
+        el("leadMeta").textContent = (items[0].tag.toUpperCase()) + " • " + (items[0].pubDate ? timeAgo(items[0].pubDate) : "");
+        el("leadTitle").parentElement.onclick = ()=> trackClick(items[0]);
+        el("leadTitle").parentElement.style.cursor = "pointer";
+        el("leadTitle").parentElement.addEventListener("click", ()=> window.open(items[0].link, "_blank"));
+      }
+
+      // Grid
+      const grid = el("storyGrid");
+      grid.innerHTML = "";
+      items.slice(1).forEach(it=>{
         const div = document.createElement("div");
-        div.className = "news-item";
-        const published = x.published ? new Date(x.published) : null;
-        const niceDate = published ? published.toLocaleString() : "";
+        div.className = "card";
         div.innerHTML = `
-          <h3><a href="${x.url}" target="_blank" rel="noopener">${x.title}</a></h3>
-          <div class="meta">${x.source || ""}${niceDate ? " — " + niceDate : ""}</div>
-          <p class="summary">${x.summary ? x.summary : ""}</p>
+          <a href="${it.link}" target="_blank" rel="noopener">
+            <h3>${escapeHTML(it.title)}</h3>
+          </a>
+          <p>${escapeHTML(strip(it.desc).slice(0,140))}</p>
+          <div class="meta"><span class="chip">${it.tag}</span> · ${it.pubDate ? timeAgo(it.pubDate) : ""}</div>
         `;
-        target.appendChild(div);
+        div.querySelector("a").addEventListener("click", ()=> trackClick(it));
+        grid.appendChild(div);
+      });
+
+      renderMostRead();
+    }
+
+    function renderMostRead(){
+      const box = el("mostRead");
+      const data = JSON.parse(localStorage.getItem("ptd_most")||"[]");
+      // sort by clicks desc
+      data.sort((a,b)=> b.c - a.c);
+      box.innerHTML = "";
+      data.slice(0,8).forEach(d=>{
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${d.l}" target="_blank" rel="noopener">${escapeHTML(d.t)}</a>
+                        <div class="meta">${d.c} reads</div>`;
+        li.querySelector("a").addEventListener("click", ()=> trackClick({title:d.t, link:d.l}));
+        box.appendChild(li);
       });
     }
 
-    async function loadFeed(jsonPath, listEl, stampEl) {
-      try {
-        const res = await fetch(jsonPath + "?cachebust=" + Date.now());
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
-        renderList(listEl, data.items);
-        stampEl.textContent = data.generated_at_readable ? ("Updated " + data.generated_at_readable) : "";
-      } catch (e) {
-        console.error(e);
-        listEl.innerHTML = "<p>Could not load today’s headlines.</p>";
-      }
+    function trackClick(item){
+      const key = "ptd_most";
+      const arr = JSON.parse(localStorage.getItem(key)||"[]");
+      const i = arr.findIndex(x=> x.l === item.link);
+      if (i >= 0) arr[i].c += 1;
+      else arr.push({t:item.title, l:item.link, c:1});
+      localStorage.setItem(key, JSON.stringify(arr));
+      renderMostRead();
     }
 
-    const latestEl = document.getElementById("latest");
-    const trendEl  = document.getElementById("trending");
-    const stampL   = document.getElementById("stamp-latest");
-    const stampT   = document.getElementById("stamp-trend");
+    function strip(html){
+      const tmp = document.createElement("div");
+      tmp.innerHTML = html;
+      return tmp.textContent || tmp.innerText || "";
+    }
+    function escapeHTML(s){
+      return s.replace(/[&<>"']/g, m => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+      }[m]));
+    }
 
-    loadFeed("data/top.json", latestEl, stampL);
-    loadFeed("data/trending.json", trendEl, stampT);
+    // UI hooks
+    document.getElementById("refreshNow").addEventListener("click", fetchAll);
+    document.querySelectorAll("[data-filter]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        state.filter = btn.getAttribute("data-filter");
+        render();
+      });
+    });
+    document.getElementById("clearFilter").addEventListener("click", ()=>{
+      state.filter = null; render();
+    });
+
+    // Boot
+    fetchAll();
+    // Auto refresh every 3 hours (3*60*60*1000)
+    setInterval(fetchAll, 10800000);
   </script>
 </body>
 </html>
