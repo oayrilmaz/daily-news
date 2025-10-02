@@ -4,14 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today | Power Transmission & Distribution Daily News</title>
-  <meta name="description" content="PTD Today delivers the latest headlines, insights, and updates across power transmission & distribution, HV substations, grid modernization, and energy technology." />
-  <meta name="theme-color" content="#ffffff" />
-  <meta property="og:title" content="PTD Today | Power Transmission & Distribution Daily News" />
-  <meta property="og:description" content="Daily and near real-time headlines across T&D, HV substations, grid modernization, and energy technology." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://ptdtoday.com/" />
+  <meta name="description" content="PTD Today delivers the latest headlines, insights, and updates across power transmission & distribution, HV substations, grid modernization, and energy technology.">
+  <meta name="theme-color" content="#ffffff">
+  <meta property="og:title" content="PTD Today | Power Transmission & Distribution Daily News">
+  <meta property="og:description" content="Daily and near real-time headlines across T&D, HV substations, grid modernization, and energy technology.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ptdtoday.com/">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' font-size='36' font-family='Georgia,serif'%3EPTD%3C/text%3E%3C/svg%3E">
-
   <style>
     :root{--ink:#111;--ink-2:#333;--ink-3:#555;--line:#e5e5e5;--bg:#fff;--maxw:1150px;}
     body{margin:0;background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Arial,system-ui,sans-serif;line-height:1.5;}
@@ -34,7 +33,6 @@
     button.min{border:1px solid var(--line);background:#fafafa;color:var(--ink);font-size:12px;padding:6px 10px;border-radius:6px;cursor:pointer}
     button.min:hover{background:#f2f2f2}
     .tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 0;}
-
     .grid{display:grid;gap:22px;grid-template-columns:1.6fr 1fr;padding:20px 0 28px;}
     .lead{border-right:1px solid var(--line);padding-right:22px;}
     .lead h1{font-size:40px;line-height:1.1;margin:8px 0;font-weight:700;}
@@ -48,7 +46,6 @@
     .card a{color:var(--ink);text-decoration:none;}
     .card a:hover{text-decoration:underline;}
     .card .row{display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap}
-
     .sidebar section{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:14px;}
     .sidebar h4{font-family:Georgia,serif;margin:0 0 8px;font-size:18px;}
     .list{list-style:none;margin:0;padding:0;font-size:14px;}
@@ -97,7 +94,6 @@
         <img id="leadImg" alt="Lead image" src="https://placehold.co/1200x650/png?text=PTD+Today" />
         <div class="meta" id="leadMeta">Published —</div>
       </article>
-
       <section style="margin-top:22px">
         <div class="cards" id="storyGrid"></div>
       </section>
@@ -146,7 +142,6 @@
   ];
   const state = { filter:null, items:[] };
   let shortMap = {}; // originalLink -> slug
-
   const el = (id)=>document.getElementById(id);
 
   function timeAgo(date){ const d=new Date(date); if(isNaN(d)) return ""; const diff=(Date.now()-d)/1000;
@@ -157,7 +152,7 @@
 
   async function loadShortMap(){
     try{
-      const r = await fetch("/data/shortlinks.json", {cache:"no-store"});
+      const r = await fetch("data/shortlinks.json", {cache:"no-store"});
       if (r.ok) shortMap = await r.json();
     }catch(e){}
   }
@@ -204,11 +199,12 @@
     const i=encodeURIComponent(it.img||"");
     const g=encodeURIComponent(it.tag||"news");
     const p=encodeURIComponent(it.pubDate||"");
-    return `/article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
+    // NOTE: relative path (no leading slash) to avoid 404s
+    return `article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
   }
   function shortShareURL(it){
     const slug = shortMap[it.link];
-    return slug ? `/s/${slug}.html` : internalArticleURL(it);
+    return slug ? `s/${slug}.html` : internalArticleURL(it);
   }
 
   function render(){
@@ -231,9 +227,7 @@
       const div=document.createElement("div"); div.className="card";
       const internal=internalArticleURL(it);
       div.innerHTML = `
-        <a href="${internal}" rel="noopener">
-          <h3>${escapeHTML(it.title)}</h3>
-        </a>
+        <a href="${internal}" rel="noopener"><h3>${escapeHTML(it.title)}</h3></a>
         <p>${escapeHTML(strip(it.desc).slice(0,140))}</p>
         <div class="meta"><span class="chip">${it.tag}</span> · ${it.pubDate?timeAgo(it.pubDate):""}</div>
         <div class="row">
@@ -244,7 +238,7 @@
       `;
       const shareBtn=div.querySelector("button.min");
       shareBtn.addEventListener("click", ()=>{
-        const share = location.origin + shortShareURL(it);
+        const share = (location.origin + "/" + shortShareURL(it)).replace(/\/+/g,"/");
         const text  = strip(it.desc||"").slice(0,160);
         if(navigator.share){ navigator.share({title:it.title,text,url:share}).catch(()=>{}); }
         else{
@@ -252,26 +246,8 @@
           window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`,"_blank");
         }
       });
-      div.querySelectorAll("a").forEach(a=>a.addEventListener("click", ()=>trackClick(it)));
       grid.appendChild(div);
     });
-    renderMostRead();
-  }
-
-  function renderMostRead(){
-    const box=el("mostRead"); const data=JSON.parse(localStorage.getItem("ptd_most")||"[]");
-    data.sort((a,b)=>b.c-a.c); box.innerHTML="";
-    data.slice(0,8).forEach(d=>{
-      const internal=`/article.html?t=${encodeURIComponent(d.t)}&u=${encodeURIComponent(d.l)}`;
-      const li=document.createElement("li");
-      li.innerHTML=`<a href="${internal}">${escapeHTML(d.t)}</a><div class="meta">${d.c} reads</div>`;
-      box.appendChild(li);
-    });
-  }
-  function trackClick(item){
-    const key="ptd_most"; const arr=JSON.parse(localStorage.getItem(key)||"[]");
-    const i=arr.findIndex(x=>x.l===item.link); if(i>=0) arr[i].c+=1; else arr.push({t:item.title,l:item.link,c:1});
-    localStorage.setItem(key, JSON.stringify(arr));
   }
 
   document.getElementById("refreshNow").addEventListener("click", fetchAll);
