@@ -1,0 +1,22 @@
+name: Daily Energy Headlines
+on:
+  schedule:
+    - cron: "15 9 * * *"   # 09:15 UTC ~ 05:15 ET. Change time if you want.
+  workflow_dispatch: {}     # lets you run it manually the first time
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install feedparser python-dateutil beautifulsoup4 html5lib
+      - run: python pull_news.py
+      - name: Commit & push generated data
+        run: |
+          git config user.name "news-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/top.json data/linkedin.txt
+          git commit -m "daily: update headlines" || echo "No changes to commit"
+          git push
