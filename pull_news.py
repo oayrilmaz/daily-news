@@ -1,245 +1,158 @@
-import os, json, time, re, hashlib
+#!/usr/bin/env python3
+import os, re, json, hashlib, urllib.parse, time
 from datetime import datetime, timezone
-from urllib.parse import quote_plus
+from html import unescape
 
 import feedparser
-import requests
 from bs4 import BeautifulSoup
-from dateutil import parser as dtp
 
-OUT_DIR = "data"
-TOP_PATH = os.path.join(OUT_DIR, "top.json")
-TREND_PATH = os.path.join(OUT_DIR, "trending.json")
-
-os.makedirs(OUT_DIR, exist_ok=True)
-
-USER_AGENT = "Mozilla/5.0 (compatible; PTDNewsBot/1.0; +https://consultlift.com)"
-
-# ---------------------------------------------
-# Helpers
-# ---------------------------------------------
-def now_iso():
-    return datetime.now(timezone.utc).isoformat()
-
-def clean_text(x):
-    if not x:
-        return ""
-    return re.sub(r"\s+", " ", BeautifulSoup(x, "html5lib").get_text(" ", strip=True))
-
-def hash_key(title, url):
-    return hashlib.sha1((title.strip() + "|" + url.strip()).encode("utf-8")).hexdigest()
-
-def fix_date(dtstr):
-    if not dtstr:
-        return None
-    try:
-        d = dtp.parse(dtstr)
-        if not d.tzinfo:
-            d = d.replace(tzinfo=timezone.utc)
-        return d
-    except Exception:
-        return None
-
-def to_item(title, url, source, published=None, summary=None, score=0):
-    return {
-        "title": clean_text(title)[:300],
-        "url": url,
-        "source": source,
-        "published": (published or datetime.now(timezone.utc)).isoformat(),
-        "summary": clean_text(summary)[:600] if summary else "",
-        "score": score,
-    }
-
-# ---------------------------------------------
-# Sources
-# ---------------------------------------------
-def google_news_queries():
-    base = "https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q="
-    queries = [
-        "power+transmission+when:24h",
-        "power+distribution+when:24h",
-        "electric+grid+when:24h",
-        "renewable+energy+grid+when:24h",
-        "wind+power+grid+when:24h",
-        "ai+data+center+energy+when:24h",
-        "utility+power+when:24h",
-    ]
-    return [base + q for q in queries]
-
-RSS_SOURCES = [
-    # Good industry feeds
-    "https://www.tdworld.com/rss.xml",
-    "https://www.power-technology.com/feed/",
-    "https://www.offshorewind.biz/feed/",
-    # Google News queries
-    *google_news_queries(),
+# ------------------ CONFIG ------------------
+FEEDS = [
+    "https://www.tdworld.com/rss",
+    "https://www.utilitydive.com/feeds/news/",
+    "https://feeds.reuters.com/reuters/energy",
+    "https://www.powermag.com/feed/",
+    "https://www.ieee-pes.org/feed/"
 ]
 
-# Popularity sources (provide scores or “trending” feel)
-def reddit_jsons():
-    subs = ["energy", "renewableenergy", "technology"]
-    return [f"https://www.reddit.com/r/{s}/top/.json?t=day&limit=25" for s in subs]
+SHORT_DIR = "s"                        # where short HTML pages live
+LOOKUP_JSON = "data/shortlinks.json"   # original-link -> slug
+TOP_JSON = "data/top.json"             # optional list for debugging/other uses
+SITE_ORIGIN = "https://ptdtoday.com"   # used in generated short pages
+# -------------------------------------------
 
-HN_RSS = "https://hnrss.org/frontpage"
+def ensure_dir(p):
+    if not os.path.isdir(p):
+        os.makedirs(p, exist_ok=True)
 
-# ---------------------------------------------
-# Harvesting
-# ---------------------------------------------
-def harvest_rss(url):
+def strip_html(x):
+    if not x: return ""
+    return BeautifulSoup(x, "lxml").get_text(" ", strip=True)
+
+def find_img(html):
+    if not html: return ""
+    soup = BeautifulSoup(html, "lxml")
+    img = soup.find("img")
+    return img["src"] if img and img.has_attr("src") else ""
+
+def tag_for(title, desc):
+    k = (title + " " + desc).lower()
+    if any(w in k for w in ["substation","switchgear"]): return "substation"
+    if any(w in k for w in ["relay","protection","iec"]): return "protection"
+    if any(w in k for w in ["cable","hvdc","xlpe"]): return "cable"
+    if any(w in k for w in ["policy","tariff","regulat"]): return "policy"
+    if any(w in k for w in ["data center","datacenter"]): return "datacenter"
+    if any(w in k for w in ["renewable","solar","wind"]): return "renewable"
+    return "grid"
+
+def fetch_items():
     items = []
-    d = feedparser.parse(url)
-    for e in d.entries:
-        title = e.get("title") or ""
-        link = e.get("link") or ""
-        if not title or not link:
-            continue
-        source = d.feed.get("title") or "RSS"
-        published = None
-        for k in ("published_parsed", "updated_parsed", "created_parsed"):
-            if e.get(k):
-                published = datetime.fromtimestamp(time.mktime(e[k]), tz=timezone.utc)
-                break
-        if not published:
-            published = fix_date(e.get("published") or e.get("updated") or e.get("created"))
+    for url in FEEDS:
+        f = feedparser.parse(url)
+        for e in f.entries:
+            title = unescape(getattr(e, "title", "")).strip()
+            link  = getattr(e, "link", "").strip()
+            desc  = getattr(e, "summary", "") or getattr(e, "description", "")
+            desc  = unescape(desc)
+            content = ""
+            if hasattr(e, "content") and e.content:
+                content = e.content[0].value or ""
+            img = find_img(content) or find_img(desc)
+            pub = ""
+            if getattr(e, "published", ""):
+                pub = e.published
+            elif getattr(e, "updated", ""):
+                pub = e.updated
 
-        summary = e.get("summary") or e.get("description") or ""
-        items.append(to_item(title, link, source, published, summary))
-    return items
-
-def harvest_reddit(url):
-    items = []
-    try:
-        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
-        r.raise_for_status()
-        data = r.json()
-        for child in data.get("data", {}).get("children", []):
-            d = child.get("data", {})
-            title = d.get("title")
-            link = d.get("url")
-            score = int(d.get("score") or 0)
             if not title or not link:
                 continue
-            items.append(to_item(title, link, "Reddit", datetime.fromtimestamp(d.get("created_utc", time.time()), tz=timezone.utc), "", score))
-    except Exception:
-        pass
-    return items
 
-def harvest_hn():
-    items = []
-    try:
-        d = feedparser.parse(HN_RSS)
-        for e in d.entries:
-            title = e.get("title") or ""
-            link = e.get("link") or ""
-            if not title or not link:
-                continue
-            # try to extract points from title (format: "Title (123 points)")
-            m = re.search(r"\((\d+)\spoints\)", title)
-            score = int(m.group(1)) if m else 0
-            items.append(to_item(title, link, "Hacker News", fix_date(e.get("published")), "", score))
-    except Exception:
-        pass
-    return items
-
-# ---------------------------------------------
-# Scoring / dedupe
-# ---------------------------------------------
-KEYWORD_BOOSTS = {
-    "transmission": 2.0,
-    "distribution": 2.0,
-    "grid": 1.8,
-    "hv": 1.5,
-    "substation": 1.6,
-    "wind": 1.3,
-    "renewable": 1.2,
-    "ai": 1.2,
-    "data center": 1.2,
-    "utility": 1.1,
-}
-
-def keyword_score(title):
-    t = title.lower()
-    score = 0.0
-    for k, w in KEYWORD_BOOSTS.items():
-        if k in t:
-            score += w
-    return score
-
-def recency_score(dt):
-    if not dt:
-        return 0.0
-    # hours since now; fresher = higher
-    hours = (datetime.now(timezone.utc) - dt).total_seconds()/3600
-    return max(0.0, 12 - hours)  # 0..12
-
-def merge_and_rank(raw_items):
-    # Deduplicate by normalized (title,url)
-    seen = {}
-    for it in raw_items:
-      key = hash_key(it["title"], it["url"])
-      if key not in seen:
-          seen[key] = it
-      else:
-          # keep earlier summary if missing, and earliest/strongest published
-          if not seen[key]["summary"] and it["summary"]:
-              seen[key]["summary"] = it["summary"]
-
-    items = list(seen.values())
-    # Add score
+            items.append({
+                "title": title,
+                "link": link,
+                "desc": strip_html(desc)[:500],
+                "img": img,
+                "tag": tag_for(title, desc),
+                "pubDate": pub
+            })
+    # de-dup by link, keep first (usually the newest sort later)
+    seen = set()
+    dedup = []
     for it in items:
-        dt = fix_date(it["published"])
-        it["_dt"] = dt
-        it["score"] = it.get("score", 0) + keyword_score(it["title"]) + recency_score(dt)
+        if it["link"] in seen: continue
+        seen.add(it["link"]); dedup.append(it)
 
-    # Sort by score then recency
-    items.sort(key=lambda x: (x["score"], x["_dt"] or datetime.fromtimestamp(0, tz=timezone.utc)), reverse=True)
-    for it in items:
-        if "_dt" in it:
-            del it["_dt"]
-    return items
-
-# ---------------------------------------------
-# Build feeds
-# ---------------------------------------------
-def build_top():
-    raw = []
-    for url in RSS_SOURCES:
+    # sort newest first where possible
+    def sort_key(it):
         try:
-            raw.extend(harvest_rss(url))
+            return time.mktime(feedparser._parse_date(it["pubDate"]))
         except Exception:
-            pass
-    top_items = merge_and_rank(raw)[:40]
-    return {
-        "generated_at": now_iso(),
-        "generated_at_readable": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "items": top_items
-    }
+            return 0
+    dedup.sort(key=sort_key, reverse=True)
+    return dedup[:60]   # cap
 
-def build_trending():
-    raw = []
-    # popularity-driven sources
-    for url in reddit_jsons():
-        raw.extend(harvest_reddit(url))
-    raw.extend(harvest_hn())
-    # also count items that repeat across mainstream feeds (proxy for “most cited”)
-    # (already merged in merge_and_rank)
-    trending_items = merge_and_rank(raw)[:30]
-    return {
-        "generated_at": now_iso(),
-        "generated_at_readable": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
-        "items": trending_items
-    }
+def slugify(title, link):
+    base = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:40]
+    h = hashlib.blake2b(link.encode('utf-8'), digest_size=4).hexdigest()  # 8 chars
+    return f"{base}-{h}" if base else h
+
+def og_escape(s):
+    return (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").strip()
+
+def build_article_url(it):
+    t = urllib.parse.quote(it["title"], safe="")
+    u = urllib.parse.quote(it["link"],  safe="")
+    d = urllib.parse.quote(it["desc"],  safe="")
+    i = urllib.parse.quote(it["img"] or "", safe="")
+    g = urllib.parse.quote(it["tag"],  safe="")
+    p = urllib.parse.quote(it["pubDate"] or "", safe="")
+    return f"{SITE_ORIGIN}/article.html?t={t}&u={u}&d={d}&i={i}&g={g}&p={p}"
+
+def build_short_page(slug, it):
+    og_title = og_escape(it["title"]) or "PTD Today"
+    og_desc  = og_escape(it["desc"])[:220]
+    og_img   = it["img"] if (it["img"] and it["img"].startswith("http")) else f"{SITE_ORIGIN}/logo.svg"
+    og_url   = f"{SITE_ORIGIN}/s/{slug}.html"
+    target   = build_article_url(it)
+
+    html = f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<title>{og_title}</title>
+<meta property="og:title" content="{og_title}">
+<meta property="og:description" content="{og_desc}">
+<meta property="og:image" content="{og_img}">
+<meta property="og:url" content="{og_url}">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<meta http-equiv="refresh" content="0; url={target}">
+<link rel="canonical" href="{target}">
+</head><body>
+<p>Redirecting to <a href="{target}">PTD Today</a>…</p>
+</body></html>"""
+    return html
+
+def build_shortlinks(items):
+    ensure_dir(SHORT_DIR)
+    ensure_dir(os.path.dirname(LOOKUP_JSON))
+    lookup = {}
+    for it in items:
+        slug = slugify(it["title"], it["link"])
+        lookup[it["link"]] = slug
+        with open(os.path.join(SHORT_DIR, f"{slug}.html"), "w", encoding="utf-8") as f:
+            f.write(build_short_page(slug, it))
+    with open(LOOKUP_JSON, "w", encoding="utf-8") as f:
+        json.dump(lookup, f, ensure_ascii=False, indent=2)
+
+def write_top(items):
+    ensure_dir(os.path.dirname(TOP_JSON))
+    with open(TOP_JSON, "w", encoding="utf-8") as f:
+        json.dump(items[:24], f, ensure_ascii=False, indent=2)
 
 def main():
-    top = build_top()
-    with open(TOP_PATH, "w", encoding="utf-8") as f:
-        json.dump(top, f, ensure_ascii=False, indent=2)
-
-    trending = build_trending()
-    with open(TREND_PATH, "w", encoding="utf-8") as f:
-        json.dump(trending, f, ensure_ascii=False, indent=2)
-
-    print(f"Wrote {TOP_PATH} and {TREND_PATH}")
+    items = fetch_items()
+    write_top(items)
+    build_shortlinks(items)
+    print(f"Generated {len(items)} items, shortlinks in /s, lookup at {LOOKUP_JSON}")
 
 if __name__ == "__main__":
     main()
