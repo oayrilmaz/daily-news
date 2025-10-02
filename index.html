@@ -145,6 +145,8 @@
     "https://www.ieee-pes.org/feed/"
   ];
   const state = { filter:null, items:[] };
+  let shortMap = {}; // originalLink -> slug
+
   const el = (id)=>document.getElementById(id);
 
   function timeAgo(date){ const d=new Date(date); if(isNaN(d)) return ""; const diff=(Date.now()-d)/1000;
@@ -152,6 +154,13 @@
     const h=Math.floor(m/60); if(h<24) return h+" h ago"; const days=Math.floor(h/24); return days+" d ago"; }
   function strip(html){ const tmp=document.createElement("div"); tmp.innerHTML=html; return tmp.textContent||tmp.innerText||""; }
   function escapeHTML(s){ return (s||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
+
+  async function loadShortMap(){
+    try{
+      const r = await fetch("/data/shortlinks.json", {cache:"no-store"});
+      if (r.ok) shortMap = await r.json();
+    }catch(e){}
+  }
 
   async function fetchRSS(url){
     const prox="https://api.allorigins.win/raw?url="+encodeURIComponent(url);
@@ -188,6 +197,20 @@
     el("lastUpdated").textContent="Updated: "+new Date().toLocaleString();
   }
 
+  function internalArticleURL(it){
+    const t=encodeURIComponent(it.title||"");
+    const u=encodeURIComponent(it.link||"#");
+    const d=encodeURIComponent(strip(it.desc||"").slice(0,280));
+    const i=encodeURIComponent(it.img||"");
+    const g=encodeURIComponent(it.tag||"news");
+    const p=encodeURIComponent(it.pubDate||"");
+    return `/article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
+  }
+  function shortShareURL(it){
+    const slug = shortMap[it.link];
+    return slug ? `/s/${slug}.html` : internalArticleURL(it);
+  }
+
   function render(){
     const filtered=state.filter?state.items.filter(i=>i.tag===state.filter):state.items;
 
@@ -197,10 +220,7 @@
       el("leadDek").textContent=strip(L.desc).slice(0,180)||"Latest updates across power T&D.";
       el("leadImg").src=L.img||"https://placehold.co/1200x650/png?text=PTD+Today";
       el("leadMeta").textContent=(L.tag.toUpperCase())+" • "+(L.pubDate?timeAgo(L.pubDate):"");
-      const t=encodeURIComponent(L.title||""); const u=encodeURIComponent(L.link||"#");
-      const d=encodeURIComponent(strip(L.desc||"").slice(0,280)); const i=encodeURIComponent(L.img||"");
-      const g=encodeURIComponent(L.tag||"news"); const p=encodeURIComponent(L.pubDate?timeAgo(L.pubDate):"");
-      const internal=`/article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
+      const internal=internalArticleURL(L);
       el("leadTitle").onclick=()=>location.href=internal;
       el("leadImg").onclick=()=>location.href=internal;
       el("lead").style.cursor="pointer";
@@ -209,11 +229,7 @@
     const grid=el("storyGrid"); grid.innerHTML="";
     filtered.slice(1).forEach(it=>{
       const div=document.createElement("div"); div.className="card";
-      const t=encodeURIComponent(it.title||""); const u=encodeURIComponent(it.link||"#");
-      const d=encodeURIComponent(strip(it.desc||"").slice(0,280)); const i=encodeURIComponent(it.img||"");
-      const g=encodeURIComponent(it.tag||"news"); const p=encodeURIComponent(it.pubDate?timeAgo(it.pubDate):"");
-      const internal=`/article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
-
+      const internal=internalArticleURL(it);
       div.innerHTML = `
         <a href="${internal}" rel="noopener">
           <h3>${escapeHTML(it.title)}</h3>
@@ -226,21 +242,17 @@
           <a class="min" href="${it.link}" target="_blank" rel="noopener">Source</a>
         </div>
       `;
-      // share button -> share the internal article URL
       const shareBtn=div.querySelector("button.min");
       shareBtn.addEventListener("click", ()=>{
-        const full=location.origin+internal;
-        const text=strip(it.desc||"").slice(0,160);
-        if(navigator.share){ navigator.share({title:it.title,text, url:full}).catch(()=>{}); }
+        const share = location.origin + shortShareURL(it);
+        const text  = strip(it.desc||"").slice(0,160);
+        if(navigator.share){ navigator.share({title:it.title,text,url:share}).catch(()=>{}); }
         else{
-          const url=encodeURIComponent(full); const tx=encodeURIComponent(it.title+" via PTD Today");
-          window.open(`https://twitter.com/intent/tweet?text=${tx}&url=${url}`,"_blank");
+          const url=encodeURIComponent(share);
+          window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`,"_blank");
         }
       });
-      // track clicks for Most Read
-      div.querySelectorAll("a").forEach(a=>{
-        a.addEventListener("click", ()=>trackClick(it));
-      });
+      div.querySelectorAll("a").forEach(a=>a.addEventListener("click", ()=>trackClick(it)));
       grid.appendChild(div);
     });
     renderMostRead();
@@ -250,8 +262,8 @@
     const box=el("mostRead"); const data=JSON.parse(localStorage.getItem("ptd_most")||"[]");
     data.sort((a,b)=>b.c-a.c); box.innerHTML="";
     data.slice(0,8).forEach(d=>{
-      const li=document.createElement("li");
       const internal=`/article.html?t=${encodeURIComponent(d.t)}&u=${encodeURIComponent(d.l)}`;
+      const li=document.createElement("li");
       li.innerHTML=`<a href="${internal}">${escapeHTML(d.t)}</a><div class="meta">${d.c} reads</div>`;
       box.appendChild(li);
     });
@@ -268,7 +280,8 @@
   });
   document.getElementById("clearFilter").onclick=()=>{state.filter=null; render();};
 
-  fetchAll(); setInterval(fetchAll,10800000);
+  loadShortMap().then(fetchAll);
+  setInterval(fetchAll,10800000);
 </script>
 </body>
 </html>
