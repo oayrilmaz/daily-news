@@ -1,198 +1,245 @@
-# Daily Energy/T&D headlines tuned for HV + AI data centers + Wind
-# Requires: feedparser, python-dateutil, beautifulsoup4, html5lib
+import os, json, time, re, hashlib
+from datetime import datetime, timezone
+from urllib.parse import quote_plus
 
-import os, json, re, hashlib
-from datetime import datetime, timezone, timedelta
-from urllib.parse import urlparse, quote
 import feedparser
-from dateutil import parser as dtp
+import requests
 from bs4 import BeautifulSoup
+from dateutil import parser as dtp
 
-# ---------- CONFIG ----------
-MAX_ITEMS        = 10           # total items to publish
-PER_SOURCE_MAX   = 2            # cap per source
-MAX_PER_FEED     = 25           # entries scanned per feed
-LOOKBACK_HOURS   = 120          # last 5 days
+OUT_DIR = "data"
+TOP_PATH = os.path.join(OUT_DIR, "top.json")
+TREND_PATH = os.path.join(OUT_DIR, "trending.json")
 
-# Core grid/HV + NEW data center + wind feeds
-FEEDS = [
-    # Grid / T&D / HV
-    "https://www.tdworld.com/rss",
-    "https://www.smart-energy.com/feed/",
-    "https://www.renewableenergyworld.com/feed/",
-    "https://energycentral.com/news/rss",
+os.makedirs(OUT_DIR, exist_ok=True)
+
+USER_AGENT = "Mozilla/5.0 (compatible; PTDNewsBot/1.0; +https://consultlift.com)"
+
+# ---------------------------------------------
+# Helpers
+# ---------------------------------------------
+def now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+def clean_text(x):
+    if not x:
+        return ""
+    return re.sub(r"\s+", " ", BeautifulSoup(x, "html5lib").get_text(" ", strip=True))
+
+def hash_key(title, url):
+    return hashlib.sha1((title.strip() + "|" + url.strip()).encode("utf-8")).hexdigest()
+
+def fix_date(dtstr):
+    if not dtstr:
+        return None
+    try:
+        d = dtp.parse(dtstr)
+        if not d.tzinfo:
+            d = d.replace(tzinfo=timezone.utc)
+        return d
+    except Exception:
+        return None
+
+def to_item(title, url, source, published=None, summary=None, score=0):
+    return {
+        "title": clean_text(title)[:300],
+        "url": url,
+        "source": source,
+        "published": (published or datetime.now(timezone.utc)).isoformat(),
+        "summary": clean_text(summary)[:600] if summary else "",
+        "score": score,
+    }
+
+# ---------------------------------------------
+# Sources
+# ---------------------------------------------
+def google_news_queries():
+    base = "https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q="
+    queries = [
+        "power+transmission+when:24h",
+        "power+distribution+when:24h",
+        "electric+grid+when:24h",
+        "renewable+energy+grid+when:24h",
+        "wind+power+grid+when:24h",
+        "ai+data+center+energy+when:24h",
+        "utility+power+when:24h",
+    ]
+    return [base + q for q in queries]
+
+RSS_SOURCES = [
+    # Good industry feeds
+    "https://www.tdworld.com/rss.xml",
     "https://www.power-technology.com/feed/",
-    "https://feeds.feedburner.com/IeeeSpectrumEnergy",
-
-    # Data center & AI infra (power/cooling/interconnection)
-    "https://www.datacenterdynamics.com/en/rss/",
-    "https://www.datacenterfrontier.com/rss",
-    "https://www.datacenterknowledge.com/rss.xml",
-    "https://www.hpcwire.com/feed/",
-
-    # Wind-specific
     "https://www.offshorewind.biz/feed/",
-    "https://www.windpowerengineering.com/feed/",
-    "https://www.renewableenergyworld.com/wind-power/feed/",
+    # Google News queries
+    *google_news_queries(),
 ]
 
-# Focused Google News searches (RSS)
-GN_QUERIES = [
-    # AI data centers + grid/substations
-    '"AI data center" OR "hyperscale data center" power OR substation OR grid OR interconnection',
-    'hyperscale data center PPA OR offtake OR "grid connection" OR "interconnection queue"',
-    # Wind PPAs & buildout
-    '"wind farm" PPA OR offtake OR tender OR auction',
-    'offshore wind grid connection OR interconnector OR HVDC',
-]
-def gnews(q: str) -> str:
-    return f"https://news.google.com/rss/search?q={quote(q)}&hl=en-US&gl=US&ceid=US:en"
-FEEDS += [gnews(q) for q in GN_QUERIES]
+# Popularity sources (provide scores or “trending” feel)
+def reddit_jsons():
+    subs = ["energy", "renewableenergy", "technology"]
+    return [f"https://www.reddit.com/r/{s}/top/.json?t=day&limit=25" for s in subs]
 
-# Optional domain blacklist
-BLACKLIST_DOMAINS = set([])
+HN_RSS = "https://hnrss.org/frontpage"
 
-# Keyword scoring — base relevance to keep HV/T&D + renewables
-BASE_PATTERNS = [
-    r"\b(HV|HVDC|high voltage|substation|switchgear|transformer|STATCOM|SVC|FACTS|SynCon|synchronous condenser|series capacitor|OHL|T&D|transmission line|interconnector|BESS|curtailment|interconnection|grid|reliability|resilience|SCADA|PMU|protection|ISO|TSO)\b",
-    r"\b(renewable|wind|offshore wind|solar|battery|storage|inverter|PPA|tender|auction)\b",
-]
+# ---------------------------------------------
+# Harvesting
+# ---------------------------------------------
+def harvest_rss(url):
+    items = []
+    d = feedparser.parse(url)
+    for e in d.entries:
+        title = e.get("title") or ""
+        link = e.get("link") or ""
+        if not title or not link:
+            continue
+        source = d.feed.get("title") or "RSS"
+        published = None
+        for k in ("published_parsed", "updated_parsed", "created_parsed"):
+            if e.get(k):
+                published = datetime.fromtimestamp(time.mktime(e[k]), tz=timezone.utc)
+                break
+        if not published:
+            published = fix_date(e.get("published") or e.get("updated") or e.get("created"))
 
-# EXTRA boosts for your groups (AI DC + wind focus)
-BOOST_WEIGHTS = {
-    # AI & data centers
-    r"\bAI data center\b":          3,
-    r"\bhyperscale data center\b":  3,
-    r"\bdata center(s)?\b":         2,
-    r"\bpower usage effectiveness\b":1,
-    r"\bliquid cooling|immersion cooling|direct-to-chip cooling\b": 2,
-    r"\bsubstation\b.*\bdata center\b": 3,
-    r"\binterconnection\b.*\bdata center\b": 3,
-    r"\bPUE\b": 1,
+        summary = e.get("summary") or e.get("description") or ""
+        items.append(to_item(title, link, source, published, summary))
+    return items
 
-    # Wind specifics
-    r"\boffshore wind\b":           3,
-    r"\bwind (farm|project|turbine|capacity)\b": 2,
-    r"\bcorporate PPA\b":           2,
-    r"\bofftake agreement\b":       2,
+def harvest_reddit(url):
+    items = []
+    try:
+        r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+        for child in data.get("data", {}).get("children", []):
+            d = child.get("data", {})
+            title = d.get("title")
+            link = d.get("url")
+            score = int(d.get("score") or 0)
+            if not title or not link:
+                continue
+            items.append(to_item(title, link, "Reddit", datetime.fromtimestamp(d.get("created_utc", time.time()), tz=timezone.utc), "", score))
+    except Exception:
+        pass
+    return items
+
+def harvest_hn():
+    items = []
+    try:
+        d = feedparser.parse(HN_RSS)
+        for e in d.entries:
+            title = e.get("title") or ""
+            link = e.get("link") or ""
+            if not title or not link:
+                continue
+            # try to extract points from title (format: "Title (123 points)")
+            m = re.search(r"\((\d+)\spoints\)", title)
+            score = int(m.group(1)) if m else 0
+            items.append(to_item(title, link, "Hacker News", fix_date(e.get("published")), "", score))
+    except Exception:
+        pass
+    return items
+
+# ---------------------------------------------
+# Scoring / dedupe
+# ---------------------------------------------
+KEYWORD_BOOSTS = {
+    "transmission": 2.0,
+    "distribution": 2.0,
+    "grid": 1.8,
+    "hv": 1.5,
+    "substation": 1.6,
+    "wind": 1.3,
+    "renewable": 1.2,
+    "ai": 1.2,
+    "data center": 1.2,
+    "utility": 1.1,
 }
 
-def plain_text(html: str) -> str:
-    if not html: return ""
-    return " ".join(BeautifulSoup(html, "html5lib").get_text(" ").split())
-
-def domain_of(url: str) -> str:
-    try:
-        return urlparse(url).netloc.replace("www.", "")
-    except Exception:
-        return ""
-
-def score_item(title: str, summary: str) -> float:
-    text = (title + " " + summary).lower()
+def keyword_score(title):
+    t = title.lower()
     score = 0.0
-    # base relevance
-    for pat in BASE_PATTERNS:
-        if re.search(pat, text, flags=re.I):
-            score += 1.0
-    # boosted relevance
-    for pat, wt in BOOST_WEIGHTS.items():
-        if re.search(pat, text, flags=re.I):
-            score += float(wt)
+    for k, w in KEYWORD_BOOSTS.items():
+        if k in t:
+            score += w
     return score
 
-def collect_items():
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=LOOKBACK_HOURS)
-    seen = set()
-    items = []
+def recency_score(dt):
+    if not dt:
+        return 0.0
+    # hours since now; fresher = higher
+    hours = (datetime.now(timezone.utc) - dt).total_seconds()/3600
+    return max(0.0, 12 - hours)  # 0..12
 
-    for feed_url in FEEDS:
-        try:
-            d = feedparser.parse(feed_url)
-        except Exception:
-            continue
-        feed_title = d.feed.get("title", "") if hasattr(d, "feed") else ""
-        for e in d.entries[:MAX_PER_FEED]:
-            title = e.get("title", "").strip()
-            link  = e.get("link", "")
-            if not title or not link: 
-                continue
-            key = hashlib.md5((title + link).encode()).hexdigest()
-            if key in seen: 
-                continue
-            seen.add(key)
+def merge_and_rank(raw_items):
+    # Deduplicate by normalized (title,url)
+    seen = {}
+    for it in raw_items:
+      key = hash_key(it["title"], it["url"])
+      if key not in seen:
+          seen[key] = it
+      else:
+          # keep earlier summary if missing, and earliest/strongest published
+          if not seen[key]["summary"] and it["summary"]:
+              seen[key]["summary"] = it["summary"]
 
-            dom = domain_of(link)
-            if dom in BLACKLIST_DOMAINS: 
-                continue
-
-            published_raw = e.get("published") or e.get("updated") or ""
-            try:
-                dt = dtp.parse(published_raw)
-                if not dt.tzinfo:
-                    dt = dt.replace(tzinfo=timezone.utc)
-            except Exception:
-                dt = now
-
-            if dt < cutoff:
-                continue
-
-            summary = plain_text(e.get("summary") or e.get("description") or "")
-            src = feed_title or dom or "Source"
-
-            relevance = score_item(title, summary)
-            # freshness boost (0..1)
-            hrs_old = max(0, (now - dt).total_seconds()/3600.0)
-            fresh = max(0.0, 48.0 - hrs_old)/48.0
-
-            final = relevance*2.0 + fresh  # weight relevance more
-
-            items.append({
-                "title": title,
-                "url": link,
-                "summary": summary[:320],
-                "source": src,
-                "domain": dom,
-                "published": dt.isoformat(),
-                "score": round(final, 3)
-            })
+    items = list(seen.values())
+    # Add score
+    for it in items:
+        dt = fix_date(it["published"])
+        it["_dt"] = dt
+        it["score"] = it.get("score", 0) + keyword_score(it["title"]) + recency_score(dt)
 
     # Sort by score then recency
-    items.sort(key=lambda x: (x["score"], x["published"]), reverse=True)
-
-    # Enforce per-source cap
-    out, count = [], {}
+    items.sort(key=lambda x: (x["score"], x["_dt"] or datetime.fromtimestamp(0, tz=timezone.utc)), reverse=True)
     for it in items:
-        dom = it["domain"] or it["source"]
-        count.setdefault(dom, 0)
-        if count[dom] < PER_SOURCE_MAX:
-            out.append(it)
-            count[dom] += 1
-        if len(out) >= MAX_ITEMS:
-            break
-    return out
+        if "_dt" in it:
+            del it["_dt"]
+    return items
 
-def write_outputs(items):
-    os.makedirs("data", exist_ok=True)
-    now = datetime.now(timezone.utc)
-    data = {
-        "generated_at": now.isoformat(),
-        "generated_at_readable": now.astimezone().strftime("%Y-%m-%d %H:%M %Z"),
-        "items": items
+# ---------------------------------------------
+# Build feeds
+# ---------------------------------------------
+def build_top():
+    raw = []
+    for url in RSS_SOURCES:
+        try:
+            raw.extend(harvest_rss(url))
+        except Exception:
+            pass
+    top_items = merge_and_rank(raw)[:40]
+    return {
+        "generated_at": now_iso(),
+        "generated_at_readable": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "items": top_items
     }
-    with open("data/top.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
-    # LinkedIn text
-    lines = [f"🔌 Today’s Top Energy, Grid, AI Data Center & Wind — {now.astimezone().strftime('%b %d, %Y')}\n"]
-    for i, it in enumerate(items, 1):
-        lines.append(f"{i}) {it['title']}  [{it['source']}]")
-        lines.append(it["url"] + "\n")
-    lines.append("—")
-    lines.append("Follow for daily HV, transmission, AI data centers & wind updates.")
-    with open("data/linkedin.txt", "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+def build_trending():
+    raw = []
+    # popularity-driven sources
+    for url in reddit_jsons():
+        raw.extend(harvest_reddit(url))
+    raw.extend(harvest_hn())
+    # also count items that repeat across mainstream feeds (proxy for “most cited”)
+    # (already merged in merge_and_rank)
+    trending_items = merge_and_rank(raw)[:30]
+    return {
+        "generated_at": now_iso(),
+        "generated_at_readable": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "items": trending_items
+    }
+
+def main():
+    top = build_top()
+    with open(TOP_PATH, "w", encoding="utf-8") as f:
+        json.dump(top, f, ensure_ascii=False, indent=2)
+
+    trending = build_trending()
+    with open(TREND_PATH, "w", encoding="utf-8") as f:
+        json.dump(trending, f, ensure_ascii=False, indent=2)
+
+    print(f"Wrote {TOP_PATH} and {TREND_PATH}")
 
 if __name__ == "__main__":
-    items = collect_items()
-    write_outputs(items)
+    main()
