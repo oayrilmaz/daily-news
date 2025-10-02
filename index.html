@@ -18,6 +18,8 @@
     :root{
       --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
       --maxw:1000px;
+      --leadImg:260px;    /* square size for the lead image */
+      --itemImg:200px;    /* square size for list item images */
     }
     *{box-sizing:border-box}
     html,body{margin:0;background:var(--bg);color:var(--ink);}
@@ -26,37 +28,42 @@
     /* Masthead */
     header{background:#fff;border-bottom:1px solid var(--line)}
     .wrap{max-width:var(--maxw);margin:0 auto;padding:0 18px}
-    .mast{padding:28px 0 8px}
-    .brandRow{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+    .mast{padding:28px 0 8px;text-align:center}
+    .brandRow{display:inline-flex;gap:12px;align-items:baseline;flex-wrap:wrap}
     .brand{font-size:48px;font-weight:800;letter-spacing:.2px;line-height:1.05}
     .motto{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink3);font-size:14px}
     .strap{font-size:22px;font-weight:700;margin-top:6px}
-    .subhed{font-size:15px;color:var(--ink3);margin-top:6px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
     .hr{height:1px;background:var(--line);margin:14px 0}
 
     /* Top nav / filters */
     nav{padding:10px 0}
-    .tabs{display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+    .tabs{display:flex;gap:20px;flex-wrap:wrap;align-items:center;justify-content:center}
     .tab{font-size:16px;text-decoration:none;color:var(--ink2)}
     .tab[aria-current="true"]{color:var(--ink);font-weight:700}
-    .stamp{margin-left:auto;font-size:12px;color:var(--ink3);border:1px solid var(--line);border-radius:18px;padding:4px 10px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .stamp{margin-left:12px;font-size:12px;color:var(--ink3);border:1px solid var(--line);border-radius:18px;padding:4px 10px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
 
-    /* One-column feed */
-    main{padding:16px 0 40px}
-    .lead{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px}
-    .lead h1{font-size:34px;line-height:1.12;margin:4px 0 8px}
-    .lead .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink2);font-size:15px;margin:6px 0 10px}
-    .lead img{width:100%;max-height:180px;object-fit:cover;border:1px solid var(--line)}
-    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:var(--ink3);margin:8px 0}
+    /* Buttons & meta */
+    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:var(--ink3)}
     .row{display:flex;gap:10px;flex-wrap:wrap}
     .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--line);background:#fafafa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink);text-decoration:none}
     .btn:hover{background:#f2f2f2}
 
-    .feed{display:grid;gap:22px}
-    .card{border-top:1px solid var(--line);padding-top:14px}
-    .card h3{font-size:24px;line-height:1.16;margin:0 0 6px}
-    .card .dek{font-family:ui-sans-serif;color:var(--ink2);font-size:14px;margin:6px 0 8px}
-    .thumb{width:100%;max-height:180px;object-fit:cover;border:1px solid var(--line);margin:8px 0 6px;display:none}
+    /* Media object layout (image left, text right; text wraps below) */
+    .media{display:grid;grid-template-columns:var(--leadImg) 1fr;gap:16px;align-items:start}
+    .media .imgWrap{width:var(--leadImg);height:var(--leadImg);border:1px solid var(--line);overflow:hidden}
+    .media img{width:100%;height:100%;object-fit:cover}
+    .lead{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}
+    .lead h1{font-size:32px;line-height:1.15;margin:0 0 6px}
+    .lead .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink2);font-size:15px;margin:6px 0 8px}
+
+    /* Feed (stacked) */
+    main{padding:12px 0 42px}
+    .feed{display:grid;gap:20px}
+    .item{border-top:1px solid var(--line);padding-top:14px}
+    .item .media{grid-template-columns:var(--itemImg) 1fr}
+    .item .imgWrap{width:var(--itemImg);height:var(--itemImg)}
+    .item h3{font-size:22px;line-height:1.16;margin:0 0 6px}
+    .item .dek{font-family:ui-sans-serif;color:var(--ink2);font-size:14px;margin:6px 0 8px}
 
     footer{border-top:1px solid var(--line);padding:16px 0 36px;color:var(--ink3);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px}
 
@@ -72,7 +79,6 @@
       <div class="motto">First to Know. First to Lead.</div>
     </div>
     <div class="strap">Daily Energy &amp; Power News</div>
-    <div class="subhed">Curated coverage for grid, HV substations, protection &amp; control, cables, policy, and more.</div>
   </div>
   <div class="hr"></div>
   <nav class="wrap">
@@ -93,14 +99,18 @@
 <main class="wrap">
   <!-- Lead -->
   <article class="lead" id="lead">
-    <h1 id="leadTitle">Loading…</h1>
-    <div class="dek" id="leadDek"></div>
-    <img id="leadImg" alt="Lead image">
-    <div class="meta" id="leadMeta"></div>
-    <div class="row">
-      <a id="leadOpen" class="btn" href="#">Open on PTD Today</a>
-      <button id="leadShare" class="btn" type="button">Share</button>
-      <a id="leadSource" class="btn" target="_blank" rel="noopener">Source</a>
+    <div class="media">
+      <div class="imgWrap"><img id="leadImg" alt="Lead image"></div>
+      <div>
+        <h1 id="leadTitle">Loading…</h1>
+        <div class="dek" id="leadDek"></div>
+        <div class="meta" id="leadMeta"></div>
+        <div class="row" style="margin-top:8px">
+          <a id="leadOpen" class="btn" href="#">Open on PTD Today</a>
+          <button id="leadShare" class="btn" type="button">Share</button>
+          <a id="leadSource" class="btn" target="_blank" rel="noopener">Source</a>
+        </div>
+      </div>
     </div>
   </article>
 
@@ -197,7 +207,7 @@ function renderLead(list){
   const L=list[0];
   $("leadTitle").textContent=L.title;
   $("leadDek").textContent=strip(L.desc).slice(0,240);
-  $("leadImg").src=L.img || "https://placehold.co/1000x180/png?text=PTD+Today";
+  $("leadImg").src=L.img || "https://placehold.co/520x520/png?text=PTD+Today";
   $("leadMeta").textContent=(L.tag.toUpperCase())+" • "+(L.pubDate?ago(L.pubDate):"");
   $("leadOpen").href=internalURL(L);
   $("leadSource").href=L.link;
@@ -213,17 +223,21 @@ function renderLead(list){
 function renderFeed(list){
   const el=$("feed"); el.innerHTML="";
   list.slice(1).forEach(it=>{
-    const card=document.createElement("article"); card.className="card";
+    const card=document.createElement("article"); card.className="item";
     const internal=internalURL(it); const share=shareURL(it);
     card.innerHTML=`
-      <h3><a href="${internal}">${it.title}</a></h3>
-      <img class="thumb" ${it.img ? `src="${it.img}"` : 'style="display:none"'} alt="">
-      <div class="dek">${strip(it.desc).slice(0,180)}</div>
-      <div class="meta">${it.tag.toUpperCase()} • ${it.pubDate?ago(it.pubDate):""}</div>
-      <div class="row">
-        <a class="btn" href="${internal}">Open on PTD Today</a>
-        <button class="btn share" type="button">Share</button>
-        <a class="btn" href="${it.link}" target="_blank" rel="noopener">Source</a>
+      <div class="media">
+        <div class="imgWrap"><img ${it.img ? `src="${it.img}"` : ''} alt=""></div>
+        <div>
+          <h3><a href="${internal}">${it.title}</a></h3>
+          <div class="dek">${strip(it.desc).slice(0,180)}</div>
+          <div class="meta">${it.tag.toUpperCase()} • ${it.pubDate?ago(it.pubDate):""}</div>
+          <div class="row" style="margin-top:8px">
+            <a class="btn" href="${internal}">Open on PTD Today</a>
+            <button class="btn share" type="button">Share</button>
+            <a class="btn" href="${it.link}" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
       </div>
     `;
     card.querySelector(".share").onclick=()=>{
@@ -236,13 +250,7 @@ function renderFeed(list){
 }
 
 function markActive(){ document.querySelectorAll(".tab").forEach(a=>a.setAttribute("aria-current", a.dataset.filter===FILTER?"true":"false")); }
-
-function renderAll(){
-  const view=applyFilter(ALL);
-  renderLead(view);
-  renderFeed(view);
-  markActive();
-}
+function renderAll(){ const view=applyFilter(ALL); renderLead(view); renderFeed(view); markActive(); }
 
 /* ---------------- Interactions ---------------- */
 $("refresh").onclick = async ()=>{ await loadAll(); renderAll(); };
