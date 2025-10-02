@@ -1,76 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Daily Energy & Grid News</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
       font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
       margin: 0;
       padding: 0;
-      background: #111;
-      color: #f0f0f0;
     }
     header {
-      background: #222;
+      background: #1e1e1e;
       padding: 20px;
       text-align: center;
+      border-bottom: 2px solid #333;
     }
     header h1 {
       margin: 0;
-      font-size: 1.5em;
+      color: #fff;
     }
     header p {
+      margin: 5px 0 0;
       font-size: 0.9em;
       color: #aaa;
     }
-    .wrap {
+    .news-container {
       max-width: 800px;
       margin: 20px auto;
-      padding: 0 15px;
+      padding: 0 20px;
     }
-    .item {
-      background: #1c1c1c;
+    .news-item {
+      background: #1e1e1e;
+      margin-bottom: 16px;
+      padding: 16px;
       border-radius: 8px;
-      padding: 15px;
-      margin-bottom: 15px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.5);
+      border: 1px solid #2f2f2f;
     }
-    .item h2 {
-      margin: 0 0 5px;
-      font-size: 1.1em;
+    .news-item h2 {
+      margin: 0 0 8px;
+      font-size: 1.2em;
     }
-    .item a {
-      color: #4db8ff;
+    .news-item h2 a {
+      color: #4da6ff;
       text-decoration: none;
     }
-    .item a:hover {
-      text-decoration: underline;
-    }
-    .meta {
-      font-size: 0.8em;
-      color: #bbb;
-      margin-bottom: 10px;
+    .news-item p {
+      margin: 6px 0;
+      font-size: 0.95em;
+      line-height: 1.4em;
     }
     .footer {
+      margin: 30px 0;
       text-align: center;
-      font-size: 0.9em;
-      margin: 40px 0;
-      color: #aaa;
+      font-size: 0.85em;
+      color: #888;
     }
     .footer a {
-      color: #4db8ff;
+      color: #4da6ff;
+      text-decoration: none;
     }
   </style>
 </head>
 <body>
   <header>
     <h1>Daily Energy & Grid News</h1>
-    <p id="datastamp">Loading…</p>
+    <p id="timestamp"></p>
   </header>
 
-  <main class="wrap" id="feed">Loading headlines…</main>
+  <div class="news-container" id="news-container">
+    Loading...
+  </div>
 
   <div class="footer">
     Tip: copy the 
@@ -78,36 +80,43 @@
     each morning.
   </div>
 
+  <!-- Sponsor CTA -->
+  <div style="margin:20px auto; max-width:800px; padding:16px; border:1px solid #2f2f2f; border-radius:10px; background:#1b1b1b; text-align:center;">
+    <h3 style="margin:0 0 8px; color:#FFD54F;">📢 Sponsor This Page</h3>
+    <p style="margin:0 0 12px; color:#cfcfcf;">
+      Reach energy, grid, HV, AI data center & wind professionals daily.<br/>
+      Feature your brand below and in our LinkedIn posts.
+    </p>
+    <a href="mailto:consultliftpro@hotmail.com?subject=Sponsor%20Daily%20Energy%20News&body=Hi%20Consultlift%2C%0A%0AWe%27re%20interested%20in%20sponsoring%20your%20Daily%20Energy%20%26%20Grid%20News.%20Please%20send%20packages%20and%20availability.%0A%0AThanks!"
+       style="display:inline-block; background:#FFD54F; color:#000; padding:10px 16px; border-radius:8px; text-decoration:none; font-weight:700;">
+      Contact for Sponsorship
+    </a>
+  </div>
+
   <script>
-    (async () => {
+    async function loadNews() {
+      const container = document.getElementById('news-container');
       try {
-        const r = await fetch("data/top.json?cachebust=" + Date.now());
-        const data = await r.json();
-        document.getElementById("datastamp").textContent =
-          data.generated_at_readable || "";
-
-        const feed = document.getElementById("feed");
-        feed.innerHTML = "";
-
-        data.items.forEach(x => {
-          const div = document.createElement("div");
-          div.className = "item";
+        const resp = await fetch('data/top.json?cachebust=' + Date.now());
+        if (!resp.ok) throw new Error("Failed to load news");
+        const data = await resp.json();
+        container.innerHTML = '';
+        data.items.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'news-item';
           div.innerHTML = `
-            <h2><a href="${x.url}" target="_blank">${x.title}</a></h2>
-            <div class="meta">${x.source} – ${new Date(x.published).toLocaleString()}</div>
-            <p>${x.summary || ""}</p>
+            <h2><a href="${item.url}" target="_blank">${item.title}</a></h2>
+            <p><em>${item.source} – ${new Date(item.published).toLocaleString()}</em></p>
+            <p>${item.summary || ''}</p>
           `;
-          feed.appendChild(div);
+          container.appendChild(div);
         });
-
-        if (data.items.length === 0) {
-          feed.innerHTML = "<p>No headlines available yet.</p>";
-        }
+        document.getElementById('timestamp').textContent = data.generated_at_readable || "";
       } catch (e) {
-        document.getElementById("feed").innerHTML =
-          "<p>Could not load today’s headlines.</p>";
+        container.innerHTML = "<p>Could not load today's headlines.</p>";
       }
-    })();
+    }
+    loadNews();
   </script>
 </body>
 </html>
