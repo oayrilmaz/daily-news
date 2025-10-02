@@ -1,80 +1,65 @@
-# Requires: pip install feedparser python-dateutil beautifulsoup4 html5lib
-import os, re, json, hashlib
-from datetime import datetime, timezone, timedelta
-from dateutil import parser as dtp
 import feedparser
-from bs4 import BeautifulSoup
+import json
+from datetime import datetime
+from dateutil import parser as dateparser
 
-# ======== CONFIG ========
-OUT_DIR = os.path.join('data')
-MAX_ITEMS = 5                 # number of top news items to keep
-MIN_HOURS_NEW = 72            # only consider stories from last 3 days
-KEYWORDS = [
-    'HV','high voltage','substation','switchgear','transformer','STATCOM','SVC','HVDC',
-    'FSC','series capacitor','synchronous condenser','SynCon','FACTS','OHL','T&D',
-    'transmission line','grid','interconnector','ISO','TSO','protection','SCADA','PMU',
-    'reliability','resilience','renewable','wind','offshore','solar','BESS','battery',
-    'storage','inverter','curtailment','interconnection','policy','RTO','FERC','NERC',
-    'CIGRE','IEEE','auction','PPA','RFP'
-]
-
-# RSS feeds
+# Sources (you can add more RSS feeds here)
 FEEDS = [
-    "https://www.tdworld.com/rss",
-    "https://www.smart-energy.com/feed/",
-    "https://www.renewableenergyworld.com/feed/",
-    "https://energycentral.com/news/rss",
-    "https://www.power-technology.com/feed/",
-    "https://feeds.feedburner.com/IeeeSpectrumEnergy"
+    "https://feeds.reuters.com/reuters/businessNews",
+    "https://feeds.reuters.com/reuters/environment",
+    "https://www.eenews.net/rss",
+    "https://www.utilitydive.com/feeds/news/",
 ]
 
-# Google News queries
-GN_QUERIES = [
-    '("high voltage" OR HV OR "substation" OR "transmission line" OR HVDC) power grid',
-    'STATCOM OR "synchronous condenser" OR "series capacitor" OR FACTS',
-    'renewable transmission OR interconnection OR curtailment OR "grid congestion"'
-]
-
-def gnews_rss(q):
-    import urllib.parse as up
-    return f"https://news.google.com/rss/search?q={up.quote(q)}&hl=en-US&gl=US&ceid=US:en"
-
-FEEDS += [gnews_rss(q) for q in GN_QUERIES]
-# ======== /CONFIG ========
-
-def clean_text(html):
-    if not html: return ""
-    soup = BeautifulSoup(html, "html5lib")
-    return ' '.join(soup.get_text(" ").split())
-
-def relevance_score(title, summary):
-    text = f"{title} {summary}".lower()
-    score = 0
-    for kw in KEYWORDS:
-        if kw.lower() in text:
-            score += 1
-    return score
-
-def collect():
-    seen = set()
+def fetch_news():
     items = []
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=MIN_HOURS_NEW)
-
     for url in FEEDS:
         try:
-            d = feedparser.parse(url)
-            for e in d.entries:
-                title = e.get('title', '').strip()
-                if not title: continue
-                uid = hashlib.md5((title + e.get('link','')).encode()).hexdigest()
-                if uid in seen: continue
-                seen.add(uid)
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:5]:
+                published_dt = None
+                if hasattr(entry, "published"):
+                    try:
+                        published_dt = dateparser.parse(entry.published)
+                    except Exception:
+                        published_dt = None
 
-                link = e.get('link') or ''
-                published = e.get('published') or e.get('updated') or ''
-                try:
-                    published_dt = dtp.parse(published)
-                    if not published_dt.tzinfo: 
-                        published_dt = published_dt.replace(tzinfo=timezone.utc)
-                except Exception:
+                items.append({
+                    "title": entry.title,
+                    "url": entry.link,
+                    "published": published_dt.isoformat() if published_dt else "",
+                    "source": feed.feed.get("title", ""),
+                    "summary": getattr(entry, "summary", ""),
+                })
+        except Exception as e:
+            print(f"Error fetching {url}: {e}")
+
+    # Sort newest first
+    items.sort(key=lambda x: x["published"], reverse=True)
+    return items[:15]
+
+def main():
+    items = fetch_news()
+    now = datetime.utcnow()
+
+    data = {
+        "generated_at": now.isoformat(),
+        "generated_at_readable": now.strftime("%Y-%m-%d %H:%M UTC"),
+        "items": items,
+    }
+
+    # Save JSON for website
+    with open("data/top.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    # Save LinkedIn-ready text
+    lines = ["🌍 Daily Energy & Grid Headlines\n"]
+    for x in items:
+        line = f"🔹 {x['title']} ({x['source']})\n{x['url']}"
+        lines.append(line)
+    lines.append("\n#Energy #Grid #Power #Transmission")
+    with open("data/linkedin.txt", "w", encoding="utf-8") as f:
+        f.write("\n\n".join(lines))
+
+if __name__ == "__main__":
+    main()
