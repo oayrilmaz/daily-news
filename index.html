@@ -1,275 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PTD Today | Power Transmission & Distribution Daily News</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PTD Today — Daily Energy & Power News</title>
 
-  <!-- Homepage OG so LinkedIn shows a card for ptdtoday.com -->
-  <meta name="description" content="Daily headlines across power transmission & distribution, HV substations, protection & control, cables, grid modernization, policy, and more.">
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="PTD Today">
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
-  <meta property="og:description" content="Curated headlines across Power T&D, refreshed throughout the day.">
+  <meta property="og:description" content="First to Know. First to Lead. Daily curated coverage for energy, power grids, HV substations, renewables, and more.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://ptdtoday.com/">
-  <meta property="og:image" content="https://ptdtoday.com/logo.svg">
+  <meta property="og:url" content="https://ptdtoday.com">
+  <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
+
+  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PTD Today — Daily Energy & Power News">
+  <meta name="twitter:description" content="First to Know. First to Lead.">
+  <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png">
 
   <style>
-    :root{
-      --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
-      --maxw:1000px;
-      --leadImg:260px;    /* square for lead */
-      --itemImg:200px;    /* square for items */
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--ink);}
-    body{font-family:Georgia, 'Times New Roman', Times, serif; line-height:1.5}
+    body { font-family: Georgia, serif; margin: 0; background: #fff; color: #111; }
+    header { text-align: center; padding: 28px 0 12px 0; border-bottom: 1px solid #ddd; }
+    header h1 { font-size: 3rem; margin: 0; font-weight: 700; }
+    header p.motto { font-size: 1rem; margin: 4px 0 0 0; color: #555; }
+    header h2 { font-size: 1.4rem; margin: 8px 0 0 0; font-weight: 600; }
 
-    /* Masthead */
-    header{background:#fff;border-bottom:1px solid var(--line)}
-    .wrap{max-width:var(--maxw);margin:0 auto;padding:0 18px}
-    .mast{padding:28px 0 8px;text-align:center}
-    .brandRow{display:inline-flex;gap:12px;align-items:baseline;flex-wrap:wrap}
-    .brand{font-size:48px;font-weight:800;letter-spacing:.2px;line-height:1.05}
-    .motto{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink3);font-size:14px}
-    .strap{font-size:22px;font-weight:700;margin-top:6px}
-    .hr{height:1px;background:var(--line);margin:14px 0}
+    nav { text-align: center; padding: 12px 0; border-bottom: 1px solid #eee; }
+    nav a { margin: 0 10px; text-decoration: none; color: #111; font-size: 1rem; }
+    nav a.active { font-weight: bold; border-bottom: 2px solid #111; }
 
-    /* Top nav / filters */
-    nav{padding:10px 0}
-    .tabs{display:flex;gap:20px;flex-wrap:wrap;align-items:center;justify-content:center}
-    .tab{font-size:16px;text-decoration:none;color:var(--ink2)}
-    .tab[aria-current="true"]{color:var(--ink);font-weight:700}
-    .rightStamp{margin-left:auto}
-    .navRow{display:flex;align-items:center;gap:12px}
-    .stamp{font-size:12px;color:var(--ink3);border:1px solid var(--line);border-radius:18px;padding:4px 10px;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+    .article { display: flex; flex-direction: row; gap: 16px; border-bottom: 1px solid #eee; padding: 20px 0; }
+    .article img { width: 220px; height: 220px; object-fit: cover; flex-shrink: 0; }
+    .article h3 { margin: 0; font-size: 1.4rem; line-height: 1.3; }
+    .article p { margin: 8px 0; font-size: 1rem; line-height: 1.4; color: #333; }
+    .meta { font-size: 0.85rem; color: #666; margin-top: 6px; }
 
-    /* Buttons & meta */
-    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px;color:var(--ink3)}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;border:1px solid var(--line);background:#fafafa;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink);text-decoration:none}
-    .btn:hover{background:#f2f2f2}
+    .buttons { margin-top: 8px; }
+    .buttons a { margin-right: 10px; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;
+      text-decoration: none; font-size: 0.85rem; color: #111; }
 
-    /* Media-object layout */
-    .media{display:grid;grid-template-columns:var(--leadImg) 1fr;gap:16px;align-items:start}
-    .media .imgWrap{width:var(--leadImg);height:var(--leadImg);border:1px solid var(--line);overflow:hidden;background:#fff}
-    .media img{width:100%;height:100%;object-fit:cover}
-    .lead{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:18px}
-    .lead h1{font-size:32px;line-height:1.15;margin:0 0 6px}
-    .lead .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink2);font-size:15px;margin:6px 0 8px}
-
-    /* Feed (stacked) */
-    main{padding:12px 0 42px}
-    .feed{display:grid;gap:20px}
-    .item{border-top:1px solid var(--line);padding-top:14px}
-    .item .media{grid-template-columns:var(--itemImg) 1fr}
-    .item .imgWrap{width:var(--itemImg);height:var(--itemImg)}
-    .item h3{font-size:22px;line-height:1.16;margin:0 0 6px}
-    .item .dek{font-family:ui-sans-serif;color:var(--ink2);font-size:14px;margin:6px 0 8px}
-
-    footer{border-top:1px solid var(--line);padding:16px 0 36px;color:var(--ink3);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:12px}
-
-    /* Floating refresh bottom-right */
-    .floating{position:fixed;right:16px;bottom:16px;z-index:30}
+    footer { text-align: right; padding: 16px; font-size: 0.85rem; color: #666; border-top: 1px solid #ddd; }
   </style>
 </head>
 <body>
-<header>
-  <div class="wrap mast">
-    <div class="brandRow">
-      <div class="brand">PTD Today</div>
-      <div class="motto">First to Know. First to Lead.</div>
-    </div>
-    <div class="strap">Daily Energy &amp; Power News</div>
-  </div>
-  <div class="hr"></div>
-  <nav class="wrap">
-    <div class="navRow">
-      <div class="tabs" id="tabs">
-        <a href="#" class="tab" data-filter="all" aria-current="true">All</a>
-        <a href="#" class="tab" data-filter="grid">Grid</a>
-        <a href="#" class="tab" data-filter="substation">Substations</a>
-        <a href="#" class="tab" data-filter="protection">Protection</a>
-        <a href="#" class="tab" data-filter="cable">Cables</a>
-        <a href="#" class="tab" data-filter="hvdc">HVDC</a>
-        <a href="#" class="tab" data-filter="renewable">Renewables</a>
-        <a href="#" class="tab" data-filter="policy">Policy</a>
-      </div>
-      <span class="stamp rightStamp" id="updated">Updated —</span>
-    </div>
+  <header>
+    <h1>PTD Today</h1>
+    <p class="motto">First to Know. First to Lead.</p>
+    <h2>Daily Energy & Power News</h2>
+  </header>
+
+  <nav id="filters">
+    <a href="#" data-cat="all" class="active">All</a>
+    <a href="#" data-cat="Grid">Grid</a>
+    <a href="#" data-cat="Substations">Substations</a>
+    <a href="#" data-cat="Protection">Protection</a>
+    <a href="#" data-cat="Cables">Cables</a>
+    <a href="#" data-cat="HVDC">HVDC</a>
+    <a href="#" data-cat="Renewables">Renewables</a>
+    <a href="#" data-cat="Policy">Policy</a>
   </nav>
-</header>
 
-<main class="wrap">
-  <!-- Lead -->
-  <article class="lead" id="lead">
-    <div class="media">
-      <div class="imgWrap"><img id="leadImg" alt="Lead image"></div>
-      <div>
-        <h1 id="leadTitle">Loading…</h1>
-        <div class="dek" id="leadDek"></div>
-        <div class="meta" id="leadMeta"></div>
-        <div class="row" style="margin-top:8px">
-          <a id="leadOpen" class="btn" href="#">Open on PTD Today</a>
-          <button id="leadShare" class="btn" type="button">Share</button>
-          <a id="leadSource" class="btn" target="_blank" rel="noopener">Source</a>
-        </div>
-      </div>
-    </div>
-  </article>
+  <div class="container" id="news"></div>
 
-  <!-- Stacked feed -->
-  <section class="feed" id="feed"></section>
-</main>
+  <footer>
+    Updated — <span id="updated"></span>
+    <button onclick="location.reload()">Refresh</button>
+  </footer>
 
-<footer>
-  <div class="wrap">© 2025 PTD Today. Headlines link to their original publishers.</div>
-</footer>
+  <script>
+    let articlesData = [];
 
-<!-- Floating refresh -->
-<div class="floating">
-  <button id="refresh" class="btn" type="button">Refresh</button>
-</div>
+    async function loadNews() {
+      const response = await fetch("data/news.json");
+      articlesData = await response.json();
+      renderNews("all");
+      document.getElementById("updated").textContent = new Date().toLocaleString();
+    }
 
-<script>
-/* ---------------- Data & helpers ---------------- */
-const FEEDS = [
-  "https://www.tdworld.com/rss",
-  "https://www.utilitydive.com/feeds/news/",
-  "https://feeds.reuters.com/reuters/energy",
-  "https://www.powermag.com/feed/",
-  "https://www.ieee-pes.org/feed/"
-];
-let shortMap = {};   // { originalLink: "slug" }
-let ALL = [];        // normalized stories
-let FILTER = "all";
+    function renderNews(category) {
+      const container = document.getElementById("news");
+      container.innerHTML = "";
 
-const $ = (id)=>document.getElementById(id);
-const strip = (h)=>{ const d=document.createElement("div"); d.innerHTML=h; return d.textContent||d.innerText||""; };
-const ago = (date)=>{ const d=new Date(date); if(isNaN(d)) return ""; const s=(Date.now()-d)/1e3;
-  if(s<60) return "just now"; const m=Math.floor(s/60); if(m<60) return m+" min ago";
-  const h=Math.floor(m/60); if(h<24) return h+" h ago"; return Math.floor(h/24)+" d ago"; };
+      articlesData
+        .filter(a => category === "all" || (a.category && a.category.toLowerCase().includes(category.toLowerCase())))
+        .forEach(a => {
+          const imgUrl = a.image && a.image.trim() !== "" ? a.image : "assets/og-default.png";
 
-async function loadShortMap(){
-  try{
-    const r = await fetch("data/shortlinks.json", {cache:"no-store"});
-    if(r.ok) shortMap = await r.json();
-  }catch(e){}
-}
+          const article = document.createElement("div");
+          article.className = "article";
+          article.innerHTML = `
+            <img src="${imgUrl}" alt="">
+            <div>
+              <h3>${a.title}</h3>
+              <p>${a.summary || ""}</p>
+              <div class="meta">${a.category || ""} • ${a.time || ""}</div>
+              <div class="buttons">
+                <a href="article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary)}&i=${encodeURIComponent(imgUrl)}">Open on PTD Today</a>
+                <a href="${a.url}" target="_blank">Source</a>
+                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://ptdtoday.com/article.html?u=${encodeURIComponent(a.url)}" target="_blank">Share</a>
+              </div>
+            </div>
+          `;
+          container.appendChild(article);
+        });
+    }
 
-function internalURL(it){
-  const t=encodeURIComponent(it.title||""); const u=encodeURIComponent(it.link||"#");
-  const d=encodeURIComponent(strip(it.desc||"").slice(0,280));
-  const i=encodeURIComponent(it.img||""); const g=encodeURIComponent(it.tag||"news");
-  const p=encodeURIComponent(it.pubDate||"");
-  return `article.html?t=${t}&u=${u}&d=${d}&i=${i}&g=${g}&p=${p}`;
-}
-function shareURL(it){
-  const slug = shortMap[it.link];
-  return slug ? `s/${slug}.html` : internalURL(it);
-}
+    // handle filter clicks
+    document.getElementById("filters").addEventListener("click", e => {
+      if (e.target.tagName === "A") {
+        e.preventDefault();
+        document.querySelectorAll("#filters a").forEach(a => a.classList.remove("active"));
+        e.target.classList.add("active");
+        renderNews(e.target.dataset.cat);
+      }
+    });
 
-async function fetchRSS(url){
-  const prox="https://api.allorigins.win/raw?url="+encodeURIComponent(url);
-  const res=await fetch(prox); if(!res.ok) return [];
-  const text=await res.text(); const xml=new DOMParser().parseFromString(text,"text/xml");
-  return [...xml.querySelectorAll("item")].map(item=>{
-    const title=item.querySelector("title")?.textContent?.trim()||"";
-    const link=item.querySelector("link")?.textContent?.trim()||"#";
-    const pubDate=item.querySelector("pubDate")?.textContent||"";
-    const desc=item.querySelector("description")?.textContent||"";
-    const enc=item.querySelector("content\\:encoded")?.textContent||"";
-    const imgMatch=(enc||desc).match(/<img[^>]+src=["']([^"']+)["']/i);
-    const img=imgMatch?imgMatch[1]:"";
-    const k=(title+" "+desc).toLowerCase();
-    let tag="grid";
-    if(k.includes("substation")||k.includes("switchgear")) tag="substation";
-    else if(k.includes("relay")||k.includes("protection")||k.includes("iec")) tag="protection";
-    else if(k.includes("cable")||k.includes("xlpe")) tag="cable";
-    else if(k.includes("hvdc")) tag="hvdc";
-    else if(k.includes("policy")||k.includes("tariff")||k.includes("regulat")) tag="policy";
-    else if(k.includes("renewable")||k.includes("solar")||k.includes("wind")) tag="renewable";
-    return {title,link,pubDate,desc,img,tag};
-  });
-}
-
-async function loadAll(){
-  const sets=await Promise.allSettled(FEEDS.map(fetchRSS));
-  const tmp=[]; for(const s of sets){ if(s.status==="fulfilled") tmp.push(...s.value); }
-  const seen=new Set(), uniq=[];
-  for(const it of tmp){ if(!seen.has(it.link)){ seen.add(it.link); uniq.push(it); } }
-  uniq.sort((a,b)=>new Date(b.pubDate)-new Date(a.pubDate));
-  ALL = uniq;
-  $("updated").textContent="Updated — "+new Date().toLocaleString();
-}
-
-/* ---------------- Rendering ---------------- */
-function applyFilter(arr){ return FILTER==="all" ? arr : arr.filter(x=>x.tag===FILTER); }
-
-function renderLead(list){
-  if(!list.length){ $("leadTitle").textContent="No news available."; return; }
-  const L=list[0];
-  $("leadTitle").textContent=L.title;
-  $("leadDek").textContent=strip(L.desc).slice(0,240);
-  $("leadImg").src=L.img || "https://placehold.co/520x520/png?text=PTD+Today";
-  $("leadMeta").textContent=(L.tag.toUpperCase())+" • "+(L.pubDate?ago(L.pubDate):"");
-  $("leadOpen").href=internalURL(L);
-  $("leadSource").href=L.link;
-  $("leadShare").onclick=()=>{
-    const u=(location.origin+"/"+shareURL(L)).replace(/\/+/g,"/");
-    if(navigator.share){ navigator.share({title:L.title,text:strip(L.desc).slice(0,160),url:u}).catch(()=>{}); }
-    else window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(u), "_blank");
-  };
-  $("leadTitle").onclick=()=>location.href=internalURL(L);
-  $("leadImg").style.cursor="pointer"; $("leadImg").onclick=()=>location.href=internalURL(L);
-}
-
-function renderFeed(list){
-  const el=$("feed"); el.innerHTML="";
-  list.slice(1).forEach(it=>{
-    const card=document.createElement("article"); card.className="item";
-    const internal=internalURL(it); const share=shareURL(it);
-    const imgHTML = it.img ? `<img src="${it.img}" alt="">` : "";
-    card.innerHTML=`
-      <div class="media">
-        <div class="imgWrap">${imgHTML}</div>
-        <div>
-          <h3><a href="${internal}">${it.title}</a></h3>
-          <div class="dek">${strip(it.desc).slice(0,180)}</div>
-          <div class="meta">${it.tag.toUpperCase()} • ${it.pubDate?ago(it.pubDate):""}</div>
-          <div class="row" style="margin-top:8px">
-            <a class="btn" href="${internal}">Open on PTD Today</a>
-            <button class="btn share" type="button">Share</button>
-            <a class="btn" href="${it.link}" target="_blank" rel="noopener">Source</a>
-          </div>
-        </div>
-      </div>
-    `;
-    card.querySelector(".share").onclick=()=>{
-      const u=(location.origin+"/"+share).replace(/\/+/g,"/");
-      if(navigator.share){ navigator.share({title:it.title,text:strip(it.desc).slice(0,160),url:u}).catch(()=>{}); }
-      else window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(u), "_blank");
-    };
-    el.appendChild(card);
-  });
-}
-
-function markActive(){ document.querySelectorAll(".tab").forEach(a=>a.setAttribute("aria-current", a.dataset.filter===FILTER?"true":"false")); }
-function renderAll(){ const view=applyFilter(ALL); renderLead(view); renderFeed(view); markActive(); }
-
-/* ---------------- Interactions ---------------- */
-$("refresh").onclick = async ()=>{ await loadAll(); renderAll(); };
-document.getElementById("tabs").addEventListener("click",(e)=>{
-  const a=e.target.closest(".tab"); if(!a) return;
-  e.preventDefault(); FILTER=a.dataset.filter||"all"; renderAll();
-});
-
-/* ---------------- Boot ---------------- */
-(async function(){
-  await loadShortMap();
-  await loadAll();
-  renderAll();
-})();
-</script>
+    loadNews();
+  </script>
 </body>
 </html>
