@@ -9,12 +9,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write    # <-- required to push with GITHUB_TOKEN
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          persist-credentials: false   # fine; we'll set remote with token below
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -32,9 +32,22 @@ jobs:
       - name: Commit & push
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
         run: |
+          set -e
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add data s
-          git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes"
-          git push
+          git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
+
+          # Always ensure the remote uses the token
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git
+
+          # Rebase in case of simultaneous pushes (non-fatal if up to date)
+          git fetch origin ${BRANCH}
+          git pull --rebase origin ${BRANCH} || true
+
+          # Push the current HEAD to the current branch
+          git push origin HEAD:${BRANCH}
