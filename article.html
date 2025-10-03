@@ -5,51 +5,38 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today | Article</title>
 
-  <!-- Static OG/Twitter fallbacks (actual OG for LinkedIn comes from /s/<slug>.html) -->
+  <!-- Static OG placeholders; LinkedIn previews come from /s/<slug>.html -->
   <meta property="og:site_name" content="PTD Today">
   <meta property="og:title" content="PTD Today — Article">
   <meta property="og:description" content="Daily Energy & Power News">
   <meta property="og:type" content="article">
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PTD Today — Article">
-  <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png">
 
   <style>
-    :root{
-      --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
-      --maxw:900px; --img:260px;
-    }
+    :root{ --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
+           --maxw:900px; --img:260px; }
     *{box-sizing:border-box}
     html,body{margin:0;background:var(--bg);color:var(--ink)}
     body{font-family:Georgia,'Times New Roman',Times,serif; line-height:1.5}
-
     header{border-bottom:1px solid var(--line); text-align:center; padding:26px 0 10px}
     .title{font-size:40px; font-weight:800; margin:0}
-    .motto{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink3);font-size:14px;margin:4px 0 6px}
+    .motto{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink3); font-size:14px; margin:4px 0 6px}
     .strap{font-size:18px; font-weight:700; margin:0}
-
     .wrap{max-width:var(--maxw); margin:0 auto; padding:0 18px}
     main{padding:18px 0 48px}
-
     .media{display:grid; grid-template-columns:var(--img) 1fr; gap:18px; align-items:start}
     .imgWrap{width:var(--img); height:var(--img); border:1px solid var(--line); background:#fff; overflow:hidden}
     .imgWrap img{width:100%; height:100%; object-fit:cover}
-
     h1{font-size:32px; margin:0 0 6px; line-height:1.15}
     .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink2); font-size:15px; margin:6px 0 8px}
     .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:var(--ink3)}
-
     .row{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
-    .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; border:1px solid var(--line); background:#fafafa;
-      padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--ink); text-decoration:none}
+    .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; border:1px solid var(--line); background:#fafafa; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--ink); text-decoration:none}
     .btn:hover{background:#f2f2f2}
-
     .hr{height:1px; background:var(--line); margin:18px 0}
     .body{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink2); font-size:15px}
-
-    footer{border-top:1px solid var(--line); color:var(--ink3);
-      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; padding:16px 0 36px}
+    footer{border-top:1px solid var(--line); color:var(--ink3); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; padding:16px 0 36px}
     .topbar{display:flex; align-items:center; gap:10px; margin-top:6px; justify-content:center}
     .topbar a{color:var(--ink2); text-decoration:none}
   </style>
@@ -60,9 +47,7 @@
     <h1 class="title">PTD Today</h1>
     <div class="motto">First to Know. First to Lead.</div>
     <p class="strap">Daily Energy &amp; Power News</p>
-    <div class="topbar">
-      <a href="./">Home</a>
-    </div>
+    <div class="topbar"><a href="./">Home</a></div>
   </div>
 </header>
 
@@ -81,84 +66,36 @@
         </div>
       </div>
     </div>
-
     <div class="hr"></div>
-
     <div class="body" id="bodyText"></div>
   </article>
 </main>
 
-<footer>
-  <div class="wrap">© 2025 PTD Today • Headlines link to their original publishers.</div>
-</footer>
+<footer><div class="wrap">© 2025 PTD Today • Headlines link to their original publishers.</div></footer>
 
 <script>
 const OG_FALLBACK = "https://ptdtoday.com/assets/og-default.png";
-
-function qs(key){
-  const u=new URL(location.href);
-  return u.searchParams.get(key) || "";
-}
-function isHttpsNonSvg(url){
-  if(!url) return false;
-  const u = url.trim().toLowerCase();
-  if(!u.startsWith("https://")) return false;
-  if(u.endsWith(".svg")) return false;
-  return true;
-}
-function relTime(iso){
-  if(!iso) return "";
-  const t=new Date(iso), now=new Date();
-  const s=(now - t)/1e3;
-  if(s<60) return "just now";
-  const m=Math.floor(s/60); if(m<60) return m+" min ago";
-  const h=Math.floor(m/60); if(h<24) return h+" h ago";
-  return Math.floor(h/24)+" d ago";
-}
-
+function qs(k){const u=new URL(location.href); return u.searchParams.get(k)||"";}
+function safeImg(u){if(!u)return false; const s=u.trim().toLowerCase(); return s.startsWith("https://") && !s.endsWith(".svg");}
+function relTime(iso){if(!iso)return""; const t=new Date(iso), n=new Date(), d=(n-t)/1e3; if(d<60)return"just now"; const m=Math.floor(d/60); if(m<60)return m+" min ago"; const h=Math.floor(m/60); if(h<24)return h+" h ago"; return Math.floor(h/24)+" d ago";}
 (function init(){
-  // read params
-  const T = qs("t");
-  const U = qs("u");
-  const D = qs("d");
-  const I = qs("i");
-  const G = qs("g");
-  const P = qs("p");
-
-  // populate visible content
-  document.title = (T ? T + " | PTD Today" : "PTD Today | Article");
+  const T=qs("t"), U=qs("u"), D=qs("d"), I=qs("i"), G=qs("g"), P=qs("p");
+  document.title = (T?T+" | PTD Today":"PTD Today | Article");
   document.getElementById("title").textContent = T || "PTD Today";
   document.getElementById("dek").textContent = D || "";
-  document.getElementById("img").src = isHttpsNonSvg(I) ? I : OG_FALLBACK;
-
-  const metaText = [G || "", P ? relTime(P) : ""].filter(Boolean).join(" • ");
-  document.getElementById("meta").textContent = metaText;
-
-  const source = U || "#";
-  const open = document.getElementById("openSource");
-  open.href = source;
-  open.textContent = "Open Source";
-
-  // body text (short)
-  const body = document.getElementById("bodyText");
-  body.textContent = D || "Read this story summary on PTD Today, then continue to the original source.";
-
-  // share / copy
-  const shareUrl = location.href; // human page share
+  document.getElementById("img").src = safeImg(I) ? I : OG_FALLBACK;
+  const meta = [G||"", P?("Published "+relTime(P)):""].filter(Boolean).join(" • ");
+  document.getElementById("meta").textContent = meta;
+  document.getElementById("openSource").href = U || "#";
+  document.getElementById("bodyText").textContent = D || "Read this story summary on PTD Today, then continue to the original source.";
+  const shareUrl = location.href;
   document.getElementById("shareBtn").onclick = () => {
-    if(navigator.share){
-      navigator.share({title: T || "PTD Today", text: D || "", url: shareUrl}).catch(()=>{});
-    }else{
-      window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(shareUrl), "_blank");
-    }
+    if(navigator.share){navigator.share({title:T||"PTD Today", text:D||"", url:shareUrl}).catch(()=>{});}
+    else{window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(shareUrl), "_blank");}
   };
   document.getElementById("copyBtn").onclick = async () => {
-    try{
-      await navigator.clipboard.writeText(shareUrl);
-      alert("Link copied.");
-    }catch(e){
-      prompt("Copy the link:", shareUrl);
-    }
+    try{await navigator.clipboard.writeText(shareUrl); alert("Link copied.");}
+    catch{prompt("Copy the link:", shareUrl);}
   };
 })();
 </script>
