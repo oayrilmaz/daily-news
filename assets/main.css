@@ -1,5 +1,5 @@
-/* ====== Desktop-first baseline (looks like your 2nd screenshot) ====== */
-:root { --maxw: 1100px; --gap: 18px; }
+/* ===== Desktop-first news layout (like your 2nd screenshot) ===== */
+:root { --maxw: 1140px; --gap: 18px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
@@ -9,131 +9,84 @@ body {
   -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 
-/* ---------- Masthead (center titles, motto non-centric to the right) ---------- */
+/* ---- Masthead: center title & subtitle; motto non-centric to the right ---- */
 .masthead { margin: 28px auto 10px; max-width: var(--maxw); padding: 0 12px; }
-.title-row {
-  display: flex; justify-content: center; align-items: baseline; gap: 12px; flex-wrap: wrap;
-}
+.title-row { display:flex; justify-content:center; align-items:baseline; gap:12px; flex-wrap:wrap; }
 .site-title {
-  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-  font-weight: 900; line-height: 1; margin: 0;
-  text-align: center;
-  font-size: 64px;       /* desktop baseline */
+  font-family:"Playfair Display", Georgia, "Times New Roman", serif;
+  font-weight:900; line-height:1; margin:0; text-align:center; font-size:64px;
 }
-.site-motto {
-  font-size: 15px; font-weight: 500; opacity: .75; white-space: nowrap;
-}
-.site-subtitle {
-  text-align: center; font-weight: 800; margin-top: 6px;
-  font-size: 28px;
-}
+.site-motto { font-size:15px; font-weight:500; opacity:.75; white-space:nowrap; }
+.site-subtitle { text-align:center; font-weight:800; margin-top:6px; font-size:28px; }
 
-/* ---------- Category bar (single row, timestamp on the right) ---------- */
+/* ---- Section bar (single row; timestamp on the right) ---- */
 .catbar {
-  max-width: var(--maxw); margin: 10px auto 12px; padding: 0 12px;
-  display: flex; gap: 14px; align-items: center; border-top: 1px solid #eee; border-bottom: 1px solid #eee;
-  height: 46px;
+  max-width:var(--maxw); margin:10px auto 12px; padding:0 12px;
+  display:flex; gap:14px; align-items:center; border-top:1px solid #eee; border-bottom:1px solid #eee; height:46px;
 }
-.catbar a { text-decoration: none; color: #333; font-weight: 500; }
-.catbar a.active { color:#000; font-weight: 700; }
-.catbar .updated { margin-left: auto; color: #666; font-size: 13px; }
+.catbar a { text-decoration:none; color:#333; font-weight:500; }
+.catbar a.active { color:#000; font-weight:700; }
+.catbar .updated { margin-left:auto; color:#666; font-size:13px; }
 
-/* ---------- One-column list container ---------- */
-.list { max-width: var(--maxw); margin: 0 auto; padding: 0 12px; }
+/* ---- Article list container ---- */
+.list { max-width:var(--maxw); margin:0 auto; padding:0 12px; }
 
-/* ---------- Article card (DESKTOP GRID) ----------
-   Left: square thumbnail
-   Right: headline + dek + meta + buttons
-*/
+/* ---- Article card (desktop grid: image left, text right) ---- */
 .post {
-  padding: 18px 0 22px;
-  border-bottom: 1px solid #eaeaea;
-  display: grid;
-  grid-template-columns: 280px 1fr;    /* image column ~ like your 2nd screenshot */
+  padding:18px 0 22px; border-bottom:1px solid #eaeaea;
+  display:grid; grid-template-columns: 260px 1fr;   /* <= image column width (not huge) */
   grid-template-areas:
     "thumb title"
     "thumb dek"
     "thumb meta"
     "thumb actions";
-  column-gap: var(--gap);
-  align-items: start;
+  column-gap:var(--gap); align-items:start;
 }
 
-/* Square, half-ish size versus your older very large images */
+/* Square thumbnail; if external URL fails, hide broken icon gracefully */
 .post-thumb {
-  grid-area: thumb;
-  width: 100%;
-  aspect-ratio: 1 / 1;      /* square */
-  object-fit: cover;
-  border-radius: 6px;
+  grid-area:thumb; width:100%;
+  aspect-ratio:1/1; object-fit:cover; border-radius:6px; background:#f3f3f3;
 }
+.post-thumb[onerror] { display:block; } /* keep CSS valid */
 
-/* Headline sizing to match your reference */
-.post-title {
-  grid-area: title;
-  margin: 0 0 10px 0;
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: 40px;          /* desktop */
-  line-height: 1.15;
-}
+/* Headline / dek / meta / actions */
+.post-title { grid-area:title; margin:0 0 10px; font-family:"Playfair Display", Georgia, serif; font-size:40px; line-height:1.15; }
 .post-title a { color:#111; text-decoration:none; }
-.post-title a:hover { text-decoration: underline; }
+.post-title a:hover { text-decoration:underline; }
+.post-dek   { grid-area:dek;  margin:0 0 8px; color:#333; font-size:16px; }
+.post-meta  { grid-area:meta; color:#666; font-size:13px; margin:2px 0 10px; }
+.post-actions { grid-area:actions; display:flex; gap:10px; flex-wrap:wrap; }
+.btn { padding:8px 12px; border:1px solid #d0d0d0; border-radius:8px; text-decoration:none; color:#111; background:#f8f8f8; }
+.btn.ghost { background:transparent; }
 
-.post-dek { grid-area: dek; margin: 0 0 8px; color:#333; font-size: 16px; }
-.post-meta { grid-area: meta; color:#666; font-size: 13px; margin: 2px 0 10px; }
+/* ---- Footer ---- */
+.footnote { max-width:var(--maxw); margin:18px auto 40px; padding:0 12px; color:#666; }
 
-.post-actions {
-  grid-area: actions;
-  display: flex; gap: 10px; flex-wrap: wrap;
-}
-.btn { padding: 8px 12px; border: 1px solid #d0d0d0; border-radius: 8px; text-decoration: none; color:#111; background:#f8f8f8; }
-.btn.ghost { background: transparent; }
-
-/* ---------- Footer ---------- */
-.footnote { max-width: var(--maxw); margin: 18px auto 40px; padding: 0 12px; color:#666; }
-
-/* ====== Responsive adjustments (ONLY below this line) ====== */
-
-/* Large tablets / small laptops */
-@media (max-width: 1024px) {
-  .site-title { font-size: 56px; }
+/* ===== Responsive tweaks (only below desktop) ===== */
+@media (max-width: 1100px) {
+  .site-title { font-size:56px; }
   .post { grid-template-columns: 240px 1fr; }
-  .post-title { font-size: 36px; }
+  .post-title { font-size:36px; }
 }
-
-/* Tablets */
-@media (max-width: 820px) {
-  .site-title { font-size: 48px; }
-  .site-subtitle { font-size: 24px; }
+@media (max-width: 860px) {
+  .site-title { font-size:48px; }
+  .site-subtitle { font-size:24px; }
   .post { grid-template-columns: 210px 1fr; }
-  .post-title { font-size: 32px; }
+  .post-title { font-size:32px; }
 }
+@media (max-width: 600px) {        /* compact phone look */
+  .site-title { font-size:40px; }
+  .site-motto { width:100%; text-align:left; padding-left:6px; } /* non-centric on mobile */
+  .site-subtitle { font-size:20px; }
 
-/* Phones: collapse to compact layout; image stays left but smaller */
-@media (max-width: 600px) {
-  .site-title { font-size: 40px; }
-  .site-motto { width: 100%; text-align: left; padding-left: 6px; } /* non-centric on mobile */
-  .site-subtitle { font-size: 20px; }
-
-  /* Switch from grid to float-left for classic news feel on phones */
-  .post {
-    display: block;
-    padding: 16px 0 20px;
-  }
-  .post-thumb {
-    float: left;
-    width: 120px; height: 120px;    /* small square */
-    aspect-ratio: auto;
-    margin: 0 14px 8px 0;
-  }
+  .post { display:block; padding:16px 0 20px; }
+  .post-thumb { float:left; width:120px; height:120px; aspect-ratio:auto; margin:0 14px 8px 0; }
   .post::after { content:""; display:block; clear:both; }
-
-  .post-title { font-size: 24px; margin-top: 0; }
-  .post-dek { font-size: 15px; }
+  .post-title { font-size:24px; margin-top:0; }
+  .post-dek { font-size:15px; }
 }
-
-/* Super-small phones */
 @media (max-width: 380px) {
-  .post-thumb { width: 104px; height: 104px; }
-  .post-title { font-size: 22px; }
+  .post-thumb { width:104px; height:104px; }
+  .post-title { font-size:22px; }
 }
