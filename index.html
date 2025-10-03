@@ -1,123 +1,173 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Energy & Power News</title>
 
-  <!-- Open Graph -->
+  <!-- Open Graph / Twitter (homepage) -->
   <meta property="og:site_name" content="PTD Today">
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
-  <meta property="og:description" content="First to Know. First to Lead. Daily curated coverage for energy, power grids, HV substations, renewables, and more.">
+  <meta property="og:description" content="First to Know. First to Lead. Curated headlines for power T&D, substations, protection & control, cables, HVDC, renewables, and policy.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://ptdtoday.com">
+  <meta property="og:url" content="https://ptdtoday.com/">
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
-
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="PTD Today — Daily Energy & Power News">
   <meta name="twitter:description" content="First to Know. First to Lead.">
   <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png">
 
   <style>
-    body { font-family: Georgia, serif; margin: 0; background: #fff; color: #111; }
-    header { text-align: center; padding: 28px 0 12px 0; border-bottom: 1px solid #ddd; }
-    header h1 { font-size: 3rem; margin: 0; font-weight: 700; }
-    header p.motto { font-size: 1rem; margin: 4px 0 0 0; color: #555; }
-    header h2 { font-size: 1.4rem; margin: 8px 0 0 0; font-weight: 600; }
+    :root{
+      --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
+      --maxw:1000px; --itemImg:200px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--ink);}
+    body{font-family:Georgia,'Times New Roman',Times,serif; line-height:1.5}
 
-    nav { text-align: center; padding: 12px 0; border-bottom: 1px solid #eee; }
-    nav a { margin: 0 10px; text-decoration: none; color: #111; font-size: 1rem; }
-    nav a.active { font-weight: bold; border-bottom: 2px solid #111; }
+    header{border-bottom:1px solid var(--line); text-align:center; padding:28px 0 12px}
+    .title{font-size:48px; font-weight:800; margin:0}
+    .motto{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink3);font-size:14px;margin:4px 0 6px}
+    .strap{font-size:22px;font-weight:700;margin:0}
+    .wrap{max-width:var(--maxw); margin:0 auto; padding:0 18px}
 
-    .container { max-width: 900px; margin: 0 auto; padding: 20px; }
-    .article { display: flex; flex-direction: row; gap: 16px; border-bottom: 1px solid #eee; padding: 20px 0; }
-    .article img { width: 220px; height: 220px; object-fit: cover; flex-shrink: 0; }
-    .article h3 { margin: 0; font-size: 1.4rem; line-height: 1.3; }
-    .article p { margin: 8px 0; font-size: 1rem; line-height: 1.4; color: #333; }
-    .meta { font-size: 0.85rem; color: #666; margin-top: 6px; }
+    nav{border-bottom:1px solid var(--line); padding:12px 0}
+    .navRow{display:flex; align-items:center; gap:12px}
+    .tabs{display:flex; gap:18px; flex-wrap:wrap; align-items:center; justify-content:center; margin:0 auto}
+    .tab{font-size:16px; text-decoration:none; color:var(--ink2)}
+    .tab[aria-current="true"]{color:var(--ink); font-weight:700}
+    .stamp{margin-left:auto; font-size:12px; color:var(--ink3); border:1px solid var(--line); border-radius:18px; padding:4px 10px;
+      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
 
-    .buttons { margin-top: 8px; }
-    .buttons a { margin-right: 10px; padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px;
-      text-decoration: none; font-size: 0.85rem; color: #111; }
+    main{padding:14px 0 48px}
+    .feed{display:grid; gap:18px}
+    .item{border-top:1px solid var(--line); padding-top:14px}
+    .media{display:grid; grid-template-columns:var(--itemImg) 1fr; gap:16px; align-items:start}
+    .imgWrap{width:var(--itemImg); height:var(--itemImg); border:1px solid var(--line); overflow:hidden; background:#fff}
+    .imgWrap img{width:100%; height:100%; object-fit:cover}
+    h3{font-size:22px; margin:0 0 6px; line-height:1.16}
+    .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink2); font-size:14px; margin:6px 0 8px}
+    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:var(--ink3)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+    .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; border:1px solid var(--line); background:#fafafa;
+      padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--ink); text-decoration:none}
+    .btn:hover{background:#f2f2f2}
 
-    footer { text-align: right; padding: 16px; font-size: 0.85rem; color: #666; border-top: 1px solid #ddd; }
+    footer{border-top:1px solid var(--line); color:var(--ink3); font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; padding:16px 0 36px}
+    .floating{position:fixed; right:16px; bottom:16px; z-index:30}
   </style>
 </head>
 <body>
-  <header>
-    <h1>PTD Today</h1>
-    <p class="motto">First to Know. First to Lead.</p>
-    <h2>Daily Energy & Power News</h2>
-  </header>
+<header>
+  <div class="wrap">
+    <h1 class="title">PTD Today</h1>
+    <div class="motto">First to Know. First to Lead.</div>
+    <p class="strap">Daily Energy &amp; Power News</p>
+  </div>
+</header>
 
-  <nav id="filters">
-    <a href="#" data-cat="all" class="active">All</a>
-    <a href="#" data-cat="Grid">Grid</a>
-    <a href="#" data-cat="Substations">Substations</a>
-    <a href="#" data-cat="Protection">Protection</a>
-    <a href="#" data-cat="Cables">Cables</a>
-    <a href="#" data-cat="HVDC">HVDC</a>
-    <a href="#" data-cat="Renewables">Renewables</a>
-    <a href="#" data-cat="Policy">Policy</a>
-  </nav>
+<nav>
+  <div class="wrap navRow">
+    <div class="tabs" id="tabs">
+      <a href="#" class="tab" data-cat="All" aria-current="true">All</a>
+      <a href="#" class="tab" data-cat="Grid">Grid</a>
+      <a href="#" class="tab" data-cat="Substations">Substations</a>
+      <a href="#" class="tab" data-cat="Protection">Protection</a>
+      <a href="#" class="tab" data-cat="Cables">Cables</a>
+      <a href="#" class="tab" data-cat="HVDC">HVDC</a>
+      <a href="#" class="tab" data-cat="Renewables">Renewables</a>
+      <a href="#" class="tab" data-cat="Policy">Policy</a>
+    </div>
+    <span class="stamp" id="updated">Updated —</span>
+  </div>
+</nav>
 
-  <div class="container" id="news"></div>
+<main class="wrap">
+  <section class="feed" id="feed"></section>
+</main>
 
-  <footer>
-    Updated — <span id="updated"></span>
-    <button onclick="location.reload()">Refresh</button>
-  </footer>
+<footer>
+  <div class="wrap">© 2025 PTD Today • Headlines link to their original publishers.</div>
+</footer>
 
-  <script>
-    let articlesData = [];
+<div class="floating">
+  <button id="refresh" class="btn" type="button">Refresh</button>
+</div>
 
-    async function loadNews() {
-      const response = await fetch("data/news.json");
-      articlesData = await response.json();
-      renderNews("all");
-      document.getElementById("updated").textContent = new Date().toLocaleString();
-    }
+<script>
+const FEED_EL = document.getElementById("feed");
+const UPDATED_EL = document.getElementById("updated");
+const TABS = document.getElementById("tabs");
 
-    function renderNews(category) {
-      const container = document.getElementById("news");
-      container.innerHTML = "";
+let ALL = [];
+let CAT = "All";
 
-      articlesData
-        .filter(a => category === "all" || (a.category && a.category.toLowerCase().includes(category.toLowerCase())))
-        .forEach(a => {
-          const imgUrl = a.image && a.image.trim() !== "" ? a.image : "assets/og-default.png";
+const esc = (s='') => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-          const article = document.createElement("div");
-          article.className = "article";
-          article.innerHTML = `
-            <img src="${imgUrl}" alt="">
-            <div>
-              <h3>${a.title}</h3>
-              <p>${a.summary || ""}</p>
-              <div class="meta">${a.category || ""} • ${a.time || ""}</div>
-              <div class="buttons">
-                <a href="article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary)}&i=${encodeURIComponent(imgUrl)}">Open on PTD Today</a>
-                <a href="${a.url}" target="_blank">Source</a>
-                <a href="https://www.linkedin.com/sharing/share-offsite/?url=https://ptdtoday.com/article.html?u=${encodeURIComponent(a.url)}" target="_blank">Share</a>
-              </div>
-            </div>
-          `;
-          container.appendChild(article);
-        });
-    }
+const relTime = (iso) => {
+  if(!iso) return "";
+  const t = new Date(iso), now = new Date();
+  const diff = (now - t)/1000;
+  if(diff < 60) return "just now";
+  const m = Math.floor(diff/60); if(m<60) return `${m} min ago`;
+  const h = Math.floor(m/60); if(h<24) return `${h} h ago`;
+  return `${Math.floor(h/24)} d ago`;
+};
 
-    // handle filter clicks
-    document.getElementById("filters").addEventListener("click", e => {
-      if (e.target.tagName === "A") {
-        e.preventDefault();
-        document.querySelectorAll("#filters a").forEach(a => a.classList.remove("active"));
-        e.target.classList.add("active");
-        renderNews(e.target.dataset.cat);
-      }
-    });
+function cardHTML(a){
+  const img = a.image && a.image.trim() ? a.image : "assets/og-default.png";
+  const internal = `article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary||'')}&i=${encodeURIComponent(img)}&g=${encodeURIComponent(a.category||'')}&p=${encodeURIComponent(a.time||'')}`;
+  const short = a.slug ? `${location.origin}/s/${a.slug}.html` : internal;
+  return `
+  <article class="item">
+    <div class="media">
+      <div class="imgWrap">${img ? `<img src="${esc(img)}" alt="">` : ""}</div>
+      <div>
+        <h3><a href="${internal}">${esc(a.title)}</a></h3>
+        <div class="dek">${esc((a.summary||"").slice(0,180))}</div>
+        <div class="meta">${esc(a.category||"")} • ${esc(relTime(a.time))}</div>
+        <div class="row">
+          <a class="btn" href="${internal}">Open on PTD Today</a>
+          <a class="btn" href="${a.url}" target="_blank" rel="noopener">Source</a>
+          <button class="btn" onclick="shareURL('${encodeURIComponent(short)}','${esc(a.title)}')">Share</button>
+        </div>
+      </div>
+    </div>
+  </article>`;
+}
 
-    loadNews();
-  </script>
+function render(){
+  const list = CAT==="All" ? ALL : ALL.filter(x => (x.category||"").toLowerCase() === CAT.toLowerCase());
+  FEED_EL.innerHTML = list.map(cardHTML).join("");
+  [...TABS.querySelectorAll(".tab")].forEach(a => a.setAttribute("aria-current", a.dataset.cat===CAT ? "true" : "false"));
+}
+
+function shareURL(urlEnc, title){
+  const url = decodeURIComponent(urlEnc);
+  if(navigator.share){
+    navigator.share({title, url}).catch(()=>{ window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(url), "_blank"); });
+  }else{
+    window.open("https://www.linkedin.com/sharing/share-offsite/?url="+encodeURIComponent(url), "_blank");
+  }
+}
+
+async function loadData(){
+  const r = await fetch("data/news.json?ts="+Date.now());
+  const data = await r.json();
+  ALL = Array.isArray(data.items) ? data.items : data;    // support {items:[...]} or [...]
+  UPDATED_EL.textContent = "Updated — " + (data.generated_at || new Date().toLocaleString());
+  render();
+}
+
+TABS.addEventListener("click", e=>{
+  const a = e.target.closest("a.tab"); if(!a) return;
+  e.preventDefault(); CAT = a.dataset.cat; render();
+});
+document.getElementById("refresh").onclick = loadData;
+
+// boot
+loadData();
+</script>
 </body>
 </html>
