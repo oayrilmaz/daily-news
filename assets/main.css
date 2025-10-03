@@ -1,50 +1,139 @@
-/* Quick visual sanity check so you KNOW CSS loaded */
-body { background:#fff; }
-
-/* Base */
-:root { --maxw: 1100px; }
+/* ====== Desktop-first baseline (looks like your 2nd screenshot) ====== */
+:root { --maxw: 1100px; --gap: 18px; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  color:#111; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  line-height:1.5; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  background:#fff; color:#111;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
 }
 
-/* Masthead */
-.masthead { margin:24px auto 6px; max-width:var(--maxw); padding:0 12px; }
-.title-row { display:flex; justify-content:center; align-items:baseline; gap:12px; flex-wrap:wrap; }
-.site-title { font-family:"Playfair Display", Georgia, serif; font-weight:700; line-height:1; margin:0; text-align:center; font-size:clamp(42px,6vw,68px); }
-.site-subtitle { text-align:center; font-weight:700; margin-top:4px; font-size:clamp(18px,2.6vw,28px); }
-.site-motto { font-size:clamp(12px,1.5vw,15px); font-weight:500; opacity:.75; white-space:nowrap; }
-@media (max-width:520px){ .site-motto{ width:100%; text-align:left; padding-left:6px; } }
+/* ---------- Masthead (center titles, motto non-centric to the right) ---------- */
+.masthead { margin: 28px auto 10px; max-width: var(--maxw); padding: 0 12px; }
+.title-row {
+  display: flex; justify-content: center; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+.site-title {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-weight: 900; line-height: 1; margin: 0;
+  text-align: center;
+  font-size: 64px;       /* desktop baseline */
+}
+.site-motto {
+  font-size: 15px; font-weight: 500; opacity: .75; white-space: nowrap;
+}
+.site-subtitle {
+  text-align: center; font-weight: 800; margin-top: 6px;
+  font-size: 28px;
+}
 
-/* Catbar */
-.catbar { max-width:var(--maxw); margin:8px auto 4px; padding:0 12px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-.catbar a { text-decoration:none; color:#444; padding:6px 0; }
-.catbar a.active { color:#000; font-weight:700; }
-.catbar .updated { margin-left:auto; color:#666; font-size:13px; }
+/* ---------- Category bar (single row, timestamp on the right) ---------- */
+.catbar {
+  max-width: var(--maxw); margin: 10px auto 12px; padding: 0 12px;
+  display: flex; gap: 14px; align-items: center; border-top: 1px solid #eee; border-bottom: 1px solid #eee;
+  height: 46px;
+}
+.catbar a { text-decoration: none; color: #333; font-weight: 500; }
+.catbar a.active { color:#000; font-weight: 700; }
+.catbar .updated { margin-left: auto; color: #666; font-size: 13px; }
 
-/* List */
-.list { max-width:var(--maxw); margin:10px auto; padding:0 12px; display:block; }
-.post { border-bottom:1px solid #eee; padding:14px 0 18px; margin:0; clear:both; }
+/* ---------- One-column list container ---------- */
+.list { max-width: var(--maxw); margin: 0 auto; padding: 0 12px; }
 
-/* Left square thumbnail (half-size footprint) */
-.post-thumb { float:left; width:clamp(120px,18vw,180px); height:clamp(120px,18vw,180px); object-fit:cover; border-radius:4px; margin:0 16px 8px 0; }
-.post::after { content:""; display:block; clear:both; }
+/* ---------- Article card (DESKTOP GRID) ----------
+   Left: square thumbnail
+   Right: headline + dek + meta + buttons
+*/
+.post {
+  padding: 18px 0 22px;
+  border-bottom: 1px solid #eaeaea;
+  display: grid;
+  grid-template-columns: 280px 1fr;    /* image column ~ like your 2nd screenshot */
+  grid-template-areas:
+    "thumb title"
+    "thumb dek"
+    "thumb meta"
+    "thumb actions";
+  column-gap: var(--gap);
+  align-items: start;
+}
 
-.post-title { font-size:clamp(22px,3vw,34px); line-height:1.2; margin:0 0 8px; font-family:"Playfair Display", Georgia, serif; }
+/* Square, half-ish size versus your older very large images */
+.post-thumb {
+  grid-area: thumb;
+  width: 100%;
+  aspect-ratio: 1 / 1;      /* square */
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+/* Headline sizing to match your reference */
+.post-title {
+  grid-area: title;
+  margin: 0 0 10px 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 40px;          /* desktop */
+  line-height: 1.15;
+}
 .post-title a { color:#111; text-decoration:none; }
-.post-title a:hover { text-decoration:underline; }
-.post-dek { margin:0 0 8px; color:#333; font-size:15.5px; }
-.post-meta { color:#666; font-size:13px; margin-bottom:8px; }
+.post-title a:hover { text-decoration: underline; }
 
-.post-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
-.btn { padding:6px 10px; border:1px solid #ccc; border-radius:6px; text-decoration:none; color:#111; background:#f8f8f8; }
-.btn.ghost { background:transparent; }
+.post-dek { grid-area: dek; margin: 0 0 8px; color:#333; font-size: 16px; }
+.post-meta { grid-area: meta; color:#666; font-size: 13px; margin: 2px 0 10px; }
 
-/* Footer */
-.footnote { max-width:var(--maxw); margin:16px auto 40px; padding:0 12px; color:#666; }
+.post-actions {
+  grid-area: actions;
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.btn { padding: 8px 12px; border: 1px solid #d0d0d0; border-radius: 8px; text-decoration: none; color:#111; background:#f8f8f8; }
+.btn.ghost { background: transparent; }
 
-/* Safety */
-header, .masthead, .title-row { background:transparent; }
-aside, .right-rail, .sidebar { display:none !important; }
+/* ---------- Footer ---------- */
+.footnote { max-width: var(--maxw); margin: 18px auto 40px; padding: 0 12px; color:#666; }
+
+/* ====== Responsive adjustments (ONLY below this line) ====== */
+
+/* Large tablets / small laptops */
+@media (max-width: 1024px) {
+  .site-title { font-size: 56px; }
+  .post { grid-template-columns: 240px 1fr; }
+  .post-title { font-size: 36px; }
+}
+
+/* Tablets */
+@media (max-width: 820px) {
+  .site-title { font-size: 48px; }
+  .site-subtitle { font-size: 24px; }
+  .post { grid-template-columns: 210px 1fr; }
+  .post-title { font-size: 32px; }
+}
+
+/* Phones: collapse to compact layout; image stays left but smaller */
+@media (max-width: 600px) {
+  .site-title { font-size: 40px; }
+  .site-motto { width: 100%; text-align: left; padding-left: 6px; } /* non-centric on mobile */
+  .site-subtitle { font-size: 20px; }
+
+  /* Switch from grid to float-left for classic news feel on phones */
+  .post {
+    display: block;
+    padding: 16px 0 20px;
+  }
+  .post-thumb {
+    float: left;
+    width: 120px; height: 120px;    /* small square */
+    aspect-ratio: auto;
+    margin: 0 14px 8px 0;
+  }
+  .post::after { content:""; display:block; clear:both; }
+
+  .post-title { font-size: 24px; margin-top: 0; }
+  .post-dek { font-size: 15px; }
+}
+
+/* Super-small phones */
+@media (max-width: 380px) {
+  .post-thumb { width: 104px; height: 104px; }
+  .post-title { font-size: 22px; }
+}
