@@ -4,30 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Energy & Power News</title>
+
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
   <meta property="og:description" content="First to Know. First to Lead.">
-  <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
-  <link rel="stylesheet" href="assets/main.css" />
+  <meta property="og:image" content="/assets/og-default.png">
+  <link rel="icon" href="/logo.svg">
   <style>
     body{font-family:Georgia,serif;color:#111;margin:0;background:#fff;line-height:1.6}
-    header{text-align:center;padding:42px 0 14px}
-    header h1{font-size:3.25em;margin:0;font-weight:700}
-    header p{margin:6px 0;color:#666;font-size:1.08em}
-    nav{display:flex;justify-content:center;gap:1.5em;font-size:1.05em;
-        border-top:1px solid #eee;border-bottom:1px solid #eee;padding:12px 0;margin-bottom:30px}
-    nav a{text-decoration:none;color:#000} nav a:hover{text-decoration:underline}
-    .updated{display:flex;justify-content:center;margin:-20px 0 22px}
+    header{text-align:center;padding:42px 0 12px}
+    header h1{font-size:3.2em;margin:0;font-weight:700}
+    header p{margin:6px 0;color:#666;font-size:1.05em}
+    .kicker{font-weight:700;margin-top:8px}
+    .bar{border-top:1px solid #eee;border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:5}
+    nav{display:flex;justify-content:center;flex-wrap:wrap;gap:1.2rem;padding:12px 10px}
+    nav button{background:none;border:none;font-size:1.02em;cursor:pointer}
+    nav button.active{font-weight:700;text-decoration:underline}
+    .updated{display:flex;justify-content:center;margin:10px 0 24px}
     .updated span{border:1px solid #e6e6e6;border-radius:18px;padding:6px 10px;color:#555;font-size:.9em}
-    .news-container{max-width:950px;margin:0 auto;padding:0 16px}
-    .news-item{display:flex;flex-wrap:wrap;gap:20px;border-bottom:1px solid #eee;margin-bottom:30px;padding-bottom:20px}
+    .wrap{max-width:950px;margin:0 auto;padding:0 16px}
+    .item{display:flex;flex-wrap:wrap;gap:20px;border-bottom:1px solid #eee;margin-bottom:28px;padding-bottom:20px}
     .thumb{flex:0 0 200px}
     .thumb img{width:200px;height:200px;object-fit:cover;border:1px solid #ddd}
-    .content{flex:1;min-width:240px}
-    .content h2{font-size:1.5em;margin:0 0 8px}
+    .txt{flex:1;min-width:240px}
+    .txt h2{font-size:1.5em;margin:0 0 8px}
     .meta{font-size:.9em;color:#666;margin:8px 0}
-    .buttons{margin-top:10px}
-    .buttons a{display:inline-block;border:1px solid #ddd;border-radius:6px;padding:6px 10px;text-decoration:none;color:#333;font-size:.9em;margin-right:8px}
-    .buttons a:hover{background:#f4f4f4}
+    .btns{margin-top:10px}
+    .btns a{display:inline-block;border:1px solid #ddd;border-radius:6px;padding:6px 10px;text-decoration:none;color:#333;font-size:.9em;margin-right:8px}
+    .btns a:hover{background:#f4f4f4}
+    .chips{margin-top:6px}
+    .chip{display:inline-block;border:1px solid #e5e5e5;border-radius:10px;padding:2px 8px;margin-right:6px;font-size:.78em;color:#666}
     footer{text-align:center;font-size:.9em;color:#777;border-top:1px solid #eee;padding:20px 0;margin-top:40px}
   </style>
 </head>
@@ -35,67 +40,108 @@
 <header>
   <h1>PTD Today</h1>
   <p>First to Know. First to Lead.</p>
-  <p><strong>Daily Energy & Power News</strong></p>
+  <p class="kicker">Daily Energy &amp; Power News</p>
 </header>
 
-<nav>
-  <a href="#">All</a>
-  <a href="#">Grid</a>
-  <a href="#">Substations</a>
-  <a href="#">Protection</a>
-  <a href="#">Cables</a>
-  <a href="#">HVDC</a>
-  <a href="#">Renewables</a>
-  <a href="#">Policy</a>
-</nav>
+<div class="bar">
+  <nav id="tabs">
+    <button data-cat="all" class="active">All</button>
+    <button data-cat="grid">Grid</button>
+    <button data-cat="substations">Substations</button>
+    <button data-cat="protection">Protection</button>
+    <button data-cat="cables">Cables</button>
+    <button data-cat="hvdc">HVDC</button>
+    <button data-cat="renewables">Renewables</button>
+    <button data-cat="policy">Policy</button>
+    <button data-cat="supply-chain">Supply&nbsp;Chain</button>
+    <button data-cat="data-centers">Data&nbsp;Centers</button>
+    <button data-cat="ai">AI</button>
+  </nav>
+</div>
 
 <div class="updated"><span id="updated">Updated —</span></div>
 
-<div class="news-container" id="news"></div>
+<div class="wrap" id="list"></div>
 
 <footer>
   © 2025 PTD Today • Headlines link to their original publishers.
 </footer>
 
 <script>
-async function loadNews() {
-  const res = await fetch('data/news.json?_=' + Date.now());
-  const items = await res.json();
-  const container = document.getElementById('news');
-  container.innerHTML = '';
+const listEl = document.getElementById('list');
+const updatedEl = document.getElementById('updated');
+const tabsEl = document.getElementById('tabs');
 
-  document.getElementById('updated').textContent =
-    'Updated — ' + new Date().toISOString();
+let ALL_ITEMS = [];
+let CURRENT_CAT = 'all';
 
-  if (!items || items.length === 0) {
-    container.innerHTML =
-      `<p style="text-align:center;color:#777;">No stories for the current window yet. Please check back soon.</p>`;
+function fallbackImg(img){
+  img.onerror = null;
+  img.src = '/assets/og-default.png';
+}
+
+function chipLabel(slug){
+  const map = {
+    'grid':'Grid', 'substations':'Substations', 'protection':'Protection',
+    'cables':'Cables','hvdc':'HVDC','renewables':'Renewables','policy':'Policy',
+    'supply-chain':'Supply Chain','ai':'AI','data-centers':'Data Centers'
+  };
+  return map[slug] || slug;
+}
+
+function render(){
+  listEl.innerHTML = '';
+  const items = ALL_ITEMS.filter(a => {
+    if (CURRENT_CAT === 'all') return true;
+    return Array.isArray(a.cats) && a.cats.includes(CURRENT_CAT);
+  });
+
+  if (items.length === 0){
+    listEl.innerHTML = `<p style="text-align:center;color:#777;">No stories for this section yet.</p>`;
     return;
   }
 
-  items.forEach(n => {
+  for (const n of items){
+    const chips = (n.cats || []).slice(0,6).map(c => `<span class="chip">${chipLabel(c)}</span>`).join('');
     const div = document.createElement('div');
-    div.className = 'news-item';
+    div.className = 'item';
     div.innerHTML = `
       <div class="thumb">
-        <img src="${n.image || '/assets/og-default.png'}"
-             onerror="this.onerror=null;this.src='/assets/og-default.png'">
+        <img src="${n.image || '/assets/og-default.png'}" onerror="fallbackImg(this)">
       </div>
-      <div class="content">
+      <div class="txt">
         <h2><a href="${n.url}" target="_blank" rel="noopener">${n.title}</a></h2>
         <div class="meta">${n.source || ''} • ${n.timeAgo || ''}</div>
         <p>${n.summary || ''}</p>
-        <div class="buttons">
+        <div class="chips">${chips}</div>
+        <div class="btns">
           <a href="${n.url}" target="_blank" rel="noopener">Source</a>
           <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(n.url)}" target="_blank" rel="noopener">Share</a>
         </div>
       </div>`;
-    container.appendChild(div);
-  });
+    listEl.appendChild(div);
+  }
 }
 
-loadNews();
-setInterval(loadNews, 10800000); // refresh every 3 hours
+async function load(){
+  const res = await fetch('/data/news.json?_=' + Date.now());
+  ALL_ITEMS = await res.json();
+  updatedEl.textContent = 'Updated — ' + new Date().toISOString();
+  render();
+}
+
+tabsEl.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-cat]');
+  if (!btn) return;
+  for (const b of tabsEl.querySelectorAll('button')) b.classList.remove('active');
+  btn.classList.add('active');
+  CURRENT_CAT = btn.dataset.cat;
+  render();
+});
+
+load();
+// Optional auto-refresh every 3 hours to mirror the job cadence
+setInterval(load, 10800000);
 </script>
 </body>
 </html>
