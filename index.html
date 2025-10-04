@@ -15,8 +15,10 @@
   <meta name="twitter:card" content="summary_large_image">
 
   <style>
-    :root{ --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
-           --maxw:1000px; --img:200px; }
+    :root{
+      --ink:#0b0b0b; --ink2:#333; --ink3:#666; --line:#e6e6e6; --bg:#fff;
+      --maxw:1000px; --img:200px; --pill:#f2f2f2;
+    }
     *{box-sizing:border-box}
     html,body{margin:0;background:var(--bg);color:var(--ink)}
     body{font-family:Georgia,'Times New Roman',Times,serif; line-height:1.5}
@@ -41,7 +43,8 @@
     .imgWrap img{width:100%; height:100%; object-fit:cover}
     h3{font-size:22px; margin:0 0 6px; line-height:1.16}
     .dek{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--ink2); font-size:14px; margin:6px 0 8px}
-    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:var(--ink3)}
+    .meta{font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; color:var(--ink3); display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+    .pill{display:inline-block; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:12px; padding:2px 8px; border-radius:999px; background:var(--pill); color:var(--ink2); border:1px solid var(--line)}
     .row{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
     .btn{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; border:1px solid var(--line); background:#fafafa; padding:7px 12px; border-radius:8px; cursor:pointer; font-size:13px; color:var(--ink); text-decoration:none}
     .btn:hover{background:#f2f2f2}
@@ -102,22 +105,42 @@ const relTime = (iso) => {
   const h = Math.floor(m/60); if(h<24) return `${h} h ago`;
   return `${Math.floor(h/24)} d ago`;
 };
+const safeImg = (u) => u && u.startsWith("https://") && !u.endsWith(".svg");
+
+function toUnifiedItem(x){
+  // Accepts either "items" (old format) or "articles" (new company/topic format),
+  // and returns a unified object for rendering.
+  if (x.url || x.link) {
+    return {
+      title: x.title || "",
+      url: x.url || x.link || "#",
+      summary: x.summary || "",
+      time: x.time || x.date || "",
+      category: x.category || x.topic || "",      // topic shows as a tag
+      image: (x.image && safeImg(x.image)) ? x.image : "assets/og-default.png",
+      slug: x.slug || x.id || ""                  // if present, used for /s/<slug>.html
+    };
+  }
+  return null;
+}
 
 function cardHTML(a){
-  const img = a.image && a.image.trim() ? a.image : "assets/og-default.png";
-  const internal = `article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary||'')}&i=${encodeURIComponent(img)}&g=${encodeURIComponent(a.category||'')}&p=${encodeURIComponent(a.time||'')}`;
-  const short = a.slug ? `${location.origin}/s/${a.slug}.html` : internal;
+  // internal article view (keeps image left, text right)
+  const internal = `article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary||'')}&i=${encodeURIComponent(a.image||'assets/og-default.png')}&g=${encodeURIComponent(a.category||'')}&p=${encodeURIComponent(a.time||'')}`;
+  // prefer shortlink when available
+  const short = a.slug ? `${location.origin}/s/${a.slug}.html` : a.url;
 
   return `
   <article class="item">
     <div class="media">
-      <div class="imgWrap"><img src="${esc(img)}" alt=""></div>
+      <div class="imgWrap"><img src="${esc(a.image||'assets/og-default.png')}" alt=""></div>
       <div>
         <h3><a href="${internal}">${esc(a.title)}</a></h3>
-        <div class="dek">${esc((a.summary||"").slice(0,220))}</div>
+        ${a.summary ? `<div class="dek">${esc((a.summary||"").slice(0,220))}</div>` : ``}
         <div class="meta">
-          ${esc(a.category||"")} • Published ${esc(relTime(a.time))}
-          ${BUILD_AT ? ` • Refreshed ${esc(relTime(BUILD_AT))}` : ""}
+          ${a.category ? `<span class="pill">${esc(a.category)}</span>` : ``}
+          <span>Published ${esc(relTime(a.time))}</span>
+          ${BUILD_AT ? `<span>• Refreshed ${esc(relTime(BUILD_AT))}</span>` : ``}
         </div>
         <div class="row">
           <a class="btn" href="${internal}">Open on PTD Today</a>
@@ -130,7 +153,9 @@ function cardHTML(a){
 }
 
 function render(){
-  const list = CAT==="All" ? ALL : ALL.filter(x => (x.category||"").toLowerCase() === CAT.toLowerCase());
+  const list = CAT==="All"
+    ? ALL
+    : ALL.filter(x => (x.category||"").toLowerCase() === CAT.toLowerCase());
   FEED_EL.innerHTML = list.map(cardHTML).join("");
   [...TABS.querySelectorAll(".tab")].forEach(a => a.setAttribute("aria-current", a.dataset.cat===CAT ? "true" : "false"));
 }
@@ -149,7 +174,13 @@ async function loadData(){
     const r = await fetch("data/news.json?ts="+Date.now());
     if(!r.ok) throw new Error("news.json not found");
     const data = await r.json();
-    ALL = Array.isArray(data.items) ? data.items : data;
+
+    // Accept both shapes: {items:[...]} or {articles:[...]}
+    let raw = Array.isArray(data.items) ? data.items
+            : Array.isArray(data.articles) ? data.articles
+            : [];
+    ALL = raw.map(toUnifiedItem).filter(Boolean);
+
     BUILD_AT = data.generated_at || null;
     UPDATED_EL.textContent = "Updated — " + (data.generated_at || new Date().toLocaleString());
     render();
