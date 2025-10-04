@@ -1,213 +1,94 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>PTD Today — Article</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Read this story summary on PTD Today, then continue to the original source." />
-  <link rel="icon" href="logo.svg" />
-  <link rel="canonical" href="" id="canonicalTag">
+<meta charset="utf-8">
+<title>PTD Today | Article</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Static OG fallback -->
-  <meta property="og:type" content="article" />
-  <meta property="og:title" content="PTD Today — Article" />
-  <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:description" content="Read this story summary on PTD Today, then continue to the original source." />
-  <meta property="og:image" content="/assets/og-default.png" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="/assets/og-default.png" />
+<script>
+  // Parse query
+  const P = new URLSearchParams(location.search);
+  const u = P.get('u') || '';
+  const t = P.get('t') || 'PTD Today — Article';
+  const i = P.get('i') || '/assets/og-default.png';
 
-  <style>
-    :root{ --ink:#111; --ink2:#555; --line:#e6e6e6 }
-    *{ box-sizing:border-box }
-    html,body{ margin:0; background:#fff; color:var(--ink);
-      font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial }
-    .container{ max-width:840px; margin:0 auto; padding:0 16px }
-    header{ border-bottom:1px solid var(--line); padding:24px 0 16px }
-    h1.site{ font:700 42px/1.15 Georgia,'Times New Roman',Times,serif; margin:0 }
-    .motto{ color:var(--ink2); margin-top:6px; font-weight:500 }
-    main{ padding:24px 0 56px }
-    h2.title{ font:700 34px/1.15 Georgia,'Times New Roman',Times,serif; margin:10px 0 12px }
-    .meta{ color:var(--ink2); font-size:14px; margin:6px 0 16px }
-    .hero{ width:100%; max-height:420px; object-fit:cover; border:1px solid var(--line); background:#f6f6f6 }
-    .dek{ margin:16px 0 18px; color:var(--ink); font-size:18px }
-    .actions{ display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 24px }
-    .btn{ border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px 14px; cursor:pointer; font-size:14px }
-    .btn:hover{ border-color:#ccc }
-    .source-block{ border-top:1px solid var(--line); margin-top:26px; padding-top:16px; color:var(--ink2) }
-    .source-block a{ color:#1a0dab; text-decoration:underline; text-underline-offset:2px }
-    .back{ margin-top:28px }
-    .back a{ color:#1a0dab; text-decoration:underline; text-underline-offset:2px }
-    /* Share modal */
-    .backdrop{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.18); z-index:50 }
-    .modal{ width:min(92vw,460px); background:#fff; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.18); overflow:hidden }
-    .modal header{ padding:14px 16px; border-bottom:1px solid var(--line) }
-    .modal h4{ margin:0; font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial }
-    .share-list{ display:flex; flex-direction:column }
-    .share-item{ padding:14px 18px; border-top:1px solid var(--line); text-align:left; background:#fff; cursor:pointer; font-size:16px }
-    .share-item:active{ background:#f7f7f7 }
-    .close-row{ padding:12px 16px; border-top:1px solid var(--line); text-align:right }
-    .link-like{ color:#555; text-decoration:underline; cursor:pointer }
-    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#111;color:#fff;
-      padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s ease;z-index:60}
-    .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
-  </style>
+  // Inject Open Graph for nice link previews
+  document.write(`
+    <meta property="og:title" content="${t.replace(/"/g,'&quot;')}">
+    <meta property="og:description" content="Read this story summary on PTD Today, then continue to the original source.">
+    <meta property="og:image" content="${i}">
+    <meta property="og:url" content="${location.href}">
+    <meta name="twitter:card" content="summary_large_image">
+  `);
+</script>
+
+<style>
+  :root{--ink:#1a1a1a;--muted:#666;--rule:#e8e8e8}
+  body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--ink)}
+  .wrap{max-width:860px;margin:0 auto;padding:28px}
+  h1{font-weight:800;letter-spacing:.3px;font-size:30px;margin:0 0 8px}
+  .meta{color:#777;margin:6px 0 18px}
+  .hero{width:100%;max-height:380px;object-fit:cover;border-radius:10px;background:#f5f5f5}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+  .btn{border:1px solid var(--rule);border-radius:10px;background:#fff;padding:10px 14px;font-weight:700;cursor:pointer}
+  .btn:hover{background:#fafafa}
+  .share a,.share button{border-top:1px solid var(--rule);display:block;padding:14px 12px;text-decoration:none;color:inherit}
+  .share a:hover,.share button:hover{background:#fafafa}
+  .sheet{max-width:420px;margin:18px 0;border:1px solid var(--rule);border-radius:12px}
+  .sheet h3{margin:10px 12px 8px}
+</style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1 class="site">PTD Today</h1>
-      <div class="motto">First to Know. First to Lead.</div>
-    </div>
-  </header>
+<div class="wrap">
+  <h1 id="ttl">PTD Today — Article</h1>
+  <div class="meta"><span id="host"></span></div>
+  <img id="img" class="hero" alt="">
 
-  <main class="container" id="app" aria-live="polite"></main>
+  <div class="btns">
+    <a id="toSource" class="btn" target="_blank" rel="noopener">Open source</a>
+    <button id="copy" class="btn">Copy PTD link</button>
+  </div>
 
-  <!-- Share modal -->
-  <div class="backdrop" id="shareBackdrop" role="dialog" aria-modal="true" aria-label="Share options">
-    <div class="modal">
-      <header><h4>Share</h4></header>
-      <div class="share-list">
-        <button class="share-item" data-type="linkedin">LinkedIn</button>
-        <button class="share-item" data-type="x">X (Twitter)</button>
-        <button class="share-item" data-type="facebook">Facebook</button>
-        <button class="share-item" data-type="reddit">Reddit</button>
-        <button class="share-item" data-type="copy">Copy link</button>
-        <button class="share-item" data-type="email">Email</button>
-      </div>
-      <div class="close-row"><span class="link-like" id="closeShare">Close ×</span></div>
+  <div class="sheet">
+    <h3>Share this article</h3>
+    <div class="share">
+      <a id="ln" target="_blank" rel="noopener">LinkedIn</a>
+      <a id="x" target="_blank" rel="noopener">X (Twitter)</a>
+      <a id="fb" target="_blank" rel="noopener">Facebook</a>
+      <a id="rd" target="_blank" rel="noopener">Reddit</a>
+      <button id="em">Email</button>
     </div>
   </div>
 
-  <div id="toast" class="toast" role="status" aria-live="polite">Link copied</div>
+  <p style="color:#777">Note: You’re viewing this item on PTD Today for a clean preview and easy sharing. Use <em>Open source</em> to read the full article at the publisher.</p>
+</div>
 
-  <script>
-  (function(){
-    const app = document.getElementById('app');
-    const canon = document.getElementById('canonicalTag');
+<script>
+(function(){
+  const P = new URLSearchParams(location.search);
+  const u = P.get('u') || '';
+  const t = P.get('t') || 'PTD Today — Article';
+  const i = P.get('i') || '/assets/og-default.png';
 
-    // Robust copy helper
-    async function copyText(text){
-      try{
-        if(navigator.clipboard && window.isSecureContext){
-          await navigator.clipboard.writeText(text);
-          showToast('Link copied');
-          return;
-        }
-      }catch(_) {}
-      try{
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.setAttribute('readonly','');
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
-        document.body.appendChild(ta);
-        ta.focus(); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        showToast('Link copied');
-      }catch(_){
-        prompt('Copy link:', text);
-      }
-    }
-    function showToast(msg){
-      const t = document.getElementById('toast');
-      t.textContent = msg;
-      t.classList.add('show');
-      setTimeout(()=>t.classList.remove('show'), 1400);
-    }
+  document.getElementById('ttl').textContent = t;
+  document.getElementById('img').src = i;
+  document.getElementById('toSource').href = u;
+  try{ document.getElementById('host').textContent = new URL(u).host.replace(/^www\./,''); }catch{ }
 
-    // Helpers
-    function qs(k){ const u=new URL(location.href); return u.searchParams.get(k); }
-    function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-    function escAttr(s){return esc(s).replace(/'/g,'&#39;');}
-    function hostFrom(url){ try{ return new URL(url).hostname.replace(/^www\./,''); }catch(e){ return ''; } }
-    function setCanonical(href){ canon.setAttribute('href', href); }
+  const encU = encodeURIComponent(location.href);
+  const encT = encodeURIComponent(t);
 
-    async function resolveArticle(){
-      const m = location.pathname.match(/\/s\/([a-zA-Z0-9_-]+)\.html$/);
-      if(m){
-        const id = m[1];
-        try{
-          const map = await fetch('/data/shortlinks.json?v='+Date.now()).then(r=>r.json());
-          if(map && map.__reverse && map.__reverse[id]) return { url: map.__reverse[id] };
-          if(map){ for(const k in map){ if(map[k]===id) return { url:k }; } }
-        }catch(e){}
-        return { url:'' };
-      }
-      return { url: qs('u')||'', title:qs('t')||'', image:qs('i')||'', summary:qs('d')||'' };
-    }
+  document.getElementById('ln').href = `https://www.linkedin.com/sharing/share-offsite/?url=${encU}`;
+  document.getElementById('x').href  = `https://twitter.com/intent/tweet?url=${encU}&text=${encT}`;
+  document.getElementById('fb').href = `https://www.facebook.com/sharer/sharer.php?u=${encU}`;
+  document.getElementById('rd').href = `https://www.reddit.com/submit?url=${encU}&title=${encT}`;
+  document.getElementById('em').onclick = () => location.href = `mailto:?subject=${encT}&body=${encU}`;
 
-    function render(data){
-      const srcUrl = data.url || '';
-      const title  = data.title || '';
-      const image  = data.image || '';
-      const summary= data.summary || '';
-      const srcHost = hostFrom(srcUrl);
-
-      document.title = `PTD Today — ${title?title:'Article'}`;
-      setCanonical(location.href);
-
-      app.innerHTML = `
-        ${title?`<h2 class="title">${esc(title)}</h2>`:''}
-        ${srcHost?`<div class="meta">${esc(srcHost)}</div>`:''}
-        ${image?`<img class="hero" src="${escAttr(image)}" alt="">`:''}
-        ${summary?`<div class="dek">${esc(summary)}</div>`:''}
-        <div class="actions">
-          <button class="btn" id="shareBtn">Share</button>
-          ${srcUrl?`<a class="btn" href="${escAttr(srcUrl)}" target="_blank" rel="noopener">Source</a>`:''}
-          <a class="btn" href="/">Home</a>
-        </div>
-        ${srcUrl?`<div class="source-block">
-          You’re reading a brief on PTD Today. Continue at the original publisher:
-          <a href="${escAttr(srcUrl)}" target="_blank" rel="noopener">${esc(srcHost||'Source')}</a>.
-        </div>`:''}
-        <div class="back"><a href="/">← Back to PTD Today</a></div>
-      `;
-
-      const shareBtn=document.getElementById('shareBtn');
-      if(shareBtn) shareBtn.addEventListener('click', openShare);
-    }
-
-    // Share modal
-    const backdrop = document.getElementById('shareBackdrop');
-    const closeShare = document.getElementById('closeShare');
-    backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
-    closeShare.addEventListener('click', closeModal);
-    backdrop.querySelectorAll('.share-item').forEach(b=>{
-      b.addEventListener('click', ()=> doShare(b.getAttribute('data-type')));
-    });
-
-    function openShare(){ backdrop.style.display='flex'; }
-    function closeModal(){ backdrop.style.display='none'; }
-    function doShare(kind){
-      const link = location.href; // always share PTD URL
-      const title = document.title.replace(/^PTD Today —\s*/,'') || 'PTD Today';
-      let url='';
-      if(kind==='linkedin'){
-        url=`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`;
-      }else if(kind==='x'){
-        url=`https://twitter.com/intent/tweet?url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`;
-      }else if(kind==='facebook'){
-        url=`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`;
-      }else if(kind==='reddit'){
-        url=`https://www.reddit.com/submit?url=${encodeURIComponent(link)}&title=${encodeURIComponent(title)}`;
-      }else if(kind==='email'){
-        url=`mailto:?subject=${encodeURIComponent('PTD Today: '+title)}&body=${encodeURIComponent(title+'\n\n'+link)}`;
-      }else if(kind==='copy'){
-        copyText(link);
-        closeModal();
-        return;
-      }
-      if(url) window.open(url,'_blank','noopener');
-      closeModal();
-    }
-
-    (async function(){
-      const data = await resolveArticle();
-      render(data);
-    })();
-  })();
-  </script>
+  document.getElementById('copy').onclick = async () => {
+    try{ await navigator.clipboard.writeText(location.href); alert('Link copied: ' + location.href); }
+    catch{ prompt('Copy link:', location.href); }
+  };
+})();
+</script>
 </body>
 </html>
