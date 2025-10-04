@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Energy & Power News</title>
 
-  <!-- OG/Twitter (homepage) -->
   <meta property="og:site_name" content="PTD Today">
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
   <meta property="og:description" content="First to Know. First to Lead. Curated headlines for power T&D, substations, protection & control, cables, HVDC, renewables and policy.">
@@ -39,6 +38,9 @@
     .feed{display:grid; gap:18px}
     .item{border-top:1px solid var(--line); padding-top:14px}
     .media{display:grid; grid-template-columns:var(--img) 1fr; gap:16px; align-items:start}
+    @media (max-width:720px){
+      :root{ --img:120px }
+    }
     .imgWrap{width:var(--img); height:var(--img); border:1px solid var(--line); overflow:hidden; background:#fff}
     .imgWrap img{width:100%; height:100%; object-fit:cover}
     h3{font-size:22px; margin:0 0 6px; line-height:1.16}
@@ -105,35 +107,39 @@ const relTime = (iso) => {
   const h = Math.floor(m/60); if(h<24) return `${h} h ago`;
   return `${Math.floor(h/24)} d ago`;
 };
-const safeImg = (u) => u && u.startsWith("https://") && !u.endsWith(".svg");
 
 function toUnifiedItem(x){
-  // Accepts either "items" (old format) or "articles" (new company/topic format),
-  // and returns a unified object for rendering.
+  // Accept either old format {items:[{...}]} or new {articles:[{...}]}
   if (x.url || x.link) {
+    const image = x.image && typeof x.image === 'string' && x.image.startsWith('http')
+      ? x.image
+      : 'assets/og-default.png';
     return {
       title: x.title || "",
       url: x.url || x.link || "#",
       summary: x.summary || "",
       time: x.time || x.date || "",
-      category: x.category || x.topic || "",      // topic shows as a tag
-      image: (x.image && safeImg(x.image)) ? x.image : "assets/og-default.png",
-      slug: x.slug || x.id || ""                  // if present, used for /s/<slug>.html
+      category: x.category || x.topic || "",  // topic tag
+      image,
+      slug: x.slug || x.id || ""
     };
   }
   return null;
 }
 
 function cardHTML(a){
-  // internal article view (keeps image left, text right)
   const internal = `article.html?u=${encodeURIComponent(a.url)}&t=${encodeURIComponent(a.title)}&d=${encodeURIComponent(a.summary||'')}&i=${encodeURIComponent(a.image||'assets/og-default.png')}&g=${encodeURIComponent(a.category||'')}&p=${encodeURIComponent(a.time||'')}`;
-  // prefer shortlink when available
   const short = a.slug ? `${location.origin}/s/${a.slug}.html` : a.url;
 
   return `
   <article class="item">
     <div class="media">
-      <div class="imgWrap"><img src="${esc(a.image||'assets/og-default.png')}" alt=""></div>
+      <div class="imgWrap">
+        <img src="${esc(a.image || 'assets/og-default.png')}"
+             alt=""
+             loading="lazy"
+             onerror="this.onerror=null;this.src='/assets/og-default.png';">
+      </div>
       <div>
         <h3><a href="${internal}">${esc(a.title)}</a></h3>
         ${a.summary ? `<div class="dek">${esc((a.summary||"").slice(0,220))}</div>` : ``}
@@ -175,7 +181,6 @@ async function loadData(){
     if(!r.ok) throw new Error("news.json not found");
     const data = await r.json();
 
-    // Accept both shapes: {items:[...]} or {articles:[...]}
     let raw = Array.isArray(data.items) ? data.items
             : Array.isArray(data.articles) ? data.articles
             : [];
