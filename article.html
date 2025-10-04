@@ -8,7 +8,7 @@
   <link rel="icon" href="logo.svg" />
   <link rel="canonical" href="" id="canonicalTag">
 
-  <!-- Open Graph/Twitter fallback (static; crawlers don’t run JS) -->
+  <!-- Static OG fallback -->
   <meta property="og:type" content="article" />
   <meta property="og:title" content="PTD Today — Article" />
   <meta property="og:site_name" content="PTD Today" />
@@ -18,9 +18,9 @@
   <meta name="twitter:image" content="/assets/og-default.png" />
 
   <style>
-    :root{ --ink:#111; --ink2:#555; --line:#e6e6e6; }
+    :root{ --ink:#111; --ink2:#555; --line:#e6e6e6 }
     *{ box-sizing:border-box }
-    html,body{ margin:0; color:var(--ink); background:#fff;
+    html,body{ margin:0; background:#fff; color:var(--ink);
       font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial }
     .container{ max-width:840px; margin:0 auto; padding:0 16px }
     header{ border-bottom:1px solid var(--line); padding:24px 0 16px }
@@ -29,26 +29,18 @@
     main{ padding:24px 0 56px }
     h2.title{ font:700 34px/1.15 Georgia,'Times New Roman',Times,serif; margin:10px 0 12px }
     .meta{ color:var(--ink2); font-size:14px; margin:6px 0 16px }
-    .hero{
-      width:100%; max-height:420px; object-fit:cover;
-      border:1px solid var(--line); background:#f6f6f6
-    }
+    .hero{ width:100%; max-height:420px; object-fit:cover; border:1px solid var(--line); background:#f6f6f6 }
     .dek{ margin:16px 0 18px; color:var(--ink); font-size:18px }
     .actions{ display:flex; flex-wrap:wrap; gap:10px; margin:14px 0 24px }
-    .btn{
-      border:1px solid var(--line); border-radius:10px; background:#fff;
-      padding:10px 14px; cursor:pointer; font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial
-    }
+    .btn{ border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px 14px; cursor:pointer; font-size:14px }
     .btn:hover{ border-color:#ccc }
     .source-block{ border-top:1px solid var(--line); margin-top:26px; padding-top:16px; color:var(--ink2) }
     .source-block a{ color:#1a0dab; text-decoration:underline; text-underline-offset:2px }
-    .back{ margin-top:28px; color:#1a0dab; text-decoration:underline; text-underline-offset:2px }
-
+    .back{ margin-top:28px }
+    .back a{ color:#1a0dab; text-decoration:underline; text-underline-offset:2px }
     /* Share modal */
-    .backdrop{ position:fixed; inset:0; display:none; align-items:center; justify-content:center;
-      background:rgba(0,0,0,.18); z-index:50 }
-    .modal{ width:min(92vw,460px); background:#fff; border-radius:14px;
-      box-shadow:0 10px 40px rgba(0,0,0,.18); overflow:hidden }
+    .backdrop{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.18); z-index:50 }
+    .modal{ width:min(92vw,460px); background:#fff; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.18); overflow:hidden }
     .modal header{ padding:14px 16px; border-bottom:1px solid var(--line) }
     .modal h4{ margin:0; font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial }
     .share-list{ display:flex; flex-direction:column }
@@ -56,10 +48,9 @@
     .share-item:active{ background:#f7f7f7 }
     .close-row{ padding:12px 16px; border-top:1px solid var(--line); text-align:right }
     .link-like{ color:#555; text-decoration:underline; cursor:pointer }
-    @media (max-width:720px){
-      h1.site{ font-size:36px }
-      h2.title{ font-size:28px }
-    }
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#111;color:#fff;
+      padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s ease;z-index:60}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
   </style>
 </head>
 <body>
@@ -70,9 +61,7 @@
     </div>
   </header>
 
-  <main class="container" id="app" aria-live="polite">
-    <!-- Content injected by JS -->
-  </main>
+  <main class="container" id="app" aria-live="polite"></main>
 
   <!-- Share modal -->
   <div class="backdrop" id="shareBackdrop" role="dialog" aria-modal="true" aria-label="Share options">
@@ -90,125 +79,130 @@
     </div>
   </div>
 
+  <div id="toast" class="toast" role="status" aria-live="polite">Link copied</div>
+
   <script>
   (function(){
     const app = document.getElementById('app');
     const canon = document.getElementById('canonicalTag');
-    const ORIGIN = location.origin;
 
-    // --- Utilities ---
-    function qs(k){
-      const u = new URL(location.href);
-      return u.searchParams.get(k);
+    // Robust copy helper
+    async function copyText(text){
+      try{
+        if(navigator.clipboard && window.isSecureContext){
+          await navigator.clipboard.writeText(text);
+          showToast('Link copied');
+          return;
+        }
+      }catch(_) {}
+      try{
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly','');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Link copied');
+      }catch(_){
+        prompt('Copy link:', text);
+      }
     }
-    function esc(s){return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+    function showToast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(()=>t.classList.remove('show'), 1400);
+    }
+
+    // Helpers
+    function qs(k){ const u=new URL(location.href); return u.searchParams.get(k); }
+    function esc(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
     function escAttr(s){return esc(s).replace(/'/g,'&#39;');}
-    function hostFrom(url){
-      try{ return new URL(url).hostname.replace(/^www\./,''); }catch(e){ return ''; }
-    }
+    function hostFrom(url){ try{ return new URL(url).hostname.replace(/^www\./,''); }catch(e){ return ''; } }
     function setCanonical(href){ canon.setAttribute('href', href); }
 
-    // --- Resolve article data ---
     async function resolveArticle(){
-      // Case A: shortlink path /s/<id>.html
       const m = location.pathname.match(/\/s\/([a-zA-Z0-9_-]+)\.html$/);
       if(m){
         const id = m[1];
         try{
-          const map = await fetch('/data/shortlinks.json?v=' + Date.now()).then(r => r.json());
-          const longUrl = map && map.__reverse && map.__reverse[id] ? map.__reverse[id] : null;
-          // If reverse not provided, try a simple inversion
-          if(!longUrl && map){
-            for(const k in map){ if(map[k] === id){ return { url:k }; }
-            }
-          }
-          return { url: longUrl || '' };
-        }catch(e){ return { url:'' }; }
+          const map = await fetch('/data/shortlinks.json?v='+Date.now()).then(r=>r.json());
+          if(map && map.__reverse && map.__reverse[id]) return { url: map.__reverse[id] };
+          if(map){ for(const k in map){ if(map[k]===id) return { url:k }; } }
+        }catch(e){}
+        return { url:'' };
       }
-
-      // Case B: query params
-      return {
-        url: qs('u') || '',
-        title: qs('t') || '',
-        image: qs('i') || '',
-        summary: qs('d') || ''
-      };
+      return { url: qs('u')||'', title:qs('t')||'', image:qs('i')||'', summary:qs('d')||'' };
     }
 
-    // --- Render ---
     function render(data){
-      const srcUrl   = data.url || '';
-      const title    = data.title || '';
-      const image    = data.image || '';
-      const summary  = data.summary || '';
-
-      const titleHtml = title ? esc(title) : 'Article';
-      document.title = `PTD Today — ${title ? title : 'Article'}`;
-      setCanonical(location.href);
-
+      const srcUrl = data.url || '';
+      const title  = data.title || '';
+      const image  = data.image || '';
+      const summary= data.summary || '';
       const srcHost = hostFrom(srcUrl);
 
-      const html = `
-        ${title ? `<h2 class="title">${titleHtml}</h2>` : ``}
-        ${srcHost ? `<div class="meta">${esc(srcHost)}</div>` : ``}
-        ${image ? `<img class="hero" loading="eager" src="${escAttr(image)}" alt="">` : ``}
-        ${summary ? `<div class="dek">${esc(summary)}</div>` : ``}
+      document.title = `PTD Today — ${title?title:'Article'}`;
+      setCanonical(location.href);
+
+      app.innerHTML = `
+        ${title?`<h2 class="title">${esc(title)}</h2>`:''}
+        ${srcHost?`<div class="meta">${esc(srcHost)}</div>`:''}
+        ${image?`<img class="hero" src="${escAttr(image)}" alt="">`:''}
+        ${summary?`<div class="dek">${esc(summary)}</div>`:''}
         <div class="actions">
           <button class="btn" id="shareBtn">Share</button>
-          ${srcUrl ? `<a class="btn" href="${escAttr(srcUrl)}" target="_blank" rel="noopener">Source</a>` : ``}
+          ${srcUrl?`<a class="btn" href="${escAttr(srcUrl)}" target="_blank" rel="noopener">Source</a>`:''}
           <a class="btn" href="/">Home</a>
         </div>
-        ${srcUrl ? `
-          <div class="source-block">
-            You’re reading a brief on PTD Today. Continue at the original publisher:
-            <a href="${escAttr(srcUrl)}" target="_blank" rel="noopener">${esc(srcHost||'Source')}</a>.
-          </div>` : ``}
+        ${srcUrl?`<div class="source-block">
+          You’re reading a brief on PTD Today. Continue at the original publisher:
+          <a href="${escAttr(srcUrl)}" target="_blank" rel="noopener">${esc(srcHost||'Source')}</a>.
+        </div>`:''}
         <div class="back"><a href="/">← Back to PTD Today</a></div>
       `;
-      app.innerHTML = html;
 
-      // wire share
-      const shareBtn = document.getElementById('shareBtn');
-      if(shareBtn){ shareBtn.addEventListener('click', openShare); }
+      const shareBtn=document.getElementById('shareBtn');
+      if(shareBtn) shareBtn.addEventListener('click', openShare);
     }
 
-    // --- Share Modal logic (always share the current PTD URL) ---
+    // Share modal
     const backdrop = document.getElementById('shareBackdrop');
     const closeShare = document.getElementById('closeShare');
+    backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
     closeShare.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', (e)=>{ if(e.target === backdrop) closeModal(); });
-    backdrop.querySelectorAll('.share-item').forEach(btn=>{
-      btn.addEventListener('click', ()=> doShare(btn.getAttribute('data-type')));
+    backdrop.querySelectorAll('.share-item').forEach(b=>{
+      b.addEventListener('click', ()=> doShare(b.getAttribute('data-type')));
     });
 
     function openShare(){ backdrop.style.display='flex'; }
     function closeModal(){ backdrop.style.display='none'; }
     function doShare(kind){
-      const ptdLink = location.href; // always share the current PTD article URL
-      const pageTitle = document.title.replace(/^PTD Today —\s*/,'') || 'PTD Today';
-      let url = '';
-      if(kind === 'linkedin'){
-        url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(ptdLink)}`;
-      }else if(kind === 'x'){
-        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(ptdLink)}&text=${encodeURIComponent(pageTitle)}`;
-      }else if(kind === 'facebook'){
-        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(ptdLink)}`;
-      }else if(kind === 'reddit'){
-        url = `https://www.reddit.com/submit?url=${encodeURIComponent(ptdLink)}&title=${encodeURIComponent(pageTitle)}`;
-      }else if(kind === 'email'){
-        const subj = `PTD Today: ${pageTitle}`;
-        const body = `${pageTitle}\n\n${ptdLink}`;
-        url = `mailto:?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
-      }else if(kind === 'copy'){
-        navigator.clipboard.writeText(ptdLink).then(()=>alert('Link copied: '+ptdLink))
-          .catch(()=>prompt('Copy link:', ptdLink));
+      const link = location.href; // always share PTD URL
+      const title = document.title.replace(/^PTD Today —\s*/,'') || 'PTD Today';
+      let url='';
+      if(kind==='linkedin'){
+        url=`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`;
+      }else if(kind==='x'){
+        url=`https://twitter.com/intent/tweet?url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`;
+      }else if(kind==='facebook'){
+        url=`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`;
+      }else if(kind==='reddit'){
+        url=`https://www.reddit.com/submit?url=${encodeURIComponent(link)}&title=${encodeURIComponent(title)}`;
+      }else if(kind==='email'){
+        url=`mailto:?subject=${encodeURIComponent('PTD Today: '+title)}&body=${encodeURIComponent(title+'\n\n'+link)}`;
+      }else if(kind==='copy'){
+        copyText(link);
+        closeModal();
         return;
       }
-      if(url) window.open(url, '_blank', 'noopener');
+      if(url) window.open(url,'_blank','noopener');
       closeModal();
     }
 
-    // --- Boot ---
     (async function(){
       const data = await resolveArticle();
       render(data);
