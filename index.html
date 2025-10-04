@@ -5,35 +5,72 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Energy & Power News</title>
 
+  <!-- Basic social meta -->
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
   <meta property="og:description" content="First to Know. First to Lead.">
   <meta property="og:image" content="/assets/og-default.png">
   <link rel="icon" href="/logo.svg">
+
   <style>
-    body{font-family:Georgia,serif;color:#111;margin:0;background:#fff;line-height:1.6}
+    :root{
+      --ink:#111; --muted:#666; --line:#eaeaea;
+      --chip:#f6f6f6; --chipline:#e6e6e6;
+    }
+    html,body{margin:0;padding:0}
+    body{font-family:Georgia,serif;color:var(--ink);background:#fff;line-height:1.6}
+
     header{text-align:center;padding:42px 0 12px}
-    header h1{font-size:3.2em;margin:0;font-weight:700}
+    header h1{font-size:3.2em;margin:0;font-weight:700;letter-spacing:.3px}
     header p{margin:6px 0;color:#666;font-size:1.05em}
     .kicker{font-weight:700;margin-top:8px}
-    .bar{border-top:1px solid #eee;border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:5}
+
+    .bar{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;position:sticky;top:0;z-index:5}
     nav{display:flex;justify-content:center;flex-wrap:wrap;gap:1.0rem;padding:12px 10px}
     nav button{background:none;border:none;font-size:1.02em;cursor:pointer}
     nav button.active{font-weight:700;text-decoration:underline}
+
     .updated{display:flex;justify-content:center;margin:10px 0 24px}
     .updated span{border:1px solid #e6e6e6;border-radius:18px;padding:6px 10px;color:#555;font-size:.9em}
+
     .wrap{max-width:950px;margin:0 auto;padding:0 16px}
-    .item{display:flex;flex-wrap:wrap;gap:20px;border-bottom:1px solid #eee;margin-bottom:28px;padding-bottom:20px}
+    .item{display:flex;flex-wrap:wrap;gap:20px;border-bottom:1px solid var(--line);margin-bottom:28px;padding-bottom:20px;position:relative}
     .thumb{flex:0 0 200px}
     .thumb img{width:200px;height:200px;object-fit:cover;border:1px solid #ddd}
     .txt{flex:1;min-width:240px}
     .txt h2{font-size:1.5em;margin:0 0 8px}
+    .txt h2 a{color:#1a0dab;text-decoration:none}
+    .txt h2 a:hover{text-decoration:underline}
     .meta{font-size:.9em;color:#666;margin:8px 0}
-    .btns{margin-top:10px}
-    .btns a{display:inline-block;border:1px solid #ddd;border-radius:6px;padding:6px 10px;text-decoration:none;color:#333;font-size:.9em;margin-right:8px}
-    .btns a:hover{background:#f4f4f4}
+    .btns{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
+    .btn{display:inline-block;border:1px solid #ddd;border-radius:6px;padding:6px 10px;text-decoration:none;color:#333;font-size:.9em;background:#fff}
+    .btn:hover{background:#f4f4f4}
     .chips{margin-top:6px}
-    .chip{display:inline-block;border:1px solid #e5e5e5;border-radius:10px;padding:2px 8px;margin-right:6px;font-size:.78em;color:#666}
-    footer{text-align:center;font-size:.9em;color:#777;border-top:1px solid #eee;padding:20px 0;margin-top:40px}
+    .chip{display:inline-block;border:1px solid var(--chipline);background:var(--chip);border-radius:10px;padding:2px 8px;margin-right:6px;font-size:.78em;color:#666}
+
+    /* Share menu */
+    .share-menu{
+      position:absolute;
+      right:16px; top:auto;
+      border:1px solid #ddd; border-radius:10px;
+      background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.12);
+      padding:8px; width:260px; z-index:10;
+    }
+    .share-row{display:flex;flex-wrap:wrap;gap:8px}
+    .share-menu a, .share-menu button{
+      flex:1 1 48%; display:inline-block; text-align:center;
+      padding:8px 6px; border:1px solid #e1e1e1; border-radius:8px;
+      background:#fff; color:#222; font-size:.9em; text-decoration:none; cursor:pointer;
+    }
+    .share-menu a:hover, .share-menu button:hover{background:#f7f7f7}
+    .share-menu .full{flex-basis:100%}
+    .share-menu .small{font-size:.85em;color:#666;border:none;background:transparent;text-align:right;cursor:pointer}
+    .share-menu hr{border:0;border-top:1px solid #eee;margin:8px 0}
+
+    footer{text-align:center;font-size:.9em;color:#777;border-top:1px solid var(--line);padding:20px 0;margin-top:40px}
+    @media (max-width:600px){
+      .thumb{flex:0 0 140px}
+      .thumb img{width:140px;height:140px}
+    }
   </style>
 </head>
 <body>
@@ -75,11 +112,13 @@ const tabsEl   = document.getElementById('tabs');
 
 let ALL_ITEMS = [];
 let CURRENT_CAT = 'all';
+let OPEN_MENU = null;   // currently open share menu element
 
 function fallbackImg(img){
   img.onerror = null;
   img.src = '/assets/og-default.png';
 }
+
 function chipLabel(slug){
   const map = {
     'grid':'Grid','substations':'Substations','protection':'Protection',
@@ -89,12 +128,65 @@ function chipLabel(slug){
   return map[slug] || slug;
 }
 
+function scoreBadge(n){
+  return (CURRENT_CAT === 'top' && n.score)
+    ? `<span class="chip">Score: ${Number(n.score).toFixed(2)}</span>` : '';
+}
+
+function closeShareMenu(){
+  if (OPEN_MENU && OPEN_MENU.parentNode){
+    OPEN_MENU.parentNode.removeChild(OPEN_MENU);
+  }
+  OPEN_MENU = null;
+}
+
+function buildShareMenu(url, title){
+  const text = title || 'Check this out';
+  const encU = encodeURIComponent(url);
+  const encT = encodeURIComponent(text);
+
+  const menu = document.createElement('div');
+  menu.className = 'share-menu';
+  menu.innerHTML = `
+    <div class="share-row">
+      <a class="full" href="https://www.linkedin.com/sharing/share-offsite/?url=${encU}" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="https://twitter.com/intent/tweet?url=${encU}&text=${encT}" target="_blank" rel="noopener">X (Twitter)</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u=${encU}" target="_blank" rel="noopener">Facebook</a>
+      <a href="https://www.reddit.com/submit?url=${encU}&title=${encT}" target="_blank" rel="noopener">Reddit</a>
+      <button class="copy">Copy link</button>
+      <a href="mailto:?subject=${encT}&body=${encU}" class="email" target="_blank" rel="noopener">Email</a>
+      ${('share' in navigator) ? `<button class="full native">Share via…</button>` : ``}
+      <button class="small close">close ✕</button>
+    </div>
+  `;
+  // Copy handler
+  menu.querySelector('.copy').addEventListener('click', async () => {
+    try{
+      await navigator.clipboard.writeText(url);
+      menu.querySelector('.copy').textContent = 'Copied!';
+      setTimeout(()=>{ menu.querySelector('.copy').textContent = 'Copy link'; }, 1400);
+    }catch(e){ alert('Copy failed'); }
+  });
+  // Native share
+  const native = menu.querySelector('.native');
+  if (native){
+    native.addEventListener('click', async ()=>{
+      try{
+        await navigator.share({title, url});
+      }catch(e){}
+    });
+  }
+  // Close
+  menu.querySelector('.close').addEventListener('click', closeShareMenu);
+  return menu;
+}
+
 function render(){
+  closeShareMenu();
   listEl.innerHTML = '';
   let items = [];
 
   if (CURRENT_CAT === 'top'){
-    // Last 7d AND score > 0, sorted by score desc then recency
     items = ALL_ITEMS.filter(a => a.week && a.score && a.score > 0)
                      .sort((a,b)=> (b.score - a.score) || (new Date(b.date)-new Date(a.date)));
   } else if (CURRENT_CAT === 'all') {
@@ -110,11 +202,12 @@ function render(){
 
   for (const n of items){
     const chips = (n.cats || []).slice(0,6).map(c => `<span class="chip">${chipLabel(c)}</span>`).join('');
-    const scoreBadge = (CURRENT_CAT === 'top' && n.score)
-      ? `<span class="chip">Score: ${n.score.toFixed(2)}</span>` : '';
-
     const div = document.createElement('div');
     div.className = 'item';
+    // data attributes used by share menu
+    div.dataset.url = n.url;
+    div.dataset.title = n.title;
+
     div.innerHTML = `
       <div class="thumb">
         <img src="${n.image || '/assets/og-default.png'}" onerror="fallbackImg(this)">
@@ -123,10 +216,10 @@ function render(){
         <h2><a href="${n.url}" target="_blank" rel="noopener">${n.title}</a></h2>
         <div class="meta">${n.source || ''} • ${n.timeAgo || ''}</div>
         <p>${n.summary || ''}</p>
-        <div class="chips">${chips} ${scoreBadge}</div>
+        <div class="chips">${chips} ${scoreBadge(n)}</div>
         <div class="btns">
-          <a href="${n.url}" target="_blank" rel="noopener">Source</a>
-          <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(n.url)}" target="_blank" rel="noopener">Share</a>
+          <a class="btn" href="${n.url}" target="_blank" rel="noopener">Source</a>
+          <button class="btn share-btn">Share</button>
         </div>
       </div>`;
     listEl.appendChild(div);
@@ -149,8 +242,35 @@ tabsEl.addEventListener('click', (e)=>{
   render();
 });
 
+// Open share menu (event delegation)
+listEl.addEventListener('click', (e)=>{
+  const shareBtn = e.target.closest('.share-btn');
+  if (!shareBtn) return;
+
+  // close any open menu first
+  closeShareMenu();
+
+  const item = shareBtn.closest('.item');
+  const url = item?.dataset?.url || location.href;
+  const title = item?.dataset?.title || 'PTD Today';
+
+  const menu = buildShareMenu(url, title);
+  // place the menu at bottom-right of the item block
+  item.appendChild(menu);
+  OPEN_MENU = menu;
+});
+
+// click outside to close menu
+document.addEventListener('click', (e)=>{
+  if (!OPEN_MENU) return;
+  if (e.target.closest('.share-menu') || e.target.closest('.share-btn')) return;
+  closeShareMenu();
+});
+document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeShareMenu(); });
+
 load();
-setInterval(load, 10800000); // 3 hours
+// auto-refresh every 3 hours
+setInterval(load, 10800000);
 </script>
 </body>
 </html>
