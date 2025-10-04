@@ -1,275 +1,322 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="utf-8" />
   <title>PTD Today — Daily Energy & Power News</title>
-
-  <meta property="og:title" content="PTD Today — Daily Energy & Power News">
-  <meta property="og:description" content="Daily coverage of grid, HV substations, cables, protection, renewables, policy, supply chain and more.">
-  <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
-  <meta property="og:url" content="https://ptdtoday.com">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="stylesheet" href="assets/main.css">
-
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="PTD Today curates the latest daily and weekly news across power transmission & distribution, substations, protection & control, cables, HVDC, renewables, policy, data centers and supply chain." />
+  <link rel="icon" href="logo.svg" />
   <style>
-    body { font-family: Georgia, serif; }
-    nav.site {
-      text-align:center;
-      border-top:1px solid #ddd;
-      border-bottom:1px solid #ddd;
-      padding:10px 0;
-      margin-bottom:14px;
-      white-space:nowrap;
-      overflow:auto;
+    :root{
+      --ink:#111; --ink-2:#444; --line:#e6e6e6;
+      --accent:#000;
     }
-    nav.site a {
-      color:#111;
-      text-decoration:none;
-      margin:0 8px;
-    }
-    nav.site a.active { font-weight:700; text-decoration:underline; }
-
-    .updated { float:right; margin-right:20px; color:#777; font-size:.9rem; }
-
-    .toolbar {
-      max-width:980px;
-      margin:0 auto 14px;
-      padding:10px 12px;
-      border:1px solid #e5e5e5;
-      border-radius:6px;
-      background:#fafafa;
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      align-items:center;
-      justify-content:space-between;
-    }
-    .toolbar .range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .toolbar label { font-size:.92rem; color:#555; }
-    .toolbar input[type="date"] {
-      padding:6px 8px;
-      border:1px solid #ddd;
-      border-radius:4px;
-      font-size:.95rem;
-    }
-    .toolbar button {
-      padding:7px 12px;
-      border:1px solid #ccc;
-      border-radius:5px;
-      background:#f5f5f5;
-      cursor:pointer;
-    }
-    .toolbar button:hover { background:#eee; }
-
-    .share-modal {
-      position:fixed;
-      inset:0;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      background:rgba(0,0,0,.35);
-      z-index:9999;
-    }
-    .share-popup {
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
       background:#fff;
-      padding:18px;
-      border-radius:10px;
-      box-shadow:0 8px 24px rgba(0,0,0,.18);
-      min-width:260px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
     }
-    .share-popup button {
-      font-size:16px;
-      padding:9px 11px;
-      border:1px solid #ddd;
-      border-radius:6px;
-      background:#f8f8f8;
-      cursor:pointer;
-    }
-    .share-popup button:hover { background:#efefef; }
+    header{padding:28px 16px 8px; border-bottom:1px solid var(--line)}
+    .container{max-width:980px; margin:0 auto; padding:0 16px}
+    h1{font:700 46px/1.15 Georgia, 'Times New Roman', Times, serif; margin:0 0 6px}
+    .motto{color:var(--ink-2); font-weight:500; margin-bottom:10px}
+    .dek{font:700 22px/1.25 Georgia, 'Times New Roman', Times, serif; margin:6px 0 12px}
 
-    @media(max-width:640px){
-      .updated{ float:none; margin:8px 0 0 }
+    /* tabs */
+    .tabs{display:flex; flex-wrap:wrap; gap:18px; padding:10px 0 14px; border-bottom:1px solid var(--line)}
+    .tab{color:var(--ink); text-decoration:none; font-weight:600}
+    .tab.active{border-bottom:2px solid var(--ink); padding-bottom:3px}
+
+    /* list */
+    .cards{padding:18px 0 60px}
+    .card{display:grid; grid-template-columns:140px 1fr; gap:16px; padding:18px 0; border-bottom:1px solid var(--line)}
+    .card:first-child{padding-top:0}
+    .thumb{
+      width:140px; height:95px; background:#f5f5f5; border:1px solid var(--line); object-fit:cover
+    }
+    .card h3{margin:0 0 8px; font:700 26px/1.2 Georgia, 'Times New Roman', Times, serif}
+    .card h3 a{color:#1a0dab; text-decoration:underline; text-underline-offset:3px}
+    .meta{color:var(--ink-2); font-size:14px; margin-bottom:8px}
+    .actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+    .btn{
+      font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+      border:1px solid var(--line); padding:8px 12px; border-radius:10px; background:#fff; cursor:pointer
+    }
+    .btn:hover{border-color:#ccc}
+    .pill{font-size:12px; color:var(--ink-2); border:1px solid var(--line); padding:4px 8px; border-radius:999px; display:inline-block; margin-right:6px}
+
+    /* share modal */
+    .modal-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.18); display:none; align-items:center; justify-content:center; z-index:50
+    }
+    .modal{width:min(92vw,460px); background:#fff; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.18); overflow:hidden}
+    .modal header{border:0; padding:14px 16px}
+    .modal h4{margin:0; font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+    .share-list{display:flex; flex-direction:column}
+    .share-item{padding:14px 18px; border-top:1px solid var(--line); background:#fff; text-align:left; width:100%; font-size:16px; cursor:pointer}
+    .share-item:active{background:#f7f7f7}
+    .modal .close{border-top:1px solid var(--line); padding:12px 16px; text-align:right}
+    .link-like{color:#555; text-decoration:underline; cursor:pointer}
+
+    @media (max-width:720px){
+      .card{grid-template-columns:110px 1fr}
+      .thumb{width:110px; height:75px}
+      .card h3{font-size:22px}
     }
   </style>
 </head>
 <body>
-  <header style="text-align:center; padding:20px 0;">
-    <h1 style="font-size:2.6em; margin:0;">PTD Today</h1>
-    <p style="margin:0; font-style:italic; color:#555;">First to Know. First to Lead.</p>
-    <h2 style="font-size:1.3em; margin-top:6px;">Daily Energy & Power News</h2>
+  <header>
+    <div class="container">
+      <h1>PTD Today</h1>
+      <div class="motto">First to Know. First to Lead.</div>
+      <div class="dek">Daily Energy &amp; Power News</div>
+
+      <!-- TOP TABS (no date range UI) -->
+      <nav class="tabs" id="tabs">
+        <a href="#" data-cat="all" class="tab active">All</a>
+        <a href="#" data-cat="top" class="tab">Top (7d)</a>
+        <a href="#" data-cat="grid" class="tab">Grid</a>
+        <a href="#" data-cat="substations" class="tab">Substations</a>
+        <a href="#" data-cat="protection" class="tab">Protection</a>
+        <a href="#" data-cat="cables" class="tab">Cables</a>
+        <a href="#" data-cat="hvdc" class="tab">HVDC</a>
+        <a href="#" data-cat="renewables" class="tab">Renewables</a>
+        <a href="#" data-cat="policy" class="tab">Policy</a>
+      </nav>
+    </div>
   </header>
 
-  <nav class="site">
-    <a href="#" data-cat="all" class="active" onclick="setCategory(event,'all')"><strong>All</strong></a>
-    <a href="#" data-cat="top7d" onclick="setCategory(event,'top7d')">Top (7d)</a>
-    <a href="#" data-cat="grid" onclick="setCategory(event,'grid')">Grid</a>
-    <a href="#" data-cat="substations" onclick="setCategory(event,'substations')">Substations</a>
-    <a href="#" data-cat="protection" onclick="setCategory(event,'protection')">Protection</a>
-    <a href="#" data-cat="cables" onclick="setCategory(event,'cables')">Cables</a>
-    <a href="#" data-cat="hvdc" onclick="setCategory(event,'hvdc')">HVDC</a>
-    <a href="#" data-cat="renewables" onclick="setCategory(event,'renewables')">Renewables</a>
-    <a href="#" data-cat="policy" onclick="setCategory(event,'policy')">Policy</a>
-    <a href="#" data-cat="supply" onclick="setCategory(event,'supply')">Supply Chain</a>
-    <span class="updated">Updated — <span id="updateTime"></span></span>
-  </nav>
+  <main class="container">
+    <section class="cards" id="cards" aria-live="polite"></section>
+  </main>
 
-  <section class="toolbar" aria-label="Date range filter">
-    <div class="range">
-      <label>From</label>
-      <input type="date" id="fromDate">
-      <label>To</label>
-      <input type="date" id="toDate">
-      <button onclick="applyDateRange()">Apply</button>
-      <button onclick="clearDateRange()">Clear</button>
+  <!-- SHARE MODAL -->
+  <div class="modal-backdrop" id="shareBackdrop" role="dialog" aria-modal="true" aria-label="Share options">
+    <div class="modal">
+      <header><h4>Share</h4></header>
+      <div class="share-list">
+        <button class="share-item" data-type="linkedin">LinkedIn</button>
+        <button class="share-item" data-type="x">X (Twitter)</button>
+        <button class="share-item" data-type="facebook">Facebook</button>
+        <button class="share-item" data-type="reddit">Reddit</button>
+        <button class="share-item" data-type="copy">Copy link</button>
+        <button class="share-item" data-type="email">Email</button>
+      </div>
+      <div class="close"><span class="link-like" id="closeShare">Close ×</span></div>
     </div>
-    <div style="font-size:.9rem; color:#666;">
-      Tip: choose a range (e.g., last Mon–Sun) and combine with a category.
-    </div>
-  </section>
-
-  <main id="newsContainer" style="max-width:980px; margin:0 auto; padding:0 15px;"></main>
-
-  <footer style="text-align:center; padding:20px; color:#666; font-size:.9em;">
-    © 2025 PTD Today • Headlines link to their original publishers.
-  </footer>
+  </div>
 
   <script>
-    let ALL_NEWS = [];
-    let currentCategory = 'all';
-    let rangeFrom = null;
-    let rangeTo = null;
+  (function(){
+    const cardsEl = document.getElementById('cards');
+    const tabsEl  = document.getElementById('tabs');
 
-    async function loadNews(){
-      const res = await fetch('data/news.json', {cache:'no-store'});
-      ALL_NEWS = await res.json();
-      ALL_NEWS.sort((a,b)=> new Date(b.date||b.time||0)-new Date(a.date||a.time||0));
-      document.getElementById('updateTime').textContent =
-        new Date().toISOString().replace('T',' ').slice(0,19)+'Z';
-      render();
+    // cache
+    let NEWS = [];
+    let SHORT = {}; // url -> id
+    let currentCat = 'all';
+    let shareTarget = null; // article object used by modal
+
+    const ORIGIN = location.origin;
+    const PTD_ARTICLE = ORIGIN + '/article.html';
+
+    function fmtTime(ts){
+      try{
+        const d = new Date(ts);
+        return d.toISOString().replace('T',' ').replace('Z',' UTC');
+      }catch(e){ return ''; }
     }
 
-    function visibleArticles(){
-      let list = ALL_NEWS;
-      if(currentCategory==='top7d'){
-        const cutoff=new Date(Date.now()-7*24*60*60*1000);
-        list=list.filter(a=>new Date(a.date||a.time||0)>=cutoff);
-      }else if(currentCategory!=='all'){
-        list=list.filter(a=>(a.category||'').toLowerCase()===currentCategory);
+    function ptc(str){ return encodeURIComponent(str || ''); }
+
+    // Build the PTD landing link (shortlink if available)
+    function buildPTDLink(item){
+      const u = item.url;
+      if(SHORT && SHORT[u]){
+        return `${ORIGIN}/s/${SHORT[u]}.html`;
       }
-      if(rangeFrom){
-        const fromTs=new Date(rangeFrom+'T00:00:00Z').getTime();
-        list=list.filter(a=>new Date(a.date||a.time||0).getTime()>=fromTs);
-      }
-      if(rangeTo){
-        const toTs=new Date(rangeTo+'T23:59:59Z').getTime();
-        list=list.filter(a=>new Date(a.date||a.time||0).getTime()<=toTs);
-      }
-      return list;
+      // fall back to article.html carrying params
+      const params = new URLSearchParams({
+        u: u,
+        t: item.title || '',
+        i: item.image || '',
+        d: item.description || ''
+      });
+      return `${PTD_ARTICLE}?${params.toString()}`;
     }
 
-    function render(){
-      const container=document.getElementById('newsContainer');
-      container.innerHTML='';
-      const items=visibleArticles();
-      if(!items.length){
-        container.innerHTML='<p style="text-align:center;color:#666;padding:40px 0;">No articles match your filters yet.</p>';
+    function iconlessSource(host){
+      try{
+        return new URL(host).hostname.replace(/^www\./,'');
+      }catch(e){
+        return String(host||'').replace(/^https?:\/\//,'').replace(/^www\./,'');
+      }
+    }
+
+    function pickTop7d(all){
+      const now = Date.now();
+      const weekAgo = now - 7*24*60*60*1000;
+      return all.filter(a => {
+        const t = Date.parse(a.ts || a.time || a.published || 0);
+        return isFinite(t) && t >= weekAgo;
+      }).sort((a,b)=>{
+        // optional score desc then time
+        const sa = +a.score || 0, sb = +b.score || 0;
+        if(sb !== sa) return sb - sa;
+        const ta = Date.parse(a.ts || a.time || 0) || 0;
+        const tb = Date.parse(b.ts || b.time || 0) || 0;
+        return tb - ta;
+      });
+    }
+
+    function applyFilter(cat){
+      currentCat = cat;
+      let rows = [...NEWS];
+      if(cat === 'top'){
+        rows = pickTop7d(rows);
+      } else if(cat !== 'all'){
+        rows = rows.filter(r => (r.category||'').toLowerCase() === cat);
+      } else {
+        rows.sort((a,b)=>{
+          const ta = Date.parse(a.ts || a.time || 0) || 0;
+          const tb = Date.parse(b.ts || b.time || 0) || 0;
+          return tb - ta;
+        });
+      }
+      render(rows);
+    }
+
+    function render(rows){
+      if(!rows || !rows.length){
+        cardsEl.innerHTML = `<p style="color:#666">No stories found for this view.</p>`;
         return;
       }
-      items.forEach(article=>{
-        const id=(article.id||Math.random().toString(36).slice(2,8)).toLowerCase();
-        const image=article.image||'assets/og-default.png';
-        const title=article.title||'Untitled';
-        const sum=article.summary||'';
-        const cat=(article.category||'').toString();
-        const time=article.time||article.date||'';
-        container.insertAdjacentHTML('beforeend',`
-          <article style="display:flex;gap:18px;margin-bottom:28px;border-bottom:1px solid #eee;padding-bottom:18px;">
-            <div style="flex:0 0 160px;">
-              <img src="${image}" alt="${title}" style="width:160px;height:160px;object-fit:cover;border:1px solid #ddd;">
-            </div>
-            <div style="flex:1;">
-              <h3 style="margin:0 0 6px;">
-                <a href="s/${id}.html" style="color:#003399;text-decoration:none;">${title}</a>
-              </h3>
-              <p style="margin:0 0 10px;color:#333;font-size:.98rem;">${sum}</p>
-              <p style="margin:0 0 12px;font-size:.86rem;color:#777;">${cat} • ${time}</p>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button onclick="window.open('s/${id}.html','_blank')">Open on PTD Today</button>
-                <button onclick="shareArticle('${id}')">Share</button>
-                <button onclick="window.open('${article.source}','_blank')">Source</button>
+      const html = rows.map(item=>{
+        const linkPTD = buildPTDLink(item);
+        const sourceHost = iconlessSource(item.url||'');
+        const when = fmtTime(item.ts || item.time || '');
+        const cat  = (item.category||'').toUpperCase();
+        const img  = item.image || '';
+
+        return `
+          <article class="card">
+            <a href="${linkPTD}" aria-label="Open ${escapeHtml(item.title||'')}" title="Open on PTD" >
+              <img class="thumb" loading="lazy" src="${img ? escapeHtml(img) : ''}" alt="">
+            </a>
+            <div>
+              <h3><a href="${linkPTD}">${escapeHtml(item.title || '')}</a></h3>
+              <div class="meta">
+                ${escapeHtml(sourceHost)} • <span>${when}</span>
+              </div>
+              <div>${escapeHtml(item.summary || item.description || '')}</div>
+              <div class="actions">
+                <a class="btn" href="${linkPTD}">Open on PTD Today</a>
+                <a class="btn" href="${escapeAttr(item.url||'#')}" target="_blank" rel="noopener">Source</a>
+                <button class="btn js-share" data-url="${escapeAttr(item.url||'')}" data-title="${escapeAttr(item.title||'')}" data-image="${escapeAttr(img)}" data-summary="${escapeAttr(item.summary||'')}">Share</button>
+                ${cat ? `<span class="pill">${escapeHtml(cat)}</span>` : ``}
+                ${item.score ? `<span class="pill">Score: ${escapeHtml(String(item.score))}</span>` : ``}
               </div>
             </div>
           </article>
-        `);
+        `;
+      }).join('');
+      cardsEl.innerHTML = html;
+      // attach share handlers
+      cardsEl.querySelectorAll('.js-share').forEach(btn=>{
+        btn.addEventListener('click', onClickShare);
       });
     }
 
-    function setCategory(ev,cat){
-      ev.preventDefault();
-      currentCategory=cat.toLowerCase();
-      document.querySelectorAll('nav.site a').forEach(a=>{
-        a.classList.toggle('active',a.dataset.cat===currentCategory);
+    function onClickShare(e){
+      const b = e.currentTarget;
+      shareTarget = {
+        url: b.getAttribute('data-url') || '',
+        title: b.getAttribute('data-title') || '',
+        image: b.getAttribute('data-image') || '',
+        summary: b.getAttribute('data-summary') || ''
+      };
+      openShare();
+    }
+
+    // ==== SHARE MODAL ====
+    const shareBackdrop = document.getElementById('shareBackdrop');
+    const closeShare = document.getElementById('closeShare');
+    shareBackdrop.addEventListener('click', (e)=>{
+      if(e.target === shareBackdrop) closeModal();
+    });
+    closeShare.addEventListener('click', closeModal);
+    shareBackdrop.querySelectorAll('.share-item').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        doShare(btn.getAttribute('data-type'));
       });
+    });
 
-      // auto-fill dates when "Top (7d)" selected
-      if(currentCategory==='top7d'){
-        const today=new Date();
-        const toDate=today.toISOString().split('T')[0];
-        const fromDate=new Date(today.getTime()-6*24*60*60*1000).toISOString().split('T')[0];
-        document.getElementById('fromDate').value=fromDate;
-        document.getElementById('toDate').value=toDate;
-        rangeFrom=fromDate;
-        rangeTo=toDate;
-      }else{
-        clearDateRange(false);
+    function openShare(){ shareBackdrop.style.display='flex'; }
+    function closeModal(){ shareBackdrop.style.display='none'; }
+
+    function doShare(kind){
+      if(!shareTarget) return;
+      // Always share PTD link (shortlink if available)
+      const ptdLink = buildPTDLink(shareTarget);
+      const title = shareTarget.title || 'PTD Today';
+      let url = '';
+      if(kind === 'linkedin'){
+        url = `https://www.linkedin.com/sharing/share-offsite/?url=${ptc(ptdLink)}`;
+      } else if(kind === 'x'){
+        const text = `${title}`;
+        url = `https://twitter.com/intent/tweet?url=${ptc(ptdLink)}&text=${ptc(text)}`;
+      } else if(kind === 'facebook'){
+        url = `https://www.facebook.com/sharer/sharer.php?u=${ptc(ptdLink)}`;
+      } else if(kind === 'reddit'){
+        url = `https://www.reddit.com/submit?url=${ptc(ptdLink)}&title=${ptc(title)}`;
+      } else if(kind === 'email'){
+        const subj = `PTD Today: ${title}`;
+        const body = `${title}\n\n${ptdLink}`;
+        url = `mailto:?subject=${ptc(subj)}&body=${ptc(body)}`;
+      } else if(kind === 'copy'){
+        navigator.clipboard.writeText(ptdLink).then(()=> {
+          alert('Link copied: ' + ptdLink);
+        }).catch(()=> {
+          prompt('Copy link:', ptdLink);
+        });
+        return;
       }
-      render();
+      if(url) window.open(url, '_blank', 'noopener');
+      closeModal();
     }
 
-    function applyDateRange(){
-      rangeFrom=document.getElementById('fromDate').value||null;
-      rangeTo=document.getElementById('toDate').value||null;
-      render();
-    }
-    function clearDateRange(resetInputs=true){
-      rangeFrom=rangeTo=null;
-      if(resetInputs){
-        document.getElementById('fromDate').value='';
-        document.getElementById('toDate').value='';
+    // ==== tabs ====
+    tabsEl.addEventListener('click', (e)=>{
+      const a = e.target.closest('a[data-cat]');
+      if(!a) return;
+      e.preventDefault();
+      tabsEl.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      a.classList.add('active');
+      applyFilter(a.dataset.cat);
+    });
+
+    // escape helpers
+    function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+    function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
+
+    async function bootstrap(){
+      try{
+        const [n,s] = await Promise.all([
+          fetch('data/news.json?v=' + Date.now()).then(r=>r.json()),
+          fetch('data/shortlinks.json').then(r => r.ok ? r.json() : ({}))
+        ]);
+        NEWS  = Array.isArray(n) ? n : (n.items||[]);
+        SHORT = s || {};
+      }catch(e){
+        console.error('Failed to load data:', e);
+        NEWS = [];
+        SHORT = {};
       }
-      render();
+      applyFilter('all'); // default
     }
-
-    function shareArticle(articleId){
-      const url=`https://ptdtoday.com/s/${articleId}.html`;
-      const text=`Check out this article on PTD Today — your daily source for energy, grid, and power news:\n${url}`;
-      const opts=[
-        {name:'LinkedIn',url:`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`},
-        {name:'X (Twitter)',url:`https://twitter.com/intent/tweet?text=${encodeURIComponent('Latest from PTD Today: ')}${encodeURIComponent(url)}`},
-        {name:'Facebook',url:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`},
-        {name:'Reddit',url:`https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent('Latest from PTD Today')}`},
-        {name:'Copy link',action:()=>{navigator.clipboard.writeText(url);alert('✅ Link copied: '+url);}},
-        {name:'Email',url:`mailto:?subject=${encodeURIComponent('Interesting read from PTD Today')}&body=${encodeURIComponent(text)}`},
-      ];
-      const modal=document.createElement('div');
-      modal.className='share-modal';
-      modal.innerHTML=`
-        <div class="share-popup">
-          ${opts.map(o=>o.url
-            ? `<button onclick="window.open('${o.url}','_blank')">${o.name}</button>`
-            : `<button onclick="(${o.action})();">${o.name}</button>`
-          ).join('')}
-          <button onclick="this.closest('.share-modal').remove()">Close ×</button>
-        </div>`;
-      document.body.appendChild(modal);
-    }
-
-    loadNews();
+    bootstrap();
+  })();
   </script>
 </body>
 </html>
