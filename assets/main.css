@@ -1,73 +1,53 @@
-/* ===== Desktop-first news layout ===== */
-:root { --maxw: 1140px; --gap: 18px; }
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body {
-  background:#fff; color:#111;
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
-}
+// --- SHARE FUNCTION ---
+function shareArticle(articleId) {
+  const articleUrl = `https://ptdtoday.com/s/${articleId}.html`;
+  const shareText = `Check out this article on PTD Today — your daily source for power transmission, distribution, and energy news:\n${articleUrl}`;
+  
+  const shareOptions = [
+    { name: 'LinkedIn', url: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(articleUrl)}` },
+    { name: 'X (Twitter)', url: `https://twitter.com/intent/tweet?text=${encodeURIComponent('Latest from PTD Today: ')}${encodeURIComponent(articleUrl)}` },
+    { name: 'Facebook', url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(articleUrl)}` },
+    { name: 'Reddit', url: `https://www.reddit.com/submit?url=${encodeURIComponent(articleUrl)}&title=${encodeURIComponent('Latest from PTD Today')}` },
+    { name: 'Copy link', action: () => {
+        navigator.clipboard.writeText(articleUrl);
+        alert('✅ Link copied: ' + articleUrl);
+      }
+    },
+    { name: 'Email', url: `mailto:?subject=${encodeURIComponent('Interesting read from PTD Today')}&body=${encodeURIComponent(shareText)}` },
+  ];
 
-/* Masthead */
-.masthead { margin: 28px auto 10px; max-width: var(--maxw); padding: 0 12px; }
-.title-row { display:flex; justify-content:center; align-items:baseline; gap:12px; flex-wrap:wrap; }
-.site-title { font-family:"Playfair Display", Georgia, serif; font-weight:900; line-height:1; margin:0; text-align:center; font-size:64px; }
-.site-motto { font-size:15px; font-weight:500; opacity:.75; white-space:nowrap; }
-.site-subtitle { text-align:center; font-weight:800; margin-top:6px; font-size:28px; }
-
-/* Category bar */
-.catbar { max-width:var(--maxw); margin:10px auto 12px; padding:0 12px;
-  display:flex; gap:14px; align-items:center; border-top:1px solid #eee; border-bottom:1px solid #eee; height:46px; }
-.catbar a { text-decoration:none; color:#333; font-weight:500; }
-.catbar a.active { color:#000; font-weight:700; }
-.catbar .updated { margin-left:auto; color:#666; font-size:13px; }
-
-/* Articles */
-.list { max-width:var(--maxw); margin:0 auto; padding:0 12px; }
-.post { padding:18px 0 22px; border-bottom:1px solid #eaeaea;
-  display:grid; grid-template-columns: 260px 1fr; grid-template-areas:
-    "thumb title"
-    "thumb dek"
-    "thumb meta"
-    "thumb actions";
-  column-gap:var(--gap); align-items:start; }
-.post-thumb { grid-area:thumb; width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:6px; background:#f3f3f3; }
-.post-title { grid-area:title; margin:0 0 10px; font-family:"Playfair Display", Georgia, serif; font-size:40px; line-height:1.15; }
-.post-title a { color:#111; text-decoration:none; }
-.post-title a:hover { text-decoration:underline; }
-.post-dek { grid-area:dek; margin:0 0 8px; color:#333; font-size:16px; }
-.post-meta { grid-area:meta; color:#666; font-size:13px; margin:2px 0 10px; }
-.post-actions { grid-area:actions; display:flex; gap:10px; flex-wrap:wrap; }
-.btn { padding:8px 12px; border:1px solid #d0d0d0; border-radius:8px; text-decoration:none; color:#111; background:#f8f8f8; }
-.btn.ghost { background:transparent; }
-
-/* Footer */
-.footnote { max-width:var(--maxw); margin:18px auto 40px; padding:0 12px; color:#666; }
-
-/* Responsive */
-@media (max-width: 1100px) {
-  .site-title { font-size:56px; }
-  .post { grid-template-columns: 240px 1fr; }
-  .post-title { font-size:36px; }
-}
-@media (max-width: 860px) {
-  .site-title { font-size:48px; }
-  .site-subtitle { font-size:24px; }
-  .post { grid-template-columns: 210px 1fr; }
-  .post-title { font-size:32px; }
-}
-@media (max-width: 600px) {
-  .site-title { font-size:40px; }
-  .site-motto { width:100%; text-align:left; padding-left:6px; }
-  .site-subtitle { font-size:20px; }
-  .post { display:block; padding:16px 0 20px; }
-  .post-thumb { float:left; width:120px; height:120px; margin:0 14px 8px 0; aspect-ratio:auto; }
-  .post::after { content:""; display:block; clear:both; }
-  .post-title { font-size:24px; margin-top:0; }
-  .post-dek { font-size:15px; }
-}
-@media (max-width: 380px) {
-  .post-thumb { width:104px; height:104px; }
-  .post-title { font-size:22px; }
+  // Create modal dynamically
+  const modal = document.createElement('div');
+  modal.classList.add('share-modal');
+  modal.innerHTML = `
+    <div class="share-popup">
+      ${shareOptions.map(opt =>
+        opt.url
+          ? `<button onclick="window.open('${opt.url}','_blank')">${opt.name}</button>`
+          : `<button onclick="(${opt.action})();">${opt.name}</button>`
+      ).join('')}
+      <button onclick="document.body.removeChild(this.parentNode.parentNode)">Close ×</button>
+    </div>
+  `;
+  
+  // Styling for popup
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .share-modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center;
+    }
+    .share-popup {
+      background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      display: flex; flex-direction: column; gap: 10px; min-width: 250px;
+    }
+    .share-popup button {
+      font-size: 16px; padding: 8px 10px; border: none; background: #f0f0f0; cursor: pointer;
+      border-radius: 4px; transition: background 0.3s;
+    }
+    .share-popup button:hover { background: #e0e0e0; }
+  `;
+  
+  document.head.appendChild(style);
+  document.body.appendChild(modal);
 }
