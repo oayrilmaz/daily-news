@@ -3,31 +3,50 @@ name: ptd-build
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */3 * * *"   # every 3 hours (UTC)
+    # Every 3 hours (UTC)
+    - cron: "0 */3 * * *"
+
+# Avoid overlapping runs (e.g., slow run overlapping with next cron)
+concurrency:
+  group: ptd-build
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # Needed so the job can push back to the repo
     permissions:
-      contents: write    # <-- required to push with GITHUB_TOKEN
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: false   # fine; we'll set remote with token below
+          # We'll set the remote with the token explicitly before pushing
+          persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            # Fallback so the build still succeeds if the file is missing
+            pip install requests beautifulsoup4 lxml python-dateutil feedparser
+          fi
 
       - name: Generate news + shortlinks
-        run: python pull_news.py
+        run: |
+          set -e
+          python pull_news.py
 
       - name: Commit & push
         env:
@@ -36,18 +55,23 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: |
           set -e
+
+          # Configure bot identity
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data s
+          # Stage expected outputs (adjust paths if your script writes others)
+          git add data s || true
+
+          # Create a commit if there are changes
           git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
 
-          # Always ensure the remote uses the token
-          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git
+          # Always ensure the remote uses the token for auth
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
 
-          # Rebase in case of simultaneous pushes (non-fatal if up to date)
-          git fetch origin ${BRANCH}
-          git pull --rebase origin ${BRANCH} || true
+          # Rebase in case of parallel edits; don't fail if nothing to update
+          git fetch origin "${BRANCH}"
+          git pull --rebase origin "${BRANCH}" || true
 
-          # Push the current HEAD to the current branch
-          git push origin HEAD:${BRANCH}
+          # Push current HEAD to the current branch
+          git push origin HEAD:"${BRANCH}"
