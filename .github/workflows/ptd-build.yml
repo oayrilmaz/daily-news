@@ -1,9 +1,11 @@
+# .github/workflows/ptd-build.yml
 name: ptd-build
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */3 * * *"   # every 3 hours UTC
+    # Every 3 hours (UTC)
+    - cron: "0 */3 * * *"
 
 concurrency:
   group: ptd-build
@@ -12,8 +14,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
-      contents: write
+      contents: write   # required for committing generated files
 
     steps:
       - name: Checkout
@@ -26,22 +29,30 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
+          cache: "pip"
 
+      # =========================
+      # ITEM 3 — Install deps
+      # =========================
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            pip install requests beautifulsoup4 lxml python-dateutil feedparser
+            # Fallback (keeps the job running even if the file is missing)
+            pip install requests beautifulsoup4 lxml feedparser python-dateutil
           fi
 
+      # =========================
+      # ITEM 4 — Generate news + shortlinks
+      # =========================
       - name: Generate news + shortlinks
         run: |
           set -e
           python pull_news.py
 
+      # Commit & push generated artifacts (data/news.json, data/shortlinks.json, s/*.html)
       - name: Commit & push
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
