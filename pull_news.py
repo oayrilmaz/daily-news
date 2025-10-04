@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 """
-PTD Today - Pull news directly from main sources.
+PTD Today — Pull news directly from main publishers, auto-tag by category,
+and keep only items in your rolling workday window.
 
-Finder: Bing News RSS (no key needed)
-Guardrails:
-  - Follow redirects to final URL (canonical)
-  - Only accept stories whose FINAL domain is in APPROVED_DOMAINS
-  - Scrape og:image (or twitter:image) for a thumbnail
-  - Keep items for a rolling "workday" window (Sat=Fri+Sat, Sun=Fri+Sat+Sun, Mon=Fri+Sat+Sun+Mon, Tue=Mon+Tue, Wed=Tue+Wed, Thu=Wed+Thu, Fri=Thu+Fri)
+Finder: Bing News RSS (no keys), then we follow redirects to the final URL and
+keep only approved publisher domains. We scrape OG image for thumbnails.
 
-Outputs:
-  data/news.json   # list of articles (newest first)
+Categories supported (tabs on the site):
+  grid, substations, protection, cables, hvdc, renewables, policy,
+  supply-chain, ai, data-centers
+
+Output: data/news.json
 """
 
 from __future__ import annotations
 import hashlib
 import json
+import os
 import re
 from datetime import datetime, timezone, timedelta
 from email.utils import parsedate_to_datetime
@@ -24,16 +25,17 @@ from urllib.parse import urlparse, quote
 import requests
 from bs4 import BeautifulSoup
 
-# ----------------- CONFIG -----------------
+# ----------------------------- CONFIG ---------------------------------
+
 OUTPUT_FILE = "data/news.json"
 
-# 1) Approved original publishers
+# Approved publishers (final canonical domain must be one of these)
 APPROVED_DOMAINS = {
-    # Named by you
+    # your picks
     "benzinga.com",
     "datacenterdynamics.com",
 
-    # Core energy / T&D publishers we already use
+    # strong energy/T&D publishers
     "reuters.com",
     "utilitydive.com",
     "powermag.com",
@@ -42,10 +44,9 @@ APPROVED_DOMAINS = {
     "entsoe.eu",
     "ferc.gov",
     "energy.gov",
-    "marketscreener.com",
-    "prnewswire.com",
-    "businesswire.com",
-    "marketwatch.com",
+    "eiie.org",  # add more institutes if needed
+
+    # vendor newsrooms often post relevant projects
     "abb.com",
     "se.com",                    # Schneider Electric
     "hitachienergy.com",
@@ -56,39 +57,47 @@ APPROVED_DOMAINS = {
     "prysmiangroup.com",
     "mitsubishipower.com",
     "powellind.com",
+
+    # wire services (brand-origin press releases)
+    "prnewswire.com",
+    "businesswire.com",
+
+    # finance pages (sometimes post originals)
+    "marketwatch.com",
+    "marketscreener.com",
 }
 
-# 2) What we look for at each source
-#    Each entry: (domain, list of keyword phrases to OR)
-#    We'll build a query like: site:DOMAIN (kw1 OR kw2 OR kw3 ...)
+# Domains + keyword hints to find content on each site
 SOURCE_QUERIES = [
-    ("benzinga.com", ["energy", "grid", "utilities", "transmission", "substation", "HVDC"]),
-    ("datacenterdynamics.com", ["grid", "power", "substation", "HV", "HVDC", "transmission"]),
-    ("reuters.com", ["grid", "power", "transmission", "substation", "HVDC"]),
-    ("utilitydive.com", ["transmission", "grid", "substation", "HVDC"]),
-    ("powermag.com", ["grid", "transmission", "substation", "HVDC", "cables"]),
-    ("tdworld.com", ["transmission", "substation", "protection", "HVDC", "cables"]),
-    ("ieee.org", ["power", "grid", "HVDC", "substation"]),
-    ("entsoe.eu", ["grid", "HVDC"]),
-    ("ferc.gov", ["transmission", "rule", "tariff", "order"]),
-    ("energy.gov", ["grid", "transmission", "funding", "infrastructure"]),
-    ("marketscreener.com", ["Schneider Electric", "Siemens Energy", "Hitachi Energy", "GE Vernova"]),
-    ("prnewswire.com", ["grid", "HVDC", "substation", "transmission"]),
-    ("businesswire.com", ["grid", "HVDC", "substation", "transmission"]),
-    ("marketwatch.com", ["utilities", "grid", "transmission"]),
-    ("abb.com", ["grid", "HVDC", "substation", "cable"]),
-    ("se.com", ["grid", "HVDC", "substation", "medium voltage", "switchgear"]),
-    ("hitachienergy.com", ["HVDC", "interconnector", "grid", "substation"]),
-    ("siemens-energy.com", ["HVDC", "grid", "substation"]),
-    ("gevernova.com", ["HVDC", "grid", "substation"]),
-    ("ge.com", ["energy", "grid", "HVDC"]),
-    ("nexans.com", ["HV cable", "interconnector", "subsea cable", "grid"]),
-    ("prysmiangroup.com", ["HV cable", "interconnector", "subsea cable", "grid"]),
-    ("mitsubishipower.com", ["HVDC", "grid", "substation"]),
-    ("powellind.com", ["substation", "switchgear"]),
+    ("benzinga.com",           ["energy", "utilities", "grid", "transmission", "substation", "hvdc", "renewables"]),
+    ("datacenterdynamics.com", ["grid", "power", "substation", "hvdc", "generator", "interconnector", "subsea cable"]),
+    ("reuters.com",            ["grid", "power", "utilities", "transmission", "substation", "hvdc", "renewables"]),
+    ("utilitydive.com",        ["grid", "transmission", "substation", "hvdc", "renewables", "policy"]),
+    ("powermag.com",           ["grid", "transmission", "substation", "hvdc", "cables", "renewables"]),
+    ("tdworld.com",            ["transmission", "substation", "protection", "relay", "switchgear", "hvdc", "cables"]),
+    ("ieee.org",               ["power", "grid", "hvdc", "substation", "protection", "ai"]),
+    ("entsoe.eu",              ["grid", "hvdc", "interconnector", "transmission"]),
+    ("ferc.gov",               ["transmission", "tariff", "policy", "order", "rule"]),
+    ("energy.gov",             ["grid", "funding", "infrastructure", "hvdc", "transmission", "resilience"]),
+
+    ("abb.com",                ["hvdc", "substation", "grid", "transformer", "cable"]),
+    ("se.com",                 ["grid", "substation", "switchgear", "protection", "medium voltage", "hvdc"]),
+    ("hitachienergy.com",      ["hvdc", "interconnector", "grid", "substation"]),
+    ("siemens-energy.com",     ["hvdc", "grid", "substation"]),
+    ("gevernova.com",          ["hvdc", "grid", "substation"]),
+    ("ge.com",                 ["energy", "grid", "hvdc"]),
+    ("nexans.com",             ["hv cable", "interconnector", "subsea cable", "grid"]),
+    ("prysmiangroup.com",      ["hv cable", "interconnector", "subsea cable", "grid"]),
+    ("mitsubishipower.com",    ["hvdc", "grid", "substation"]),
+    ("powellind.com",          ["substation", "switchgear"]),
+
+    ("prnewswire.com",         ["grid", "hvdc", "substation", "transmission", "interconnector"]),
+    ("businesswire.com",       ["grid", "hvdc", "substation", "transmission", "interconnector"]),
+    ("marketwatch.com",        ["utilities", "grid", "transmission", "renewables"]),
+    ("marketscreener.com",     ["Schneider Electric", "Siemens Energy", "Hitachi Energy", "GE Vernova"]),
 ]
 
-# 3) Supply chain topics (run against broad news but keep only approved domains after resolve)
+# Supply-chain & ops topics (broad queries; we still filter to approved domains)
 SUPPLY_CHAIN_TERMS = [
     "transformer lead time",
     "equipment shortage power grid",
@@ -96,34 +105,60 @@ SUPPLY_CHAIN_TERMS = [
     "switchgear delay",
     "logistics cost power equipment",
     "transport pricing energy equipment",
+    "shipping cost transformer",
+    "logistics corridor substation",
 ]
 
-# ------------------------------------------
+# Extra tech/market themes
+EXTRA_THEMES = [
+    "data center grid connection",
+    "data center power",
+    "AI power consumption",
+    "AI energy demand",
+    "grid modernization",
+    "interconnector hvdc subsea",
+]
+
+# Category keywords for auto-tagging
+CATEGORY_KEYWORDS = {
+    "grid":         ["grid", "transmission", "interconnector", "overhead line", "underground cable"],
+    "substations":  ["substation", "gis substation", "ais substation", "transformer station"],
+    "protection":   ["protection", "relay", "iec 61850", "fault", "breaker failure", "distance protection"],
+    "cables":       ["cable", "subsea cable", "hv cable", "xlpe", "underground"],
+    "hvdc":         ["hvdc", "converter station", "vsc", "lcc", "bipole"],
+    "renewables":   ["renewable", "wind", "offshore wind", "solar", "hydro", "battery", "storage"],
+    "policy":       ["ferc", "tariff", "order", "policy", "regulation", "doe funding", "rto", "iso market"],
+    "supply-chain": ["lead time", "shortage", "logistics", "shipping", "delay", "supply chain", "transport pricing"],
+    "ai":           ["ai", "artificial intelligence", "machine learning"],
+    "data-centers": ["data center", "datacenter", "hyperscale"],
+}
 
 UA = "Mozilla/5.0 (compatible; PTDTodayBot/1.0; +https://ptdtoday.com)"
 HEADERS = {"User-Agent": UA}
 
+# ------------------------- helpers -------------------------
+
 def included_dates(today=None) -> set[str]:
-    """Return allowed date set (YYYY-MM-DD, UTC) by your rule."""
+    """Rolling window as requested."""
     if today is None:
         today = datetime.now(timezone.utc).date()
     wd = today.weekday()  # Mon=0 ... Sun=6
 
-    def d(offset): return (today + timedelta(days=offset))
+    def d(off): return (today + timedelta(days=off))
     keep = set()
-    if wd == 5:          # Sat -> Fri + Sat
+    if wd == 5:        # Sat: Fri+Sat
         keep |= {d(-1), d(0)}
-    elif wd == 6:        # Sun -> Fri + Sat + Sun
+    elif wd == 6:      # Sun: Fri+Sat+Sun
         keep |= {d(-2), d(-1), d(0)}
-    elif wd == 0:        # Mon -> Fri + Sat + Sun + Mon
+    elif wd == 0:      # Mon: Fri+Sat+Sun+Mon
         keep |= {d(-3), d(-2), d(-1), d(0)}
-    elif wd == 1:        # Tue -> Mon + Tue
+    elif wd == 1:      # Tue: Mon+Tue
         keep |= {d(-1), d(0)}
-    elif wd == 2:        # Wed -> Tue + Wed
+    elif wd == 2:      # Wed: Tue+Wed
         keep |= {d(-1), d(0)}
-    elif wd == 3:        # Thu -> Wed + Thu
+    elif wd == 3:      # Thu: Wed+Thu
         keep |= {d(-1), d(0)}
-    elif wd == 4:        # Fri -> Thu + Fri
+    elif wd == 4:      # Fri: Thu+Fri
         keep |= {d(-1), d(0)}
     return {x.isoformat() for x in keep}
 
@@ -134,7 +169,6 @@ def strip_html(s: str) -> str:
     return re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ").strip()
 
 def parse_pubdate(pub: str) -> str:
-    """Return ISO8601 UTC or ''."""
     try:
         dt = parsedate_to_datetime(pub)
         if dt.tzinfo is None:
@@ -150,13 +184,12 @@ def domain_of(url: str) -> str:
         return ""
 
 def resolve_final_url(url: str) -> str:
-    """Follow redirects to get the final publisher URL."""
     try:
         r = requests.get(url, headers=HEADERS, timeout=12, allow_redirects=True)
         r.raise_for_status()
         return r.url
     except Exception:
-        return url  # best effort
+        return url
 
 def fetch_bing_rss(query: str) -> str | None:
     url = f"https://www.bing.com/news/search?q={quote(query)}&format=rss"
@@ -197,7 +230,6 @@ def coerce_https(url: str) -> str:
     if p.scheme == "https":
         return url
     if p.scheme == "http":
-        # Proxy HTTP images to HTTPS for iOS/Pages
         host_path = url.replace("http://", "", 1)
         return f"https://images.weserv.nl/?url={quote(host_path)}"
     return url
@@ -210,8 +242,8 @@ def fetch_og_image(page_url: str) -> str:
         for sel in [
             "meta[property='og:image']",
             "meta[name='og:image']",
-            "meta[name='twitter:image']",
             "meta[property='twitter:image']",
+            "meta[name='twitter:image']",
         ]:
             tag = soup.select_one(sel)
             if tag and tag.get("content"):
@@ -240,21 +272,32 @@ def time_ago(iso: str) -> str:
 
 def build_queries() -> list[str]:
     queries = []
-    # Site-targeted queries
     for dom, kws in SOURCE_QUERIES:
-        if not kws:
+        if kws:
+            or_block = " OR ".join([f'"{k}"' for k in kws])
+            queries.append(f"site:{dom} ({or_block})")
+        else:
             queries.append(f"site:{dom}")
-            continue
-        or_block = " OR ".join([f'"{k}"' for k in kws])
-        queries.append(f"site:{dom} ({or_block})")
-    # Supply chain broad terms (finder), will filter by approved after resolve
     for term in SUPPLY_CHAIN_TERMS:
-        queries.append(f'{term}')
+        queries.append(term)
+    for term in EXTRA_THEMES:
+        queries.append(term)
     return queries
+
+def tag_categories(title: str, summary: str) -> list[str]:
+    text = f"{title} {summary}".lower()
+    tags = []
+    for cat, kws in CATEGORY_KEYWORDS.items():
+        if any(kw.lower() in text for kw in kws):
+            tags.append(cat)
+    # sanity: if nothing matched, try domain-agnostic hints for grid
+    return tags[:6] if tags else ["grid"]
+
+# ----------------------------- main -----------------------------
 
 def main():
     allowed_days = included_dates()
-    seen_urls = set()
+    seen = set()
     results = []
 
     queries = build_queries()
@@ -263,6 +306,7 @@ def main():
         if not xml:
             continue
         items = parse_rss(xml)
+
         for it in items:
             if not it["date"]:
                 continue
@@ -270,44 +314,39 @@ def main():
             if day not in allowed_days:
                 continue
 
-            # resolve to final URL and validate source domain
             final_url = resolve_final_url(it["link"])
             dom = domain_of(final_url)
             if dom not in APPROVED_DOMAINS:
-                continue  # enforce original publisher only
-
-            if final_url in seen_urls:
                 continue
-            seen_urls.add(final_url)
+
+            if final_url in seen:
+                continue
+            seen.add(final_url)
 
             img = fetch_og_image(final_url)
+            cats = tag_categories(it["title"], it["summary"])
 
             results.append({
+                "id": md5_6(final_url),
                 "title": it["title"],
                 "url": final_url,
                 "source": dom,
-                "image": img,                 # may be "", index uses fallback
+                "image": img,
                 "summary": it["summary"],
                 "date": it["date"],
                 "timeAgo": time_ago(it["date"]),
-                "id": md5_6(final_url)
+                "cats": cats,  # list of category slugs
             })
 
     # newest first
     results.sort(key=lambda x: x["date"], reverse=True)
 
-    # write JSON list
-    os_make_dirs("data")
+    os.makedirs("data", exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
-    print(f"Saved {len(results)} stories from approved sources.")
+    print(f"Saved {len(results)} stories.")
     print("Allowed days (UTC):", sorted(allowed_days))
-
-# --- tiny helper (mkdir -p) ---
-import os
-def os_make_dirs(path: str):
-    os.makedirs(path, exist_ok=True)
 
 if __name__ == "__main__":
     main()
