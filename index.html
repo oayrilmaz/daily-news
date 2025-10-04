@@ -16,7 +16,7 @@
     header p{margin:6px 0;color:#666;font-size:1.05em}
     .kicker{font-weight:700;margin-top:8px}
     .bar{border-top:1px solid #eee;border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:5}
-    nav{display:flex;justify-content:center;flex-wrap:wrap;gap:1.2rem;padding:12px 10px}
+    nav{display:flex;justify-content:center;flex-wrap:wrap;gap:1.0rem;padding:12px 10px}
     nav button{background:none;border:none;font-size:1.02em;cursor:pointer}
     nav button.active{font-weight:700;text-decoration:underline}
     .updated{display:flex;justify-content:center;margin:10px 0 24px}
@@ -46,6 +46,7 @@
 <div class="bar">
   <nav id="tabs">
     <button data-cat="all" class="active">All</button>
+    <button data-cat="top">Top&nbsp;(7d)</button>
     <button data-cat="grid">Grid</button>
     <button data-cat="substations">Substations</button>
     <button data-cat="protection">Protection</button>
@@ -68,9 +69,9 @@
 </footer>
 
 <script>
-const listEl = document.getElementById('list');
-const updatedEl = document.getElementById('updated');
-const tabsEl = document.getElementById('tabs');
+const listEl   = document.getElementById('list');
+const updatedEl= document.getElementById('updated');
+const tabsEl   = document.getElementById('tabs');
 
 let ALL_ITEMS = [];
 let CURRENT_CAT = 'all';
@@ -79,10 +80,9 @@ function fallbackImg(img){
   img.onerror = null;
   img.src = '/assets/og-default.png';
 }
-
 function chipLabel(slug){
   const map = {
-    'grid':'Grid', 'substations':'Substations', 'protection':'Protection',
+    'grid':'Grid','substations':'Substations','protection':'Protection',
     'cables':'Cables','hvdc':'HVDC','renewables':'Renewables','policy':'Policy',
     'supply-chain':'Supply Chain','ai':'AI','data-centers':'Data Centers'
   };
@@ -91,10 +91,17 @@ function chipLabel(slug){
 
 function render(){
   listEl.innerHTML = '';
-  const items = ALL_ITEMS.filter(a => {
-    if (CURRENT_CAT === 'all') return true;
-    return Array.isArray(a.cats) && a.cats.includes(CURRENT_CAT);
-  });
+  let items = [];
+
+  if (CURRENT_CAT === 'top'){
+    // Last 7d AND score > 0, sorted by score desc then recency
+    items = ALL_ITEMS.filter(a => a.week && a.score && a.score > 0)
+                     .sort((a,b)=> (b.score - a.score) || (new Date(b.date)-new Date(a.date)));
+  } else if (CURRENT_CAT === 'all') {
+    items = ALL_ITEMS.slice(); // already newest-first
+  } else {
+    items = ALL_ITEMS.filter(a => Array.isArray(a.cats) && a.cats.includes(CURRENT_CAT));
+  }
 
   if (items.length === 0){
     listEl.innerHTML = `<p style="text-align:center;color:#777;">No stories for this section yet.</p>`;
@@ -103,6 +110,9 @@ function render(){
 
   for (const n of items){
     const chips = (n.cats || []).slice(0,6).map(c => `<span class="chip">${chipLabel(c)}</span>`).join('');
+    const scoreBadge = (CURRENT_CAT === 'top' && n.score)
+      ? `<span class="chip">Score: ${n.score.toFixed(2)}</span>` : '';
+
     const div = document.createElement('div');
     div.className = 'item';
     div.innerHTML = `
@@ -113,7 +123,7 @@ function render(){
         <h2><a href="${n.url}" target="_blank" rel="noopener">${n.title}</a></h2>
         <div class="meta">${n.source || ''} • ${n.timeAgo || ''}</div>
         <p>${n.summary || ''}</p>
-        <div class="chips">${chips}</div>
+        <div class="chips">${chips} ${scoreBadge}</div>
         <div class="btns">
           <a href="${n.url}" target="_blank" rel="noopener">Source</a>
           <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(n.url)}" target="_blank" rel="noopener">Share</a>
@@ -140,8 +150,7 @@ tabsEl.addEventListener('click', (e)=>{
 });
 
 load();
-// Optional auto-refresh every 3 hours to mirror the job cadence
-setInterval(load, 10800000);
+setInterval(load, 10800000); // 3 hours
 </script>
 </body>
 </html>
