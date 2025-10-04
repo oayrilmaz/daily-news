@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """
 PTD Today — Pull news directly from main publishers, auto-tag by category,
-and keep only items in your rolling workday window.
+keep only items in your rolling workday window, AND score items so the site
+can show a "Top (7d)" ranked list.
 
-Finder: Bing News RSS (no keys), then we follow redirects to the final URL and
-keep only approved publisher domains. We scrape OG image for thumbnails.
-
-Categories supported (tabs on the site):
-  grid, substations, protection, cables, hvdc, renewables, policy,
-  supply-chain, ai, data-centers
+New fields:
+  - "score": float ranking score for last 7 days (recency + publisher weight + boosts)
+  - "week":  bool (True if within last 7 days)
 
 Output: data/news.json
 """
@@ -29,45 +27,17 @@ from bs4 import BeautifulSoup
 
 OUTPUT_FILE = "data/news.json"
 
-# Approved publishers (final canonical domain must be one of these)
 APPROVED_DOMAINS = {
-    # your picks
-    "benzinga.com",
-    "datacenterdynamics.com",
-
-    # strong energy/T&D publishers
-    "reuters.com",
-    "utilitydive.com",
-    "powermag.com",
-    "tdworld.com",
-    "ieee.org",
-    "entsoe.eu",
-    "ferc.gov",
-    "energy.gov",
-    "eiie.org",  # add more institutes if needed
-
-    # vendor newsrooms often post relevant projects
-    "abb.com",
-    "se.com",                    # Schneider Electric
-    "hitachienergy.com",
-    "siemens-energy.com",
-    "gevernova.com",
-    "ge.com",
-    "nexans.com",
-    "prysmiangroup.com",
-    "mitsubishipower.com",
-    "powellind.com",
-
-    # wire services (brand-origin press releases)
-    "prnewswire.com",
-    "businesswire.com",
-
-    # finance pages (sometimes post originals)
-    "marketwatch.com",
-    "marketscreener.com",
+    "benzinga.com", "datacenterdynamics.com",
+    "reuters.com", "utilitydive.com", "powermag.com", "tdworld.com",
+    "ieee.org", "entsoe.eu", "ferc.gov", "energy.gov",
+    "abb.com", "se.com", "hitachienergy.com", "siemens-energy.com",
+    "gevernova.com", "ge.com", "nexans.com", "prysmiangroup.com",
+    "mitsubishipower.com", "powellind.com",
+    "prnewswire.com", "businesswire.com",
+    "marketwatch.com", "marketscreener.com",
 }
 
-# Domains + keyword hints to find content on each site
 SOURCE_QUERIES = [
     ("benzinga.com",           ["energy", "utilities", "grid", "transmission", "substation", "hvdc", "renewables"]),
     ("datacenterdynamics.com", ["grid", "power", "substation", "hvdc", "generator", "interconnector", "subsea cable"]),
@@ -97,7 +67,6 @@ SOURCE_QUERIES = [
     ("marketscreener.com",     ["Schneider Electric", "Siemens Energy", "Hitachi Energy", "GE Vernova"]),
 ]
 
-# Supply-chain & ops topics (broad queries; we still filter to approved domains)
 SUPPLY_CHAIN_TERMS = [
     "transformer lead time",
     "equipment shortage power grid",
@@ -109,7 +78,6 @@ SUPPLY_CHAIN_TERMS = [
     "logistics corridor substation",
 ]
 
-# Extra tech/market themes
 EXTRA_THEMES = [
     "data center grid connection",
     "data center power",
@@ -119,7 +87,6 @@ EXTRA_THEMES = [
     "interconnector hvdc subsea",
 ]
 
-# Category keywords for auto-tagging
 CATEGORY_KEYWORDS = {
     "grid":         ["grid", "transmission", "interconnector", "overhead line", "underground cable"],
     "substations":  ["substation", "gis substation", "ais substation", "transformer station"],
@@ -133,55 +100,68 @@ CATEGORY_KEYWORDS = {
     "data-centers": ["data center", "datacenter", "hyperscale"],
 }
 
-UA = "Mozilla/5.0 (compatible; PTDTodayBot/1.0; +https://ptdtoday.com)"
+# Weight by publisher when scoring "Top (7d)"
+SOURCE_WEIGHTS = {
+    "reuters.com": 3.0,
+    "utilitydive.com": 2.6,
+    "powermag.com": 2.4,
+    "tdworld.com": 2.2,
+    "ieee.org": 2.0,
+    "entsoe.eu": 2.0,
+    "energy.gov": 1.9,
+    "ferc.gov": 1.9,
+
+    # Vendor newsrooms – still valuable, lower than independent press
+    "siemens-energy.com": 1.8,
+    "hitachienergy.com": 1.8,
+    "gevernova.com": 1.8,
+    "abb.com": 1.7,
+    "se.com": 1.7,
+    "nexans.com": 1.6,
+    "prysmiangroup.com": 1.6,
+    "mitsubishipower.com": 1.6,
+    "powellind.com": 1.5,
+
+    "datacenterdynamics.com": 1.9,
+    "benzinga.com": 1.6,
+    "marketwatch.com": 1.5,
+    "marketscreener.com": 1.5,
+    "prnewswire.com": 1.3,
+    "businesswire.com": 1.3,
+}
+
+UA = "Mozilla/5.0 (compatible; PTDTodayBot/1.1; +https://ptdtoday.com)"
 HEADERS = {"User-Agent": UA}
 
 # ------------------------- helpers -------------------------
 
 def included_dates(today=None) -> set[str]:
-    """Rolling window as requested."""
+    """Rolling publishing window from your rules."""
     if today is None:
         today = datetime.now(timezone.utc).date()
     wd = today.weekday()  # Mon=0 ... Sun=6
-
     def d(off): return (today + timedelta(days=off))
     keep = set()
-    if wd == 5:        # Sat: Fri+Sat
-        keep |= {d(-1), d(0)}
-    elif wd == 6:      # Sun: Fri+Sat+Sun
-        keep |= {d(-2), d(-1), d(0)}
-    elif wd == 0:      # Mon: Fri+Sat+Sun+Mon
-        keep |= {d(-3), d(-2), d(-1), d(0)}
-    elif wd == 1:      # Tue: Mon+Tue
-        keep |= {d(-1), d(0)}
-    elif wd == 2:      # Wed: Tue+Wed
-        keep |= {d(-1), d(0)}
-    elif wd == 3:      # Thu: Wed+Thu
-        keep |= {d(-1), d(0)}
-    elif wd == 4:      # Fri: Thu+Fri
-        keep |= {d(-1), d(0)}
+    if wd == 5: keep |= {d(-1), d(0)}                       # Sat: Fri+Sat
+    elif wd == 6: keep |= {d(-2), d(-1), d(0)}              # Sun: Fri+Sat+Sun
+    elif wd == 0: keep |= {d(-3), d(-2), d(-1), d(0)}       # Mon: Fri..Mon
+    else: keep |= {d(-1), d(0)}                             # Tue..Fri: prev day + today
     return {x.isoformat() for x in keep}
 
-def md5_6(s: str) -> str:
-    return hashlib.md5(s.encode("utf-8")).hexdigest()[:6]
-
-def strip_html(s: str) -> str:
-    return re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ").strip()
+def md5_6(s: str) -> str: return hashlib.md5(s.encode("utf-8")).hexdigest()[:6]
+def strip_html(s: str) -> str: return re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;"," ").strip()
 
 def parse_pubdate(pub: str) -> str:
     try:
         dt = parsedate_to_datetime(pub)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+        if dt.tzinfo is None: dt = dt.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).isoformat()
     except Exception:
         return ""
 
 def domain_of(url: str) -> str:
-    try:
-        return urlparse(url).netloc.lower().replace("www.", "")
-    except Exception:
-        return ""
+    try: return urlparse(url).netloc.lower().replace("www.","")
+    except Exception: return ""
 
 def resolve_final_url(url: str) -> str:
     try:
@@ -207,12 +187,11 @@ def parse_rss(xml: str) -> list[dict]:
         root = ET.fromstring(xml)
         for item in root.findall(".//item"):
             title = item.findtext("title") or ""
-            link = item.findtext("link") or ""
-            pub = item.findtext("pubDate") or ""
-            desc = item.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") \
-                   or item.findtext("description") or ""
-            if not (title and link):
-                continue
+            link  = item.findtext("link")  or ""
+            pub   = item.findtext("pubDate") or ""
+            desc  = item.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") \
+                    or item.findtext("description") or ""
+            if not (title and link): continue
             out.append({
                 "title": strip_html(title),
                 "link": link.strip(),
@@ -224,11 +203,9 @@ def parse_rss(xml: str) -> list[dict]:
     return out
 
 def coerce_https(url: str) -> str:
-    if not url:
-        return ""
+    if not url: return ""
     p = urlparse(url)
-    if p.scheme == "https":
-        return url
+    if p.scheme == "https": return url
     if p.scheme == "http":
         host_path = url.replace("http://", "", 1)
         return f"https://images.weserv.nl/?url={quote(host_path)}"
@@ -240,16 +217,13 @@ def fetch_og_image(page_url: str) -> str:
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "lxml")
         for sel in [
-            "meta[property='og:image']",
-            "meta[name='og:image']",
-            "meta[property='twitter:image']",
-            "meta[name='twitter:image']",
+            "meta[property='og:image']","meta[name='og:image']",
+            "meta[property='twitter:image']","meta[name='twitter:image']",
         ]:
             tag = soup.select_one(sel)
             if tag and tag.get("content"):
                 img = tag["content"].strip()
-                if img.lower().endswith(".svg"):
-                    continue
+                if img.lower().endswith(".svg"): continue
                 return coerce_https(img)
     except Exception:
         pass
@@ -257,7 +231,7 @@ def fetch_og_image(page_url: str) -> str:
 
 def time_ago(iso: str) -> str:
     try:
-        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        dt  = datetime.fromisoformat(iso.replace("Z","+00:00"))
         now = datetime.now(timezone.utc)
         diff = (now - dt).total_seconds()
         if diff < 60: return "just now"
@@ -278,10 +252,8 @@ def build_queries() -> list[str]:
             queries.append(f"site:{dom} ({or_block})")
         else:
             queries.append(f"site:{dom}")
-    for term in SUPPLY_CHAIN_TERMS:
-        queries.append(term)
-    for term in EXTRA_THEMES:
-        queries.append(term)
+    for term in SUPPLY_CHAIN_TERMS: queries.append(term)
+    for term in EXTRA_THEMES:       queries.append(term)
     return queries
 
 def tag_categories(title: str, summary: str) -> list[str]:
@@ -290,8 +262,32 @@ def tag_categories(title: str, summary: str) -> list[str]:
     for cat, kws in CATEGORY_KEYWORDS.items():
         if any(kw.lower() in text for kw in kws):
             tags.append(cat)
-    # sanity: if nothing matched, try domain-agnostic hints for grid
     return tags[:6] if tags else ["grid"]
+
+def scoring(dom: str, iso_date: str, title: str, cats: list[str]) -> float:
+    """Score used for Top(7d): recency + publisher weight + boosts."""
+    try:
+        dt  = datetime.fromisoformat(iso_date.replace("Z","+00:00"))
+    except Exception:
+        return 0.0
+    now  = datetime.now(timezone.utc)
+    hours = max(0.0, (now - dt).total_seconds() / 3600.0)
+
+    # Recency: 0..2 points (fresh = 2, 7 days old ~0)
+    recency = max(0.0, 1.0 - min(hours, 168.0) / 168.0) * 2.0
+
+    # Publisher weight: 1.0..3.0 typical
+    src_w = SOURCE_WEIGHTS.get(dom, 1.4)
+
+    # Category boost: HVDC / Supply chain / Data Centers are hot
+    boost = 0.0
+    for hot in ("hvdc", "supply-chain", "data-centers"):
+        if hot in cats: boost += 0.4
+
+    # Keyword richness (simple proxy): number of category keywords hit (capped)
+    kw_rich = min(1.0, len(cats) * 0.2)
+
+    return round(src_w + recency + boost + kw_rich, 3)
 
 # ----------------------------- main -----------------------------
 
@@ -299,32 +295,39 @@ def main():
     allowed_days = included_dates()
     seen = set()
     results = []
+    now = datetime.now(timezone.utc)
 
     queries = build_queries()
     for q in queries:
         xml = fetch_bing_rss(q)
-        if not xml:
-            continue
+        if not xml: continue
         items = parse_rss(xml)
 
         for it in items:
-            if not it["date"]:
-                continue
+            if not it["date"]: continue
             day = it["date"][:10]
             if day not in allowed_days:
-                continue
+                # We still *score* last-7-days items (for Top tab) but don't show
+                # them in the default streams. We'll compute "week" separately.
+                pass
 
             final_url = resolve_final_url(it["link"])
             dom = domain_of(final_url)
-            if dom not in APPROVED_DOMAINS:
-                continue
-
-            if final_url in seen:
-                continue
+            if dom not in APPROVED_DOMAINS: continue
+            if final_url in seen: continue
             seen.add(final_url)
 
-            img = fetch_og_image(final_url)
             cats = tag_categories(it["title"], it["summary"])
+            img  = fetch_og_image(final_url)
+
+            # last 7 days flag
+            try:
+                dt = datetime.fromisoformat(it["date"].replace("Z","+00:00"))
+            except Exception:
+                dt = now
+            in_week = (now - dt) <= timedelta(days=7)
+
+            score = scoring(dom, it["date"], it["title"], cats) if in_week else 0.0
 
             results.append({
                 "id": md5_6(final_url),
@@ -335,10 +338,12 @@ def main():
                 "summary": it["summary"],
                 "date": it["date"],
                 "timeAgo": time_ago(it["date"]),
-                "cats": cats,  # list of category slugs
+                "cats": cats,
+                "week": in_week,
+                "score": score,
             })
 
-    # newest first
+    # newest first for default view
     results.sort(key=lambda x: x["date"], reverse=True)
 
     os.makedirs("data", exist_ok=True)
