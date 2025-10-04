@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PTD Today — Daily Energy & Power News</title>
 
-  <!-- Social previews -->
   <meta property="og:title" content="PTD Today — Daily Energy & Power News">
-  <meta property="og:description" content="Daily coverage of grid, HV substations, cables, protection & control, renewables, policy, and more.">
+  <meta property="og:description" content="Daily coverage of grid, HV substations, cables, protection, renewables, policy, supply chain and more.">
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
   <meta property="og:url" content="https://ptdtoday.com">
   <meta name="twitter:card" content="summary_large_image">
@@ -15,55 +14,96 @@
   <link rel="stylesheet" href="assets/main.css">
 
   <style>
-    /* Minimal extras just for the date toolbar and share modal */
-    .toolbar {
-      max-width: 980px; margin: 0 auto 14px; padding: 10px 12px;
-      border: 1px solid #e5e5e5; border-radius: 6px; background:#fafafa;
-      display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;
-    }
-    .toolbar .range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .toolbar label { font-size: .92rem; color:#555; }
-    .toolbar input[type="date"] {
-      padding:6px 8px; border:1px solid #ddd; border-radius:4px; font-size:.95rem;
-    }
-    .toolbar button {
-      padding:7px 12px; border:1px solid #ccc; border-radius:5px; background:#f5f5f5; cursor:pointer;
-    }
-    .toolbar button:hover { background:#eee; }
+    body { font-family: Georgia, serif; }
     nav.site {
-      text-align:center; border-top:1px solid #ddd; border-bottom:1px solid #ddd;
-      padding:10px 0; margin-bottom:14px; white-space:nowrap; overflow:auto;
+      text-align:center;
+      border-top:1px solid #ddd;
+      border-bottom:1px solid #ddd;
+      padding:10px 0;
+      margin-bottom:14px;
+      white-space:nowrap;
+      overflow:auto;
     }
-    nav.site a { color:#111; text-decoration:none; margin:0 8px; }
+    nav.site a {
+      color:#111;
+      text-decoration:none;
+      margin:0 8px;
+    }
     nav.site a.active { font-weight:700; text-decoration:underline; }
+
     .updated { float:right; margin-right:20px; color:#777; font-size:.9rem; }
 
-    /* share modal minimal styling */
+    .toolbar {
+      max-width:980px;
+      margin:0 auto 14px;
+      padding:10px 12px;
+      border:1px solid #e5e5e5;
+      border-radius:6px;
+      background:#fafafa;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .toolbar .range { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .toolbar label { font-size:.92rem; color:#555; }
+    .toolbar input[type="date"] {
+      padding:6px 8px;
+      border:1px solid #ddd;
+      border-radius:4px;
+      font-size:.95rem;
+    }
+    .toolbar button {
+      padding:7px 12px;
+      border:1px solid #ccc;
+      border-radius:5px;
+      background:#f5f5f5;
+      cursor:pointer;
+    }
+    .toolbar button:hover { background:#eee; }
+
     .share-modal {
-      position: fixed; inset: 0; display:flex; justify-content:center; align-items:center;
-      background: rgba(0,0,0,.35); z-index: 9999;
+      position:fixed;
+      inset:0;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:rgba(0,0,0,.35);
+      z-index:9999;
     }
     .share-popup {
-      background:#fff; padding:18px; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18);
-      min-width:260px; display:flex; flex-direction:column; gap:10px;
+      background:#fff;
+      padding:18px;
+      border-radius:10px;
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+      min-width:260px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
     }
     .share-popup button {
-      font-size:16px; padding:9px 11px; border:1px solid #ddd; border-radius:6px; background:#f8f8f8; cursor:pointer;
+      font-size:16px;
+      padding:9px 11px;
+      border:1px solid #ddd;
+      border-radius:6px;
+      background:#f8f8f8;
+      cursor:pointer;
     }
     .share-popup button:hover { background:#efefef; }
-    @media (max-width: 640px){
+
+    @media(max-width:640px){
       .updated{ float:none; margin:8px 0 0 }
     }
   </style>
 </head>
 <body>
-  <header style="text-align:center; padding: 20px 0;">
-    <h1 style="font-family:Georgia,serif; font-size:2.6em; margin:0;">PTD Today</h1>
+  <header style="text-align:center; padding:20px 0;">
+    <h1 style="font-size:2.6em; margin:0;">PTD Today</h1>
     <p style="margin:0; font-style:italic; color:#555;">First to Know. First to Lead.</p>
-    <h2 style="font-family:Georgia,serif; font-size:1.3em; margin-top:6px;">Daily Energy & Power News</h2>
+    <h2 style="font-size:1.3em; margin-top:6px;">Daily Energy & Power News</h2>
   </header>
 
-  <!-- Categories -->
   <nav class="site">
     <a href="#" data-cat="all" class="active" onclick="setCategory(event,'all')"><strong>All</strong></a>
     <a href="#" data-cat="top7d" onclick="setCategory(event,'top7d')">Top (7d)</a>
@@ -78,12 +118,11 @@
     <span class="updated">Updated — <span id="updateTime"></span></span>
   </nav>
 
-  <!-- Date range toolbar -->
   <section class="toolbar" aria-label="Date range filter">
     <div class="range">
-      <label for="fromDate">From</label>
+      <label>From</label>
       <input type="date" id="fromDate">
-      <label for="toDate">To</label>
+      <label>To</label>
       <input type="date" id="toDate">
       <button onclick="applyDateRange()">Apply</button>
       <button onclick="clearDateRange()">Clear</button>
@@ -93,157 +132,143 @@
     </div>
   </section>
 
-  <!-- News list -->
   <main id="newsContainer" style="max-width:980px; margin:0 auto; padding:0 15px;"></main>
 
-  <footer style="text-align:center; padding:20px; color:#666; font-size:0.9em;">
+  <footer style="text-align:center; padding:20px; color:#666; font-size:.9em;">
     © 2025 PTD Today • Headlines link to their original publishers.
   </footer>
 
   <script>
-    // --------- STATE ---------
     let ALL_NEWS = [];
     let currentCategory = 'all';
     let rangeFrom = null;
     let rangeTo = null;
 
-    // --------- LOAD NEWS ---------
-    async function loadNews() {
+    async function loadNews(){
       const res = await fetch('data/news.json', {cache:'no-store'});
       ALL_NEWS = await res.json();
-      // Optional: sort newest first (by date)
-      ALL_NEWS.sort((a,b)=> new Date(b.date || b.time || 0) - new Date(a.date || a.time || 0));
-
-      // updated time
+      ALL_NEWS.sort((a,b)=> new Date(b.date||b.time||0)-new Date(a.date||a.time||0));
       document.getElementById('updateTime').textContent =
-        new Date().toISOString().replace('T',' ').slice(0,19) + 'Z';
-
+        new Date().toISOString().replace('T',' ').slice(0,19)+'Z';
       render();
     }
 
-    // --------- FILTER PIPELINE ---------
-    function visibleArticles() {
+    function visibleArticles(){
       let list = ALL_NEWS;
-
-      // category filter
-      if (currentCategory === 'top7d') {
-        const cutoff = new Date(Date.now() - 7*24*60*60*1000);
-        list = list.filter(a => new Date(a.date || a.time || 0) >= cutoff);
-      } else if (currentCategory !== 'all') {
-        list = list.filter(a => (a.category || '').toLowerCase() === currentCategory);
+      if(currentCategory==='top7d'){
+        const cutoff=new Date(Date.now()-7*24*60*60*1000);
+        list=list.filter(a=>new Date(a.date||a.time||0)>=cutoff);
+      }else if(currentCategory!=='all'){
+        list=list.filter(a=>(a.category||'').toLowerCase()===currentCategory);
       }
-
-      // date range filters (inclusive)
-      if (rangeFrom) {
-        const fromTs = new Date(rangeFrom + 'T00:00:00Z').getTime();
-        list = list.filter(a => new Date(a.date || a.time || 0).getTime() >= fromTs);
+      if(rangeFrom){
+        const fromTs=new Date(rangeFrom+'T00:00:00Z').getTime();
+        list=list.filter(a=>new Date(a.date||a.time||0).getTime()>=fromTs);
       }
-      if (rangeTo) {
-        const toTs = new Date(rangeTo + 'T23:59:59Z').getTime();
-        list = list.filter(a => new Date(a.date || a.time || 0).getTime() <= toTs);
+      if(rangeTo){
+        const toTs=new Date(rangeTo+'T23:59:59Z').getTime();
+        list=list.filter(a=>new Date(a.date||a.time||0).getTime()<=toTs);
       }
-
       return list;
     }
 
-    // --------- RENDER ---------
-    function render() {
-      const container = document.getElementById('newsContainer');
-      container.innerHTML = '';
-
-      const items = visibleArticles();
-      if (items.length === 0) {
-        container.innerHTML = `<p style="color:#666; text-align:center; padding:40px 0;">
-          No articles match your filters yet.
-        </p>`;
+    function render(){
+      const container=document.getElementById('newsContainer');
+      container.innerHTML='';
+      const items=visibleArticles();
+      if(!items.length){
+        container.innerHTML='<p style="text-align:center;color:#666;padding:40px 0;">No articles match your filters yet.</p>';
         return;
       }
-
-      items.forEach(article => {
-        const id = (article.id || Math.random().toString(36).slice(2,8)).toLowerCase();
-        const image = article.image || 'assets/og-default.png';
-        const title = article.title || 'Untitled';
-        const sum = article.summary || '';
-        const cat = (article.category || '').toString();
-        const time = article.time || article.date || '';
-
-        const row = `
-          <article style="display:flex; gap:18px; margin-bottom:28px; border-bottom:1px solid #eee; padding-bottom:18px;">
+      items.forEach(article=>{
+        const id=(article.id||Math.random().toString(36).slice(2,8)).toLowerCase();
+        const image=article.image||'assets/og-default.png';
+        const title=article.title||'Untitled';
+        const sum=article.summary||'';
+        const cat=(article.category||'').toString();
+        const time=article.time||article.date||'';
+        container.insertAdjacentHTML('beforeend',`
+          <article style="display:flex;gap:18px;margin-bottom:28px;border-bottom:1px solid #eee;padding-bottom:18px;">
             <div style="flex:0 0 160px;">
-              <img src="${image}" alt="${title}" style="width:160px; height:160px; object-fit:cover; border:1px solid #ddd;">
+              <img src="${image}" alt="${title}" style="width:160px;height:160px;object-fit:cover;border:1px solid #ddd;">
             </div>
-            <div style="flex:1 1 auto;">
+            <div style="flex:1;">
               <h3 style="margin:0 0 6px;">
-                <a href="s/${id}.html" style="color:#0a3; color:#003399; text-decoration:none;">${title}</a>
+                <a href="s/${id}.html" style="color:#003399;text-decoration:none;">${title}</a>
               </h3>
-              <p style="margin:0 0 10px; color:#333; font-size:.98rem;">${sum}</p>
-              <p style="margin:0 0 12px; font-size:.86rem; color:#777;">${cat} • ${time}</p>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <p style="margin:0 0 10px;color:#333;font-size:.98rem;">${sum}</p>
+              <p style="margin:0 0 12px;font-size:.86rem;color:#777;">${cat} • ${time}</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button onclick="window.open('s/${id}.html','_blank')">Open on PTD Today</button>
                 <button onclick="shareArticle('${id}')">Share</button>
                 <button onclick="window.open('${article.source}','_blank')">Source</button>
               </div>
             </div>
-          </article>`;
-        container.insertAdjacentHTML('beforeend', row);
+          </article>
+        `);
       });
     }
 
-    // --------- CATEGORY NAV ---------
-    function setCategory(ev, cat){
-      ev && ev.preventDefault();
-      currentCategory = cat.toLowerCase();
-      // nav active state
-      document.querySelectorAll('nav.site a').forEach(a => {
-        a.classList.toggle('active', a.dataset.cat === currentCategory);
+    function setCategory(ev,cat){
+      ev.preventDefault();
+      currentCategory=cat.toLowerCase();
+      document.querySelectorAll('nav.site a').forEach(a=>{
+        a.classList.toggle('active',a.dataset.cat===currentCategory);
       });
+
+      // auto-fill dates when "Top (7d)" selected
+      if(currentCategory==='top7d'){
+        const today=new Date();
+        const toDate=today.toISOString().split('T')[0];
+        const fromDate=new Date(today.getTime()-6*24*60*60*1000).toISOString().split('T')[0];
+        document.getElementById('fromDate').value=fromDate;
+        document.getElementById('toDate').value=toDate;
+        rangeFrom=fromDate;
+        rangeTo=toDate;
+      }else{
+        clearDateRange(false);
+      }
       render();
     }
 
-    // --------- DATE RANGE CONTROLS ---------
     function applyDateRange(){
-      const f = document.getElementById('fromDate').value || null;
-      const t = document.getElementById('toDate').value || null;
-      rangeFrom = f;
-      rangeTo = t;
+      rangeFrom=document.getElementById('fromDate').value||null;
+      rangeTo=document.getElementById('toDate').value||null;
       render();
     }
-    function clearDateRange(){
-      rangeFrom = rangeTo = null;
-      document.getElementById('fromDate').value = '';
-      document.getElementById('toDate').value = '';
+    function clearDateRange(resetInputs=true){
+      rangeFrom=rangeTo=null;
+      if(resetInputs){
+        document.getElementById('fromDate').value='';
+        document.getElementById('toDate').value='';
+      }
       render();
     }
 
-    // --------- SHARE (PTD shortlink always) ---------
     function shareArticle(articleId){
-      const url = `https://ptdtoday.com/s/${articleId}.html`;
-      const text = `Check out this article on PTD Today — your daily source for energy, grid, and power news:\n${url}`;
-
-      const opts = [
-        { name:'LinkedIn', url:`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}` },
-        { name:'X (Twitter)', url:`https://twitter.com/intent/tweet?text=${encodeURIComponent('Latest from PTD Today: ')}${encodeURIComponent(url)}` },
-        { name:'Facebook', url:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}` },
-        { name:'Reddit', url:`https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent('Latest from PTD Today')}` },
-        { name:'Copy link', action: () => { navigator.clipboard.writeText(url); alert('✅ Link copied: ' + url); } },
-        { name:'Email', url:`mailto:?subject=${encodeURIComponent('Interesting read from PTD Today')}&body=${encodeURIComponent(text)}` },
+      const url=`https://ptdtoday.com/s/${articleId}.html`;
+      const text=`Check out this article on PTD Today — your daily source for energy, grid, and power news:\n${url}`;
+      const opts=[
+        {name:'LinkedIn',url:`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`},
+        {name:'X (Twitter)',url:`https://twitter.com/intent/tweet?text=${encodeURIComponent('Latest from PTD Today: ')}${encodeURIComponent(url)}`},
+        {name:'Facebook',url:`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`},
+        {name:'Reddit',url:`https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent('Latest from PTD Today')}`},
+        {name:'Copy link',action:()=>{navigator.clipboard.writeText(url);alert('✅ Link copied: '+url);}},
+        {name:'Email',url:`mailto:?subject=${encodeURIComponent('Interesting read from PTD Today')}&body=${encodeURIComponent(text)}`},
       ];
-
-      const modal = document.createElement('div');
-      modal.className = 'share-modal';
-      modal.innerHTML = `
+      const modal=document.createElement('div');
+      modal.className='share-modal';
+      modal.innerHTML=`
         <div class="share-popup">
-          ${opts.map(o => o.url
+          ${opts.map(o=>o.url
             ? `<button onclick="window.open('${o.url}','_blank')">${o.name}</button>`
             : `<button onclick="(${o.action})();">${o.name}</button>`
           ).join('')}
           <button onclick="this.closest('.share-modal').remove()">Close ×</button>
-        </div>
-      `;
+        </div>`;
       document.body.appendChild(modal);
     }
 
-    // Boot
     loadNews();
   </script>
 </body>
