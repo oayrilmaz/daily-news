@@ -4,95 +4,84 @@
   <meta charset="utf-8" />
   <title>PTD Today — Daily Energy & Power News</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="PTD Today curates the latest daily and weekly news across power transmission & distribution, substations, protection & control, cables, HVDC, renewables, policy, data centers and supply chain." />
+  <meta name="description" content="Curated daily & weekly news for grid, substations, protection & control, cables, HVDC, renewables, policy and more." />
   <link rel="icon" href="logo.svg" />
   <style>
-    :root{
-      --ink:#111; --ink-2:#444; --line:#e6e6e6;
-      --accent:#000;
-    }
+    :root{ --ink:#111; --ink2:#555; --line:#e6e6e6 }
     *{box-sizing:border-box}
-    body{
-      margin:0; color:var(--ink); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
-      background:#fff;
-    }
-    header{padding:28px 16px 8px; border-bottom:1px solid var(--line)}
-    .container{max-width:980px; margin:0 auto; padding:0 16px}
-    h1{font:700 46px/1.15 Georgia, 'Times New Roman', Times, serif; margin:0 0 6px}
-    .motto{color:var(--ink-2); font-weight:500; margin-bottom:10px}
-    .dek{font:700 22px/1.25 Georgia, 'Times New Roman', Times, serif; margin:6px 0 12px}
-
-    /* tabs */
-    .tabs{display:flex; flex-wrap:wrap; gap:18px; padding:10px 0 14px; border-bottom:1px solid var(--line)}
-    .tab{color:var(--ink); text-decoration:none; font-weight:600}
-    .tab.active{border-bottom:2px solid var(--ink); padding-bottom:3px}
-
-    /* list */
-    .cards{padding:18px 0 60px}
-    .card{display:grid; grid-template-columns:140px 1fr; gap:16px; padding:18px 0; border-bottom:1px solid var(--line)}
-    .card:first-child{padding-top:0}
-    .thumb{
-      width:140px; height:95px; background:#f5f5f5; border:1px solid var(--line); object-fit:cover
-    }
-    .card h3{margin:0 0 8px; font:700 26px/1.2 Georgia, 'Times New Roman', Times, serif}
-    .card h3 a{color:#1a0dab; text-decoration:underline; text-underline-offset:3px}
-    .meta{color:var(--ink-2); font-size:14px; margin-bottom:8px}
-    .actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
-    .btn{
-      font:14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
-      border:1px solid var(--line); padding:8px 12px; border-radius:10px; background:#fff; cursor:pointer
-    }
+    html,body{margin:0;background:#fff;color:var(--ink);
+      font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+    .wrap{max-width:980px;margin:0 auto;padding:0 16px}
+    header{border-bottom:1px solid var(--line);padding:28px 0 18px}
+    h1{margin:0;font:700 48px/1.1 Georgia,'Times New Roman',Times,serif;text-align:center}
+    .motto{margin-top:6px;text-align:center;color:var(--ink2);font-weight:500}
+    .kicker{margin:16px 0 10px;text-align:center;
+      font:600 22px/1.25 Georgia,'Times New Roman',Times,serif}
+    nav{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;
+      border-bottom:1px solid var(--line);padding:10px 0 12px;margin-bottom:6px}
+    nav a{color:inherit;text-decoration:none;font-weight:600}
+    nav a.active{text-decoration:underline;text-underline-offset:6px}
+    .updated{display:inline-block;border:1px solid var(--line);border-radius:22px;
+      padding:6px 12px;margin:10px 0 0;color:var(--ink2);font-size:13px}
+    .grid{display:grid;grid-template-columns:1fr;gap:22px;margin:18px 0 60px}
+    .card{display:grid;grid-template-columns:130px 1fr;gap:16px;border-top:1px solid var(--line);padding-top:16px}
+    .thumb{width:130px;height:90px;object-fit:cover;border:1px solid var(--line);background:#f6f6f6}
+    .title{font:700 24px/1.2 Georgia,'Times New Roman',Times,serif;margin:0 0 6px}
+    .meta{color:var(--ink2);font-size:14px;margin-bottom:6px}
+    .dek{color:var(--ink);margin:6px 0 10px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{border:1px solid var(--line);border-radius:10px;background:#fff;padding:8px 12px;cursor:pointer;font-size:14px}
     .btn:hover{border-color:#ccc}
-    .pill{font-size:12px; color:var(--ink-2); border:1px solid var(--line); padding:4px 8px; border-radius:999px; display:inline-block; margin-right:6px}
-
-    /* share modal */
-    .modal-backdrop{
-      position:fixed; inset:0; background:rgba(0,0,0,.18); display:none; align-items:center; justify-content:center; z-index:50
-    }
-    .modal{width:min(92vw,460px); background:#fff; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.18); overflow:hidden}
-    .modal header{border:0; padding:14px 16px}
-    .modal h4{margin:0; font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
-    .share-list{display:flex; flex-direction:column}
-    .share-item{padding:14px 18px; border-top:1px solid var(--line); background:#fff; text-align:left; width:100%; font-size:16px; cursor:pointer}
+    footer{border-top:1px solid var(--line);padding:18px 0 40px;color:var(--ink2);text-align:center}
+    /* Share modal */
+    .backdrop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.18);z-index:50}
+    .modal{width:min(92vw,460px);background:#fff;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.18);overflow:hidden}
+    .modal header{padding:14px 16px;border-bottom:1px solid var(--line)}
+    .modal h4{margin:0;font:600 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+    .share-list{display:flex;flex-direction:column}
+    .share-item{padding:14px 18px;border-top:1px solid var(--line);text-align:left;background:#fff;cursor:pointer;font-size:16px}
     .share-item:active{background:#f7f7f7}
-    .modal .close{border-top:1px solid var(--line); padding:12px 16px; text-align:right}
-    .link-like{color:#555; text-decoration:underline; cursor:pointer}
-
+    .close-row{padding:12px 16px;border-top:1px solid var(--line);text-align:right}
+    .link-like{color:#555;text-decoration:underline;cursor:pointer}
+    /* Toast */
+    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#111;color:#fff;
+      padding:10px 14px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.25s ease;z-index:60}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
     @media (max-width:720px){
+      h1{font-size:40px}
       .card{grid-template-columns:110px 1fr}
-      .thumb{width:110px; height:75px}
-      .card h3{font-size:22px}
+      .thumb{width:110px;height:78px}
+      .title{font-size:20px}
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1>PTD Today</h1>
-      <div class="motto">First to Know. First to Lead.</div>
-      <div class="dek">Daily Energy &amp; Power News</div>
-
-      <!-- TOP TABS (no date range UI) -->
-      <nav class="tabs" id="tabs">
-        <a href="#" data-cat="all" class="tab active">All</a>
-        <a href="#" data-cat="top" class="tab">Top (7d)</a>
-        <a href="#" data-cat="grid" class="tab">Grid</a>
-        <a href="#" data-cat="substations" class="tab">Substations</a>
-        <a href="#" data-cat="protection" class="tab">Protection</a>
-        <a href="#" data-cat="cables" class="tab">Cables</a>
-        <a href="#" data-cat="hvdc" class="tab">HVDC</a>
-        <a href="#" data-cat="renewables" class="tab">Renewables</a>
-        <a href="#" data-cat="policy" class="tab">Policy</a>
-      </nav>
-    </div>
+  <header class="wrap">
+    <h1>PTD Today</h1>
+    <div class="motto">First to Know. First to Lead.</div>
+    <div class="kicker">Daily Energy &amp; Power News</div>
+    <nav id="tabs">
+      <a href="#" data-filter="all" class="active">All</a>
+      <a href="#" data-filter="top7">Top (7d)</a>
+      <a href="#" data-filter="grid">Grid</a>
+      <a href="#" data-filter="substations">Substations</a>
+      <a href="#" data-filter="protection">Protection</a>
+      <a href="#" data-filter="cables">Cables</a>
+      <a href="#" data-filter="hvdc">HVDC</a>
+      <a href="#" data-filter="renewables">Renewables</a>
+      <a href="#" data-filter="policy">Policy</a>
+    </nav>
+    <div class="updated" id="updated">Updated —</div>
   </header>
 
-  <main class="container">
-    <section class="cards" id="cards" aria-live="polite"></section>
+  <main class="wrap">
+    <section class="grid" id="list" aria-live="polite"></section>
   </main>
 
-  <!-- SHARE MODAL -->
-  <div class="modal-backdrop" id="shareBackdrop" role="dialog" aria-modal="true" aria-label="Share options">
+  <footer class="wrap">© 2025 PTD Today • Headlines link to their original publishers.</footer>
+
+  <!-- Share modal -->
+  <div class="backdrop" id="shareBackdrop" role="dialog" aria-modal="true" aria-label="Share options">
     <div class="modal">
       <header><h4>Share</h4></header>
       <div class="share-list">
@@ -103,219 +92,162 @@
         <button class="share-item" data-type="copy">Copy link</button>
         <button class="share-item" data-type="email">Email</button>
       </div>
-      <div class="close"><span class="link-like" id="closeShare">Close ×</span></div>
+      <div class="close-row"><span class="link-like" id="closeShare">Close ×</span></div>
     </div>
   </div>
 
+  <div id="toast" class="toast" role="status" aria-live="polite">Link copied</div>
+
   <script>
   (function(){
-    const cardsEl = document.getElementById('cards');
-    const tabsEl  = document.getElementById('tabs');
+    const listEl = document.getElementById('list');
+    const updatedEl = document.getElementById('updated');
 
-    // cache
-    let NEWS = [];
-    let SHORT = {}; // url -> id
-    let currentCat = 'all';
-    let shareTarget = null; // article object used by modal
-
-    const ORIGIN = location.origin;
-    const PTD_ARTICLE = ORIGIN + '/article.html';
-
-    function fmtTime(ts){
+    // --- Robust copy helper (works on iOS Safari) ---
+    async function copyText(text){
       try{
-        const d = new Date(ts);
-        return d.toISOString().replace('T',' ').replace('Z',' UTC');
-      }catch(e){ return ''; }
-    }
-
-    function ptc(str){ return encodeURIComponent(str || ''); }
-
-    // Build the PTD landing link (shortlink if available)
-    function buildPTDLink(item){
-      const u = item.url;
-      if(SHORT && SHORT[u]){
-        return `${ORIGIN}/s/${SHORT[u]}.html`;
-      }
-      // fall back to article.html carrying params
-      const params = new URLSearchParams({
-        u: u,
-        t: item.title || '',
-        i: item.image || '',
-        d: item.description || ''
-      });
-      return `${PTD_ARTICLE}?${params.toString()}`;
-    }
-
-    function iconlessSource(host){
+        if(navigator.clipboard && window.isSecureContext){
+          await navigator.clipboard.writeText(text);
+          showToast('Link copied');
+          return;
+        }
+      }catch(_) {}
       try{
-        return new URL(host).hostname.replace(/^www\./,'');
-      }catch(e){
-        return String(host||'').replace(/^https?:\/\//,'').replace(/^www\./,'');
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly','');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Link copied');
+      }catch(_){
+        prompt('Copy link:', text); // ultimate fallback
       }
     }
-
-    function pickTop7d(all){
-      const now = Date.now();
-      const weekAgo = now - 7*24*60*60*1000;
-      return all.filter(a => {
-        const t = Date.parse(a.ts || a.time || a.published || 0);
-        return isFinite(t) && t >= weekAgo;
-      }).sort((a,b)=>{
-        // optional score desc then time
-        const sa = +a.score || 0, sb = +b.score || 0;
-        if(sb !== sa) return sb - sa;
-        const ta = Date.parse(a.ts || a.time || 0) || 0;
-        const tb = Date.parse(b.ts || b.time || 0) || 0;
-        return tb - ta;
-      });
+    function showToast(msg){
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(()=>t.classList.remove('show'), 1400);
     }
 
-    function applyFilter(cat){
-      currentCat = cat;
-      let rows = [...NEWS];
-      if(cat === 'top'){
-        rows = pickTop7d(rows);
-      } else if(cat !== 'all'){
-        rows = rows.filter(r => (r.category||'').toLowerCase() === cat);
-      } else {
-        rows.sort((a,b)=>{
-          const ta = Date.parse(a.ts || a.time || 0) || 0;
-          const tb = Date.parse(b.ts || b.time || 0) || 0;
-          return tb - ta;
+    // Build a ptd link (shortlink if available; else article.html)
+    function buildPtdLink(item){
+      if(item.s){ return `/s/${item.s}.html`; }
+      const u = new URL('/article.html', location.origin);
+      u.searchParams.set('u', item.url);
+      if(item.title)  u.searchParams.set('t', item.title);
+      if(item.image)  u.searchParams.set('i', item.image);
+      if(item.summary)u.searchParams.set('d', item.summary);
+      return u.toString();
+    }
+
+    // Render one card
+    function renderItem(item){
+      const ptdUrl = buildPtdLink(item);
+      const el = document.createElement('article');
+      el.className = 'card';
+      el.innerHTML = `
+        <img class="thumb" src="${item.image ? item.image : '/assets/og-default.png'}" alt="">
+        <div>
+          <h3 class="title"><a href="${ptdUrl}">${item.title || 'Untitled'}</a></h3>
+          <div class="meta">${(new URL(item.url)).hostname.replace(/^www\./,'')}</div>
+          ${item.summary ? `<div class="dek">${item.summary}</div>` : ``}
+          <div class="actions">
+            <a class="btn" href="${ptdUrl}">Open on PTD Today</a>
+            <button class="btn btn-share" data-ptd="${ptdUrl}">Share</button>
+            <a class="btn" href="${item.url}" target="_blank" rel="noopener">Source</a>
+          </div>
+        </div>
+      `;
+      // local share button
+      el.querySelector('.btn-share').addEventListener('click', (e)=>{
+        openShare(e.currentTarget.getAttribute('data-ptd'));
+      });
+      return el;
+    }
+
+    // Load data
+    async function load(){
+      const data = await fetch('/data/news.json?v='+Date.now()).then(r=>r.json());
+      updatedEl.textContent = 'Updated — ' + (data.updated || '');
+      const items = data.items || [];
+      listEl.innerHTML = '';
+      items.forEach(item => listEl.appendChild(renderItem(item)));
+      wireTabs(items);
+    }
+
+    // Simple category filter (client-side)
+    function wireTabs(items){
+      const tabs = document.querySelectorAll('#tabs a');
+      tabs.forEach(a=>{
+        a.addEventListener('click', (e)=>{
+          e.preventDefault();
+          tabs.forEach(x=>x.classList.remove('active'));
+          a.classList.add('active');
+          const f = a.getAttribute('data-filter');
+          listEl.innerHTML = '';
+          let subset = items;
+          if(f && f!=='all' && f!=='top7'){
+            subset = items.filter(x => (x.cats||[]).includes(f));
+          }else if(f==='top7'){
+            subset = items.filter(x => (x.score||0) >= (dataTopCutoff || 0));
+          }
+          subset.forEach(item => listEl.appendChild(renderItem(item)));
         });
-      }
-      render(rows);
-    }
-
-    function render(rows){
-      if(!rows || !rows.length){
-        cardsEl.innerHTML = `<p style="color:#666">No stories found for this view.</p>`;
-        return;
-      }
-      const html = rows.map(item=>{
-        const linkPTD = buildPTDLink(item);
-        const sourceHost = iconlessSource(item.url||'');
-        const when = fmtTime(item.ts || item.time || '');
-        const cat  = (item.category||'').toUpperCase();
-        const img  = item.image || '';
-
-        return `
-          <article class="card">
-            <a href="${linkPTD}" aria-label="Open ${escapeHtml(item.title||'')}" title="Open on PTD" >
-              <img class="thumb" loading="lazy" src="${img ? escapeHtml(img) : ''}" alt="">
-            </a>
-            <div>
-              <h3><a href="${linkPTD}">${escapeHtml(item.title || '')}</a></h3>
-              <div class="meta">
-                ${escapeHtml(sourceHost)} • <span>${when}</span>
-              </div>
-              <div>${escapeHtml(item.summary || item.description || '')}</div>
-              <div class="actions">
-                <a class="btn" href="${linkPTD}">Open on PTD Today</a>
-                <a class="btn" href="${escapeAttr(item.url||'#')}" target="_blank" rel="noopener">Source</a>
-                <button class="btn js-share" data-url="${escapeAttr(item.url||'')}" data-title="${escapeAttr(item.title||'')}" data-image="${escapeAttr(img)}" data-summary="${escapeAttr(item.summary||'')}">Share</button>
-                ${cat ? `<span class="pill">${escapeHtml(cat)}</span>` : ``}
-                ${item.score ? `<span class="pill">Score: ${escapeHtml(String(item.score))}</span>` : ``}
-              </div>
-            </div>
-          </article>
-        `;
-      }).join('');
-      cardsEl.innerHTML = html;
-      // attach share handlers
-      cardsEl.querySelectorAll('.js-share').forEach(btn=>{
-        btn.addEventListener('click', onClickShare);
       });
     }
 
-    function onClickShare(e){
-      const b = e.currentTarget;
-      shareTarget = {
-        url: b.getAttribute('data-url') || '',
-        title: b.getAttribute('data-title') || '',
-        image: b.getAttribute('data-image') || '',
-        summary: b.getAttribute('data-summary') || ''
-      };
-      openShare();
-    }
-
-    // ==== SHARE MODAL ====
-    const shareBackdrop = document.getElementById('shareBackdrop');
+    // --- Share modal (always share PTD link) ---
+    const backdrop = document.getElementById('shareBackdrop');
     const closeShare = document.getElementById('closeShare');
-    shareBackdrop.addEventListener('click', (e)=>{
-      if(e.target === shareBackdrop) closeModal();
-    });
+    let currentShareLink = '';
+
+    function openShare(ptdLink){
+      currentShareLink = ptdLink;
+      backdrop.style.display='flex';
+    }
+    function closeModal(){ backdrop.style.display='none'; }
+    backdrop.addEventListener('click', (e)=>{ if(e.target===backdrop) closeModal(); });
     closeShare.addEventListener('click', closeModal);
-    shareBackdrop.querySelectorAll('.share-item').forEach(btn=>{
+    backdrop.querySelectorAll('.share-item').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         doShare(btn.getAttribute('data-type'));
       });
     });
 
-    function openShare(){ shareBackdrop.style.display='flex'; }
-    function closeModal(){ shareBackdrop.style.display='none'; }
-
     function doShare(kind){
-      if(!shareTarget) return;
-      // Always share PTD link (shortlink if available)
-      const ptdLink = buildPTDLink(shareTarget);
-      const title = shareTarget.title || 'PTD Today';
+      const link = currentShareLink || location.href;
+      const title = document.title.replace(/^PTD Today —\s*/,'') || 'PTD Today';
       let url = '';
-      if(kind === 'linkedin'){
-        url = `https://www.linkedin.com/sharing/share-offsite/?url=${ptc(ptdLink)}`;
-      } else if(kind === 'x'){
-        const text = `${title}`;
-        url = `https://twitter.com/intent/tweet?url=${ptc(ptdLink)}&text=${ptc(text)}`;
-      } else if(kind === 'facebook'){
-        url = `https://www.facebook.com/sharer/sharer.php?u=${ptc(ptdLink)}`;
-      } else if(kind === 'reddit'){
-        url = `https://www.reddit.com/submit?url=${ptc(ptdLink)}&title=${ptc(title)}`;
-      } else if(kind === 'email'){
+      if(kind==='linkedin'){
+        url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(link)}`;
+      }else if(kind==='x'){
+        url = `https://twitter.com/intent/tweet?url=${encodeURIComponent(link)}&text=${encodeURIComponent(title)}`;
+      }else if(kind==='facebook'){
+        url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`;
+      }else if(kind==='reddit'){
+        url = `https://www.reddit.com/submit?url=${encodeURIComponent(link)}&title=${encodeURIComponent(title)}`;
+      }else if(kind==='email'){
         const subj = `PTD Today: ${title}`;
-        const body = `${title}\n\n${ptdLink}`;
-        url = `mailto:?subject=${ptc(subj)}&body=${ptc(body)}`;
-      } else if(kind === 'copy'){
-        navigator.clipboard.writeText(ptdLink).then(()=> {
-          alert('Link copied: ' + ptdLink);
-        }).catch(()=> {
-          prompt('Copy link:', ptdLink);
-        });
+        const body = `${title}\n\n${link}`;
+        url = `mailto:?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+      }else if(kind==='copy'){
+        copyText(link);
+        closeModal();
         return;
       }
-      if(url) window.open(url, '_blank', 'noopener');
+      if(url) window.open(url,'_blank','noopener');
       closeModal();
     }
 
-    // ==== tabs ====
-    tabsEl.addEventListener('click', (e)=>{
-      const a = e.target.closest('a[data-cat]');
-      if(!a) return;
-      e.preventDefault();
-      tabsEl.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-      a.classList.add('active');
-      applyFilter(a.dataset.cat);
-    });
+    // Optional: threshold for “Top (7d)” if your JSON exports one
+    const dataTopCutoff = 0; // set by workflow if desired
 
-    // escape helpers
-    function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    function escapeAttr(s){ return escapeHtml(s).replace(/'/g,'&#39;'); }
-
-    async function bootstrap(){
-      try{
-        const [n,s] = await Promise.all([
-          fetch('data/news.json?v=' + Date.now()).then(r=>r.json()),
-          fetch('data/shortlinks.json').then(r => r.ok ? r.json() : ({}))
-        ]);
-        NEWS  = Array.isArray(n) ? n : (n.items||[]);
-        SHORT = s || {};
-      }catch(e){
-        console.error('Failed to load data:', e);
-        NEWS = [];
-        SHORT = {};
-      }
-      applyFilter('all'); // default
-    }
-    bootstrap();
+    load();
   })();
   </script>
 </body>
