@@ -1,153 +1,72 @@
-import hashlib
-import json
-import re
-from datetime import datetime, timezone
-from urllib.parse import urlparse, quote
-
 import requests
-from bs4 import BeautifulSoup
+import json
+from datetime import datetime, timezone
 
-# -----------------------------
-# QUERIES (company + topics)
-# -----------------------------
-NEWS_SOURCES = [
-    # Companies
-    "GE Vernova energy site:reuters.com",
-    "Siemens Energy site:businesswire.com",
-    "Hitachi Energy site:prnewswire.com",
-    "Schneider Electric site:marketscreener.com",
-    "ABB grid",
-    "Mitsubishi Power",
-    "Powell substation",
-
-    # Sector topics
-    "power transmission equipment shortage",
-    "transformer lead time extension",
-    "high voltage cable supply chain",
-    "international shipping costs energy",
-    "HV substation project delay",
+# === News sources & keywords === #
+SOURCES = [
+    "https://newsapi.org/v2/everything"
+]
+KEYWORDS = [
+    "GE Vernova", "Siemens Energy", "Hitachi Energy", "Schneider Electric",
+    "HVDC", "grid", "power transmission", "substations", "renewables",
+    "transformer lead time", "equipment shortage", "cable supply", "switchgear delay",
+    "logistics cost", "transport pricing energy"
 ]
 
-OUTPUT_NEWS_FILE = "data/news.json"
-OUTPUT_SHORTLINKS_FILE = "data/shortlinks.json"
+# === API setup === #
+API_KEY = "demo"  # replace with your NewsAPI key if available
+OUTPUT_FILE = "data/news.json"
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; PTDTodayBot/1.0; +https://ptdtoday.com)"
-}
+def fetch_articles():
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    all_articles = []
 
-def md5_6(s: str) -> str:
-    return hashlib.md5(s.encode("utf-8")).hexdigest()[:6]
+    for kw in KEYWORDS:
+        print(f"Fetching for keyword: {kw}")
+        params = {
+            "q": kw,
+            "language": "en",
+            "sortBy": "publishedAt",
+            "pageSize": 8,
+            "apiKey": API_KEY
+        }
+        try:
+            r = requests.get(SOURCES[0], params=params)
+            r.raise_for_status()
+            data = r.json()
+            for art in data.get("articles", []):
+                date_str = art.get("publishedAt", "")
+                if date_str.startswith(today):
+                    all_articles.append({
+                        "title": art.get("title"),
+                        "url": art.get("url"),
+                        "source": art.get("source", {}).get("name", ""),
+                        "image": art.get("urlToImage"),
+                        "summary": art.get("description"),
+                        "date": date_str,
+                        "timeAgo": "today"
+                    })
+        except Exception as e:
+            print(f"⚠️ Error fetching {kw}: {e}")
 
-def fetch_bing_rss(query: str) -> str | None:
-    url = f"https://www.bing.com/news/search?q={quote(query)}&format=rss"
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=12)
-        r.raise_for_status()
-        return r.text
-    except Exception as e:
-        print("RSS error:", query, e)
-        return None
+    return all_articles
 
-def parse_rss(xml: str, query: str) -> list[dict]:
-    from xml.etree import ElementTree as ET
-    out = []
-    try:
-        root = ET.fromstring(xml)
-        for item in root.findall(".//item"):
-            title = item.findtext("title") or ""
-            link = item.findtext("link") or ""
-            pub = item.findtext("pubDate") or ""
-            desc = item.findtext("{http://purl.org/rss/1.0/modules/content/}encoded") \
-                   or item.findtext("description") or ""
-            if not (title and link):
-                continue
-            out.append({
-                "title": strip_html(title),
-                "link": link,
-                "date": pub,
-                "summary": strip_html(desc)[:320],
-                "topic": query
-            })
-    except Exception as e:
-        print("Parse RSS error:", e)
-    return out
+def save_articles(articles):
+    # Deduplicate by URL
+    seen = set()
+    unique_articles = []
+    for a in articles:
+        if a["url"] not in seen:
+            unique_articles.append(a)
+            seen.add(a["url"])
 
-def strip_html(s: str) -> str:
-    # quick HTML stripper
-    return re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ").strip()
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(unique_articles, f, ensure_ascii=False, indent=2)
 
-def coerce_https(url: str) -> str:
-    # Some sources return http images; mobile Safari blocks mixed content.
-    # If http -> use a proxy that returns https.
-    if not url:
-        return ""
-    try:
-        p = urlparse(url)
-    except Exception:
-        return ""
-    if p.scheme == "https":
-        return url
-    if p.scheme == "http":
-        # Proxy through a free https image proxy
-        return f"https://images.weserv.nl/?url={quote(url.replace('http://','',1))}"
-    return url
-
-def fetch_og_image(page_url: str) -> str:
-    # Try to get og:image / twitter:image from the article page
-    try:
-        r = requests.get(page_url, headers=HEADERS, timeout=10)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "lxml")
-        # Priority order
-        for sel in [
-            "meta[property='og:image']",
-            "meta[name='og:image']",
-            "meta[name='twitter:image']",
-            "meta[property='twitter:image']",
-        ]:
-            tag = soup.select_one(sel)
-            if tag and tag.get("content"):
-                return coerce_https(tag["content"].strip())
-    except Exception as e:
-        print("OG image error:", page_url, e)
-    return ""
-
-def main():
-    all_items = []
-    shortlinks = {}
-
-    for q in NEWS_SOURCES:
-        xml = fetch_bing_rss(q)
-        if not xml: 
-            continue
-        arts = parse_rss(xml, q)
-        for a in arts:
-            slug = md5_6(a["link"])
-            img = fetch_og_image(a["link"])  # try to get a thumbnail
-            if not img:
-                img = ""  # index will fall back to default
-            shortlinks[slug] = a["link"]
-            all_items.append({
-                "id": slug,
-                "title": a["title"],
-                "link": a["link"],
-                "date": a["date"],
-                "summary": a.get("summary",""),
-                "topic": a["topic"],
-                "image": img
-            })
-
-    payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "articles": all_items
-    }
-    with open(OUTPUT_NEWS_FILE, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
-
-    with open(OUTPUT_SHORTLINKS_FILE, "w", encoding="utf-8") as f:
-        json.dump(shortlinks, f, indent=2)
-
-    print(f"Saved {len(all_items)} articles with {len(shortlinks)} shortlinks")
+    print(f"✅ Saved {len(unique_articles)} fresh articles to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
-    main()
+    articles = fetch_articles()
+    if not articles:
+        print("⚠️ No new articles found for today.")
+    save_articles(articles)
