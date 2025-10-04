@@ -3,10 +3,8 @@ name: ptd-build
 on:
   workflow_dispatch:
   schedule:
-    # Every 3 hours (UTC)
-    - cron: "0 */3 * * *"
+    - cron: "0 */3 * * *"   # every 3 hours UTC
 
-# Avoid overlapping runs (e.g., slow run overlapping with next cron)
 concurrency:
   group: ptd-build
   cancel-in-progress: false
@@ -14,8 +12,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    # Needed so the job can push back to the repo
     permissions:
       contents: write
 
@@ -23,7 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # We'll set the remote with the token explicitly before pushing
           persist-credentials: false
           fetch-depth: 0
 
@@ -31,7 +26,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
 
       - name: Install deps
         run: |
@@ -39,7 +34,6 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            # Fallback so the build still succeeds if the file is missing
             pip install requests beautifulsoup4 lxml python-dateutil feedparser
           fi
 
@@ -55,23 +49,13 @@ jobs:
           BRANCH: ${{ github.ref_name }}
         run: |
           set -e
-
-          # Configure bot identity
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage expected outputs (adjust paths if your script writes others)
           git add data s || true
-
-          # Create a commit if there are changes
           git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
 
-          # Always ensure the remote uses the token for auth
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-
-          # Rebase in case of parallel edits; don't fail if nothing to update
           git fetch origin "${BRANCH}"
           git pull --rebase origin "${BRANCH}" || true
-
-          # Push current HEAD to the current branch
           git push origin HEAD:"${BRANCH}"
