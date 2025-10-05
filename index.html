@@ -1,230 +1,170 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>PTD Today — Daily Energy & Power News</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Daily headlines for grid, HV substations, protection & control, cables, HVDC, renewables, and policy.">
-  <style>
-    :root{--ink:#111;--muted:#666;--line:#e6e6e6;--pad:16px;--max:960px}
-    *{box-sizing:border-box} body{margin:0;font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;color:var(--ink);background:#fff}
-    header{max-width:var(--max);margin:32px auto 8px;padding:0 16px;text-align:center}
-    h1{font-size:44px;line-height:1.1;margin:0 0 6px;font-weight:800;letter-spacing:.3px}
-    .motto{color:var(--muted);font-size:18px;margin-bottom:12px}
-    .dek{font-size:22px;font-weight:700;margin-top:10px}
-    nav{max-width:var(--max);margin:10px auto;border-bottom:1px solid var(--line);padding:0 8px 8px}
-    .tabs{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
-    .tabs a{color:var(--ink);text-decoration:none;font-weight:700;padding:6px 6px;border-bottom:3px solid transparent}
-    .tabs a.active{border-color:var(--ink)}
-    .updated{max-width:var(--max);margin:8px auto 0;padding:0 16px}
-    .updated .chip{display:inline-block;padding:8px 12px;border:1px solid var(--line);border-radius:20px;color:#333;background:#fafafa;font-size:14px}
-    .list{max-width:var(--max);margin:10px auto 48px;padding:0 16px}
-    article{display:grid;grid-template-columns:140px 1fr;gap:14px;padding:18px 0;border-bottom:1px solid var(--line)}
-    @media (max-width:640px){article{grid-template-columns:110px 1fr}}
-    .thumb{background:#f4f4f4;width:100%;aspect-ratio:16/10;object-fit:cover;border:1px solid #eee}
-    h2{font-size:24px;line-height:1.25;margin:0 0 4px}
-    h2 a{color:#2414a6;text-decoration:none}
-    .meta{color:var(--muted);font-size:14px;margin:4px 0 10px}
-    .actions{display:flex;gap:10px;flex-wrap:wrap}
-    .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
-    .btn:hover{background:#fafafa}
-    footer{max-width:var(--max);margin:40px auto 80px;padding:0 16px;color:var(--muted);text-align:center}
-    /* share modal */
-    .modal{position:fixed;inset:0;display:none;background:rgba(0,0,0,.45);align-items:center;justify-content:center}
-    .modal.open{display:flex}
-    .sheet{background:#fff;max-width:420px;width:92%;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-    .sheet h3{margin:14px 16px 6px}
-    .share-list{display:flex;flex-direction:column;margin:6px}
-    .share-list a,.share-list button{appearance:none;border:0;background:#fff;border-top:1px solid var(--line);padding:14px 16px;text-align:left;font-weight:600;cursor:pointer}
-    .share-list a:first-child,.share-list button:first-child{border-top:0}
-    .share-close{display:block;width:100%;padding:14px 16px;border-top:1px solid var(--line);background:#fafafa;border-radius:0 0 14px 14px;font-weight:700;cursor:pointer}
-    .empty{padding:32px 0;color:var(--muted);text-align:center}
-  </style>
-</head>
-<body>
+/* === PTD Today — house style (WSJ-like) === */
 
-<header>
-  <h1>PTD Today</h1>
-  <div class="motto">First to Know. First to Lead.</div>
-  <div class="dek">Daily Energy & Power News</div>
-</header>
+/* Paper-like background (very subtle, not busy) */
+html, body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 800px at 50% -20%, rgba(0,0,0,0.03), transparent 60%),
+    repeating-linear-gradient(0deg, #f7f3ee, #f7f3ee 28px, #f6f2ed 28px, #f6f2ed 56px);
+  color: #111;
+  -webkit-font-smoothing: antialiased;
+  font-kerning: normal;
+}
 
-<nav>
-  <div class="tabs" id="tabs">
-    <a data-cat="all" class="active" href="#all">All</a>
-    <a data-cat="top" href="#top">Top (7d)</a>
-    <a data-cat="grid" href="#grid">Grid</a>
-    <a data-cat="substations" href="#substations">Substations</a>
-    <a data-cat="protection" href="#protection">Protection</a>
-    <a data-cat="cables" href="#cables">Cables</a>
-    <a data-cat="hvdc" href="#hvdc">HVDC</a>
-    <a data-cat="renewables" href="#renewables">Renewables</a>
-    <a data-cat="policy" href="#policy">Policy</a>
-  </div>
-</nav>
+/* Typography — system serif, tight spacing, classic feel */
+:root{
+  --ink:#111;
+  --muted:#6b6b6b;
+  --rule:#e4dfd8;
+  --link:#1b52b1;
+  --link-visited:#603f99;
+}
 
-<div class="updated"><span class="chip" id="updatedChip">Updated —</span></div>
+body, .copy, .summary, .byline, .meta, .time {
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 18px;
+  line-height: 1.55;
+}
 
-<main class="list" id="list"><div class="empty">Loading…</div></main>
+header.site {
+  max-width: 980px;
+  margin: 26px auto 10px auto;
+  padding: 0 16px 8px 16px;
+  border-bottom: 1px solid var(--rule);
+}
 
-<footer>
-  © <span id="year"></span> PTD Today • Headlines link to their original publishers.
-</footer>
+.site-title {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 64px);
+  line-height: 1.05;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+  color: var(--ink);
+}
 
-<!-- Share modal -->
-<div class="modal" id="shareModal" role="dialog" aria-modal="true" aria-label="Share">
-  <div class="sheet">
-    <h3>Share</h3>
-    <div class="share-list" id="shareList">
-      <!-- buttons inserted dynamically -->
-    </div>
-    <button class="share-close" id="shareClose">Close ×</button>
-  </div>
-</div>
+.site-motto {
+  margin: 8px 0 6px 0;
+  color: var(--muted);
+  font-size: 18px;
+  letter-spacing: 0.2px;
+}
 
-<script>
-  const $ = sel => document.querySelector(sel);
-  const list = $('#list');
-  const updatedChip = $('#updatedChip');
-  const yearSpan = $('#year');
-  yearSpan.textContent = new Date().getFullYear();
+.site-kicker {
+  margin: 8px 0 0 0;
+  font-size: clamp(22px, 3.2vw, 32px);
+  font-weight: 700;
+}
 
-  let items = [];
-  let shortmap = {};
+.nav {
+  max-width: 980px;
+  margin: 8px auto 16px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid var(--rule);
+}
+.nav a {
+  color: var(--ink);
+  text-decoration: none;
+  padding: 12px 0;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+}
+.nav a.active {
+  border-color: var(--ink);
+}
 
-  // Load data + shortlink map
-  Promise.all([
-    fetch('/data/news.json', {cache:'no-cache'}).then(r=>r.json()),
-    fetch('/data/shortlinks.json', {cache:'no-cache'}).then(r=>r.json())
-  ]).then(([news, map])=>{
-    shortmap = map || {};
-    items = (news.items||[]).slice();
-    if (!items.length){ list.innerHTML = '<div class="empty">No stories found.</div>'; return; }
-    if (news.updated) {
-      try {
-        const d = new Date(news.updated);
-        updatedChip.textContent = 'Updated — ' + d.toISOString();
-      } catch (_) {}
-    }
-    // initial route
-    renderFromHash();
-  }).catch(err=>{
-    console.error(err);
-    list.innerHTML = '<div class="empty">Failed to load.</div>';
-  });
+.updated {
+  max-width: 980px;
+  margin: 12px auto;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
 
-  // Tabs / hash router
-  window.addEventListener('hashchange', renderFromHash);
-  function renderFromHash(){
-    const hash = (location.hash||'#all').replace('#','').toLowerCase();
-    document.querySelectorAll('.tabs a').forEach(a=>{
-      a.classList.toggle('active', a.dataset.cat===hash || (hash==='all' && a.dataset.cat==='all'));
-    });
-    render(hash);
+.main {
+  max-width: 980px;
+  margin: 0 auto 64px auto;
+  padding: 0 16px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 152px 1fr;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+@media (max-width: 640px) {
+  .card {
+    grid-template-columns: 110px 1fr;
   }
+}
 
-  function within7d(iso){
-    const t = new Date(iso).getTime();
-    const now = Date.now();
-    const week = 7*24*3600*1000;
-    return (now - t) <= week;
-  }
+.thumb {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
 
-  function render(cat){
-    let data = items.slice();
-    if (cat && cat!=='all' && cat!=='top') data = data.filter(x=>x.category===cat);
-    if (cat==='top') data = data.filter(x=>within7d(x.published));
+.hline {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 28px);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
 
-    if (!data.length){ list.innerHTML = '<div class="empty">No stories in this category yet.</div>'; return; }
+.hline a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.hline a:hover { text-decoration: underline; }
 
-    const html = data.map(cardHTML).join('');
-    list.innerHTML = html;
-    wireShareButtons();
-  }
+.meta {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
 
-  function cardHTML(it){
-    const img = it.image ? `<img class="thumb" loading="lazy" src="${escapeHtml(it.image)}" alt="">`
-                         : `<div class="thumb" aria-hidden="true"></div>`;
-    const short = shortmap[it.id] ? (`https://ptdtoday.com/s/${shortmap[it.id]}`) : it.url;
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
 
-    return `
-      <article>
-        <a href="${short}" target="_blank" rel="noopener">${img}</a>
-        <div>
-          <h2><a href="${short}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a></h2>
-          <div class="meta">${escapeHtml(cap(it.category))} • ${escapeHtml(it.source)} • ${formatTime(it.published)}</div>
-          <div class="actions">
-            <a class="btn" href="${short}" target="_blank" rel="noopener">Open on PTD Today</a>
-            <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
-            <button class="btn share" data-id="${it.id}">Share</button>
-          </div>
-        </div>
-      </article>
-    `;
-  }
+.btn {
+  display: inline-block;
+  font-size: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+}
+.btn:hover { background:#faf7f2; }
 
-  function formatTime(iso){
-    try{
-      const d = new Date(iso);
-      return d.toISOString().replace('T',' ').replace('.000Z','Z');
-    }catch{ return '' }
-  }
+a, .link { color: var(--link); }
+a:visited { color: var(--link-visited); }
 
-  function cap(s){ return s ? s.charAt(0).toUpperCase()+s.slice(1) : '' }
-
-  // Share sheet
-  const shareModal = $('#shareModal');
-  const shareList = $('#shareList');
-  $('#shareClose').onclick = ()=> shareModal.classList.remove('open');
-
-  function wireShareButtons(){
-    document.querySelectorAll('button.share').forEach(btn=>{
-      btn.onclick = ()=>{
-        const id = btn.dataset.id;
-        const item = items.find(x=>x.id===id);
-        if(!item) return;
-
-        const short = shortmap[id] ? (`https://ptdtoday.com/s/${shortmap[id]}`) : item.url;
-        const title = item.title;
-
-        // Use native share if available
-        if (navigator.share){
-          navigator.share({title, url: short}).catch(()=>{});
-          return;
-        }
-
-        // fallback modal
-        shareList.innerHTML = [
-          link('LinkedIn', `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(short)}`),
-          link('X (Twitter)', `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(short)}`),
-          link('Facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(short)}`),
-          link('Reddit', `https://www.reddit.com/submit?url=${encodeURIComponent(short)}&title=${encodeURIComponent(title)}`),
-          buttonCopy('Copy link', short),
-          link('Email', `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(short)}`)
-        ].join('');
-        shareModal.classList.add('open');
-      };
-    });
-  }
-
-  function link(label, href){
-    return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
-  }
-  function buttonCopy(label, text){
-    const id = 'cpy'+Math.random().toString(16).slice(2);
-    setTimeout(()=>{
-      const el = document.getElementById(id);
-      if (el){
-        el.addEventListener('click', async ()=>{
-          try{ await navigator.clipboard.writeText(text); el.textContent = 'Copied ✓'; }
-          catch(_){ el.textContent = text; }
-        });
-      }
-    },0);
-    return `<button id="${id}">${label}</button>`;
-  }
-
-  function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]))}
-</script>
-</body>
-</html>
+/* Footer */
+.site-foot {
+  max-width: 980px;
+  margin: 36px auto 64px auto;
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
