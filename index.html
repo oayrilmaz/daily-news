@@ -1,170 +1,184 @@
-/* === PTD Today — house style (WSJ-like) === */
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PTD Today — Daily Energy & Power News</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/assets/main.css?v=2025-10-05">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M36 4 8 36h16L28 60 56 28H40L36 4z' fill='%23111'/%3E%3C/svg%3E">
+<meta name="description" content="Curated daily & weekly headlines across grid, HV substations, protection & control, cables, HVDC, renewables, and policy.">
+</head>
+<body>
 
-/* Paper-like background (very subtle, not busy) */
-html, body {
-  height: 100%;
-}
-body {
-  margin: 0;
-  background:
-    radial-gradient(1200px 800px at 50% -20%, rgba(0,0,0,0.03), transparent 60%),
-    repeating-linear-gradient(0deg, #f7f3ee, #f7f3ee 28px, #f6f2ed 28px, #f6f2ed 56px);
-  color: #111;
-  -webkit-font-smoothing: antialiased;
-  font-kerning: normal;
-}
+<header class="site">
+  <h1 class="site-title">PTD Today</h1>
+  <div class="site-motto">First to Know. First to Lead.</div>
+  <div class="site-kicker">Daily Energy &amp; Power News</div>
+</header>
 
-/* Typography — system serif, tight spacing, classic feel */
-:root{
-  --ink:#111;
-  --muted:#6b6b6b;
-  --rule:#e4dfd8;
-  --link:#1b52b1;
-  --link-visited:#603f99;
-}
+<nav class="nav" id="nav">
+  <a href="#all" class="active">All</a>
+  <a href="#top">Top (7d)</a>
+  <a href="#grid">Grid</a>
+  <a href="#substations">Substations</a>
+  <a href="#protection">Protection</a>
+  <a href="#cables">Cables</a>
+  <a href="#hvdc">HVDC</a>
+  <a href="#renewables">Renewables</a>
+  <a href="#policy">Policy</a>
+</nav>
 
-body, .copy, .summary, .byline, .meta, .time {
-  font-family: Georgia, "Times New Roman", Times, serif;
-  font-size: 18px;
-  line-height: 1.55;
-}
+<div class="updated"><span id="updated">Updated — …</span></div>
 
-header.site {
-  max-width: 980px;
-  margin: 26px auto 10px auto;
-  padding: 0 16px 8px 16px;
-  border-bottom: 1px solid var(--rule);
-}
+<main class="main">
+  <div id="feed"></div>
+</main>
 
-.site-title {
-  margin: 0;
-  font-size: clamp(34px, 6vw, 64px);
-  line-height: 1.05;
-  letter-spacing: 0.4px;
-  font-weight: 700;
-  color: var(--ink);
-}
+<footer class="site-foot">© 2025 PTD Today • Headlines link to their original publishers.</footer>
 
-.site-motto {
-  margin: 8px 0 6px 0;
-  color: var(--muted);
-  font-size: 18px;
-  letter-spacing: 0.2px;
-}
+<!-- Share sheet (fallback if Web Share API unavailable) -->
+<div class="sheet-backdrop" id="sheetBackdrop" role="dialog" aria-modal="true" style="display:none">
+  <div class="sheet" role="document">
+    <h3>Share</h3>
+    <a id="shL" target="_blank" rel="noopener">LinkedIn</a>
+    <a id="shX" target="_blank" rel="noopener">X (Twitter)</a>
+    <a id="shF" target="_blank" rel="noopener">Facebook</a>
+    <a id="shR" target="_blank" rel="noopener">Reddit</a>
+    <button id="shC">Copy link</button>
+    <button id="shE">Email</button>
+    <button class="close" id="shClose">Close ×</button>
+  </div>
+</div>
 
-.site-kicker {
-  margin: 8px 0 0 0;
-  font-size: clamp(22px, 3.2vw, 32px);
-  font-weight: 700;
-}
+<script>
+const FEED = document.getElementById('feed');
+const UPDATED = document.getElementById('updated');
+const NAV = document.getElementById('nav');
+const SHEET = document.getElementById('sheetBackdrop');
 
-.nav {
-  max-width: 980px;
-  margin: 8px auto 16px auto;
-  padding: 0 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  border-bottom: 1px solid var(--rule);
-}
-.nav a {
-  color: var(--ink);
-  text-decoration: none;
-  padding: 12px 0;
-  font-weight: 600;
-  border-bottom: 2px solid transparent;
-}
-.nav a.active {
-  border-color: var(--ink);
+let ALL_ITEMS = [];
+let activeHash = (location.hash || '#all').toLowerCase();
+
+/* util */
+const enc = s => encodeURIComponent(s || '');
+const fmt = iso => {
+  try { return new Date(iso).toLocaleString(); }
+  catch(e){ return iso || ''; }
+};
+const daysAgo = (iso) => (Date.now() - new Date(iso).getTime())/86400000;
+
+function shortUrl(id){ return `https://ptdtoday.com/s/${id}.html`; }
+
+function setActiveTab(){
+  [...NAV.querySelectorAll('a')].forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === activeHash);
+  });
 }
 
-.updated {
-  max-width: 980px;
-  margin: 12px auto;
-  padding: 8px 16px;
-  color: var(--muted);
-  font-size: 14px;
-  display:flex;
-  align-items:center;
-  gap:8px;
+function cardHTML(it){
+  const id = it.id || Math.random().toString(36).slice(2,8);
+  const sUrl = shortUrl(id);
+  const img = it.image ? it.image : '';
+  const srcName = it.source || it.site || '';
+  const cat = (it.category || '').toString();
+  const when = it.published || it.date || '';
+  const score = (it.score!=null) ? ` • Score: ${(+it.score).toFixed(3)}` : '';
+
+  return `
+  <article class="card">
+    <a href="${sUrl}" aria-label="Open"><img class="thumb" src="${img}" alt=""></a>
+    <div>
+      <h2 class="hline"><a href="${sUrl}">${it.title || ''}</a></h2>
+      <div class="meta">
+        ${cat ? cat.charAt(0).toUpperCase()+cat.slice(1) : ''} •
+        ${srcName ? srcName : ''} •
+        ${when ? fmt(when) : ''}${score}
+      </div>
+      <div class="actions">
+        <a class="btn" href="${sUrl}">Open on PTD Today</a>
+        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
+        <button class="btn" onclick='share("${id}", ${JSON.stringify(it.title || '').replace(/'/g,"&#39;")})'>Share</button>
+      </div>
+    </div>
+  </article>`;
 }
 
-.main {
-  max-width: 980px;
-  margin: 0 auto 64px auto;
-  padding: 0 16px;
+function render(){
+  let list = ALL_ITEMS.slice();
+
+  // Filter by tab
+  switch(activeHash){
+    case '#top':
+      list = list.filter(x => x.published && daysAgo(x.published) <= 7);
+      list.sort((a,b) => (b.score||0) - (a.score||0) || new Date(b.published||0)-new Date(a.published||0));
+      break;
+    case '#grid': list = list.filter(x => (x.category||'').toLowerCase()==='grid'); break;
+    case '#substations': list = list.filter(x => (x.category||'').toLowerCase()==='substations'); break;
+    case '#protection': list = list.filter(x => (x.category||'').toLowerCase()==='protection'); break;
+    case '#cables': list = list.filter(x => (x.category||'').toLowerCase()==='cables'); break;
+    case '#hvdc': list = list.filter(x => (x.category||'').toLowerCase()==='hvdc'); break;
+    case '#renewables': list = list.filter(x => (x.category||'').toLowerCase()==='renewables'); break;
+    case '#policy': list = list.filter(x => (x.category||'').toLowerCase()==='policy'); break;
+    default: /* all */ break;
+  }
+
+  FEED.innerHTML = list.map(cardHTML).join('') || `<p class="meta">No stories in this category yet.</p>`;
 }
 
-.card {
-  display: grid;
-  grid-template-columns: 152px 1fr;
-  gap: 16px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--rule);
+function openSheet(id, title){
+  // Build URLs for classic sharing with shortlink
+  const u = shortUrl(id);
+  document.getElementById('shL').href = `https://www.linkedin.com/sharing/share-offsite/?url=${enc(u)}&title=${enc(title)}`;
+  document.getElementById('shX').href = `https://twitter.com/intent/tweet?url=${enc(u)}&text=${enc(title)}`;
+  document.getElementById('shF').href = `https://www.facebook.com/sharer/sharer.php?u=${enc(u)}`;
+  document.getElementById('shR').href = `https://www.reddit.com/submit?url=${enc(u)}&title=${enc(title)}`;
+  document.getElementById('shC').onclick = () => { navigator.clipboard.writeText(u); closeSheet(); };
+  document.getElementById('shE').onclick = () => {
+    location.href = `mailto:?subject=${enc(title)}&body=${enc(u)}`;
+    closeSheet();
+  };
+  SHEET.style.display='block';
 }
+function closeSheet(){ SHEET.style.display='none'; }
 
-@media (max-width: 640px) {
-  .card {
-    grid-template-columns: 110px 1fr;
+async function share(id, title){
+  const url = shortUrl(id);
+  if (navigator.share){
+    try {
+      await navigator.share({title, text:title, url});
+    } catch(e){ /* user canceled */ }
+  } else {
+    openSheet(id, title);
   }
 }
 
-.thumb {
-  width: 100%;
-  aspect-ratio: 4/3;
-  object-fit: cover;
-  border: 1px solid var(--rule);
-  background: #fff;
-}
+SHEET.addEventListener('click', (e)=>{ if(e.target===SHEET) closeSheet(); });
+document.getElementById('shClose').onclick = closeSheet;
 
-.hline {
-  margin: 0;
-  font-size: clamp(20px, 3vw, 28px);
-  line-height: 1.25;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
+// Routing
+window.addEventListener('hashchange', ()=>{
+  activeHash = (location.hash || '#all').toLowerCase();
+  setActiveTab(); render();
+});
 
-.hline a {
-  color: var(--ink);
-  text-decoration: none;
-}
-.hline a:hover { text-decoration: underline; }
-
-.meta {
-  margin-top: 6px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.btn {
-  display: inline-block;
-  font-size: 14px;
-  padding: 8px 12px;
-  border: 1px solid var(--rule);
-  border-radius: 10px;
-  background: #fff;
-  color: var(--ink);
-  text-decoration: none;
-}
-.btn:hover { background:#faf7f2; }
-
-a, .link { color: var(--link); }
-a:visited { color: var(--link-visited); }
-
-/* Footer */
-.site-foot {
-  max-width: 980px;
-  margin: 36px auto 64px auto;
-  padding: 0 16px;
-  color: var(--muted);
-  font-size: 14px;
-  border-top: 1px solid var(--rule);
-  padding-top: 12px;
-}
+// Load JSON
+(async function load(){
+  try{
+    const res = await fetch('/data/news.json', {cache:'no-store'});
+    const json = await res.json();
+    UPDATED.textContent = 'Updated — ' + (json.updated || new Date().toISOString());
+    ALL_ITEMS = (json.items || []).map(x => ({
+      id: x.id || (x.url||'').split('/').slice(-1)[0].replace(/[^a-z0-9]/gi,'').slice(0,8),
+      title: x.title, url: x.url, image: x.image, source: x.source, site: x.site,
+      published: x.published || x.date, category: (x.category||'').toLowerCase(),
+      score: x.score
+    }));
+    setActiveTab(); render();
+  }catch(e){
+    UPDATED.textContent = 'Updated — (failed to load)';
+    FEED.innerHTML = '<p class="meta">No stories found. Ensure /data/news.json is present.</p>';
+  }
+})();
+</script>
+</body>
+</html>
