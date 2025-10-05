@@ -3,8 +3,7 @@ name: build
 on:
   workflow_dispatch:
   schedule:
-    # every 3 hours (at minute 7 to avoid top-of-hour traffic)
-    - cron: "7 */3 * * *"
+    - cron: "7 */3 * * *"   # every 3 hours
   push:
     paths:
       - "pull_news.py"
@@ -12,21 +11,17 @@ on:
       - ".github/workflows/ptd-build.yml"
 
 permissions:
-  contents: write   # IMPORTANT: allow the workflow to commit & push
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      TZ: UTC
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           persist-credentials: true
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
