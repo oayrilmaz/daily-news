@@ -1,1 +1,157 @@
+/* === PTD Today — house style (WSJ-like) === */
 
+/* Paper-like background (subtle) */
+html, body { height: 100%; }
+body{
+  margin:0;
+  background:
+    radial-gradient(1200px 800px at 50% -20%, rgba(0,0,0,0.03), transparent 60%),
+    repeating-linear-gradient(0deg, #f7f3ee, #f7f3ee 28px, #f6f2ed 28px, #f6f2ed 56px);
+  color:#111;
+  -webkit-font-smoothing:antialiased;
+  font-kerning:normal;
+}
+
+/* Typography — system serif for newspaper look */
+:root{
+  --ink:#111;
+  --muted:#6b6b6b;
+  --rule:#e4dfd8;
+  --link:#1b52b1;
+  --link-visited:#603f99;
+  --maxw:980px;
+}
+
+body, .copy, .summary, .byline, .meta, .time{
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size:18px;
+  line-height:1.55;
+}
+
+header.site{
+  max-width:var(--maxw);
+  margin:26px auto 10px auto;
+  padding:0 16px 8px 16px;
+  border-bottom:1px solid var(--rule);
+}
+.site-title{
+  margin:0;
+  font-size:clamp(34px, 6vw, 64px);
+  line-height:1.05;
+  letter-spacing:.4px;
+  font-weight:700;
+  color:var(--ink);
+}
+.site-motto{
+  margin:8px 0 6px 0;
+  color:var(--muted);
+  font-size:18px;
+  letter-spacing:.2px;
+}
+.site-kicker{
+  margin:8px 0 0 0;
+  font-size:clamp(22px, 3.2vw, 32px);
+  font-weight:700;
+}
+
+.nav{
+  max-width:var(--maxw);
+  margin:8px auto 16px auto;
+  padding:0 16px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:16px;
+  border-bottom:1px solid var(--rule);
+}
+.nav a{
+  color:var(--ink);
+  text-decoration:none;
+  padding:12px 0;
+  font-weight:600;
+  border-bottom:2px solid transparent;
+}
+.nav a.active{ border-color:var(--ink); }
+
+.updated{
+  max-width:var(--maxw);
+  margin:12px auto;
+  padding:8px 16px;
+  color:var(--muted);
+  font-size:14px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.main{
+  max-width:var(--maxw);
+  margin:0 auto 64px auto;
+  padding:0 16px;
+}
+
+.card{
+  display:grid;
+  grid-template-columns:152px 1fr;
+  gap:16px;
+  padding:18px 0;
+  border-bottom:1px solid var(--rule);
+}
+@media (max-width:640px){
+  .card{ grid-template-columns:110px 1fr; }
+}
+.thumb{
+  width:100%;
+  aspect-ratio:4/3;
+  object-fit:cover;
+  border:1px solid var(--rule);
+  background:#fff;
+}
+
+.hline{
+  margin:0;
+  font-size:clamp(20px, 3vw, 28px);
+  line-height:1.25;
+  font-weight:700;
+  letter-spacing:.2px;
+}
+.hline a{ color:var(--ink); text-decoration:none; }
+.hline a:hover{ text-decoration:underline; }
+
+.meta{ margin-top:6px; color:var(--muted); font-size:14px; }
+.actions{ display:flex; gap:8px; margin-top:10px; }
+.btn{
+  display:inline-block; font-size:14px; padding:8px 12px;
+  border:1px solid var(--rule); border-radius:10px; background:#fff; color:var(--ink);
+  text-decoration:none;
+}
+.btn:hover{ background:#faf7f2; }
+
+a, .link{ color:var(--link); }
+a:visited{ color:var(--link-visited); }
+
+.site-foot{
+  max-width:var(--maxw);
+  margin:36px auto 64px auto;
+  padding:0 16px;
+  color:var(--muted);
+  font-size:14px;
+  border-top:1px solid var(--rule);
+  padding-top:12px;
+}
+
+/* Share sheet */
+.sheet-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.38); display:none;
+}
+.sheet{
+  position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(92vw,420px); background:#fff; border-radius:16px; overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.sheet h3{ margin:0; padding:14px 16px; border-bottom:1px solid var(--rule); font-size:18px; }
+.sheet a, .sheet button{
+  display:block; width:100%; text-align:left; background:#fff; color:#111;
+  padding:14px 16px; border:0; border-top:1px solid var(--rule); font-size:16px; cursor:pointer;
+}
+.sheet a:hover, .sheet button:hover{ background:#faf7f2; }
+.sheet .close{ text-align:center; color:#555; }
