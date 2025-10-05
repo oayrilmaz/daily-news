@@ -1,133 +1,228 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PTD Today — Daily Energy & Power News</title>
-<link rel="stylesheet" href="assets/main.css">
-<meta name="description" content="Curated, fast headlines for grid, substations, protection & control, cables, HVDC, renewables, and policy. First to Know. First to Lead.">
+<meta name="description" content="Daily curated coverage for grid, HV substations, protection & control, cables, HVDC, renewables, policy, and more.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E">
 
+<style>
+  :root{
+    --ink:#111; --ink2:#333; --paper:#f4ede3; --rule:#d8cfc2; --accent:#1a0dab;
+    --maxw:980px;
+  }
+  html,body{margin:0; padding:0; background:var(--paper); color:var(--ink);}
+  body{font-family:Georgia, "Times New Roman", Times, serif; line-height:1.55;}
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:24px 16px;}
+  header{ text-align:center; margin-bottom:10px;}
+  .brand{ font-size:44px; font-weight:700; letter-spacing:.5px; }
+  .motto{ color:var(--ink2); font-style:italic; font-size:18px; margin-top:6px;}
+  .kicker{ font-size:26px; margin:18px 0 10px; font-weight:700;}
+  .rule{border-top:1px solid var(--rule); margin:14px 0 10px;}
+
+  /* tabs */
+  .tabs{ display:flex; flex-wrap:wrap; gap:18px; justify-content:center; margin:10px 0 14px; }
+  .tab{ font-size:20px; font-weight:700; cursor:pointer; color:var(--ink); }
+  .tab.active{ text-decoration:underline; text-underline-offset:6px; }
+
+  /* updated pill */
+  .pill{ display:inline-block; border:1px solid var(--rule); border-radius:999px; padding:6px 14px; color:var(--ink2); background:#f8f4ef; font-size:14px; }
+
+  /* list */
+  .list{ margin-top:14px; }
+  .card{ background:#fff; border:1px solid var(--rule); padding:14px; margin:18px 0; border-radius:6px; }
+  .title{ font-size:28px; font-weight:800; line-height:1.25; margin-top:10px; }
+  a{ color:var(--accent); text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  .meta{ color:var(--ink2); font-size:14px; margin:6px 0 10px; }
+  .imgbox{ width:100%; aspect-ratio:16/9; background:#eee; border:1px solid var(--rule); display:flex; align-items:center; justify-content:center;}
+  .imgbox img{ max-width:100%; max-height:100%; width:100%; height:100%; object-fit:cover; display:block; }
+
+  /* actions */
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;}
+  .btn{ padding:8px 12px; border:1px solid var(--rule); border-radius:8px; background:#fff; font-size:14px; cursor:pointer;}
+  .btn:hover{ background:#faf8f4; }
+
+  /* share sheet (fallback) */
+  .sheet{ position:fixed; inset:0; background:rgba(0,0,0,.35); display:none; align-items:flex-end; justify-content:center; }
+  .sheet.open{ display:flex; }
+  .sheet .box{ background:#fff; width:min(520px, 92vw); border-top-left-radius:14px; border-top-right-radius:14px; padding:12px; }
+  .sheet .opt{ display:block; width:100%; text-align:center; border:1px solid var(--rule); border-radius:8px; padding:12px; margin:8px 0; font-size:16px; background:#fff;}
+  .sheet .opt:hover{ background:#faf8f4; }
+  .center{text-align:center;}
+  footer{ color:var(--ink2); font-size:14px; text-align:center; margin:28px 0 10px;}
+</style>
+</head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>PTD Today</h1>
-    <div class="tagline">First to Know. First to Lead.</div>
-    <div class="kicker">Daily Energy &amp; Power News</div>
-  </header>
+  <div class="wrap">
+    <header>
+      <div class="brand">PTD Today</div>
+      <div class="motto">First to Know. First to Lead.</div>
+      <div class="kicker">Daily Energy & Power News</div>
+    </header>
 
-  <nav id="tabs"></nav>
-  <div id="updated" class="updated">Updated — …</div>
-  <div id="list"></div>
+    <div class="rule"></div>
 
-  <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
-</div>
+    <nav class="tabs" id="tabs">
+      <div class="tab active" data-cat="All">All</div>
+      <div class="tab" data-cat="Top">Top (7d)</div>
+      <div class="tab" data-cat="Grid">Grid</div>
+      <div class="tab" data-cat="Substations">Substations</div>
+      <div class="tab" data-cat="Protection">Protection</div>
+      <div class="tab" data-cat="Cables">Cables</div>
+      <div class="tab" data-cat="HVDC">HVDC</div>
+      <div class="tab" data-cat="Renewables">Renewables</div>
+      <div class="tab" data-cat="Policy">Policy</div>
+    </nav>
 
-<!-- Share modal -->
-<div class="dialog" id="shareDialog" role="dialog" aria-modal="true" aria-label="Share">
-  <div class="box">
-    <h3>Share</h3>
-    <div class="list">
-      <button data-sh="linkedin">LinkedIn</button>
-      <button data-sh="x">X (Twitter)</button>
-      <button data-sh="facebook">Facebook</button>
-      <button data-sh="reddit">Reddit</button>
-      <button data-sh="copy">Copy link</button>
-      <button data-sh="email">Email</button>
-    </div>
-    <div class="copyHint" id="copyHint" hidden>Link copied ✔</div>
-    <div class="close" id="closeShare">Close ×</div>
+    <div class="center"><span id="updated" class="pill">Updated —</span></div>
+
+    <section id="list" class="list" aria-live="polite"></section>
+
+    <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
   </div>
-</div>
+
+  <!-- Share sheet (fallback) -->
+  <div class="sheet" id="shareSheet" role="dialog" aria-modal="true" aria-label="Share options">
+    <div class="box">
+      <button class="opt" id="shLinkedIn">LinkedIn</button>
+      <button class="opt" id="shX">X (Twitter)</button>
+      <button class="opt" id="shFacebook">Facebook</button>
+      <button class="opt" id="shCopy">Copy link</button>
+      <button class="opt" id="shEmail">Email</button>
+      <button class="opt" id="shClose">Close ×</button>
+    </div>
+  </div>
 
 <script>
-const CATS = ["All","Top (7d)","Grid","Substations","Protection","Cables","HVDC","Renewables","Policy"];
-const listEl = document.getElementById('list');
-const tabsEl = document.getElementById('tabs');
-const updatedEl = document.getElementById('updated');
-let ITEMS=[], CAT="All";
+const SITE = "https://ptdtoday.com";
+const FALLBACK_IMG = "/assets/og-default.png";
 
-function tab(a){return `<a href="#" data-cat="${a}">${a}</a>`}
-tabsEl.innerHTML = CATS.map(tab).join('');
-tabsEl.addEventListener('click', e=>{
-  const a=e.target.closest('a'); if(!a) return;
-  e.preventDefault(); CAT=a.dataset.cat; render();
-});
+let NEWS = { updated: "", items: [] };
+let SHORTS = {}; // id -> original
+let ORIG2ID = {}; // original -> id
+let currentShareUrl = "";
 
-fetch('data/news.json?_='+Date.now()).then(r=>r.json()).then(data=>{
-  ITEMS = data.items||[];
-  updatedEl.textContent = 'Updated — ' + (data.updated||'');
-  CAT = (new URL(location).searchParams.get('cat')||'All');
-  render();
-});
-
-function score7d(it){ // simplistic "top" filter by score/date
-  const t=Date.parse(it.iso||it.date||''); return (Date.now()-t) < 7*864e5;
+function fmtTime(iso){
+  try{
+    const d = new Date(iso);
+    return d.toISOString();
+  }catch(e){ return iso; }
 }
-function matchCat(it){
-  if(CAT==='All') return true;
-  if(CAT==='Top (7d)') return score7d(it);
-  return (it.category||'').toLowerCase()===CAT.toLowerCase();
+
+function byScoreDesc(a,b){ return (b.score||0) - (a.score||0); }
+function inLast7d(iso){
+  const t = new Date(iso).getTime();
+  const now = Date.now();
+  return (now - t) <= 7*24*3600*1000;
 }
-function esc(s){return s?String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])):''}
 
-function render(){
-  [...tabsEl.querySelectorAll('a')].forEach(a=>a.classList.toggle('active',a.dataset.cat===CAT));
-  const out = ITEMS.filter(matchCat).map(it=>`
-    <article class="item">
-      <img class="thumb" src="${esc(it.image||'')}" alt="">
-      <div>
-        <h2><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></h2>
-        <div class="meta">${esc(it.category||'')} • ${esc(it.source||'')} • ${esc(it.date||'')}</div>
-        <div class="links">
-          <a class="btn primary" href="${esc(it.url)}" target="_blank" rel="noopener">Open on PTD Today</a>
-          <a class="btn" href="${esc(it.original)}" target="_blank" rel="noopener">Source</a>
-          <button class="btn" data-share="${esc(it.url)}" data-title="${esc(it.title)}">Share</button>
-        </div>
-      </div>
-    </article>
-  `).join('');
-  listEl.innerHTML = out || `<p>No stories in this category yet.</p>`;
+function shortFor(original){
+  // map original -> id if present
+  if (ORIG2ID[original]) return `${SITE}/s/${ORIG2ID[original]}.html`;
+  // fallback to article.html redirector (still shows preview from your OG tags)
+  return `${SITE}/article.html?u=${encodeURIComponent(original)}`;
 }
-</script>
 
-<script>
-/* Share logic (Chooser + Web Share) */
-const dlg = document.getElementById('shareDialog');
-const closeShare = document.getElementById('closeShare');
-const copyHint = document.getElementById('copyHint');
-let shareTarget={url:'', title:''};
+function cardHTML(it){
+  const short = shortFor(it.original);
+  const img = (it.image && it.image.trim().length) ? it.image : FALLBACK_IMG;
 
-document.addEventListener('click', e=>{
-  const b = e.target.closest('[data-share]');
-  if(b){
-    shareTarget.url=b.dataset.share;
-    shareTarget.title=b.dataset.title||'';
-    if(navigator.share){
-      navigator.share({title:shareTarget.title, url:shareTarget.url}).catch(()=>{});
-    }else{
-      dlg.style.display='grid';
-      copyHint.hidden=true;
+  return `
+  <article class="card">
+    <div class="imgbox">
+      <img src="${img}"
+           alt=""
+           referrerpolicy="no-referrer"
+           loading="lazy"
+           onerror="this.onerror=null;this.src='${FALLBACK_IMG}';">
+    </div>
+    <div class="title"><a href="${short}" target="_blank" rel="noopener">${it.title}</a></div>
+    <div class="meta">${(it.category||'').toUpperCase()} • ${it.source||''} • ${fmtTime(it.published)}${it.score?` • Score: ${(+it.score).toFixed(3)}`:''}</div>
+    <div class="actions">
+      <a class="btn" href="${short}" target="_blank" rel="noopener">Open on PTD Today</a>
+      <a class="btn" href="${it.original}" target="_blank" rel="noopener">Source</a>
+      <button class="btn" onclick="share('${encodeURIComponent(short)}','${encodeURIComponent(it.title)}')">Share</button>
+    </div>
+  </article>`;
+}
+
+function render(cat="All"){
+  const list = document.getElementById("list");
+  let items = NEWS.items.slice();
+
+  if (cat === "Top"){
+    items = items.filter(x=>inLast7d(x.published)).sort(byScoreDesc);
+  } else if (cat !== "All"){
+    items = items.filter(x => (x.category||"").toLowerCase() === cat.toLowerCase());
+  }
+
+  list.innerHTML = items.map(cardHTML).join("") || `<div class="center" style="color:#555">No stories found.</div>`;
+}
+
+function setTabs(cat){
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.classList.toggle("active", t.dataset.cat === cat);
+  });
+  render(cat);
+}
+
+async function boot(){
+  try{
+    const r1 = await fetch("/data/news.json", {cache:"no-store"});
+    if (!r1.ok) throw new Error("news.json not found");
+    NEWS = await r1.json();
+  }catch(e){
+    NEWS = {updated:"", items:[]};
+  }
+
+  try{
+    const r2 = await fetch("/data/shortlinks.json", {cache:"no-store"});
+    if (r2.ok){
+      SHORTS = await r2.json(); // id -> original
+      // invert
+      Object.entries(SHORTS).forEach(([id,orig]) => ORIG2ID[orig] = id);
     }
-  }
-});
-closeShare.onclick = ()=>{ dlg.style.display='none'; }
+  }catch(e){ /* ignore */ }
 
-dlg.addEventListener('click', e=>{
-  const btn = e.target.closest('[data-sh]'); if(!btn) return;
-  const u = encodeURIComponent(shareTarget.url);
-  const t = encodeURIComponent(shareTarget.title);
-  const open = href => { window.open(href,'_blank'); };
-  switch(btn.dataset.sh){
-    case 'linkedin': open(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`); break;
-    case 'x': open(`https://twitter.com/intent/tweet?url=${u}&text=${t}`); break;
-    case 'facebook': open(`https://www.facebook.com/sharer/sharer.php?u=${u}`); break;
-    case 'reddit': open(`https://www.reddit.com/submit?url=${u}&title=${t}`); break;
-    case 'email': location.href=`mailto:?subject=${t}&body=${u}`; break;
-    case 'copy':
-      navigator.clipboard.writeText(shareTarget.url).then(()=>{copyHint.hidden=false;});
-      break;
+  document.getElementById("updated").textContent = "Updated — " + (NEWS.updated || "");
+  setTabs("All");
+}
+
+// SHARE
+function share(encodedUrl, encodedTitle){
+  const url = decodeURIComponent(encodedUrl);
+  const title = decodeURIComponent(encodedTitle || "PTD Today");
+
+  if (navigator.share){
+    navigator.share({ title, text: title, url }).catch(()=>{});
+    return;
   }
+  currentShareUrl = url;
+  document.getElementById("shareSheet").classList.add("open");
+}
+
+function closeShare(){ document.getElementById("shareSheet").classList.remove("open"); }
+function openWin(u){ window.open(u,"_blank","noopener"); }
+
+document.getElementById("shLinkedIn").onclick = ()=>{ openWin(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentShareUrl)}`); closeShare(); };
+document.getElementById("shX").onclick        = ()=>{ openWin(`https://twitter.com/intent/tweet?url=${encodeURIComponent(currentShareUrl)}&text=${encodeURIComponent("PTD Today")}`); closeShare(); };
+document.getElementById("shFacebook").onclick  = ()=>{ openWin(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentShareUrl)}`); closeShare(); };
+document.getElementById("shCopy").onclick      = async ()=>{
+  try{ await navigator.clipboard.writeText(currentShareUrl); alert("Link copied:\n"+currentShareUrl); }catch(e){ prompt("Copy link:", currentShareUrl); }
+  closeShare();
+};
+document.getElementById("shEmail").onclick     = ()=>{ location.href=`mailto:?subject=${encodeURIComponent("PTD Today")}&body=${encodeURIComponent(currentShareUrl)}`; closeShare(); };
+document.getElementById("shClose").onclick     = closeShare;
+
+document.getElementById("tabs").addEventListener("click", (e)=>{
+  const t = e.target.closest(".tab");
+  if (!t) return;
+  setTabs(t.dataset.cat);
 });
+
+boot();
 </script>
 </body>
 </html>
