@@ -2,183 +2,133 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PTD Today — Daily Energy & Power News</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/assets/main.css?v=2025-10-05">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M36 4 8 36h16L28 60 56 28H40L36 4z' fill='%23111'/%3E%3C/svg%3E">
-<meta name="description" content="Curated daily & weekly headlines across grid, HV substations, protection & control, cables, HVDC, renewables, and policy.">
+<link rel="icon" href="logo.svg">
+<link rel="preload" href="assets/main.css" as="style">
+<link rel="stylesheet" href="assets/main.css">
+<meta name="description" content="Curated headlines for grid, HVDC, substations, protection & control, cables, renewables, and policy.">
 </head>
 <body>
+<div class="container">
+  <header>
+    <div class="title">PTD Today</div>
+    <div class="motto">First to Know. First to Lead.</div>
+    <div class="kicker">Daily Energy &amp; Power News</div>
+  </header>
 
-<header class="site">
-  <h1 class="site-title">PTD Today</h1>
-  <div class="site-motto">First to Know. First to Lead.</div>
-  <div class="site-kicker">Daily Energy &amp; Power News</div>
-</header>
+  <nav class="nav" id="tabs">
+    <a data-cat="all" class="active" href="#">All</a>
+    <a data-cat="top" href="#">Top (7d)</a>
+    <a data-cat="grid" href="#">Grid</a>
+    <a data-cat="substations" href="#">Substations</a>
+    <a data-cat="protection" href="#">Protection</a>
+    <a data-cat="cables" href="#">Cables</a>
+    <a data-cat="hvdc" href="#">HVDC</a>
+    <a data-cat="renewables" href="#">Renewables</a>
+    <a data-cat="policy" href="#">Policy</a>
+  </nav>
 
-<nav class="nav" id="nav">
-  <a href="#all" class="active">All</a>
-  <a href="#top">Top (7d)</a>
-  <a href="#grid">Grid</a>
-  <a href="#substations">Substations</a>
-  <a href="#protection">Protection</a>
-  <a href="#cables">Cables</a>
-  <a href="#hvdc">HVDC</a>
-  <a href="#renewables">Renewables</a>
-  <a href="#policy">Policy</a>
-</nav>
+  <div class="badge" id="updated">Updated —</div>
 
-<div class="updated"><span id="updated">Updated — …</span></div>
+  <section class="list" id="list"></section>
 
-<main class="main">
-  <div id="feed"></div>
-</main>
-
-<footer class="site-foot">© 2025 PTD Today • Headlines link to their original publishers.</footer>
-
-<!-- Share sheet (fallback if Web Share API unavailable) -->
-<div class="sheet-backdrop" id="sheetBackdrop" role="dialog" aria-modal="true" style="display:none">
-  <div class="sheet" role="document">
-    <h3>Share</h3>
-    <a id="shL" target="_blank" rel="noopener">LinkedIn</a>
-    <a id="shX" target="_blank" rel="noopener">X (Twitter)</a>
-    <a id="shF" target="_blank" rel="noopener">Facebook</a>
-    <a id="shR" target="_blank" rel="noopener">Reddit</a>
-    <button id="shC">Copy link</button>
-    <button id="shE">Email</button>
-    <button class="close" id="shClose">Close ×</button>
-  </div>
+  <footer class="footer">
+    © <span id="yr"></span> PTD Today • Headlines link to their original publishers.
+  </footer>
 </div>
 
 <script>
-const FEED = document.getElementById('feed');
-const UPDATED = document.getElementById('updated');
-const NAV = document.getElementById('nav');
-const SHEET = document.getElementById('sheetBackdrop');
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+const list = $('#list');
+const updatedEl = $('#updated');
+const yearEl = $('#yr'); yearEl.textContent = new Date().getFullYear();
 
-let ALL_ITEMS = [];
-let activeHash = (location.hash || '#all').toLowerCase();
+let DATA = { updated:"", items:[] };
 
-/* util */
-const enc = s => encodeURIComponent(s || '');
-const fmt = iso => {
-  try { return new Date(iso).toLocaleString(); }
-  catch(e){ return iso || ''; }
-};
-const daysAgo = (iso) => (Date.now() - new Date(iso).getTime())/86400000;
-
-function shortUrl(id){ return `https://ptdtoday.com/s/${id}.html`; }
-
-function setActiveTab(){
-  [...NAV.querySelectorAll('a')].forEach(a => {
-    a.classList.toggle('active', a.getAttribute('href') === activeHash);
-  });
+async function loadData(){
+  try{
+    const r = await fetch('data/news.json?v=' + Date.now());
+    DATA = await r.json();
+  }catch(e){
+    console.error(e);
+    DATA = {updated:"", items:[]};
+  }
+  updatedEl.textContent = 'Updated — ' + (DATA.updated||'');
+  render('all');
 }
 
-function cardHTML(it){
-  const id = it.id || Math.random().toString(36).slice(2,8);
-  const sUrl = shortUrl(id);
-  const img = it.image ? it.image : '';
-  const srcName = it.source || it.site || '';
-  const cat = (it.category || '').toString();
-  const when = it.published || it.date || '';
-  const score = (it.score!=null) ? ` • Score: ${(+it.score).toFixed(3)}` : '';
+function shortUrl(id){ return location.origin + '/s/' + id + '.html'; }
 
+function cardHTML(it){
+  const img = it.image || 'assets/og-default.png';
+  const source = it.source || (new URL(it.url)).hostname;
+  const pub = it.published ? new Date(it.published).toLocaleString() : '';
   return `
   <article class="card">
-    <a href="${sUrl}" aria-label="Open"><img class="thumb" src="${img}" alt=""></a>
+    <img loading="lazy" src="${img}" alt="">
     <div>
-      <h2 class="hline"><a href="${sUrl}">${it.title || ''}</a></h2>
-      <div class="meta">
-        ${cat ? cat.charAt(0).toUpperCase()+cat.slice(1) : ''} •
-        ${srcName ? srcName : ''} •
-        ${when ? fmt(when) : ''}${score}
-      </div>
+      <h3><a href="${shortUrl(it.id)}" target="_blank" rel="noopener">${it.title}</a></h3>
+      <div class="meta">${(it.category||'').toUpperCase()} • ${source} • ${pub} ${it.score?`• Score: ${(+it.score).toFixed(3)}`:''}</div>
       <div class="actions">
-        <a class="btn" href="${sUrl}">Open on PTD Today</a>
+        <a class="btn primary" href="${shortUrl(it.id)}" target="_blank" rel="noopener">Open on PTD Today</a>
         <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
-        <button class="btn" onclick='share("${id}", ${JSON.stringify(it.title || '').replace(/'/g,"&#39;")})'>Share</button>
+        <button class="btn" onclick="share('${it.id}','${encodeURIComponent(it.title)}')">Share</button>
       </div>
     </div>
   </article>`;
 }
 
-function render(){
-  let list = ALL_ITEMS.slice();
-
-  // Filter by tab
-  switch(activeHash){
-    case '#top':
-      list = list.filter(x => x.published && daysAgo(x.published) <= 7);
-      list.sort((a,b) => (b.score||0) - (a.score||0) || new Date(b.published||0)-new Date(a.published||0));
-      break;
-    case '#grid': list = list.filter(x => (x.category||'').toLowerCase()==='grid'); break;
-    case '#substations': list = list.filter(x => (x.category||'').toLowerCase()==='substations'); break;
-    case '#protection': list = list.filter(x => (x.category||'').toLowerCase()==='protection'); break;
-    case '#cables': list = list.filter(x => (x.category||'').toLowerCase()==='cables'); break;
-    case '#hvdc': list = list.filter(x => (x.category||'').toLowerCase()==='hvdc'); break;
-    case '#renewables': list = list.filter(x => (x.category||'').toLowerCase()==='renewables'); break;
-    case '#policy': list = list.filter(x => (x.category||'').toLowerCase()==='policy'); break;
-    default: /* all */ break;
+function render(cat){
+  // category “top” = top 7 days by score (fallback to published)
+  let items = DATA.items || [];
+  if(cat && cat !== 'all' && cat !== 'top'){
+    items = items.filter(i => (i.category||'').toLowerCase() === cat);
   }
-
-  FEED.innerHTML = list.map(cardHTML).join('') || `<p class="meta">No stories in this category yet.</p>`;
-}
-
-function openSheet(id, title){
-  // Build URLs for classic sharing with shortlink
-  const u = shortUrl(id);
-  document.getElementById('shL').href = `https://www.linkedin.com/sharing/share-offsite/?url=${enc(u)}&title=${enc(title)}`;
-  document.getElementById('shX').href = `https://twitter.com/intent/tweet?url=${enc(u)}&text=${enc(title)}`;
-  document.getElementById('shF').href = `https://www.facebook.com/sharer/sharer.php?u=${enc(u)}`;
-  document.getElementById('shR').href = `https://www.reddit.com/submit?url=${enc(u)}&title=${enc(title)}`;
-  document.getElementById('shC').onclick = () => { navigator.clipboard.writeText(u); closeSheet(); };
-  document.getElementById('shE').onclick = () => {
-    location.href = `mailto:?subject=${enc(title)}&body=${enc(u)}`;
-    closeSheet();
-  };
-  SHEET.style.display='block';
-}
-function closeSheet(){ SHEET.style.display='none'; }
-
-async function share(id, title){
-  const url = shortUrl(id);
-  if (navigator.share){
-    try {
-      await navigator.share({title, text:title, url});
-    } catch(e){ /* user canceled */ }
+  if(cat === 'top'){
+    const now = Date.now();
+    const week = 7*24*3600*1000;
+    items = items.filter(i=>{
+      const t = i.published ? Date.parse(i.published) : now;
+      return (now - t) <= week;
+    }).sort((a,b)=>(+b.score||0)-(+a.score||0));
   } else {
-    openSheet(id, title);
+    items = items.sort((a,b)=>Date.parse(b.published||0)-Date.parse(a.published||0));
   }
+
+  list.innerHTML = items.map(cardHTML).join('') || `<p>No stories in this category yet.</p>`;
 }
 
-SHEET.addEventListener('click', (e)=>{ if(e.target===SHEET) closeSheet(); });
-document.getElementById('shClose').onclick = closeSheet;
-
-// Routing
-window.addEventListener('hashchange', ()=>{
-  activeHash = (location.hash || '#all').toLowerCase();
-  setActiveTab(); render();
+$$('#tabs a').forEach(a=>{
+  a.addEventListener('click', ev=>{
+    ev.preventDefault();
+    $$('#tabs a').forEach(n=>n.classList.remove('active'));
+    a.classList.add('active');
+    render(a.dataset.cat);
+  });
 });
 
-// Load JSON
-(async function load(){
-  try{
-    const res = await fetch('/data/news.json', {cache:'no-store'});
-    const json = await res.json();
-    UPDATED.textContent = 'Updated — ' + (json.updated || new Date().toISOString());
-    ALL_ITEMS = (json.items || []).map(x => ({
-      id: x.id || (x.url||'').split('/').slice(-1)[0].replace(/[^a-z0-9]/gi,'').slice(0,8),
-      title: x.title, url: x.url, image: x.image, source: x.source, site: x.site,
-      published: x.published || x.date, category: (x.category||'').toLowerCase(),
-      score: x.score
-    }));
-    setActiveTab(); render();
-  }catch(e){
-    UPDATED.textContent = 'Updated — (failed to load)';
-    FEED.innerHTML = '<p class="meta">No stories found. Ensure /data/news.json is present.</p>';
+async function share(id, encTitle){
+  const title = decodeURIComponent(encTitle);
+  const url = shortUrl(id);
+
+  if(navigator.share){
+    try{
+      await navigator.share({ title, url });
+      return;
+    }catch(e){}
   }
-})();
+  // copy fallback
+  try{
+    await navigator.clipboard.writeText(url);
+    alert('Link copied: ' + url);
+  }catch(e){
+    prompt('Copy link:', url);
+  }
+}
+
+loadData();
 </script>
 </body>
 </html>
