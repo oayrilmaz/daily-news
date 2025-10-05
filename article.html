@@ -1,83 +1,163 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>PTD Today | Article</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script>
-  const P = new URLSearchParams(location.search);
-  const u = P.get('u') || '';
-  const t = P.get('t') || 'PTD Today — Article';
-  const i = P.get('i') || 'https://picsum.photos/seed/ptd-default/1200/630';
-  document.write(`
-    <meta property="og:title" content="${t.replace(/"/g,'&quot;')}">
-    <meta property="og:description" content="Read this story summary on PTD Today, then continue to the original source.">
-    <meta property="og:image" content="${i}">
-    <meta property="og:url" content="${location.href}">
-    <meta name="twitter:card" content="summary_large_image">
-  `);
-</script>
+
+<!-- OG tags are injected by JS from URL params to ensure correct previews -->
+<meta property="og:site_name" content="PTD Today" />
+<meta property="og:type" content="article" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><text y=%2224%22 font-size=%2224%22>⚡</text></svg>">
+
 <style>
-  :root{--ink:#171717;--muted:#666;--rule:#e8e8e8}
-  body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--ink)}
-  .wrap{max-width:860px;margin:0 auto;padding:28px}
-  h1{font-weight:800;letter-spacing:.3px;font-size:30px;margin:0 0 8px}
-  .meta{color:#777;margin:6px 0 18px}
-  .hero{width:100%;max-height:380px;object-fit:cover;border-radius:10px;background:#f5f5f5}
-  .btns{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
-  .btn{border:1px solid var(--rule);border-radius:10px;background:#fff;padding:10px 14px;font-weight:700;cursor:pointer;text-decoration:none;color:inherit}
-  .btn:hover{background:#fafafa}
-  .sheet{max-width:420px;margin:18px 0;border:1px solid var(--rule);border-radius:12px}
-  .sheet h3{margin:10px 12px 8px}
-  .share a,.share button{border-top:1px solid var(--rule);display:block;padding:14px 12px;background:#fff;border:0;text-align:left;font-weight:700;color:inherit;text-decoration:none}
-  .share a:hover,.share button:hover{background:#fafafa}
+  :root{--ink:#111;--muted:#666;--line:#e6e6e6;--maxw:950px;}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Helvetica Neue,Arial,sans-serif;color:var(--ink);}
+  .wrap{max-width:var(--maxw);margin:24px auto;padding:0 14px;}
+  header h1{font:700 38px/1.1 Georgia,Times,serif;margin:0 0 6px}
+  header .motto{color:var(--muted);margin-bottom:18px}
+  .card{display:grid;grid-template-columns:200px 1fr;gap:18px;border-top:1px solid var(--line);padding-top:18px;margin-top:12px}
+  .thumb{width:100%;aspect-ratio:16/10;object-fit:cover;border:1px solid var(--line)}
+  .title{font:700 28px/1.2 Georgia,Times,serif;margin:0 0 10px}
+  .meta{color:var(--muted);font-size:14px;margin:4px 0 12px}
+  .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  button,.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 14px;cursor:pointer}
+  .btn{display:inline-block;text-decoration:none;color:var(--ink)}
+  .footer{border-top:1px solid var(--line);margin-top:28px;padding-top:16px;color:var(--muted);font-size:14px}
+  @media (max-width:720px){.card{grid-template-columns:1fr}.thumb{aspect-ratio:3/2}}
+  /* share modal */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;padding:16px}
+  .sheet{background:#fff;max-width:420px;width:100%;border-radius:14px;overflow:hidden}
+  .sheet h3{margin:0;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .sheet a,.sheet button{display:block;width:100%;text-align:left;padding:14px 16px;border:0;background:#fff;border-bottom:1px solid var(--line);font-size:16px}
+  .sheet a:last-child,.sheet button:last-child{border-bottom:0}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1 id="ttl">PTD Today — Article</h1>
-  <div class="meta"><span id="host"></span></div>
-  <img id="img" class="hero" alt="">
-  <div class="btns">
-    <a id="toSource" class="btn" target="_blank" rel="noopener">Open source</a>
-    <button id="copy" class="btn">Copy PTD link</button>
-  </div>
-  <div class="sheet">
-    <h3>Share this article</h3>
-    <div class="share">
-      <a id="ln" target="_blank" rel="noopener">LinkedIn</a>
-      <a id="x" target="_blank" rel="noopener">X (Twitter)</a>
-      <a id="fb" target="_blank" rel="noopener">Facebook</a>
-      <a id="rd" target="_blank" rel="noopener">Reddit</a>
-      <button id="em">Email</button>
+  <header>
+    <h1>PTD Today</h1>
+    <div class="motto">First to Know. First to Lead.</div>
+  </header>
+
+  <article id="view" class="card" hidden>
+    <img id="img" class="thumb" alt="">
+    <div>
+      <h2 id="title" class="title"></h2>
+      <div id="summary"></div>
+      <div class="meta">
+        <span id="source"></span>
+        <span id="time"></span>
+      </div>
+      <div class="btns">
+        <a id="open" class="btn" target="_blank" rel="noopener">Open original</a>
+        <button id="share">Share</button>
+        <button id="copy">Copy PTD link</button>
+      </div>
     </div>
-  </div>
-  <p style="color:#777">Note: You’re viewing this item on PTD Today for a clean preview and easy sharing. Use <em>Open source</em> to read the full article at the publisher.</p>
+  </article>
+
+  <p id="err" class="meta" hidden>Missing or invalid URL parameters.</p>
+
+  <div class="footer">© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</div>
 </div>
+
+<!-- share modal (fallback when Web Share API is unavailable) -->
+<div id="modal" class="modal" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="sheet">
+    <h3>Share</h3>
+    <a id="shareLinkedIn" target="_blank" rel="noopener">LinkedIn</a>
+    <a id="shareX" target="_blank" rel="noopener">X (Twitter)</a>
+    <a id="shareFacebook" target="_blank" rel="noopener">Facebook</a>
+    <a id="shareReddit" target="_blank" rel="noopener">Reddit</a>
+    <button id="shareCopy">Copy link</button>
+    <button id="shareClose">Close ✕</button>
+  </div>
+</div>
+
 <script>
 (function(){
-  const P = new URLSearchParams(location.search);
-  const u = P.get('u') || '';
-  const t = P.get('t') || 'PTD Today — Article';
-  const i = P.get('i') || 'https://picsum.photos/seed/ptd-default/1200/630';
+  const qs = new URLSearchParams(location.search);
+  const rawUrl = (qs.get('u')||'').trim();
+  const title = (qs.get('t')||'').trim() || 'PTD Today';
+  const desc  = (qs.get('d')||'').trim() || 'Curated by PTD Today. Continue to the original source.';
+  const img   = (qs.get('i')||'/assets/og-default.png').trim();
+  const pub   = (qs.get('p')||'').trim();   // ISO time (optional)
+  const sid   = (qs.get('sid')||'').trim(); // short id (optional)
 
-  document.getElementById('ttl').textContent = t;
-  document.getElementById('img').src = i;
-  document.getElementById('toSource').href = u;
-  try{ document.getElementById('host').textContent = new URL(u).host.replace(/^www\./,''); }catch{ }
+  function domain(u){
+    try { return new URL(u).host.replace(/^www\./,''); } catch(e){ return ''; }
+  }
 
-  const encU = encodeURIComponent(location.href);
-  const encT = encodeURIComponent(t);
+  function setOG(){
+    const head = document.head;
+    const pairs = {
+      'og:title': title,
+      'og:description': desc,
+      'og:image': img,
+      'og:url': sid ? `https://ptdtoday.com/s/${sid}.html` : location.href
+    };
+    Object.entries(pairs).forEach(([p,v])=>{
+      const m=document.createElement('meta'); m.setAttribute('property',p); m.content=v; head.appendChild(m);
+    });
+    document.title = `${title} — PTD Today`;
+  }
 
-  document.getElementById('ln').href = `https://www.linkedin.com/sharing/share-offsite/?url=${encU}`;
-  document.getElementById('x').href  = `https://twitter.com/intent/tweet?url=${encU}&text=${encT}`;
-  document.getElementById('fb').href = `https://www.facebook.com/sharer/sharer.php?u=${encU}`;
-  document.getElementById('rd').href = `https://www.reddit.com/submit?url=${encU}&title=${encT}`;
-  document.getElementById('em').onclick = () => location.href = `mailto:?subject=${encT}&body=${encU}`;
-  document.getElementById('copy').onclick = async () => {
-    try{ await navigator.clipboard.writeText(location.href); alert('Link copied: ' + location.href); }
-    catch{ prompt('Copy link:', location.href); }
-  };
+  function copy(text){
+    return navigator.clipboard?.writeText(text).catch(()=>{});
+  }
+
+  function webShare(url){
+    if (navigator.share){
+      navigator.share({title, text: desc, url}).catch(()=>{});
+    }else{
+      openSheet(url);
+    }
+  }
+
+  function openSheet(url){
+    const modal = document.getElementById('modal');
+    const enc = encodeURIComponent(url);
+    document.getElementById('shareLinkedIn').href =
+      `https://www.linkedin.com/sharing/share-offsite/?url=${enc}`;
+    document.getElementById('shareX').href =
+      `https://twitter.com/intent/tweet?url=${enc}&text=${encodeURIComponent(title)}`;
+    document.getElementById('shareFacebook').href =
+      `https://www.facebook.com/sharer/sharer.php?u=${enc}`;
+    document.getElementById('shareReddit').href =
+      `https://www.reddit.com/submit?url=${enc}&title=${encodeURIComponent(title)}`;
+    document.getElementById('shareCopy').onclick = ()=>copy(url);
+    document.getElementById('shareClose').onclick = ()=>{ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); };
+    modal.style.display='flex'; modal.setAttribute('aria-hidden','false');
+  }
+
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  if(!rawUrl){
+    document.getElementById('err').hidden = false;
+    return;
+  }
+
+  setOG();
+
+  const src = domain(rawUrl);
+  const view = document.getElementById('view');
+  document.getElementById('img').src = img;
+  document.getElementById('img').alt = title;
+  document.getElementById('title').textContent = title;
+  document.getElementById('summary').textContent = desc;
+  document.getElementById('source').textContent = src ? src : '';
+  document.getElementById('time').textContent = pub ? ` • ${pub}` : '';
+  document.getElementById('open').href = rawUrl;
+
+  const ptdUrl = sid ? `https://ptdtoday.com/s/${sid}.html` : location.href;
+
+  document.getElementById('share').onclick = ()=>webShare(ptdUrl);
+  document.getElementById('copy').onclick  = ()=>copy(ptdUrl);
+
+  view.hidden = false;
 })();
 </script>
 </body>
