@@ -1,134 +1,133 @@
 <!doctype html>
 <html lang="en">
-<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PTD Today — Daily Energy & Power News</title>
-<link rel="icon" href="logo.svg">
-<link rel="preload" href="assets/main.css" as="style">
 <link rel="stylesheet" href="assets/main.css">
-<meta name="description" content="Curated headlines for grid, HVDC, substations, protection & control, cables, renewables, and policy.">
-</head>
+<meta name="description" content="Curated, fast headlines for grid, substations, protection & control, cables, HVDC, renewables, and policy. First to Know. First to Lead.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E">
+
 <body>
-<div class="container">
+<div class="wrap">
   <header>
-    <div class="title">PTD Today</div>
-    <div class="motto">First to Know. First to Lead.</div>
+    <h1>PTD Today</h1>
+    <div class="tagline">First to Know. First to Lead.</div>
     <div class="kicker">Daily Energy &amp; Power News</div>
   </header>
 
-  <nav class="nav" id="tabs">
-    <a data-cat="all" class="active" href="#">All</a>
-    <a data-cat="top" href="#">Top (7d)</a>
-    <a data-cat="grid" href="#">Grid</a>
-    <a data-cat="substations" href="#">Substations</a>
-    <a data-cat="protection" href="#">Protection</a>
-    <a data-cat="cables" href="#">Cables</a>
-    <a data-cat="hvdc" href="#">HVDC</a>
-    <a data-cat="renewables" href="#">Renewables</a>
-    <a data-cat="policy" href="#">Policy</a>
-  </nav>
+  <nav id="tabs"></nav>
+  <div id="updated" class="updated">Updated — …</div>
+  <div id="list"></div>
 
-  <div class="badge" id="updated">Updated —</div>
+  <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
+</div>
 
-  <section class="list" id="list"></section>
-
-  <footer class="footer">
-    © <span id="yr"></span> PTD Today • Headlines link to their original publishers.
-  </footer>
+<!-- Share modal -->
+<div class="dialog" id="shareDialog" role="dialog" aria-modal="true" aria-label="Share">
+  <div class="box">
+    <h3>Share</h3>
+    <div class="list">
+      <button data-sh="linkedin">LinkedIn</button>
+      <button data-sh="x">X (Twitter)</button>
+      <button data-sh="facebook">Facebook</button>
+      <button data-sh="reddit">Reddit</button>
+      <button data-sh="copy">Copy link</button>
+      <button data-sh="email">Email</button>
+    </div>
+    <div class="copyHint" id="copyHint" hidden>Link copied ✔</div>
+    <div class="close" id="closeShare">Close ×</div>
+  </div>
 </div>
 
 <script>
-const $ = sel => document.querySelector(sel);
-const $$ = sel => document.querySelectorAll(sel);
-const list = $('#list');
-const updatedEl = $('#updated');
-const yearEl = $('#yr'); yearEl.textContent = new Date().getFullYear();
+const CATS = ["All","Top (7d)","Grid","Substations","Protection","Cables","HVDC","Renewables","Policy"];
+const listEl = document.getElementById('list');
+const tabsEl = document.getElementById('tabs');
+const updatedEl = document.getElementById('updated');
+let ITEMS=[], CAT="All";
 
-let DATA = { updated:"", items:[] };
-
-async function loadData(){
-  try{
-    const r = await fetch('data/news.json?v=' + Date.now());
-    DATA = await r.json();
-  }catch(e){
-    console.error(e);
-    DATA = {updated:"", items:[]};
-  }
-  updatedEl.textContent = 'Updated — ' + (DATA.updated||'');
-  render('all');
-}
-
-function shortUrl(id){ return location.origin + '/s/' + id + '.html'; }
-
-function cardHTML(it){
-  const img = it.image || 'assets/og-default.png';
-  const source = it.source || (new URL(it.url)).hostname;
-  const pub = it.published ? new Date(it.published).toLocaleString() : '';
-  return `
-  <article class="card">
-    <img loading="lazy" src="${img}" alt="">
-    <div>
-      <h3><a href="${shortUrl(it.id)}" target="_blank" rel="noopener">${it.title}</a></h3>
-      <div class="meta">${(it.category||'').toUpperCase()} • ${source} • ${pub} ${it.score?`• Score: ${(+it.score).toFixed(3)}`:''}</div>
-      <div class="actions">
-        <a class="btn primary" href="${shortUrl(it.id)}" target="_blank" rel="noopener">Open on PTD Today</a>
-        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
-        <button class="btn" onclick="share('${it.id}','${encodeURIComponent(it.title)}')">Share</button>
-      </div>
-    </div>
-  </article>`;
-}
-
-function render(cat){
-  // category “top” = top 7 days by score (fallback to published)
-  let items = DATA.items || [];
-  if(cat && cat !== 'all' && cat !== 'top'){
-    items = items.filter(i => (i.category||'').toLowerCase() === cat);
-  }
-  if(cat === 'top'){
-    const now = Date.now();
-    const week = 7*24*3600*1000;
-    items = items.filter(i=>{
-      const t = i.published ? Date.parse(i.published) : now;
-      return (now - t) <= week;
-    }).sort((a,b)=>(+b.score||0)-(+a.score||0));
-  } else {
-    items = items.sort((a,b)=>Date.parse(b.published||0)-Date.parse(a.published||0));
-  }
-
-  list.innerHTML = items.map(cardHTML).join('') || `<p>No stories in this category yet.</p>`;
-}
-
-$$('#tabs a').forEach(a=>{
-  a.addEventListener('click', ev=>{
-    ev.preventDefault();
-    $$('#tabs a').forEach(n=>n.classList.remove('active'));
-    a.classList.add('active');
-    render(a.dataset.cat);
-  });
+function tab(a){return `<a href="#" data-cat="${a}">${a}</a>`}
+tabsEl.innerHTML = CATS.map(tab).join('');
+tabsEl.addEventListener('click', e=>{
+  const a=e.target.closest('a'); if(!a) return;
+  e.preventDefault(); CAT=a.dataset.cat; render();
 });
 
-async function share(id, encTitle){
-  const title = decodeURIComponent(encTitle);
-  const url = shortUrl(id);
+fetch('data/news.json?_='+Date.now()).then(r=>r.json()).then(data=>{
+  ITEMS = data.items||[];
+  updatedEl.textContent = 'Updated — ' + (data.updated||'');
+  CAT = (new URL(location).searchParams.get('cat')||'All');
+  render();
+});
 
-  if(navigator.share){
-    try{
-      await navigator.share({ title, url });
-      return;
-    }catch(e){}
-  }
-  // copy fallback
-  try{
-    await navigator.clipboard.writeText(url);
-    alert('Link copied: ' + url);
-  }catch(e){
-    prompt('Copy link:', url);
-  }
+function score7d(it){ // simplistic "top" filter by score/date
+  const t=Date.parse(it.iso||it.date||''); return (Date.now()-t) < 7*864e5;
 }
+function matchCat(it){
+  if(CAT==='All') return true;
+  if(CAT==='Top (7d)') return score7d(it);
+  return (it.category||'').toLowerCase()===CAT.toLowerCase();
+}
+function esc(s){return s?String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m])):''}
 
-loadData();
+function render(){
+  [...tabsEl.querySelectorAll('a')].forEach(a=>a.classList.toggle('active',a.dataset.cat===CAT));
+  const out = ITEMS.filter(matchCat).map(it=>`
+    <article class="item">
+      <img class="thumb" src="${esc(it.image||'')}" alt="">
+      <div>
+        <h2><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></h2>
+        <div class="meta">${esc(it.category||'')} • ${esc(it.source||'')} • ${esc(it.date||'')}</div>
+        <div class="links">
+          <a class="btn primary" href="${esc(it.url)}" target="_blank" rel="noopener">Open on PTD Today</a>
+          <a class="btn" href="${esc(it.original)}" target="_blank" rel="noopener">Source</a>
+          <button class="btn" data-share="${esc(it.url)}" data-title="${esc(it.title)}">Share</button>
+        </div>
+      </div>
+    </article>
+  `).join('');
+  listEl.innerHTML = out || `<p>No stories in this category yet.</p>`;
+}
+</script>
+
+<script>
+/* Share logic (Chooser + Web Share) */
+const dlg = document.getElementById('shareDialog');
+const closeShare = document.getElementById('closeShare');
+const copyHint = document.getElementById('copyHint');
+let shareTarget={url:'', title:''};
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-share]');
+  if(b){
+    shareTarget.url=b.dataset.share;
+    shareTarget.title=b.dataset.title||'';
+    if(navigator.share){
+      navigator.share({title:shareTarget.title, url:shareTarget.url}).catch(()=>{});
+    }else{
+      dlg.style.display='grid';
+      copyHint.hidden=true;
+    }
+  }
+});
+closeShare.onclick = ()=>{ dlg.style.display='none'; }
+
+dlg.addEventListener('click', e=>{
+  const btn = e.target.closest('[data-sh]'); if(!btn) return;
+  const u = encodeURIComponent(shareTarget.url);
+  const t = encodeURIComponent(shareTarget.title);
+  const open = href => { window.open(href,'_blank'); };
+  switch(btn.dataset.sh){
+    case 'linkedin': open(`https://www.linkedin.com/sharing/share-offsite/?url=${u}`); break;
+    case 'x': open(`https://twitter.com/intent/tweet?url=${u}&text=${t}`); break;
+    case 'facebook': open(`https://www.facebook.com/sharer/sharer.php?u=${u}`); break;
+    case 'reddit': open(`https://www.reddit.com/submit?url=${u}&title=${t}`); break;
+    case 'email': location.href=`mailto:?subject=${t}&body=${u}`; break;
+    case 'copy':
+      navigator.clipboard.writeText(shareTarget.url).then(()=>{copyHint.hidden=false;});
+      break;
+  }
+});
 </script>
 </body>
 </html>
