@@ -1,72 +1,52 @@
-# .github/workflows/ptd-build.yml
-name: ptd-build
+name: build
 
 on:
   workflow_dispatch:
   schedule:
-    # Every 3 hours (UTC)
-    - cron: "0 */3 * * *"
+    # every 3 hours (at minute 7 to avoid top-of-hour traffic)
+    - cron: "7 */3 * * *"
+  push:
+    paths:
+      - "pull_news.py"
+      - "requirements.txt"
+      - ".github/workflows/ptd-build.yml"
 
-concurrency:
-  group: ptd-build
-  cancel-in-progress: false
+permissions:
+  contents: write   # IMPORTANT: allow the workflow to commit & push
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write   # required for committing generated files
-
+    env:
+      TZ: UTC
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          persist-credentials: false
-          fetch-depth: 0
+          persist-credentials: true
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
-      # =========================
-      # ITEM 3 — Install deps
-      # =========================
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            # Fallback (keeps the job running even if the file is missing)
-            pip install requests beautifulsoup4 lxml feedparser python-dateutil
-          fi
+          pip install -r requirements.txt
 
-      # =========================
-      # ITEM 4 — Generate news + shortlinks
-      # =========================
       - name: Generate news + shortlinks
         run: |
-          set -e
           python pull_news.py
 
-      # Commit & push generated artifacts (data/news.json, data/shortlinks.json, s/*.html)
       - name: Commit & push
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
         run: |
-          set -e
-          git config user.name  "github-actions[bot]"
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add data s || true
-          git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
-
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
-          git fetch origin "${BRANCH}"
-          git pull --rebase origin "${BRANCH}" || true
-          git push origin HEAD:"${BRANCH}"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: refresh news ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+            git push
+          else
+            echo "No changes – nothing to commit."
+          fi
