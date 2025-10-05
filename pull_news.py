@@ -1,207 +1,120 @@
 #!/usr/bin/env python3
-from __future__ import annotations
+"""
+PTD Today — Automated news pull + shortlink page generator
+----------------------------------------------------------
+Creates:
+  • /data/news.json   → consumed by index.html
+  • /s/{id}.html      → OG/Twitter-rich redirect pages for LinkedIn/X
+"""
 
-import hashlib, json, os, re, time
+from pathlib import Path
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+import json, re, hashlib, html
 
-import feedparser
-import requests
-from bs4 import BeautifulSoup
-from dateutil import parser as dateparser
+# ------------- CONFIG -------------------------------------------------------
+DATA_DIR = Path("data")
+SHORTLINK_DIR = Path("s")
+TEMPLATE_PATH = Path("article.html")
+JSON_PATH = DATA_DIR / "news.json"
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(ROOT, "data")
-S_DIR = os.path.join(ROOT, "s")
+DEFAULT_IMAGE = "https://ptdtoday.com/assets/og-default.png"
+DEFAULT_DESC  = "Energy & Power Transmission Daily News — PTD Today"
 
-NEWS_JSON = os.path.join(DATA, "news.json")
-SHORT_JSON = os.path.join(DATA, "shortlinks.json")
+# ------------- SHORTLINK TEMPLATE LOADING ----------------------------------
+SHORTLINK_TEMPLATE = TEMPLATE_PATH.read_text(encoding="utf-8")
 
-MAX_ITEMS = 80
+def sanitize(txt: str) -> str:
+    return html.escape(txt or "").replace("\n", " ").strip()
 
-# --------- feeds (best-effort) ----------
-FEEDS = [
-    ("grid",        "https://www.tdworld.com/rss"),
-    ("policy",      "https://www.utilitydive.com/feeds/news/"),
-    ("grid",        "https://www.datacenterdynamics.com/en/rss/"),
-    ("renewables",  "https://www.gevernova.com/news/rss"),
-    ("renewables",  "https://press.siemens-energy.com/en/pressreleases/rss.xml"),
-    ("grid",        "https://www.hitachienergy.com/rss/news"),
-    ("protection",  "https://www.se.com/ww/en/work/insights/newsroom/news/rss.xml"),
-    ("policy",      "https://feeds.reuters.com/reuters/USenergyNews"),
-]
+def make_id(url: str) -> str:
+    """8-char stable hash from URL."""
+    return hashlib.md5(url.encode("utf-8")).hexdigest()[:8]
 
-KEYWORDS = {
-    "hvdc":        [r"\bhvdc\b", r"high[- ]voltage direct current"],
-    "cables":      [r"\bcable(s)?\b", r"\bconductor(s)?\b"],
-    "substations": [r"\bsubstation(s)?\b", r"\bgis\b", r"\bswitchgear\b"],
-    "protection":  [r"\bprotection\b", r"\brelay(s|ing)?\b", r"\bscada\b", r"\biec ?61850\b"],
-    "grid":        [r"\bgrid\b", r"\btransmission\b", r"\bdistribution\b", r"\bdatacenter(s)?\b"],
-    "renewables":  [r"\bwind\b", r"\bsolar\b", r"\brenewable(s)?\b", r"\bbattery\b", r"\bstorage\b"],
-    "policy":      [r"\bferc\b", r"\bdoe\b", r"\bpolicy\b", r"\bregulat(ion|ory)\b"],
-}
+def write_shortlink_page(sid: str, title: str, desc: str, image: str, source: str):
+    """Write /s/{sid}.html with proper OpenGraph and Twitter cards."""
+    SHORTLINK_DIR.mkdir(parents=True, exist_ok=True)
 
-def now_iso():
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-def sha_id(url: str, n=6) -> str:
-    return hashlib.sha1(url.encode("utf-8")).hexdigest()[:n]
-
-def domain(u: str) -> str:
-    try: return urlparse(u).netloc.replace("www.","")
-    except: return ""
-
-def safe_get(url: str, timeout=12):
-    try:
-        r = requests.get(url, timeout=timeout, headers={"User-Agent":"PTD-Today/1.0"})
-        if r.status_code == 200: return r
-    except: pass
-    return None
-
-def og_image_from_page(url: str) -> str | None:
-    r = safe_get(url); 
-    if not r: return None
-    s = BeautifulSoup(r.text, "lxml")
-    og = s.find("meta", property="og:image")
-    if og and og.get("content"): return og["content"]
-    tw = s.find("meta", attrs={"name":"twitter:image"})
-    if tw and tw.get("content"): return tw["content"]
-    im = s.find("img")
-    if im and im.get("src"): return im["src"]
-    return None
-
-def best_image(entry, url: str) -> str | None:
-    try:
-        if hasattr(entry, "media_content"):
-            for m in entry.media_content:
-                if m.get("url"): return m["url"]
-    except: pass
-    try:
-        if hasattr(entry, "enclosures"):
-            for e in entry.enclosures:
-                link = e.get("href") or e.get("url")
-                if link: return link
-    except: pass
-    return og_image_from_page(url)
-
-def parse_time(entry) -> str:
-    if getattr(entry, "published", None):
-        try:
-            dt = dateparser.parse(entry.published)
-            if not dt.tzinfo: dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
-        except: pass
-    return now_iso()
-
-def choose_category(feed_cat: str, title: str, summary: str) -> str:
-    base = (feed_cat or "").lower()
-    if base in ("grid","substations","protection","cables","hvdc","renewables","policy"):
-        return base
-    text = f"{title} {summary}".lower()
-    for cat, pats in KEYWORDS.items():
-        for pat in pats:
-            if re.search(pat, text):
-                return cat
-    if base == "datacenter": return "grid"
-    return "grid"
-
-def ensure_dirs():
-    os.makedirs(DATA, exist_ok=True)
-    os.makedirs(S_DIR, exist_ok=True)
-
-def load_json(path, fallback):
-    if os.path.exists(path):
-        try:
-            with open(path,"r",encoding="utf-8") as f: return json.load(f)
-        except: pass
-    return fallback
-
-def write_json(path, obj):
-    tmp = path + ".tmp"
-    with open(tmp,"w",encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
-
-def make_short_page(id_, title, url, image):
-    img = image or "/assets/og-default.png"
-    html = f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>{title} — PTD Today</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="0;url={url}">
-<link rel="canonical" href="{url}">
-<meta property="og:site_name" content="PTD Today">
-<meta property="og:type" content="article">
-<meta property="og:title" content="{title}">
-<meta property="og:description" content="Headlines curated by PTD Today. Click to read at the original publisher.">
-<meta property="og:url" content="https://ptdtoday.com/s/{id_}.html">
-<meta property="og:image" content="{img}">
-<meta name="twitter:card" content="summary_large_image">
-</head>
-<body>
-Redirecting to <a href="{url}">original source</a>…
-</body>
-</html>"""
-    with open(os.path.join(S_DIR, f"{id_}.html"), "w", encoding="utf-8") as f:
-        f.write(html)
-
-def main():
-    ensure_dirs()
-
-    short = load_json(SHORT_JSON, {})
-    items = []
-
-    for feed_cat, feed_url in FEEDS:
-        try:
-            fp = feedparser.parse(feed_url)
-        except Exception:
-            continue
-        for e in fp.entries[:25]:
-            url = getattr(e, "link", "").strip()
-            title = (getattr(e, "title", "") or "").strip()
-            if not url or not title: continue
-
-            summary = (getattr(e, "summary", "") or "").strip()
-            img = best_image(e, url)
-            cat = choose_category(feed_cat, title, summary)
-            tpub = parse_time(e)
-            src = domain(url)
-            sid = sha_id(url, 6)
-
-            # create/update short page
-            if short.get(sid) != url:
-                short[sid] = url
-                make_short_page(sid, title.replace('"','&quot;'), url, img)
-
-            item = {
-                "id": sid,
-                "title": title,
-                "url": url,
-                "image": img,
-                "category": cat,
-                "source": src,
-                "published": tpub
-            }
-            items.append(item)
-
-    # De-dup by id, keep most recent first
-    seen = set()
-    uniq = []
-    for it in sorted(items, key=lambda x: x["published"], reverse=True):
-        if it["id"] in seen: continue
-        seen.add(it["id"])
-        uniq.append(it)
-        if len(uniq) >= MAX_ITEMS: break
-
-    news = {
-        "updated": now_iso(),
-        "items": uniq
+    safe_map = {
+        "{{id}}": sid,
+        "{{title}}": sanitize(title),
+        "{{description}}": sanitize(desc or DEFAULT_DESC),
+        "{{image}}": image or DEFAULT_IMAGE,
+        "{{source}}": source
     }
 
-    write_json(NEWS_JSON, news)
-    write_json(SHORT_JSON, short)
+    html_out = SHORTLINK_TEMPLATE
+    for k, v in safe_map.items():
+        html_out = html_out.replace(k, v)
+
+    Path(SHORTLINK_DIR, f"{sid}.html").write_text(html_out, encoding="utf-8")
+
+# ------------- BUILD ITEMS -------------------------------------------------
+def load_existing():
+    if JSON_PATH.exists():
+        try:
+            return json.loads(JSON_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            return {"items": []}
+    return {"items": []}
+
+def build_item(title, url, category, image=None, description=None, source=None, score=None):
+    sid = make_id(url)
+    write_shortlink_page(
+        sid=sid,
+        title=title,
+        desc=description or DEFAULT_DESC,
+        image=image or DEFAULT_IMAGE,
+        source=url
+    )
+    return {
+        "id": sid,
+        "title": title,
+        "url": url,
+        "category": category.lower(),
+        "image": image or DEFAULT_IMAGE,
+        "description": description or DEFAULT_DESC,
+        "source": source or re.sub(r"^https?://(www\.)?", "", url).split("/")[0],
+        "published": datetime.now(timezone.utc).isoformat(),
+        "score": score or 0.0,
+    }
+
+# ------------- SAMPLE DATA (replace with your scraper later) ---------------
+def sample_items():
+    """Temporary static items for testing."""
+    return [
+        build_item(
+            "Photonics startup PINC Technologies secures $6.8 m from Seed funding round",
+            "https://www.datacenterdynamics.com/en/news/photonics-startup-pinc-technologies-secures-68m-from-seed-funding-round/",
+            "grid",
+            "https://media.datacenterdynamics.com/media/images/pinc-logo.width-800.jpg",
+            "PINC Technologies has raised $6.8 million to expand photonics-based interconnect solutions for data centers.",
+            "datacenterdynamics.com",
+            3.642
+        ),
+        build_item(
+            "EE targets 99 % 5 G Standalone coverage across UK by FY 2030",
+            "https://www.datacenterdynamics.com/en/news/ee-targets-99-5g-standalone-coverage-across-uk-by-end-of-fy2030/",
+            "renewables",
+            "https://media.datacenterdynamics.com/media/images/EE_5G.width-800.jpg",
+            "EE announces plans to achieve nationwide 5 G Standalone coverage by 2030 as part of BT Group’s network upgrade strategy.",
+            "datacenterdynamics.com",
+            3.520
+        ),
+    ]
+
+# ------------- MAIN --------------------------------------------------------
+def main():
+    DATA_DIR.mkdir(exist_ok=True)
+    items = sample_items()
+
+    news = {
+        "updated": datetime.now(timezone.utc).isoformat(),
+        "items": items
+    }
+
+    JSON_PATH.write_text(json.dumps(news, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"✅ Wrote {len(items)} stories to {JSON_PATH}")
+    print(f"✅ Created {len(list(SHORTLINK_DIR.glob('*.html')))} shortlink pages in {SHORTLINK_DIR}/")
 
 if __name__ == "__main__":
     main()
