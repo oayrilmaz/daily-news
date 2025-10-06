@@ -9,13 +9,8 @@
 <link rel="icon" href="data:,">
 <style>
   :root{
-    --paper:#e6dcc7;        /* newspaper beige */
-    --ink:#1c1b18;
-    --muted:#6e675c;
-    --pill:#d9ccb3;
-    --link:#153e9f;
-    --card:#efe7d4;
-    --pillOn:#eadfc8;
+    --paper:#e6dcc7; --ink:#1c1b18; --muted:#6e675c;
+    --pill:#d9ccb3;  --link:#153e9f; --card:#efe7d4; --pillOn:#eadfc8;
   }
   html,body{margin:0;background:var(--paper);color:var(--ink);font-family:Georgia,'Times New Roman',serif}
   .wrap{max-width:900px;margin:0 auto;padding:26px 18px 60px}
@@ -38,7 +33,6 @@
   .btn{background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:9px 14px;font-weight:600;cursor:pointer}
   .btn:active{transform:translateY(1px)}
   footer{margin:36px 0 0;color:var(--muted);text-align:center}
-  /* share modal */
   dialog{border:none;border-radius:14px;padding:0;box-shadow:0 14px 60px rgba(0,0,0,.25)}
   .sheet{padding:14px}
   .sheet h3{margin:10px 12px 8px}
@@ -99,12 +93,13 @@ const STAMP = document.getElementById('stamp');
 const TABS  = document.getElementById('tabs');
 const SHARE = document.getElementById('shareDlg');
 
-let ALL = [];
+let TODAY = [];     // from /data/news.json  (your daily/weekend logic)
+let WEEK  = null;   // from /data/news_7d.json (strict last 7 days)
 let CURRENT = 'all';
 
 /* ---------- Utilities ---------- */
 
-// Weekend/day window you specified earlier
+// your weekend/day window
 function computeWindow(now=new Date()){
   const d = new Date(now);
   const wd = d.getUTCDay(); // 0 Sun .. 6 Sat
@@ -126,13 +121,13 @@ function computeWindow(now=new Date()){
   return {start,end};
 }
 
-// strict last-7×24h window (UTC)
+// strict last 7 days check
 function within7d(iso){
   const t = Date.parse(iso);
   return (Date.now() - t) <= 7*24*3600*1000;
 }
 
-// Image proxy to avoid hotlink/CORS blocks (thumbnails always load)
+// reliable thumbnail via proxy (prevents hotlink/CORS blocks)
 function prox(u){
   if(!u) return '';
   const clean = u.replace(/^https?:\/\//,'');
@@ -180,21 +175,21 @@ function cardHTML(it){
   </article>`;
 }
 
-function render(cat, items){
-  let view = items.slice();
-
-  // Category filter (except 'all' and 'top')
-  if (cat!=='all' && cat!=='top'){
-    const want = (cat||'').toLowerCase();
-    view = view.filter(x => (x.category||'').toLowerCase() === want);
-  }
+function render(cat){
+  let base = (cat==='top' && Array.isArray(WEEK)) ? WEEK : TODAY;
+  let view = base.slice();
 
   if (cat==='top'){
-    // STRICT last 7 days, ignore the daily/weekend window
-    view = view.filter(x => within7d(x.date))
-               .sort((a,b)=> (b.score||0)-(a.score||0));
+    // Use WEEK; if WEEK is absent, fall back to strict 7d from TODAY
+    if (!Array.isArray(WEEK)) view = TODAY.filter(x => within7d(x.date));
+    view = view.sort((a,b)=> (b.score||0)-(a.score||0));
   } else {
-    // Apply your “today/weekend” window
+    // category filter
+    if (cat!=='all'){
+      const want = cat.toLowerCase();
+      view = view.filter(x => (x.category||'').toLowerCase() === want);
+    }
+    // enforce your daily/weekend window on TODAY set
     const {start,end} = computeWindow(new Date());
     const lo = start.getTime(), hi = end.getTime();
     view = view.filter(x=> {
@@ -215,16 +210,26 @@ function render(cat, items){
 /* ---------- Boot ---------- */
 (async function(){
   try{
+    // load today's window
     const res  = await fetch('/data/news.json', {cache:'no-store'});
     const data = await res.json();
-    ALL = Array.isArray(data.items) ? data.items : [];
+    TODAY = Array.isArray(data.items) ? data.items : [];
     STAMP.textContent = 'Updated — ' + (data.updated || new Date().toISOString());
 
-    // Initial render (supports ?cat=grid deep-link)
+    // opportunistically load 7d file
+    try{
+      const r7  = await fetch('/data/news_7d.json', {cache:'no-store'});
+      if (r7.ok){
+        const d7 = await r7.json();
+        if (Array.isArray(d7.items)) WEEK = d7.items;
+      }
+    }catch(_){ /* optional */ }
+
+    // Initial render (deep link support ?cat=grid)
     const url  = new URL(location.href);
     const deep = (url.searchParams.get('cat') || 'all').toLowerCase();
     setTab(deep);
-    render(deep, ALL);
+    render(deep);
 
     // Tab switching
     TABS.addEventListener('click', ev=>{
@@ -232,7 +237,7 @@ function render(cat, items){
       const cat = b.dataset.cat;
       setTab(cat);
       history.replaceState(null,'', cat==='all' ? location.pathname : `?cat=${cat}`);
-      render(cat, ALL);
+      render(cat);
     });
 
   }catch(err){
