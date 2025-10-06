@@ -4,27 +4,25 @@
 <meta charset="utf-8">
 <title>PTD Today — Daily Energy & Power News</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="PTD Today curates daily news across transmission, distribution, substations, cables, HVDC, renewables, policy, AI and data centers.">
+<meta name="description" content="Daily curation across grid, substations, protection, cables, HVDC, renewables, policy, AI, and data centers.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>⚡️</text></svg>">
 <style>
-  :root{
-    --ink:#1b1b1b; --muted:#6b6b6b; --bg:#e9dfcf; --card:#f6efe3; --pill:#e1d6c4;
-    --brand:#1d2a57;
-  }
-  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia, 'Times New Roman', serif;}
+  :root{--ink:#1b1b1b;--muted:#6b6b6b;--bg:#e9dfcf;--card:#f6efe3;--pill:#e1d6c4;--brand:#1d2a57;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,'Times New Roman',serif}
   .wrap{max-width:920px;margin:0 auto;padding:24px}
-  h1{font:700 56px/1.05 'Georgia',serif;letter-spacing:.5px;margin:16px 0 6px}
-  .tagline{color:var(--muted);font-style:italic;margin:0 0 20px}
-  h2{font:700 28px/1.2 'Georgia',serif;margin:18px 0}
-  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 16px}
+  h1{font:700 56px/1.05 Georgia,serif;margin:16px 0 4px}
+  .tagline{color:var(--muted);font-style:italic;margin:0 0 16px}
+  h2{font:700 28px/1.2 Georgia,serif;margin:10px 0 14px}
+  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 14px}
   .tab{background:var(--pill);border-radius:22px;padding:8px 14px;cursor:pointer;border:1px solid #cdbfa9}
   .tab[aria-selected="true"]{background:#fff;border-color:#b9aa90}
   .stamp{display:inline-block;background:#fff;border:1px solid #cfbea5;border-radius:999px;padding:10px 16px;margin:6px 0 18px;color:#7a6a52}
-  .list{display:flex;flex-direction:column;gap:22px}
+  .list{display:flex;flex-direction:column;gap:18px}
   .card{background:var(--card);border:1px solid #dbcdb7;border-radius:14px;overflow:hidden;display:grid;grid-template-columns:120px 1fr;gap:16px;padding:14px}
   .thumb{width:120px;height:90px;background:#ddd;border-radius:8px;object-fit:cover}
-  .meta{color:#6c5e4a;font-size:.92rem;margin:.2rem 0 .6rem}
-  .title{font:700 26px/1.2 Georgia,serif;margin:.2rem 0}
+  .meta{color:#6c5e4a;font-size:.92rem;margin:.15rem 0 .55rem}
+  .title{font:700 26px/1.2 Georgia,serif;margin:.15rem 0;text-decoration:none;color:#142b61}
+  .title:hover{text-decoration:underline}
   .btnrow{display:flex;flex-wrap:wrap;gap:10px;margin:.3rem 0}
   .btn{border:1px solid #b9aa90;background:#fff;border-radius:999px;padding:8px 14px;text-decoration:none;color:#2a2a2a}
   .btn.primary{background:#fff;border-color:#7f6b4d}
@@ -34,10 +32,9 @@
     .thumb{width:94px;height:70px}
     .title{font-size:22px}
   }
-  /* share sheet */
   dialog{border:none;border-radius:16px;padding:0;max-width:420px;width:92vw}
   .sheet{padding:8px}
-  .sheet h3{margin:10px 10px 6px 12px;font:700 16px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial}
+  .sheet h3{margin:10px 10px 6px 12px;font:700 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial}
   .opt{display:block;width:100%;text-align:left;padding:12px 16px;border:none;background:#fff;border-top:1px solid #eee;font:600 16px/1.2 system-ui}
 </style>
 </head>
@@ -62,13 +59,11 @@
   </div>
 
   <div class="stamp" id="stamp">Updated — </div>
-
   <div class="list" id="list"></div>
 
   <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
 </div>
 
-<!-- Share sheet -->
 <dialog id="shareDlg">
   <div class="sheet">
     <h3>Share</h3>
@@ -83,63 +78,44 @@
 </dialog>
 
 <script>
-/* =============== Helpers =============== */
 const LIST = document.getElementById('list');
 const STAMP = document.getElementById('stamp');
 const TABS  = document.getElementById('tabs');
 const SHARE = document.getElementById('shareDlg');
-
 let STATE = { items: [], cat: 'all', share: null };
 
-function fmtDate(iso){
-  const d = new Date(iso);
-  return d.toISOString().replace('Z','+00:00');
-}
-function within(d, start, end){ const t = +new Date(d); return t >= +start && t <= +end; }
+function fmtDate(iso){ const d = new Date(iso); return d.toISOString().replace('Z','+00:00'); }
+function within(d, s, e){ const t=+new Date(d); return t>=+s && t<=+e; }
 
-/* Weekend window logic (your earlier rule)
-   Sun: Fri–Sun
-   Mon: Fri–Mon
-   Tue: Mon–Tue
-   Wed: Tue–Wed
-   Thu: Wed–Thu
-   Fri: Thu–Fri
-   Sat: Fri–Sat
-*/
+// Weekend window for "All"
 function todayWindow(now=new Date()){
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const day = d.getUTCDay(); // 0 Sun .. 6 Sat
+  const dow = d.getUTCDay();
   let start = new Date(d), end = new Date(d); end.setUTCHours(23,59,59,999);
-
-  if (day===0) { start.setUTCDate(start.getUTCDate()-2); }        // Sun -> Fri
-  else if (day===1) { start.setUTCDate(start.getUTCDate()-3); }   // Mon -> Fri
-  else if (day===2) { start.setUTCDate(start.getUTCDate()-1); }   // Tue -> Mon
-  else if (day===3) { start.setUTCDate(start.getUTCDate()-1); }   // Wed -> Tue
-  else if (day===4) { start.setUTCDate(start.getUTCDate()-1); }   // Thu -> Wed
-  else if (day===5) { start.setUTCDate(start.getUTCDate()-1); }   // Fri -> Thu
-  else if (day===6) { start.setUTCDate(start.getUTCDate()-1); }   // Sat -> Fri
+  if (dow===0) start.setUTCDate(start.getUTCDate()-2);       // Sun => Fri..Sun
+  else if (dow===1) start.setUTCDate(start.getUTCDate()-3);  // Mon => Fri..Mon
+  else start.setUTCDate(start.getUTCDate()-1);               // Tue–Sat => prev day..today
   return [start, end];
 }
+// Strict last 7 days (incl today) for "Top (7d)"
 function last7Window(now=new Date()){
-  const end = new Date(now); end.setUTCHours(23,59,59,999);
-  const start = new Date(end); start.setUTCDate(end.getUTCDate()-6); // inclusive 7 days
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23,59,59,999));
+  const start = new Date(end); start.setUTCDate(end.getUTCDate()-6);
   return [start, end];
 }
-
-/* Render */
-function pill(text){ return `<span class="meta">${text}</span>`; }
 
 function card(it){
   const sUrl = `/s/${it.id}.html`;
   return `
   <article class="card">
-    <img class="thumb" alt="" src="${it.image || '/assets/og-default.png'}" loading="lazy">
+    <img class="thumb" referrerpolicy="no-referrer" onerror="this.src='/assets/og-default.png'"
+         src="${it.image || '/assets/og-default.png'}" alt="">
     <div>
       <div class="meta">${it.cat.toUpperCase()} • ${new URL(it.url).hostname} • ${fmtDate(it.date)} • Score: ${it.score.toFixed(3)}</div>
       <a class="title" href="${sUrl}">${it.title}</a>
       <div class="btnrow">
         <a class="btn primary" href="${sUrl}">Open on PTD Today</a>
-        <a class="btn" href="${it.url}" rel="noopener" target="_blank">Source</a>
+        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
         <button class="btn" data-share-link="${sUrl}" data-share-title="${it.title}">Share</button>
       </div>
     </div>
@@ -160,7 +136,6 @@ function render(cat, items){
   LIST.innerHTML = out.map(card).join('') || `<p style="color:#7b6d5a">No stories found.</p>`;
 }
 
-/* Active tab UI */
 function setTab(cat){
   STATE.cat = cat || 'all';
   for (const b of TABS.querySelectorAll('.tab')){
@@ -168,19 +143,15 @@ function setTab(cat){
   }
 }
 
-/* Boot */
 (async function init(){
   const res  = await fetch('/data/news.json', {cache:'no-store'});
   const data = await res.json();
-  const items = (data.items||[]).slice(0,300);
+  const items = (data.items||[]).slice(0,500);
   STATE.items = items;
-
   STAMP.textContent = 'Updated — ' + fmtDate(data.updated);
 
-  setTab('all');
-  render('all', items);
+  setTab('all'); render('all', items);
 
-  // tab switching
   TABS.addEventListener('click', ev=>{
     const b = ev.target.closest('.tab'); if(!b) return;
     const cat = b.dataset.cat;
@@ -189,7 +160,6 @@ function setTab(cat){
     render(cat, STATE.items);
   });
 
-  // share (stable buttons, and sheet)
   document.body.addEventListener('click', ev=>{
     const btn = ev.target.closest('[data-share-link]');
     if(!btn) return;
@@ -201,7 +171,6 @@ function setTab(cat){
     if(!ev.target.dataset.share) return;
     const { url, title } = STATE.share || {};
     const full = 'https://ptdtoday.com' + url;
-
     const map = {
       linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(full)}`,
       x:        `https://twitter.com/intent/tweet?url=${encodeURIComponent(full)}&text=${encodeURIComponent(title)}`,
@@ -209,9 +178,8 @@ function setTab(cat){
       reddit:   `https://www.reddit.com/submit?url=${encodeURIComponent(full)}&title=${encodeURIComponent(title)}`
     };
     const action = ev.target.dataset.share;
-
     if(action === 'copy'){
-      navigator.clipboard.writeText(full).then(()=>alert('Link copied')).catch(()=>{});
+      navigator.clipboard.writeText(full).then(()=>alert('Link copied'));
     }else if(action === 'email'){
       location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(full)}`;
     }else{
