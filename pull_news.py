@@ -1,144 +1,135 @@
 #!/usr/bin/env python3
-import hashlib, json, os, re
-from datetime import datetime, timedelta, timezone
-from urllib.parse import urlparse
-import feedparser
+import hashlib, json, os, re, sys
+from datetime import datetime, timezone, timedelta
+from html import unescape
+
 import requests
+import feedparser
+from bs4 import BeautifulSoup
 
-OUT_DIR = "data"
-SHORT_DIR = "s"
-os.makedirs(OUT_DIR, exist_ok=True)
-os.makedirs(SHORT_DIR, exist_ok=True)
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
-# --------- Feeds (stable, publicly available) ----------
-FEEDS = [
-  # Data Center Dynamics (great sector overlap)
-  "https://www.datacenterdynamics.com/en/rss/",
-  # Utility Dive – Grid and policy
-  "https://www.utilitydive.com/feeds/news/",
-  # Reuters Technology (AI & infra items)
-  "https://feeds.reuters.com/reuters/technologyNews",
-  # GE Vernova newsroom (RSS)
-  "https://www.gevernova.com/rss.xml",
-  # Hitachi Energy newsroom (RSS)
-  "https://www.hitachienergy.com/rss/news.xml",
-  # Siemens Energy newsroom
-  "https://press.siemens-energy.com/en/pressreleases/feed",
+DATA_DIR = os.path.join(ROOT, 'data')
+S_DIR = os.path.join(ROOT, 's')
+TEMPLATE_FILE = os.path.join(ROOT, 'article.html')
+NEWS_FILE = os.path.join(DATA_DIR, 'news.json')
+DEFAULT_IMG = "/assets/og-default.png"
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(S_DIR, exist_ok=True)
+
+# ------------- Sources (stable RSS where possible)
+SOURCES = [
+    # Data center & grid / policy
+    ("https://www.datacenterdynamics.com/en/rss.xml", "grid"),
+    ("https://www.utilitydive.com/feeds/news/", "grid"),
+    ("https://www.utilitydive.com/feeds/policy/", "policy"),
+    # Reuters Energy (broad)
+    ("https://feeds.reuters.com/reuters/USenergyNews", "grid"),
+    # Company newsrooms (best-effort; if 404, script continues)
+    ("https://press.siemens-energy.com/en/pressreleases.xml", "grid"),
+    ("https://www.hitachienergy.com/us/en/news/rss", "grid"),
 ]
 
-# Category heuristics
-CAT_RULES = [
-  ("HVDC", r"\bhvdc\b"),
-  ("Substations", r"\bsubstation"),
-  ("Protection", r"protection|relay|iec\s*61850|scada"),
-  ("Cables", r"cable|xlpe|subsea"),
-  ("Renewables", r"renewable|solar|wind|hydro|geothermal|ppa|offshore"),
-  ("Grid", r"grid|transmission|interconnector|substation|capacity|datacenter|data\s*center"),
-  ("Policy", r"ferc|regulator|policy|tariff|legislation|doe|ppa|incentive|permitting"),
-]
+def fetch_feed(url, category):
+    try:
+        f = feedparser.parse(url)
+        items = []
+        for e in f.entries[:40]:
+            title = unescape(e.get('title','')).strip()
+            link = e.get('link') or e.get('id')
+            if not (title and link): 
+                continue
+            published = None
+            for key in ('published_parsed','updated_parsed'):
+                if e.get(key):
+                    published = datetime(*e[key][:6], tzinfo=timezone.utc)
+                    break
+            if not published:
+                published = datetime.now(tz=timezone.utc)
 
-def classify(title, summary, source):
-  text = f"{title} {summary} {source}".lower()
-  for cat, rx in CAT_RULES:
-    if re.search(rx, text):
-      return cat
-  return "Grid"
+            # Try to find an image
+            img = None
+            if 'media_content' in e and e.media_content:
+                img = e.media_content[0].get('url')
+            if not img and 'media_thumbnail' in e and e.media_thumbnail:
+                img = e.media_thumbnail[0].get('url')
 
-def best_image(entry):
-  # try media thumbnails first
-  if 'media_thumbnail' in entry and entry.media_thumbnail:
-    return entry.media_thumbnail[0]['url']
-  if 'media_content' in entry and entry.media_content:
-    return entry.media_content[0].get('url')
-  # look inside summary
-  if 'summary' in entry:
-    m = re.search(r'<img[^>]+src="([^"]+)"', entry.summary, re.I)
-    if m: return m.group(1)
-  return None
+            # Sometimes image lives in summary
+            if not img:
+                summary = e.get('summary','')
+                m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', summary)
+                if m:
+                    img = m.group(1)
 
-def hash_id(url, title):
-  h = hashlib.sha1((url + '|' + title).encode('utf-8')).hexdigest()
-  return h[:7]  # short, good enough
+            items.append({
+                "title": title,
+                "url": link,
+                "source": re.sub(r'^https?://(www\.)?','', (f.feed.get('link') or link)).split('/')[0],
+                "category": category,
+                "image": img or DEFAULT_IMG,
+                "published": published.isoformat(),
+                "summary": unescape(BeautifulSoup(e.get('summary',''), 'html.parser').get_text(' ', strip=True))[:280],
+            })
+        return items
+    except Exception as ex:
+        print(f"[warn] {url}: {ex}", file=sys.stderr)
+        return []
 
-def fetch_all():
-  items = []
-  for url in FEEDS:
-    f = feedparser.parse(url)
-    for e in f.entries[:30]:
-      title = e.get('title','').strip()
-      link  = e.get('link','').strip()
-      if not title or not link:
-        continue
-      published = None
-      if 'published_parsed' in e and e.published_parsed:
-        published = datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
-      else:
-        published = datetime.now(timezone.utc).isoformat()
-      src = urlparse(link).hostname or 'news'
-      img = best_image(e)
-      cat = classify(title, e.get('summary',''), src)
-      score = 0.25
-      # simple boost if keywords present
-      if re.search(r'\bhvdc|substation|interconnector|offshore|grid\b', title.lower()):
-        score += 0.2
-      item = {
-        "id": hash_id(link, title),
-        "title": title,
-        "url": link,
-        "image": img,
-        "published": published,
-        "source": src,
-        "category": cat,
-        "score": score
-      }
-      items.append(item)
-  # keep most recent first
-  items.sort(key=lambda x: x['published'], reverse=True)
-  return items
+def make_id(url: str) -> str:
+    return hashlib.sha1(url.encode('utf-8')).hexdigest()[:6]
 
-def write_json(items):
-  updated = datetime.now(timezone.utc).isoformat()
-  with open(os.path.join(OUT_DIR, "news.json"), "w", encoding="utf-8") as f:
-    json.dump({"updated":updated, "items":items}, f, ensure_ascii=False, indent=2)
+def score(item):
+    # lightweight score: recency + title length
+    age_h = max(1e-6, (datetime.now(timezone.utc) - datetime.fromisoformat(item['published'])).total_seconds()/3600)
+    return round(1.0/age_h + min(1.0, len(item['title'])/140.0), 4)
 
-def build_short_pages(items):
-  # also build /data/shortlinks.json for reference (optional)
-  sl = {}
-  for it in items:
-    sl[it['id']] = {"url": it["url"], "title": it["title"], "image": it.get("image")}
-    ogimg = it.get("image") or "https://ptdtoday.com/assets/og-default.png"
-    html = f"""<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>{it['title']} | PTD Today</title>
-<meta http-equiv="refresh" content="0;url={it['url']}">
-<link rel="canonical" href="{it['url']}">
-<meta property="og:title" content="{it['title']}">
-<meta property="og:description" content="Read this on PTD Today, then continue to the original source.">
-<meta property="og:image" content="{ogimg}">
-<meta property="og:type" content="article">
-<meta property="og:url" content="https://ptdtoday.com/s/{it['id']}.html">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{it['title']}">
-<meta name="twitter:image" content="{ogimg}">
-</head>
-<body>
-<p>Redirecting to the original story… <a href="{it['url']}">Continue</a></p>
-</body>
-</html>"""
-    with open(os.path.join(SHORT_DIR, f"{it['id']}.html"), "w", encoding="utf-8") as f:
-      f.write(html)
-  with open(os.path.join(OUT_DIR, "shortlinks.json"), "w", encoding="utf-8") as f:
-    json.dump(sl, f, ensure_ascii=False, indent=2)
+def build_short_page(tpl:str, item:dict):
+    html = tpl
+    html = html.replace("%%TITLE%%", item['title'])
+    html = html.replace("%%DESC%%", item.get('summary','') or "PTD Today")
+    html = html.replace("%%IMG%%", item.get('image') or DEFAULT_IMG)
+    html = html.replace("%%CANON%%", f"https://ptdtoday.com/s/{item['id']}.html")
+    html = html.replace("%%ORIG%%", item['url'])
+    return html
 
 def main():
-  items = fetch_all()
-  # hard keep: last 400 items (enough for 7d window typically)
-  items = items[:400]
-  write_json(items)
-  build_short_pages(items)
-  print(f"OK — {len(items)} items")
+    print("Fetching feeds...")
+    seen = set()
+    items = []
+    for url, cat in SOURCES:
+        items.extend(fetch_feed(url, cat))
+
+    # de-dup by canonical url host+title
+    dedup = {}
+    for it in items:
+        k = (re.sub(r'https?://(www\.)?','', it['url']).split('/')[0].lower(), it['title'].lower())
+        if k in dedup: 
+            continue
+        it['id'] = make_id(it['url'])
+        it['score'] = score(it)
+        dedup[k] = it
+    items = list(dedup.values())
+
+    # Keep last ~150 by time
+    items.sort(key=lambda x: x['published'], reverse=True)
+    items = items[:150]
+
+    # write JSON
+    out = {"updated": datetime.now(timezone.utc).isoformat(), "items": items}
+    with open(NEWS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+
+    # shortlink pages
+    with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
+        tpl = f.read()
+    for it in items:
+        path = os.path.join(S_DIR, f"{it['id']}.html")
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(build_short_page(tpl, it))
+
+    print(f"Wrote {len(items)} stories, news.json & short pages.")
+    return 0
 
 if __name__ == "__main__":
-  main()
+    raise SystemExit(main())
