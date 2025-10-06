@@ -5,119 +5,257 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PTD Today — Daily Energy & Power News</title>
 
-<!-- Social cards -->
+<!-- Canonical + social -->
+<link rel="canonical" href="https://ptdtoday.com/">
+<meta name="description" content="Daily Energy & Power News. First to Know. First to Lead.">
+<meta property="og:type" content="website">
 <meta property="og:title" content="PTD Today — Daily Energy & Power News">
 <meta property="og:description" content="First to Know. First to Lead.">
 <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
+<meta property="og:url" content="https://ptdtoday.com/">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#e8dfcf">
 
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='42' fill='%23d9cfbc'/%3E%3Ctext x='50%' y='58%' font-family='Georgia,serif' font-size='128' text-anchor='middle' fill='%23331'%3EPTD%3C/text%3E%3C/svg%3E">
+<!-- Favicon (SVG inline so it always exists) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='42' fill='%23d9cfbc'/%3E%3Ctext x='50%25' y='58%25' font-family='Georgia,serif' font-size='128' text-anchor='middle' fill='%23331'%3EPTD%3C/text%3E%3C/svg%3E">
 
 <style>
-  :root{
-    --bg:#e8dfcf; --ink:#231f1a; --muted:#6b6054;
-    --frame:#d8cdbb; --pill:#efe6d6; --white:#fff;
-    --link:#0b2c8a;
-  }
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
-  body{font-family:Georgia,serif;line-height:1.5}
-  .wrap{max-width:920px;margin:0 auto;padding:16px 14px 48px}
-  h1{font-size:56px;margin:24px 0 0}
-  .tag{margin:6px 0 22px;color:var(--muted);font-style:italic}
-  h2{margin:6px 0 18px;font-size:26px}
-  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 8px}
-  .tab{border-radius:999px;background:var(--pill);border:1px solid var(--frame);
-       padding:8px 14px;font-weight:700;cursor:pointer}
-  .tab.active{background:var(--white)}
-  .stamp{display:inline-block;margin:12px 0 16px;background:var(--white);
-         border-radius:999px;border:1px solid var(--frame);padding:8px 14px;color:var(--muted);
-         font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial}
-  .list{margin:8px 0}
-  .card{display:grid;grid-template-columns:120px 1fr;gap:16px;background:var(--white);
-        border:1px solid var(--frame);border-radius:8px;padding:14px;margin:18px 0}
-  .thumb{width:120px;height:90px;object-fit:cover;border-radius:6px;background:#f0eadf;border:1px solid #e5dac7}
-  .cat{font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:6px}
-  .title{font-size:26px;line-height:1.25;margin:0}
-  .title a{color:var(--link);text-decoration:none}
-  .meta{color:var(--muted);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;font-size:14px;margin-top:6px}
-  .btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-  .btn{border-radius:999px;padding:8px 14px;border:1px solid var(--frame);background:var(--white);cursor:pointer}
-  footer{margin-top:28px}
+/* ---------- Base / Newspaper look ---------- */
+:root{
+  --bg:#e8dfcf;         /* warm newsprint */
+  --ink:#231f1a;        /* serif ink */
+  --muted:#6b6054;      /* captions */
+  --line:#d8cdbb;       /* rules */
+  --pill:#efe6d6;       /* tab bg */
+  --paper:#fff;         /* card bg */
+  --link:#0b2c8a;       /* headline */
+  --accent:#3b82f6;     /* focus ring */
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink)}
+body{font-family:Georgia,serif;line-height:1.5; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+
+.wrap{max-width:980px;margin:0 auto;padding:16px 16px 56px}
+
+/* Masthead */
+h1{font-size:58px;margin:24px 0 2px}
+.kicker{color:var(--muted);font-style:italic;margin:0 0 14px}
+h2{font-size:28px;margin:0 0 10px}
+
+/* Tabs */
+.tabsWrap{position:sticky;top:0;background:linear-gradient(var(--bg),var(--bg));z-index:20;padding:8px 0 10px}
+.tabs{display:flex;flex-wrap:wrap;gap:10px}
+.tab{
+  border-radius:999px;background:var(--pill);border:1px solid var(--line);
+  padding:8px 13px;font-weight:700;cursor:pointer;user-select:none
+}
+.tab:focus{outline:3px solid var(--accent);outline-offset:2px}
+.tab.active{background:var(--paper)}
+
+/* Timestamp */
+.stamp{display:inline-block;margin:10px 0 14px;background:var(--paper);
+  border:1px solid var(--line);border-radius:999px;padding:8px 14px;
+  color:var(--muted);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+
+/* Cards */
+.list{margin:6px 0}
+.card{
+  display:grid;grid-template-columns:120px 1fr;gap:16px;background:var(--paper);
+  border:1px solid var(--line);border-radius:10px;padding:14px;margin:18px 0
+}
+.thumb{
+  width:120px;height:90px;border-radius:6px;border:1px solid #e7dcc8;
+  background:#f3ecdf;object-fit:cover
+}
+.sec{font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:2px 0 6px}
+.head{font-size:26px;line-height:1.25;margin:0}
+.head a{color:var(--link);text-decoration:none}
+.meta{color:var(--muted);font:14px/1.35 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;margin-top:6px}
+
+/* Buttons */
+.btns{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.btn{
+  border-radius:999px;padding:8px 14px;border:1px solid var(--line);
+  background:var(--paper);cursor:pointer;font:600 15px/1 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial
+}
+.btn[href]{text-decoration:none;color:inherit}
+.btn:focus{outline:3px solid var(--accent);outline-offset:2px}
+
+/* Share sheet */
+.sheetMask{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;z-index:60}
+.sheet{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(92vw,460px);background:var(--paper);border:1px solid var(--line);
+  border-radius:14px;padding:10px 12px;display:none;z-index:70}
+.sheet h3{margin:8px 8px 6px 8px;font:700 18px/1.2 Georgia,serif}
+.sheet .opt{display:block;width:100%;padding:12px;border:none;background:transparent;
+  text-align:left;border-top:1px solid var(--line);font:600 16px/1.1 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;cursor:pointer}
+.sheet .opt:first-of-type{border-top:none}
+.sheet .close{margin:8px;float:right}
+
+/* Helpers */
+.skel{opacity:.45}
+.centerNote{color:var(--muted);text-align:center;margin:24px 0}
+
+/* Responsive */
+@media (max-width:700px){
+  .card{grid-template-columns:100px 1fr}
+  .thumb{width:100px;height:75px}
+  .head{font-size:22px}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>PTD Today</h1>
-  <div class="tag">First to Know. First to Lead.</div>
-  <h2>Daily Energy &amp; Power News</h2>
+  <header>
+    <h1>PTD Today</h1>
+    <p class="kicker">First to Know. First to Lead.</p>
+    <h2>Daily Energy &amp; Power News</h2>
+  </header>
 
-  <nav class="tabs" id="tabs">
-    <button class="tab active" data-cat="all">All</button>
-    <button class="tab" data-cat="top">Top (7d)</button>
-    <button class="tab" data-cat="grid">Grid</button>
-    <button class="tab" data-cat="substations">Substations</button>
-    <button class="tab" data-cat="protection">Protection</button>
-    <button class="tab" data-cat="cables">Cables</button>
-    <button class="tab" data-cat="hvdc">HVDC</button>
-    <button class="tab" data-cat="renewables">Renewables</button>
-    <button class="tab" data-cat="policy">Policy</button>
-    <button class="tab" data-cat="ai">AI</button>
-    <button class="tab" data-cat="datacenters">Data Centers</button>
-  </nav>
+  <!-- Tabs -->
+  <div class="tabsWrap" role="navigation" aria-label="Sections">
+    <div class="tabs" id="tabs">
+      <button class="tab" data-cat="all" aria-selected="true">All</button>
+      <button class="tab" data-cat="top">Top (7d)</button>
+      <button class="tab" data-cat="grid">Grid</button>
+      <button class="tab" data-cat="substations">Substations</button>
+      <button class="tab" data-cat="protection">Protection</button>
+      <button class="tab" data-cat="cables">Cables</button>
+      <button class="tab" data-cat="hvdc">HVDC</button>
+      <button class="tab" data-cat="renewables">Renewables</button>
+      <button class="tab" data-cat="policy">Policy</button>
+      <button class="tab" data-cat="ai">AI</button>
+      <button class="tab" data-cat="datacenters">Data Centers</button>
+    </div>
+  </div>
 
-  <div class="stamp" id="stamp">Updated — …</div>
+  <!-- Timestamp -->
+  <div id="stamp" class="stamp">Updated — …</div>
+
+  <!-- News list -->
   <main id="list" class="list" aria-live="polite"></main>
 
-  <footer class="meta">© 2025 PTD Today • Headlines link to their original publishers.</footer>
+  <footer class="meta" style="margin-top:28px">
+    © 2025 PTD Today • Headlines link to their original publishers.
+  </footer>
+</div>
+
+<!-- Share sheet (custom, used if Web Share API unavailable) -->
+<div class="sheetMask" id="mask"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+  <button class="btn close" id="closeShare" aria-label="Close">close ×</button>
+  <h3 id="shareTitle">Share</h3>
+  <button class="opt" data-dest="linkedin">LinkedIn</button>
+  <button class="opt" data-dest="x">X (Twitter)</button>
+  <button class="opt" data-dest="facebook">Facebook</button>
+  <button class="opt" data-dest="reddit">Reddit</button>
+  <button class="opt" data-dest="copy">Copy link</button>
+  <button class="opt" data-dest="email">Email</button>
 </div>
 
 <script>
-const STAMP = document.getElementById('stamp');
+/* =======================
+   Utilities & constants
+   ======================= */
 const LIST  = document.getElementById('list');
 const TABS  = document.getElementById('tabs');
+const STAMP = document.getElementById('stamp');
+const SHEET = document.getElementById('sheet');
+const MASK  = document.getElementById('mask');
+const CLOSE = document.getElementById('closeShare');
 
-const DAY = 24*60*60*1000;
 const PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='120'%3E%3Crect width='100%25' height='100%25' fill='%23efe7d7'/%3E%3Cpath d='M15 90 L60 50 L85 72 L110 58 L145 90 Z' fill='%23d7c9b1'/%3E%3C/svg%3E";
+const DAY = 24*60*60*1000;
 
+function iso(dt){ return new Date(dt).toISOString().replace('.000Z','Z'); }
+function qs(name){ return new URL(location.href).searchParams.get(name)||''; }
+function setTab(cat){
+  TABS.querySelectorAll('.tab').forEach(b=>{
+    const act = b.dataset.cat===cat;
+    b.classList.toggle('active', act);
+    b.setAttribute('aria-selected', act?'true':'false');
+  });
+}
+
+/* Window rules we agreed */
 function windows(now=new Date()){
-  const d = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
-  const dow = d.getUTCDay(); // 0 Sun..6 Sat
+  const sod = new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()));
+  const dow = sod.getUTCDay(); // 0 Sun .. 6 Sat
   let allFrom;
-  if(dow===1){ allFrom = new Date(d.getTime()-3*DAY); }        // Mon => Fri..Mon
-  else if(dow===0){ allFrom = new Date(d.getTime()-2*DAY); }   // Sun => Fri..Sun
-  else { allFrom = new Date(d.getTime()-1*DAY); }              // others => yesterday..now
+  if(dow===1)      allFrom = new Date(sod.getTime()-3*DAY); // Monday => Fri..Mon
+  else if(dow===0) allFrom = new Date(sod.getTime()-2*DAY); // Sunday => Fri..Sun
+  else             allFrom = new Date(sod.getTime()-1*DAY); // others => yesterday..today
   return { all:[allFrom, now], top:[new Date(now.getTime()-7*DAY), now] };
 }
-function inWin(win, iso){ const t=new Date(iso); return t>=win[0] && t<=win[1]; }
+function inWin(win, dateISO){ const t=new Date(dateISO); return t>=win[0] && t<=win[1]; }
+
+/* =======================
+   Rendering
+   ======================= */
+function shareUrl(short){ // opens native if possible, falls back to sheet
+  if(navigator.share){
+    navigator.share({title:'PTD Today',url:short}).catch(()=>{});
+  }else{
+    SHEET.dataset.url = short;
+    MASK.style.display = SHEET.style.display = 'block';
+  }
+}
+MASK.onclick = CLOSE.onclick = ()=>{ MASK.style.display = SHEET.style.display = 'none'; };
+SHEET.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.opt'); if(!btn) return;
+  const url = SHEET.dataset.url;
+  const t = encodeURIComponent('PTD Today');
+  const shareLinks = {
+    linkedin : `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+    x        : `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${t}`,
+    facebook : `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+    reddit   : `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${t}`,
+    copy     : `copy`,
+    email    : `mailto:?subject=${t}&body=${encodeURIComponent(url)}`
+  };
+  const dest = shareLinks[btn.dataset.dest];
+  if(btn.dataset.dest==='copy'){
+    navigator.clipboard.writeText(url).then(()=>alert('Link copied')).catch(()=>{});
+  }else{
+    window.open(dest, '_blank', 'noopener,noreferrer');
+  }
+});
 
 function makeCard(it){
-  const a = document.createElement('article');
-  a.className = 'card';
+  const el = document.createElement('article');
+  el.className = 'card';
   const short = `https://ptdtoday.com/s/${it.id}.html`;
-  a.innerHTML = `
-    <img class="thumb" src="${it.image||PLACEHOLDER}" alt="">
+
+  el.innerHTML = `
+    <img class="thumb skel" loading="lazy" src="${PLACEHOLDER}" data-src="${it.image||''}" alt="">
     <div>
-      <div class="cat">${(it.category||'').toUpperCase()}</div>
-      <h3 class="title"><a href="${short}">${it.title}</a></h3>
-      <div class="meta">${(it.source||'')}${it.source?' • ':''}${new Date(it.published).toISOString().replace('.000Z','Z')}${it.score!=null?' • Score: '+(+it.score).toFixed(3):''}</div>
+      <div class="sec">${(it.category||'').toUpperCase()}</div>
+      <h3 class="head"><a href="${short}">${it.title}</a></h3>
+      <div class="meta">${it.source?it.source+' • ':''}${iso(it.published)}${it.score!=null?' • Score: '+(+it.score).toFixed(3):''}</div>
       <div class="btns">
         <a class="btn" href="${short}">Open on PTD Today</a>
         <a class="btn" href="${it.url}" rel="nofollow">Source</a>
-        <button class="btn" onclick="sharePTD('${short}','${it.title.replace(/'/g,'’')}')">Share</button>
+        <button class="btn" type="button">Share</button>
       </div>
     </div>`;
-  // hard fallback if the remote image 404s:
-  a.querySelector('.thumb').onerror = function(){ this.onerror=null; this.src=PLACEHOLDER; };
-  return a;
+
+  // lazy image + hard fallback
+  const img = el.querySelector('.thumb');
+  const real = img.dataset.src || '';
+  if(real){ const i = new Image(); i.onload=()=>{img.src=real; img.classList.remove('skel')}; i.onerror=()=>{img.src=PLACEHOLDER; img.classList.remove('skel')}; i.src=real; }
+  else { img.src = PLACEHOLDER; img.classList.remove('skel'); }
+
+  el.querySelector('.btns button').onclick = ()=>shareUrl(short);
+  return el;
 }
 
 function render(cat, items){
   const now = new Date();
   const win = windows(now);
-  let rows = items.slice();
 
-  if(cat==='top') rows = rows.filter(it=>inWin(win.top,it.published));
-  else if(cat==='all') rows = rows.filter(it=>inWin(win.all,it.published));
+  let rows = items.slice();
+  if(cat==='top') rows = rows.filter(it=>inWin(win.top, it.published));
+  else if(cat==='all') rows = rows.filter(it=>inWin(win.all, it.published));
   else rows = rows.filter(it=>{
     const want = (cat||'').toLowerCase();
     const hit  = (it.category||'').toLowerCase()===want;
@@ -126,31 +264,38 @@ function render(cat, items){
 
   LIST.innerHTML = '';
   if(rows.length===0){
-    const p=document.createElement('p'); p.className='meta'; p.textContent='No stories found.';
+    const p=document.createElement('p'); p.className='centerNote'; p.textContent='No stories found.';
     LIST.appendChild(p); return;
   }
   rows.forEach(it=>LIST.appendChild(makeCard(it)));
 }
 
-function sharePTD(url,title){
-  if(navigator.share){ navigator.share({title,url}).catch(()=>{}); }
-  else { navigator.clipboard.writeText(url); alert('Link copied: '+url); }
-}
-
+/* =======================
+   Boot
+   ======================= */
 (async function init(){
-  const res = await fetch('/data/news.json',{cache:'no-store'});
+  // deep-link tab: ?cat=grid or #grid
+  const url = new URL(location.href);
+  const deep = (url.searchParams.get('cat') || location.hash.replace('#','') || 'all').toLowerCase();
+
+  const res = await fetch('/data/news.json', {cache:'no-store'});
   const data = await res.json();
-  STAMP.textContent = 'Updated — ' + (data.updated||'');
   const items = (data.items||[]).slice().sort((a,b)=>new Date(b.published)-new Date(a.published));
 
-  render('all', items);
+  STAMP.textContent = 'Updated — ' + (data.updated || '');
 
+  setTab(deep);         // highlight correct tab
+  render(deep, items);  // first render
+
+  // tab switching
   TABS.addEventListener('click', ev=>{
-    const btn = ev.target.closest('.tab'); if(!btn) return;
-    TABS.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t===btn));
-    render(btn.dataset.cat, items);
+    const b = ev.target.closest('.tab'); if(!b) return;
+    const cat = b.dataset.cat;
+    setTab(cat);
+    history.replaceState(null,'',cat==='all' ? location.pathname : `?cat=${encodeURIComponent(cat)}`);
+    render(cat, items);
   });
 })();
 </script>
 </body>
-</html>
+</html> 
