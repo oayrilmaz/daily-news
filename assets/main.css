@@ -1,50 +1,56 @@
-/* WSJ-ish, centered, newspaper tint + small thumbs */
 :root{
-  --ink:#111; --ink2:#333; --line:#e6e0d6; --tint:#efe7db;
-  --link:#0b3d91; --link-visited:#4b2ca3;
-  --radius:14px;
-  font-size:16px;
+  --ink:#1a1a1a;
+  --muted:#6a6a6a;
+  --paper:#efe7d9;            /* soft newspaper */
+  --line:#e3d7c4;
+  --accent:#111;
+  --link:#1a0dab;
+  --btn:#eee6d6;
 }
 *{box-sizing:border-box}
+html,body{margin:0;padding:0}
 body{
-  margin:0;
-  color:var(--ink);
   font-family: Georgia, "Times New Roman", Times, serif;
-  background:
-    radial-gradient(1200px 600px at 50% -200px, rgba(0,0,0,.06), transparent),
-    linear-gradient(#f8f2e8, var(--tint));
+  color:var(--ink);
+  background:var(--paper);
+  -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:900px;margin:0 auto;padding:0 16px}
-.site{text-align:center;padding:28px 0 14px;border-bottom:1px solid var(--line)}
-.brand{font-size:48px;line-height:1;margin:8px 0 6px}
-.motto{margin:0 0 10px;color:#555;font-style:italic}
-.kicker{font-size:22px;margin:0 0 10px}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
 
-.tabs{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:10px 0 6px}
-.tabs button{background:none;border:none;padding:6px 2px;font:700 20px Georgia,serif;cursor:pointer}
-.tabs button.active{border-bottom:3px solid var(--ink)}
-.updated{margin:6px auto 14px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;display:inline-block;background:#fff6}
+.masthead{max-width:900px;margin:0 auto;padding:28px 16px 12px}
+.brand{font-size:56px;line-height:1;margin:0;text-align:center;letter-spacing:.5px}
+.motto{margin:6px 0 10px;text-align:center;color:var(--muted);font-style:italic}
+.tagline{margin:0 0 12px;text-align:center;font-weight:700}
 
-.stories{list-style:none;margin:0;padding:0}
-.story{display:flex;gap:14px;padding:18px 0;border-bottom:1px solid var(--line)}
-.story .thumb{flex:none;width:110px;height:82px;border-radius:10px;overflow:hidden;background:#f5efe4;border:1px solid var(--line);display:block}
+.tabs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 6px}
+.tabs button{background:transparent;border:0;padding:6px 12px;border-radius:24px;font-weight:700;cursor:pointer}
+.tabs button.active{outline:2px solid var(--ink);}
+
+.updated{max-width:900px;margin:14px auto 0;padding:6px 12px;border:1px solid var(--line);border-radius:28px;background:#f7f1e8;text-align:left}
+
+.list{max-width:900px;margin:12px auto;padding:0 12px}
+.empty{padding:28px 0;color:var(--muted);text-align:center}
+
+.story{display:flex;gap:16px;padding:18px 0;border-bottom:1px solid var(--line)}
+.story .thumb{flex:0 0 120px;height:86px;border:1px solid var(--line);background:#fff;display:block}
 .story img{width:100%;height:100%;object-fit:cover}
-.story .meta{flex:1;min-width:0}
-.story .t{display:block;color:var(--link);font-weight:700;font-size:24px;text-decoration:none}
-.story .t:visited{color:var(--link-visited)}
-.by{color:#555;margin:6px 0 10px}
-.by .cat{text-transform:uppercase;font-size:12px;letter-spacing:.05em}
-.actions{display:flex;gap:8px;flex-wrap:wrap}
-.btn{border:1px solid var(--ink);background:#fff;border-radius:999px;padding:6px 12px;cursor:pointer;text-decoration:none;color:var(--ink)}
-.btn.ghost{border-color:#aaa;color:#333}
-.btn.light{border-color:#ccc;background:#f8f8f8}
+.story .txt{flex:1 1 auto;min-width:0}
+.story .h{margin:0 0 6px;font-size:28px;line-height:1.2}
+.story .meta{color:var(--muted);font-size:14px;margin-bottom:10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{background:var(--btn);border:1px solid var(--line);padding:6px 12px;border-radius:28px;color:var(--ink);font-weight:700;cursor:pointer}
+.btn.outline{background:transparent}
 
-.foot{padding:20px 0 60px;color:#666}
+.footer{max-width:900px;margin:30px auto 40px;padding:10px 12px;color:var(--muted);border-top:1px solid var(--line);text-align:center}
 
-.article .wrap{padding:60px 16px}
-.empty{padding:30px 0;color:#666}
+/* Share sheet */
+dialog{border:0;background:transparent}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.sheet{background:#fff;border-radius:12px;max-width:420px;margin:auto;padding:8px;display:flex;flex-direction:column}
+.sheet-btn{border:0;background:#f5f5f5;color:#111;margin:6px 0;padding:12px;border-radius:10px;font-weight:700}
+.sheet-close{border:0;background:transparent;color:#666;margin-top:4px;padding:8px;font-size:14px}
 @media (max-width:640px){
-  .story{gap:10px}
-  .story .t{font-size:20px}
-  .tabs button{font-size:18px}
+  .brand{font-size:44px}
+  .story .h{font-size:22px}
 }
