@@ -1,27 +1,45 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PTD Today | Article</title>
-<link rel="stylesheet" href="assets/main.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>%%TITLE%% — PTD Today</title>
+
+  <!-- Open Graph for social previews -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PTD Today">
+  <meta property="og:title" content="%%TITLE%%">
+  <meta property="og:description" content="%%DESC%%">
+  <meta property="og:image" content="%%IMG%%">
+  <meta property="og:url" content="%%CANON%%">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="stylesheet" href="/assets/main.css">
 </head>
-<body class="article">
-  <main class="wrap">
-    <h1>PTD Today — Article</h1>
-    <p>This page takes a shortlink and forwards you to the original story, with proper social previews.</p>
-    <p><a id="to" href="#">Continue…</a></p>
+<body>
+  <div class="masthead" style="text-align:center">
+    <h1 class="brand">PTD Today</h1>
+    <p class="motto">First to Know. First to Lead.</p>
+    <h2 class="tagline">You’re opening a story via PTD Today.</h2>
+  </div>
+
+  <main class="list" style="max-width:760px">
+    <article class="story">
+      <div class="thumb" style="flex:0 0 180px;height:120px">
+        <img src="%%IMG%%" referrerpolicy="no-referrer" alt="">
+      </div>
+      <div class="txt">
+        <h3 class="h" style="margin:0 0 10px;font-size:30px"><a href="%%ORIG%%">%%TITLE%%</a></h3>
+        <p>We’ll take you to the source:</p>
+        <div class="actions">
+          <a class="btn" href="%%ORIG%%">Continue to original article</a>
+          <a class="btn outline" href="/">Back to PTD Today</a>
+        </div>
+      </div>
+    </article>
   </main>
-<script>
-const u = new URLSearchParams(location.search).get('u');
-if (u) {
-  const a = document.getElementById('to');
-  a.href = u;
-  a.textContent = 'Open original';
-  location.replace(u);
-} else {
-  document.querySelector('main').insertAdjacentHTML('beforeend','<p>Missing <code>?u=</code> parameter.</p>');
-}
-</script>
+
+  <!-- Safety redirect after a short delay -->
+  <script>setTimeout(()=>{location.replace("%%ORIG%%")},1200)</script>
 </body>
 </html>
