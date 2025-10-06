@@ -1,108 +1,141 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, os, time, hashlib, re
+"""
+PTD Today feed builder (safe version)
+- NEVER wipes existing news when collectors return 0 items
+- Keeps the "All" (today-style) and "Top (7d)" windows we agreed
+- Maintains short links for items in the current "All" window
+- Trims the stored feed to ~30 days so the JSON stays small
+"""
+
+from __future__ import annotations
+import json, os, re, hashlib
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
-DATA_DIR = "data"
-NEWS_JSON = os.path.join(DATA_DIR, "news.json")
-SHORTS_JSON = os.path.join(DATA_DIR, "shortlinks.json")
-SHORT_PAGE = "s"  # folder with short HTML files
-
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(SHORT_PAGE, exist_ok=True)
-
 # ----------------------------
-# 1) WINDOWS WE AGREED
+# Paths / constants
 # ----------------------------
 UTC = timezone.utc
+ROOT = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(ROOT, "data")
+NEWS_JSON = os.path.join(DATA_DIR, "news.json")
+SHORTS_JSON = os.path.join(DATA_DIR, "shortlinks.json")
+SHORT_DIR = os.path.join(ROOT, "s")
+SHORT_BASE = "https://ptdtoday.com/s/"
+RETENTION_DAYS = 30  # keep last 30d in news.json
 
-def start_of_day_utc(dt: datetime) -> datetime:
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(SHORT_DIR, exist_ok=True)
+
+# ----------------------------
+# Time helpers + windows
+# ----------------------------
+def now_utc() -> datetime:
+    return datetime.now(UTC)
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+def start_of_day(dt: datetime) -> datetime:
     return datetime(dt.year, dt.month, dt.day, tzinfo=UTC)
 
-def add_days(dt: datetime, n: int) -> datetime:
-    return dt + timedelta(days=n)
+def window_all(today: datetime) -> tuple[datetime, datetime]:
+    """Dynamic 'All' window we agreed:
+       Mon  -> Fri..Mon
+       Sun  -> Fri..Sun
+       else -> yesterday..now"""
+    sod = start_of_day(today)
+    dow = sod.weekday()  # Mon=0..Sun=6
+    if dow == 0:                       # Monday
+        return (sod - timedelta(days=3), today)  # Fri..Mon
+    if dow == 6:                       # Sunday
+        return (sod - timedelta(days=2), today)  # Fri..Sun
+    return (sod - timedelta(days=1), today)      # Yesterday..now
 
-def window_for_all(now: datetime) -> tuple[datetime, datetime]:
-    """Dynamic 'today' window by day-of-week.
-       Mon -> Fri..Mon (3 days)
-       Tue/Wed/Thu/Fri/Sat -> previous day..now
-       Sun -> Fri..Sun (2 days back)"""
-    today = start_of_day_utc(now)
-    dow = today.weekday()  # Mon=0 .. Sun=6
-    if dow == 0:  # Monday
-        return (add_days(today, -3), now)     # Fri..Mon
-    elif dow == 6:  # Sunday
-        return (add_days(today, -2), now)     # Fri..Sun
-    else:
-        return (add_days(today, -1), now)     # prev day..now
+def window_7d(today: datetime) -> tuple[datetime, datetime]:
+    return (today - timedelta(days=7), today)
 
-def window_for_7d(now: datetime) -> tuple[datetime, datetime]:
-    return (now - timedelta(days=7), now)
-
-# ----------------------------
-# 2) SCRAPE / COLLECT
-# ----------------------------
-# Replace this with your real collectors (Bing/Google, Benzinga, DCD, UtilityDive, Hitachi Energy, GE Vernova, Siemens Energy, Schneider, etc.)
-# Each item must provide at least:
-#   id (stable), title, url, image, category, published (ISO), score (float)
-def collect_items() -> list[dict]:
-    # TODO: your real scrapers
-    # This placeholder returns an empty list so only filtering/window logic runs.
-    return []
-
-# ----------------------------
-# 3) NORMALIZE + SAFETY
-# ----------------------------
-def safe_id(s: str) -> str:
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:6]
-
-def clamp_host(u: str) -> str:
+def within(window: tuple[datetime, datetime], when_iso: str) -> bool:
     try:
-        host = urlparse(u).netloc
-        return re.sub(r"^www\.", "", host)
-    except Exception:
-        return ""
-
-def as_iso(dt: datetime) -> str:
-    return dt.astimezone(UTC).isoformat().replace("+00:00","Z")
-
-def ensure_item_shape(it: dict) -> dict:
-    # fill required keys so index.html never breaks
-    it = dict(it)
-    it["id"] = it.get("id") or safe_id(it.get("url","")+it.get("title",""))
-    it["title"] = (it.get("title") or "").strip() or "Untitled"
-    it["url"] = it.get("url") or ""
-    it["image"] = it.get("image") or "assets/blank.png"
-    it["category"] = (it.get("category") or "grid").lower()
-    # published -> ISO
-    pub = it.get("published")
-    if isinstance(pub, str):
-        try:
-            it["published"] = datetime.fromisoformat(pub.replace("Z","+00:00")).astimezone(UTC).isoformat().replace("+00:00","Z")
-        except Exception:
-            it["published"] = as_iso(datetime.now(UTC))
-    elif isinstance(pub, datetime):
-        it["published"] = as_iso(pub)
-    else:
-        it["published"] = as_iso(datetime.now(UTC))
-    # score
-    try:
-        it["score"] = float(it.get("score", 0.0))
-    except Exception:
-        it["score"] = 0.0
-    return it
-
-def within(window: tuple[datetime, datetime], iso: str) -> bool:
-    try:
-        t = datetime.fromisoformat(iso.replace("Z","+00:00")).astimezone(UTC)
+        t = datetime.fromisoformat(when_iso.replace("Z", "+00:00")).astimezone(UTC)
         return window[0] <= t <= window[1]
     except Exception:
         return False
 
 # ----------------------------
-# 4) SHORT LINK PAGES
+# Storage helpers
+# ----------------------------
+def load_json(path: str, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+def save_json(path: str, obj):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+# ----------------------------
+# Item normalization
+# ----------------------------
+def small_id(seed: str) -> str:
+    return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:6]
+
+def host_of(u: str) -> str:
+    try:
+        h = urlparse(u).netloc
+        return re.sub(r"^www\.", "", h)
+    except Exception:
+        return ""
+
+def normalize(it: dict) -> dict:
+    """Ensure minimal schema always exists."""
+    out = dict(it)
+    out["title"] = (out.get("title") or "").strip() or "Untitled"
+    out["url"] = out.get("url") or ""
+    out["image"] = out.get("image") or "assets/blank.png"
+    out["category"] = (out.get("category") or "grid").lower()
+
+    # id
+    out["id"] = out.get("id") or small_id(out["url"] + out["title"])
+
+    # published -> ISO UTC
+    pub = out.get("published")
+    if isinstance(pub, str):
+        try:
+            dt = datetime.fromisoformat(pub.replace("Z", "+00:00")).astimezone(UTC)
+        except Exception:
+            dt = now_utc()
+    elif isinstance(pub, datetime):
+        dt = pub.astimezone(UTC)
+    else:
+        dt = now_utc()
+    out["published"] = iso(dt)
+
+    # score
+    try:
+        out["score"] = float(out.get("score", 0.0))
+    except Exception:
+        out["score"] = 0.0
+
+    return out
+
+# ----------------------------
+# Collectors (plug your scrapers here)
+# ----------------------------
+def collect_items() -> list[dict]:
+    """
+    TODO: Replace with your real Bing/Google + direct sources collectors
+    (DCD, UtilityDive, GE Vernova, Hitachi Energy, Siemens Energy, Schneider, etc.)
+    Return a list of dicts with at least: title, url, image, category, published, score.
+    """
+    return []  # returning [] will no longer wipe the site
+
+# ----------------------------
+# Short links
 # ----------------------------
 SHORT_TMPL = """<!doctype html><meta charset="utf-8">
 <meta property="og:title" content="{title}">
@@ -114,75 +147,85 @@ SHORT_TMPL = """<!doctype html><meta charset="utf-8">
 <script>location.replace("{orig}");</script>
 """
 
-def write_short_page(short_id: str, item: dict, short_url: str):
+def write_short(short_id: str, item: dict, short_url: str):
     html = SHORT_TMPL.format(
-        title = item["title"],
-        desc  = clamp_host(item["url"]),
-        image = item["image"],
-        short = short_url,
-        orig  = item["url"],
+        title=item["title"],
+        desc=host_of(item["url"]),
+        image=item["image"],
+        short=short_url,
+        orig=item["url"],
     )
-    with open(os.path.join(SHORT_PAGE, f"{short_id}.html"), "w", encoding="utf-8") as f:
+    with open(os.path.join(SHORT_DIR, f"{short_id}.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
 # ----------------------------
-# 5) MAIN
+# Main
 # ----------------------------
 def main():
-    now = datetime.now(UTC)
+    now = now_utc()
 
-    # 5.1 collect & normalize
-    raw = collect_items()
-    items = [ensure_item_shape(it) for it in raw]
+    # 1) Load existing news (so we never lose it)
+    existing = load_json(NEWS_JSON, {"updated": iso(now), "items": []})
+    old_items = existing.get("items", [])
+    # map by (url or id) to merge later
+    by_key = {}
+    for it in old_items:
+        k = (it.get("url") or "") or it.get("id")
+        if k:
+            by_key[k] = it
 
-    # 5.2 filter windows
-    win_all = window_for_all(now)
-    win_7d  = window_for_7d(now)
+    # 2) Collect new items and normalize
+    fresh_raw = collect_items()
+    fresh = [normalize(it) for it in fresh_raw]
 
-    # “All” window (today logic)
-    items_all = [it for it in items if within(win_all, it["published"])]
-    # keep everything in news.json; index.html already filters. But
-    # to guarantee presence for today/past week even if collectors return wider sets,
-    # we *also* drop anything older than 30d to keep file light:
-    cutoff_30 = now - timedelta(days=30)
-    items = [it for it in items if within((cutoff_30, now), it["published"])]
+    # 3) If collectors returned nothing, keep existing items (only tick updated)
+    if not fresh:
+        out = {"updated": iso(now), "items": old_items}
+        save_json(NEWS_JSON, out)
+        print(f"[SAFE] No new items collected. Kept {len(old_items)} existing stories.")
+        # keep shortlinks as-is
+        return
 
-    # 5.3 sort default (newest first)
-    items.sort(key=lambda it: it["published"], reverse=True)
+    # 4) Merge old + new (dedupe by URL falling back to id)
+    for it in fresh:
+        k = (it.get("url") or "") or it.get("id")
+        if not k:
+            k = it["id"]
+        by_key[k] = it  # prefer newest version
 
-    # 5.4 write short links (only for the “current displayable” ones to limit churn)
-    with open(SHORTS_JSON, "r", encoding="utf-8") as f:
-        short_map = json.load(f)
-    # if file empty/invalid:
-    if not isinstance(short_map, dict):
-        short_map = {}
+    merged = list(by_key.values())
 
-    base = "https://ptdtoday.com/s/"
+    # 5) Trim to retention
+    cutoff = now - timedelta(days=RETENTION_DAYS)
+    merged = [
+        it for it in merged
+        if within((cutoff, now), it.get("published", iso(now)))
+    ]
+
+    # 6) Sort newest first
+    merged.sort(key=lambda x: x.get("published", ""), reverse=True)
+
+    # 7) Ensure short-links for items in current "All" window
+    win_all = window_all(now)
+    short_map = load_json(SHORTS_JSON, {})
     changed = False
-    for it in items_all:  # ensure “today window” items always have short links
-        sid = it["id"]
-        if sid not in short_map:
-            short_map[sid] = base + f"{sid}.html"
-            changed = True
-        write_short_page(sid, it, short_map[sid])
-
+    for it in merged:
+        if within(win_all, it["published"]):
+            sid = it["id"]
+            if sid not in short_map:
+                short_map[sid] = SHORT_BASE + f"{sid}.html"
+                changed = True
+            write_short(sid, it, short_map[sid])
     if changed:
-        with open(SHORTS_JSON, "w", encoding="utf-8") as f:
-            json.dump(short_map, f, ensure_ascii=False, indent=2)
+        save_json(SHORTS_JSON, short_map)
 
-    # 5.5 write news.json
-    out = {
-        "updated": as_iso(now),
-        "items": items
-    }
-    with open(NEWS_JSON, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
-
-    print(f"Wrote {len(items)} items. Today-window: {len(items_all)}")
+    # 8) Write news.json
+    out = {"updated": iso(now), "items": merged}
+    save_json(NEWS_JSON, out)
+    print(f"Wrote {len(merged)} stories (merged {len(fresh)} new, kept {len(old_items)} old).")
 
 if __name__ == "__main__":
-    # ensure shortlinks.json exists
+    # Ensure shortlinks file exists
     if not os.path.exists(SHORTS_JSON):
-        with open(SHORTS_JSON, "w", encoding="utf-8") as f:
-            f.write("{}")
+        save_json(SHORTS_JSON, {})
     main()
