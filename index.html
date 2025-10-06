@@ -1,176 +1,189 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PTD Today — Daily Energy & Power News</title>
-<link rel="icon" href="data:,">
-<link rel="preload" href="assets/main.css" as="style">
-<link rel="stylesheet" href="assets/main.css">
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>PTD Today — Daily Energy & Power News</title>
 
-<!-- Social preview for the home page -->
-<meta property="og:title" content="PTD Today — Daily Energy & Power News">
-<meta property="og:description" content="First to Know. First to Lead. Curated daily headlines for grid, substations, protection & control, cables, HVDC, renewables, and policy.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://ptdtoday.com/">
-<meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="PTD Today — Daily Energy & Power News">
-<meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png">
+  <!-- OpenGraph defaults (page) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PTD Today">
+  <meta property="og:title" content="PTD Today — Daily Energy & Power News">
+  <meta property="og:description" content="First to Know. First to Lead. Curated energy, grid, HVDC, substations, protection & control, cables, policy and more.">
+  <meta property="og:image" content="/assets/og-default.png">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='48' x='6' font-size='48' font-family='Georgia,serif'%3EPTD%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/main.css">
 </head>
 <body>
-<header class="site">
-  <h1 class="brand">PTD Today</h1>
-  <p class="motto">First to Know. First to Lead.</p>
-  <h2 class="kicker">Daily Energy & Power News</h2>
+  <header class="masthead">
+    <h1 class="brand">PTD Today</h1>
+    <p class="motto">First to Know. First to Lead.</p>
+    <h2 class="tagline">Daily Energy &amp; Power News</h2>
+    <nav class="tabs" id="tabs">
+      <button data-tab="all" class="active">All</button>
+      <button data-tab="top">Top (7d)</button>
+      <button data-cat="grid">Grid</button>
+      <button data-cat="substations">Substations</button>
+      <button data-cat="protection">Protection</button>
+      <button data-cat="cables">Cables</button>
+      <button data-cat="hvdc">HVDC</button>
+      <button data-cat="renewables">Renewables</button>
+      <button data-cat="policy">Policy</button>
+    </nav>
+    <div id="updated" class="updated">Updated —</div>
+  </header>
 
-  <nav class="tabs" id="tabs">
-    <button data-tab="all" class="active">All</button>
-    <button data-tab="top">Top (7d)</button>
-    <button data-tab="Grid">Grid</button>
-    <button data-tab="Substations">Substations</button>
-    <button data-tab="Protection">Protection</button>
-    <button data-tab="Cables">Cables</button>
-    <button data-tab="HVDC">HVDC</button>
-    <button data-tab="Renewables">Renewables</button>
-    <button data-tab="Policy">Policy</button>
-  </nav>
+  <main id="list" class="list"></main>
 
-  <div class="updated" id="updated">Updated — …</div>
-</header>
+  <footer class="footer">
+    <p>© <span id="y"></span> PTD Today • Headlines link to their original publishers.</p>
+  </footer>
 
-<main class="wrap">
-  <ul id="list" class="stories" aria-live="polite"></ul>
-</main>
+  <!-- Share modal (fallback when Web Share API not available) -->
+  <dialog id="shareDlg">
+    <div class="sheet">
+      <button class="sheet-btn" data-share="linkedin">LinkedIn</button>
+      <button class="sheet-btn" data-share="x">X (Twitter)</button>
+      <button class="sheet-btn" data-share="facebook">Facebook</button>
+      <button class="sheet-btn" data-share="reddit">Reddit</button>
+      <button class="sheet-btn" id="copyBtn">Copy link</button>
+      <button class="sheet-btn" id="emailBtn">Email</button>
+      <button class="sheet-close">close ×</button>
+    </div>
+  </dialog>
 
-<footer class="foot wrap">
-  <p>© <span id="year"></span> PTD Today • Headlines link to their original publishers.</p>
-</footer>
+  <script>
+  // ------------ Helpers
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const fmt = d => new Date(d).toISOString().replace('Z','+00:00');
 
-<script>
-const $ = sel => document.querySelector(sel);
-const list = $('#list');
-const updatedEl = $('#updated');
-$('#year').textContent = new Date().getFullYear();
+  function startOfUTC(date){ const d=new Date(date); d.setUTCHours(0,0,0,0); return d; }
+  function addDaysUTC(date, n){ const d=new Date(date); d.setUTCDate(d.getUTCDate()+n); return d; }
 
-// Weekend/weekday logic for the "Today" (All tab) view
-function inTodayWindow(iso){
-  const d = new Date();
-  const dow = d.getDay(); // 0 Sun, 6 Sat
-  const pub = new Date(iso);
-
-  // start/end defaults = today 00:00..23:59
-  let start = new Date(d); start.setHours(0,0,0,0);
-  let end   = new Date(d); end.setHours(23,59,59,999);
-
-  // Your rules:
-  // Sat: Fri + Sat
-  // Sun: Fri + Sat + Sun
-  // Mon: Fri + Sat + Sun + Mon
-  // Tue+: the day itself (Tue shows Mon+Tue per earlier, but we keep it “today only” to avoid double counting in Top 7d)
-  if (dow === 6) { // Sat
-    start.setDate(start.getDate()-1);
-  } else if (dow === 0) { // Sun
-    start.setDate(start.getDate()-2);
-  } else if (dow === 1) { // Mon
-    start.setDate(start.getDate()-3);
+  // Weekend / weekday window requested:
+  // Sat => Fri+Sat, Sun => Fri+Sat+Sun, Mon => Fri..Mon, Tue => Mon+Tue, else => today only
+  function todayWindow(now=new Date()){
+    const day = now.getUTCDay();         // 0 Sun ... 6 Sat
+    const today0 = startOfUTC(now);
+    const mon0 = addDaysUTC(today0, -((day+6)%7));          // most recent Monday 00:00
+    const fri0 = addDaysUTC(mon0, 4);                        // that week's Friday 00:00
+    let from = today0, to = addDaysUTC(today0, 1);          // default: today 00:00..tomorrow 00:00
+    if (day === 6) { from = fri0; to = addDaysUTC(today0, 1); }                 // Sat
+    else if (day === 0) { from = fri0; to = addDaysUTC(today0, 1); }            // Sun
+    else if (day === 1) { from = fri0; to = addDaysUTC(today0, 1); }            // Mon
+    else if (day === 2) { from = mon0; to = addDaysUTC(today0, 1); }            // Tue (Mon+Tue)
+    return {from, to};
   }
-  return pub >= start && pub <= end;
-}
+  function weekWindow(now=new Date()){ return {from:addDaysUTC(now,-7), to: addDaysUTC(now,1)}; }
 
-function isTop7d(iso){
-  const pub = new Date(iso);
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-7);
-  return pub >= cutoff;
-}
+  function inRange(ts, range){ const t=new Date(ts); return t>=range.from && t<range.to; }
 
-function storyHTML(it){
-  const short = `s/${it.id}.html`;
-  const img = it.image || 'assets/og-default.png';
-  const date = new Date(it.published);
-  const host = it.source || new URL(it.url).hostname;
+  function esc(s){ return (s||'').replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
-  return `
-<li class="story">
-  <a class="thumb" href="${short}" title="Open: ${it.title}">
-    <img loading="lazy" src="${img}" alt="" onerror="this.src='assets/og-default.png'">
-  </a>
-  <div class="meta">
-    <a class="t" href="${short}">${it.title}</a>
-    <div class="by">
-      <span class="cat">${it.category}</span>
-      <span>•</span>
-      <span class="src">${host}</span>
-      <span>•</span>
-      <time datetime="${it.published}">${date.toISOString().replace('T',' ').slice(0,16)}</time>
-      <span>• Score: ${it.score.toFixed(4)}</span>
-    </div>
-    <div class="actions">
-      <a class="btn" href="${short}">Open on PTD Today</a>
-      <a class="btn ghost" href="${it.url}" target="_blank" rel="noopener">Source</a>
-      <button class="btn light" data-share="${it.id}">Share</button>
-    </div>
-  </div>
-</li>`;
-}
+  // ------------ Page state
+  let DATA = {updated:null, items:[]};
+  let currentTab = 'all';  // 'all' | 'top'
+  let currentCat = '';     // '', or category key
+  let currentShareUrl = '';
 
-function attachShareHandlers(){
-  document.querySelectorAll('button[data-share]').forEach(btn=>{
-    btn.onclick = async () => {
-      const id = btn.getAttribute('data-share');
-      const url = new URL(location.href);
-      url.pathname = `/s/${id}.html`;
+  // ------------ Rendering
+  function updatedBadge(){
+    $('#updated').textContent = 'Updated — ' + (DATA.updated ? fmt(DATA.updated) : '—');
+  }
 
-      if (navigator.share) {
-        try {
-          await navigator.share({title:'PTD Today', text:'Read on PTD Today', url: url.toString()});
-          return;
-        } catch(e){}
-      }
-      // fallback
-      navigator.clipboard.writeText(url.toString()).then(()=>{
-        btn.textContent='Link copied';
-        setTimeout(()=>btn.textContent='Share',1200);
+  function filteredItems(){
+    const now = new Date();
+    const range = (currentTab==='top') ? weekWindow(now) : todayWindow(now);
+    return DATA.items
+      .filter(it => (!currentCat || it.category===currentCat) && inRange(it.published, range))
+      .sort((a,b)=> new Date(b.published)-new Date(a.published));
+  }
+
+  function storyHTML(it){
+    const sUrl = `${location.origin}/s/${it.id}.html`;
+    const img = it.image || '/assets/og-default.png';
+    return `
+      <article class="story">
+        <a class="thumb" href="${sUrl}" aria-label="Open ${esc(it.title)} on PTD Today">
+          <img src="${esc(img)}" loading="lazy" referrerpolicy="no-referrer" alt="">
+        </a>
+        <div class="txt">
+          <h3 class="h"><a href="${sUrl}">${esc(it.title)}</a></h3>
+          <div class="meta">${it.category.toUpperCase()} • ${esc(it.source)} • ${fmt(it.published)} • Score: ${(+it.score||0).toFixed(4)}</div>
+          <div class="actions">
+            <a class="btn" href="${sUrl}">Open on PTD Today</a>
+            <a class="btn" href="${esc(it.url)}" rel="noopener">Source</a>
+            <button class="btn outline share" data-url="${sUrl}" data-title="${esc(it.title)}">Share</button>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function render(){
+    updatedBadge();
+    const items = filteredItems();
+    $('#list').innerHTML = items.length ? items.map(storyHTML).join('') : `<div class="empty">No stories found.</div>`;
+    // hook share buttons
+    $$('.share').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        currentShareUrl = btn.dataset.url;
+        const title = btn.dataset.title;
+        if (navigator.share) {
+          navigator.share({title, url: currentShareUrl}).catch(()=>{});
+        } else {
+          $('#shareDlg').showModal();
+        }
       });
-    };
-  });
-}
-
-async function load(){
-  try{
-    const res = await fetch('data/news.json', {cache:'no-store'});
-    if(!res.ok) throw new Error('news.json missing');
-    const data = await res.json();
-    updatedEl.textContent = 'Updated — ' + data.updated;
-
-    const tabs = $('#tabs').querySelectorAll('button');
-    const render = (mode) => {
-      let items = data.items.slice(); // copy
-      if (mode === 'top') items = items.filter(it=>isTop7d(it.published));
-      if (['Grid','Substations','Protection','Cables','HVDC','Renewables','Policy'].includes(mode)) {
-        items = items.filter(it=>it.category===mode && isTop7d(it.published));
-      }
-      if (mode === 'all'){ items = items.filter(it=>inTodayWindow(it.published)); }
-
-      list.innerHTML = items.length ? items.map(storyHTML).join('') :
-        `<li class="empty">No stories found.</li>`;
-      attachShareHandlers();
-    };
-
-    tabs.forEach(b=>{
-      b.onclick = ()=>{
-        tabs.forEach(x=>x.classList.remove('active'));
-        b.classList.add('active');
-        render(b.dataset.tab);
-      };
     });
-
-    render('all'); // default view per your request (Today window)
-  }catch(e){
-    list.innerHTML = `<li class="empty">Tip: ensure <code>/data/news.json</code> exists with { updated, items:[...] }.</li>`;
   }
-}
-load();
-</script>
+
+  // ------------ Tabs/cats
+  $('#tabs').addEventListener('click', e=>{
+    const b = e.target.closest('button'); if(!b) return;
+    $$('#tabs button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    currentTab = b.dataset.tab || currentTab;
+    currentCat = b.dataset.cat || '';
+    render();
+  });
+
+  // ------------ Share sheet actions
+  $('#copyBtn').onclick = async() => {
+    try { await navigator.clipboard.writeText(currentShareUrl); } catch {}
+    $('#shareDlg').close();
+  };
+  $('#emailBtn').onclick = ()=>{
+    location.href = `mailto:?subject=${encodeURIComponent('PTD Today: ')}&body=${encodeURIComponent(currentShareUrl)}`;
+    $('#shareDlg').close();
+  };
+  $('#shareDlg').addEventListener('click', e=>{
+    if (e.target.classList.contains('sheet-close')) $('#shareDlg').close();
+    const t = e.target.dataset.share;
+    if (!t) return;
+    const u = encodeURIComponent(currentShareUrl);
+    const title = encodeURIComponent('PTD Today');
+    const social = {
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`,
+      x:        `https://twitter.com/intent/tweet?url=${u}&text=${title}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+      reddit:   `https://www.reddit.com/submit?url=${u}&title=${title}`
+    };
+    window.open(social[t], '_blank','noopener');
+    $('#shareDlg').close();
+  });
+
+  // ------------ Load data and start
+  (async function init(){
+    $('#y').textContent = new Date().getUTCFullYear();
+    try {
+      const res = await fetch('/data/news.json', {cache:'no-store'});
+      DATA = await res.json();
+    } catch(e){ DATA = {updated:null, items:[]}; }
+    render();
+  })();
+  </script>
 </body>
 </html>
