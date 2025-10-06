@@ -1,135 +1,188 @@
 #!/usr/bin/env python3
-import hashlib, json, os, re, sys
-from datetime import datetime, timezone, timedelta
-from html import unescape
+# -*- coding: utf-8 -*-
 
-import requests
-import feedparser
-from bs4 import BeautifulSoup
+import json, os, time, hashlib, re
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-
-DATA_DIR = os.path.join(ROOT, 'data')
-S_DIR = os.path.join(ROOT, 's')
-TEMPLATE_FILE = os.path.join(ROOT, 'article.html')
-NEWS_FILE = os.path.join(DATA_DIR, 'news.json')
-DEFAULT_IMG = "/assets/og-default.png"
+DATA_DIR = "data"
+NEWS_JSON = os.path.join(DATA_DIR, "news.json")
+SHORTS_JSON = os.path.join(DATA_DIR, "shortlinks.json")
+SHORT_PAGE = "s"  # folder with short HTML files
 
 os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(S_DIR, exist_ok=True)
+os.makedirs(SHORT_PAGE, exist_ok=True)
 
-# ------------- Sources (stable RSS where possible)
-SOURCES = [
-    # Data center & grid / policy
-    ("https://www.datacenterdynamics.com/en/rss.xml", "grid"),
-    ("https://www.utilitydive.com/feeds/news/", "grid"),
-    ("https://www.utilitydive.com/feeds/policy/", "policy"),
-    # Reuters Energy (broad)
-    ("https://feeds.reuters.com/reuters/USenergyNews", "grid"),
-    # Company newsrooms (best-effort; if 404, script continues)
-    ("https://press.siemens-energy.com/en/pressreleases.xml", "grid"),
-    ("https://www.hitachienergy.com/us/en/news/rss", "grid"),
-]
+# ----------------------------
+# 1) WINDOWS WE AGREED
+# ----------------------------
+UTC = timezone.utc
 
-def fetch_feed(url, category):
+def start_of_day_utc(dt: datetime) -> datetime:
+    return datetime(dt.year, dt.month, dt.day, tzinfo=UTC)
+
+def add_days(dt: datetime, n: int) -> datetime:
+    return dt + timedelta(days=n)
+
+def window_for_all(now: datetime) -> tuple[datetime, datetime]:
+    """Dynamic 'today' window by day-of-week.
+       Mon -> Fri..Mon (3 days)
+       Tue/Wed/Thu/Fri/Sat -> previous day..now
+       Sun -> Fri..Sun (2 days back)"""
+    today = start_of_day_utc(now)
+    dow = today.weekday()  # Mon=0 .. Sun=6
+    if dow == 0:  # Monday
+        return (add_days(today, -3), now)     # Fri..Mon
+    elif dow == 6:  # Sunday
+        return (add_days(today, -2), now)     # Fri..Sun
+    else:
+        return (add_days(today, -1), now)     # prev day..now
+
+def window_for_7d(now: datetime) -> tuple[datetime, datetime]:
+    return (now - timedelta(days=7), now)
+
+# ----------------------------
+# 2) SCRAPE / COLLECT
+# ----------------------------
+# Replace this with your real collectors (Bing/Google, Benzinga, DCD, UtilityDive, Hitachi Energy, GE Vernova, Siemens Energy, Schneider, etc.)
+# Each item must provide at least:
+#   id (stable), title, url, image, category, published (ISO), score (float)
+def collect_items() -> list[dict]:
+    # TODO: your real scrapers
+    # This placeholder returns an empty list so only filtering/window logic runs.
+    return []
+
+# ----------------------------
+# 3) NORMALIZE + SAFETY
+# ----------------------------
+def safe_id(s: str) -> str:
+    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:6]
+
+def clamp_host(u: str) -> str:
     try:
-        f = feedparser.parse(url)
-        items = []
-        for e in f.entries[:40]:
-            title = unescape(e.get('title','')).strip()
-            link = e.get('link') or e.get('id')
-            if not (title and link): 
-                continue
-            published = None
-            for key in ('published_parsed','updated_parsed'):
-                if e.get(key):
-                    published = datetime(*e[key][:6], tzinfo=timezone.utc)
-                    break
-            if not published:
-                published = datetime.now(tz=timezone.utc)
+        host = urlparse(u).netloc
+        return re.sub(r"^www\.", "", host)
+    except Exception:
+        return ""
 
-            # Try to find an image
-            img = None
-            if 'media_content' in e and e.media_content:
-                img = e.media_content[0].get('url')
-            if not img and 'media_thumbnail' in e and e.media_thumbnail:
-                img = e.media_thumbnail[0].get('url')
+def as_iso(dt: datetime) -> str:
+    return dt.astimezone(UTC).isoformat().replace("+00:00","Z")
 
-            # Sometimes image lives in summary
-            if not img:
-                summary = e.get('summary','')
-                m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', summary)
-                if m:
-                    img = m.group(1)
+def ensure_item_shape(it: dict) -> dict:
+    # fill required keys so index.html never breaks
+    it = dict(it)
+    it["id"] = it.get("id") or safe_id(it.get("url","")+it.get("title",""))
+    it["title"] = (it.get("title") or "").strip() or "Untitled"
+    it["url"] = it.get("url") or ""
+    it["image"] = it.get("image") or "assets/blank.png"
+    it["category"] = (it.get("category") or "grid").lower()
+    # published -> ISO
+    pub = it.get("published")
+    if isinstance(pub, str):
+        try:
+            it["published"] = datetime.fromisoformat(pub.replace("Z","+00:00")).astimezone(UTC).isoformat().replace("+00:00","Z")
+        except Exception:
+            it["published"] = as_iso(datetime.now(UTC))
+    elif isinstance(pub, datetime):
+        it["published"] = as_iso(pub)
+    else:
+        it["published"] = as_iso(datetime.now(UTC))
+    # score
+    try:
+        it["score"] = float(it.get("score", 0.0))
+    except Exception:
+        it["score"] = 0.0
+    return it
 
-            items.append({
-                "title": title,
-                "url": link,
-                "source": re.sub(r'^https?://(www\.)?','', (f.feed.get('link') or link)).split('/')[0],
-                "category": category,
-                "image": img or DEFAULT_IMG,
-                "published": published.isoformat(),
-                "summary": unescape(BeautifulSoup(e.get('summary',''), 'html.parser').get_text(' ', strip=True))[:280],
-            })
-        return items
-    except Exception as ex:
-        print(f"[warn] {url}: {ex}", file=sys.stderr)
-        return []
+def within(window: tuple[datetime, datetime], iso: str) -> bool:
+    try:
+        t = datetime.fromisoformat(iso.replace("Z","+00:00")).astimezone(UTC)
+        return window[0] <= t <= window[1]
+    except Exception:
+        return False
 
-def make_id(url: str) -> str:
-    return hashlib.sha1(url.encode('utf-8')).hexdigest()[:6]
+# ----------------------------
+# 4) SHORT LINK PAGES
+# ----------------------------
+SHORT_TMPL = """<!doctype html><meta charset="utf-8">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{desc}">
+<meta property="og:image" content="{image}">
+<meta property="og:url" content="{short}">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="{orig}">
+<script>location.replace("{orig}");</script>
+"""
 
-def score(item):
-    # lightweight score: recency + title length
-    age_h = max(1e-6, (datetime.now(timezone.utc) - datetime.fromisoformat(item['published'])).total_seconds()/3600)
-    return round(1.0/age_h + min(1.0, len(item['title'])/140.0), 4)
+def write_short_page(short_id: str, item: dict, short_url: str):
+    html = SHORT_TMPL.format(
+        title = item["title"],
+        desc  = clamp_host(item["url"]),
+        image = item["image"],
+        short = short_url,
+        orig  = item["url"],
+    )
+    with open(os.path.join(SHORT_PAGE, f"{short_id}.html"), "w", encoding="utf-8") as f:
+        f.write(html)
 
-def build_short_page(tpl:str, item:dict):
-    html = tpl
-    html = html.replace("%%TITLE%%", item['title'])
-    html = html.replace("%%DESC%%", item.get('summary','') or "PTD Today")
-    html = html.replace("%%IMG%%", item.get('image') or DEFAULT_IMG)
-    html = html.replace("%%CANON%%", f"https://ptdtoday.com/s/{item['id']}.html")
-    html = html.replace("%%ORIG%%", item['url'])
-    return html
-
+# ----------------------------
+# 5) MAIN
+# ----------------------------
 def main():
-    print("Fetching feeds...")
-    seen = set()
-    items = []
-    for url, cat in SOURCES:
-        items.extend(fetch_feed(url, cat))
+    now = datetime.now(UTC)
 
-    # de-dup by canonical url host+title
-    dedup = {}
-    for it in items:
-        k = (re.sub(r'https?://(www\.)?','', it['url']).split('/')[0].lower(), it['title'].lower())
-        if k in dedup: 
-            continue
-        it['id'] = make_id(it['url'])
-        it['score'] = score(it)
-        dedup[k] = it
-    items = list(dedup.values())
+    # 5.1 collect & normalize
+    raw = collect_items()
+    items = [ensure_item_shape(it) for it in raw]
 
-    # Keep last ~150 by time
-    items.sort(key=lambda x: x['published'], reverse=True)
-    items = items[:150]
+    # 5.2 filter windows
+    win_all = window_for_all(now)
+    win_7d  = window_for_7d(now)
 
-    # write JSON
-    out = {"updated": datetime.now(timezone.utc).isoformat(), "items": items}
-    with open(NEWS_FILE, 'w', encoding='utf-8') as f:
+    # “All” window (today logic)
+    items_all = [it for it in items if within(win_all, it["published"])]
+    # keep everything in news.json; index.html already filters. But
+    # to guarantee presence for today/past week even if collectors return wider sets,
+    # we *also* drop anything older than 30d to keep file light:
+    cutoff_30 = now - timedelta(days=30)
+    items = [it for it in items if within((cutoff_30, now), it["published"])]
+
+    # 5.3 sort default (newest first)
+    items.sort(key=lambda it: it["published"], reverse=True)
+
+    # 5.4 write short links (only for the “current displayable” ones to limit churn)
+    with open(SHORTS_JSON, "r", encoding="utf-8") as f:
+        short_map = json.load(f)
+    # if file empty/invalid:
+    if not isinstance(short_map, dict):
+        short_map = {}
+
+    base = "https://ptdtoday.com/s/"
+    changed = False
+    for it in items_all:  # ensure “today window” items always have short links
+        sid = it["id"]
+        if sid not in short_map:
+            short_map[sid] = base + f"{sid}.html"
+            changed = True
+        write_short_page(sid, it, short_map[sid])
+
+    if changed:
+        with open(SHORTS_JSON, "w", encoding="utf-8") as f:
+            json.dump(short_map, f, ensure_ascii=False, indent=2)
+
+    # 5.5 write news.json
+    out = {
+        "updated": as_iso(now),
+        "items": items
+    }
+    with open(NEWS_JSON, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
-    # shortlink pages
-    with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
-        tpl = f.read()
-    for it in items:
-        path = os.path.join(S_DIR, f"{it['id']}.html")
-        with open(path, 'w', encoding='utf-8') as f:
-            f.write(build_short_page(tpl, it))
-
-    print(f"Wrote {len(items)} stories, news.json & short pages.")
-    return 0
+    print(f"Wrote {len(items)} items. Today-window: {len(items_all)}")
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # ensure shortlinks.json exists
+    if not os.path.exists(SHORTS_JSON):
+        with open(SHORTS_JSON, "w", encoding="utf-8") as f:
+            f.write("{}")
+    main()
