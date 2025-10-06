@@ -2,319 +2,175 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PTD Today — Daily Energy & Power News</title>
-<link rel="icon" href="/assets/favicon.ico">
-<meta name="color-scheme" content="light only">
+<link rel="icon" href="data:,">
+<link rel="preload" href="assets/main.css" as="style">
+<link rel="stylesheet" href="assets/main.css">
 
-<!-- Basic WSJ-like typography + newspaper background -->
-<style>
-  :root{
-    --ink:#0b0b0b;
-    --muted:#6a6a6a;
-    --link:#1a0dab;
-    --paper:#efe9df;       /* light newsprint */
-    --card:#f7f2ea;        /* cards on paper */
-    --cap:#5b5b5b;
-  }
-  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);}
-  body{font-family: Georgia, 'Times New Roman', serif; line-height:1.46}
-
-  .wrap{max-width:960px;margin:0 auto;padding:24px 14px}
-  header{padding:8px 0 12px;border-bottom:1px solid #e0d8cc;margin-bottom:10px}
-  .brand{font-size:48px;font-weight:700;letter-spacing:.5px;margin:0;text-align:center}
-  .motto{margin:6px 0 0;text-align:center;color:var(--muted);font-style:italic}
-  .dek{font-size:26px;margin:22px 0 10px;text-align:center}
-
-  /* nav */
-  .tabs{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;margin:12px 0 8px}
-  .tabs a{color:var(--ink);text-decoration:none;font-weight:600}
-  .tabs a.active{text-decoration:underline 3px}
-  .subtabs{display:flex;gap:18px;justify-content:center;margin:6px 0 20px;flex-wrap:wrap}
-  .subtabs a{color:var(--ink);text-decoration:none;font-weight:700}
-  .subtabs a.active{text-decoration:underline 3px}
-
-  /* updated pill */
-  .pill{display:inline-block;background:#f0e7da;border:1px solid #e7ddcf;color:#333;
-        padding:8px 14px;border-radius:999px;font-size:14px}
-  .pillwrap{display:flex;justify-content:center;margin:6px 0 18px}
-
-  /* feed list */
-  .list{display:flex;flex-direction:column;gap:20px}
-  article{background:var(--card);border:1px solid #e4dacd;border-radius:6px;padding:14px}
-  .row{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:start}
-  .thumb{
-    width:96px;height:96px;border:1px solid #d9cfbf;border-radius:4px;
-    object-fit:cover;object-position:center;background:#fff;
-  }
-  .title{font-size:24px;line-height:1.2;margin:0 0 6px}
-  .meta{color:var(--cap);font-size:14px;margin:0 0 10px}
-  .btns{display:flex;gap:10px;flex-wrap:wrap}
-  .btn{
-    display:inline-block;border:1px solid #d9cfbf;background:#fff;padding:8px 12px;
-    border-radius:20px;font-size:14px;text-decoration:none;color:#111
-  }
-  .btn.secondary{background:#f7f2ea}
-  .score{margin-left:auto;color:#8a806f}
-  a{color:var(--link)}
-  footer{margin:28px 0 40px;color:var(--muted);text-align:center;font-size:14px}
-  @media (max-width:560px){
-    .brand{font-size:38px}
-    .dek{font-size:22px}
-    .row{grid-template-columns:84px 1fr}
-    .thumb{width:84px;height:84px}
-    .title{font-size:20px}
-  }
-
-  /* share modal (unchanged behaviour) */
-  dialog{border:none;border-radius:12px;padding:0;max-width:420px;width:92%}
-  .sheet{padding:8px 10px}
-  .sheet h3{margin:8px 8px 6px;font-size:16px}
-  .shareopt{display:block;width:100%;text-align:left;border:1px solid #e5dfd6;background:#fff;
-            padding:12px 14px;border-radius:8px;margin:8px 0;font-size:16px}
-  .closex{display:block;width:100%;border:none;background:#f5efe6;padding:10px;border-radius:8px;
-          margin-top:6px}
-</style>
+<!-- Social preview for the home page -->
+<meta property="og:title" content="PTD Today — Daily Energy & Power News">
+<meta property="og:description" content="First to Know. First to Lead. Curated daily headlines for grid, substations, protection & control, cables, HVDC, renewables, and policy.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ptdtoday.com/">
+<meta property="og:image" content="https://ptdtoday.com/assets/og-default.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PTD Today — Daily Energy & Power News">
+<meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png">
 </head>
 <body>
-  <div class="wrap">
+<header class="site">
+  <h1 class="brand">PTD Today</h1>
+  <p class="motto">First to Know. First to Lead.</p>
+  <h2 class="kicker">Daily Energy & Power News</h2>
 
-    <header>
-      <h1 class="brand">PTD Today</h1>
-      <p class="motto">First to Know. First to Lead.</p>
-      <h2 class="dek">Daily Energy &amp; Power News</h2>
-      <nav class="tabs" id="tabs">
-        <a href="#" data-tab="all" class="active">All</a>
-        <a href="#" data-tab="top7">Top (7d)</a>
-        <a href="#" data-tab="Grid">Grid</a>
-        <a href="#" data-tab="Substations">Substations</a>
-        <a href="#" data-tab="Protection">Protection</a>
-        <a href="#" data-tab="Cables">Cables</a>
-        <a href="#" data-tab="HVDC">HVDC</a>
-        <a href="#" data-tab="Renewables">Renewables</a>
-        <a href="#" data-tab="Policy">Policy</a>
-      </nav>
-      <div class="pillwrap">
-        <span class="pill" id="updated">Updated —</span>
-      </div>
-    </header>
+  <nav class="tabs" id="tabs">
+    <button data-tab="all" class="active">All</button>
+    <button data-tab="top">Top (7d)</button>
+    <button data-tab="Grid">Grid</button>
+    <button data-tab="Substations">Substations</button>
+    <button data-tab="Protection">Protection</button>
+    <button data-tab="Cables">Cables</button>
+    <button data-tab="HVDC">HVDC</button>
+    <button data-tab="Renewables">Renewables</button>
+    <button data-tab="Policy">Policy</button>
+  </nav>
 
-    <main id="main">
-      <div class="list" id="list"></div>
-    </main>
+  <div class="updated" id="updated">Updated — …</div>
+</header>
 
-    <footer>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</footer>
+<main class="wrap">
+  <ul id="list" class="stories" aria-live="polite"></ul>
+</main>
 
-    <!-- share dialog -->
-    <dialog id="shareDlg">
-      <div class="sheet">
-        <h3>Share</h3>
-        <button class="shareopt" data-act="ln">LinkedIn</button>
-        <button class="shareopt" data-act="x">X (Twitter)</button>
-        <button class="shareopt" data-act="fb">Facebook</button>
-        <button class="shareopt" data-act="reddit">Reddit</button>
-        <button class="shareopt" data-act="copy">Copy link</button>
-        <button class="shareopt" data-act="email">Email</button>
-        <button class="closex" id="closeShare">Close ×</button>
-      </div>
-    </dialog>
-
-  </div>
+<footer class="foot wrap">
+  <p>© <span id="year"></span> PTD Today • Headlines link to their original publishers.</p>
+</footer>
 
 <script>
-const DATA_URL = '/data/news.json';
-const SHORTS = {}; // not required here; links already embed id
-const df = new Intl.DateTimeFormat('en-US', {year:'numeric',month:'short',day:'2-digit'});
+const $ = sel => document.querySelector(sel);
+const list = $('#list');
+const updatedEl = $('#updated');
+$('#year').textContent = new Date().getFullYear();
 
-const listEl = document.getElementById('list');
-const updatedEl = document.getElementById('updated');
-document.getElementById('yr').textContent = new Date().getFullYear();
+// Weekend/weekday logic for the "Today" (All tab) view
+function inTodayWindow(iso){
+  const d = new Date();
+  const dow = d.getDay(); // 0 Sun, 6 Sat
+  const pub = new Date(iso);
 
-// ---- Today window logic restored exactly as requested ----
-function startOfDay(d){return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));}
-function addDays(d,n){const x = new Date(d); x.setUTCDate(x.getUTCDate()+n); return x;}
+  // start/end defaults = today 00:00..23:59
+  let start = new Date(d); start.setHours(0,0,0,0);
+  let end   = new Date(d); end.setHours(23,59,59,999);
 
-function todayRange() {
-  // UTC-based window
-  const now = new Date();
-  const dow = now.getUTCDay(); // 0 Sun .. 6 Sat
-  const today0 = startOfDay(now);
-  let from, to;
-
-  // window is inclusive [from, to] with day boundaries at UTC midnights
-  switch (dow) {
-    case 0: // Sun -> Fri..Sun
-      to = addDays(today0, 1);
-      from = addDays(today0, -2);
-      break;
-    case 6: // Sat -> Fri..Sat
-      to = addDays(today0, 1);
-      from = addDays(today0, -1);
-      from = addDays(from, -1); // ensure Fri..Sat (Fri start)
-      break;
-    case 1: // Mon -> Fri..Mon
-      to = addDays(today0, 1);
-      from = addDays(today0, -3);
-      break;
-    case 2: // Tue -> Mon..Tue
-      to = addDays(today0, 1);
-      from = addDays(today0, -1);
-      break;
-    case 3: // Wed -> Tue..Wed
-      to = addDays(today0, 1);
-      from = addDays(today0, -2);
-      break;
-    case 4: // Thu -> Wed..Thu
-      to = addDays(today0, 1);
-      from = addDays(today0, -2);
-      break;
-    case 5: // Fri -> Thu..Fri
-      to = addDays(today0, 1);
-      from = addDays(today0, -1);
-      break;
+  // Your rules:
+  // Sat: Fri + Sat
+  // Sun: Fri + Sat + Sun
+  // Mon: Fri + Sat + Sun + Mon
+  // Tue+: the day itself (Tue shows Mon+Tue per earlier, but we keep it “today only” to avoid double counting in Top 7d)
+  if (dow === 6) { // Sat
+    start.setDate(start.getDate()-1);
+  } else if (dow === 0) { // Sun
+    start.setDate(start.getDate()-2);
+  } else if (dow === 1) { // Mon
+    start.setDate(start.getDate()-3);
   }
-  return {from, to};
+  return pub >= start && pub <= end;
 }
 
-function withinRange(iso, from, to){
-  const t = new Date(iso);
-  return t >= from && t < to;
+function isTop7d(iso){
+  const pub = new Date(iso);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-7);
+  return pub >= cutoff;
 }
 
-function byScoreDesc(a,b){
-  if (b.score !== a.score) return b.score - a.score;
-  return new Date(b.published) - new Date(a.published);
+function storyHTML(it){
+  const short = `s/${it.id}.html`;
+  const img = it.image || 'assets/og-default.png';
+  const date = new Date(it.published);
+  const host = it.source || new URL(it.url).hostname;
+
+  return `
+<li class="story">
+  <a class="thumb" href="${short}" title="Open: ${it.title}">
+    <img loading="lazy" src="${img}" alt="" onerror="this.src='assets/og-default.png'">
+  </a>
+  <div class="meta">
+    <a class="t" href="${short}">${it.title}</a>
+    <div class="by">
+      <span class="cat">${it.category}</span>
+      <span>•</span>
+      <span class="src">${host}</span>
+      <span>•</span>
+      <time datetime="${it.published}">${date.toISOString().replace('T',' ').slice(0,16)}</time>
+      <span>• Score: ${it.score.toFixed(4)}</span>
+    </div>
+    <div class="actions">
+      <a class="btn" href="${short}">Open on PTD Today</a>
+      <a class="btn ghost" href="${it.url}" target="_blank" rel="noopener">Source</a>
+      <button class="btn light" data-share="${it.id}">Share</button>
+    </div>
+  </div>
+</li>`;
 }
 
-function byTimeDesc(a,b){
-  return new Date(b.published) - new Date(a.published);
-}
+function attachShareHandlers(){
+  document.querySelectorAll('button[data-share]').forEach(btn=>{
+    btn.onclick = async () => {
+      const id = btn.getAttribute('data-share');
+      const url = new URL(location.href);
+      url.pathname = `/s/${id}.html`;
 
-function fmtSource(it){
-  const d = new Date(it.published);
-  return `${it.category.toUpperCase()} • ${it.source.toLowerCase().replace(/\b\w/g,m=>m.toUpperCase())} • ${d.toISOString().replace('T',' ').replace('.000Z','')}`;
-}
-
-// share dialog helpers (unchanged behaviour)
-const dlg = document.getElementById('shareDlg');
-let shareLink = '';
-document.getElementById('closeShare').onclick = ()=>dlg.close();
-dlg.addEventListener('click', (e)=>{
-  if (e.target.dataset.act === 'ln') window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareLink)}`,'_blank');
-  if (e.target.dataset.act === 'x')  window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareLink)}`,'_blank');
-  if (e.target.dataset.act === 'fb') window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`,'_blank');
-  if (e.target.dataset.act === 'reddit') window.open(`https://www.reddit.com/submit?url=${encodeURIComponent(shareLink)}`,'_blank');
-  if (e.target.dataset.act === 'email') location.href = `mailto:?subject=PTD Today&body=${encodeURIComponent(shareLink)}`;
-  if (e.target.dataset.act === 'copy'){
-    navigator.clipboard.writeText(shareLink).then(()=>alert('Link copied:\n'+shareLink));
-  }
-});
-
-function render(items){
-  listEl.innerHTML = '';
-  if (!items.length){
-    const p = document.createElement('p'); p.textContent='No stories found.'; listEl.appendChild(p); return;
-  }
-  for (const it of items){
-    const a = document.createElement('article');
-
-    // shortlink we host
-    const sid = it.id || ( (it.original && it.original.length)? (new TextEncoder().encode(it.original).length) : '' ); // keep safe
-    const shortUrl = `${location.origin}/s/${it.id || it.short || ( (it.original && (window.crypto?.subtle)) ? '' : '' )}.html`;
-    const realShort = it.id ? `${location.origin}/s/${it.id}.html` : (it.short ? `${location.origin}${it.short}` : `${location.origin}/article.html?u=${encodeURIComponent(it.original)}&t=${encodeURIComponent(it.title)}&i=${encodeURIComponent(it.image||'')}`);
-
-    const row = document.createElement('div'); row.className='row';
-
-    const img = document.createElement('img');
-    img.className='thumb';
-    img.loading='lazy';
-    img.referrerPolicy='no-referrer';
-    img.src = (it.image && it.image.length) ? it.image : '/assets/og-default.png';
-    img.onerror = ()=>{ img.src='/assets/og-default.png'; };
-    row.appendChild(img);
-
-    const box = document.createElement('div');
-
-    const h = document.createElement('h3'); h.className='title';
-    const link = document.createElement('a');
-    link.href = realShort;
-    link.textContent = it.title;
-    h.appendChild(link);
-
-    const meta = document.createElement('p'); meta.className='meta';
-    meta.textContent = `${it.category} • ${ (new URL(it.original)).hostname } • ${new Date(it.published).toISOString().replace('T',' ').replace('.000Z','') } • Score: ${it.score}`;
-
-    const btns = document.createElement('div'); btns.className='btns';
-    const open = document.createElement('a'); open.className='btn'; open.textContent='Open on PTD Today'; open.href=realShort;
-    const src  = document.createElement('a'); src.className='btn secondary'; src.textContent='Source'; src.href=it.original; src.target='_blank'; src.rel='noopener';
-    const share= document.createElement('button'); share.className='btn secondary'; share.textContent='Share';
-    share.onclick = ()=>{
-      const u = realShort;
-      shareLink = u;
-      if (navigator.share){
-        navigator.share({title: it.title, url:u}).catch(()=>dlg.showModal());
-      }else{
-        dlg.showModal();
+      if (navigator.share) {
+        try {
+          await navigator.share({title:'PTD Today', text:'Read on PTD Today', url: url.toString()});
+          return;
+        } catch(e){}
       }
+      // fallback
+      navigator.clipboard.writeText(url.toString()).then(()=>{
+        btn.textContent='Link copied';
+        setTimeout(()=>btn.textContent='Share',1200);
+      });
+    };
+  });
+}
+
+async function load(){
+  try{
+    const res = await fetch('data/news.json', {cache:'no-store'});
+    if(!res.ok) throw new Error('news.json missing');
+    const data = await res.json();
+    updatedEl.textContent = 'Updated — ' + data.updated;
+
+    const tabs = $('#tabs').querySelectorAll('button');
+    const render = (mode) => {
+      let items = data.items.slice(); // copy
+      if (mode === 'top') items = items.filter(it=>isTop7d(it.published));
+      if (['Grid','Substations','Protection','Cables','HVDC','Renewables','Policy'].includes(mode)) {
+        items = items.filter(it=>it.category===mode && isTop7d(it.published));
+      }
+      if (mode === 'all'){ items = items.filter(it=>inTodayWindow(it.published)); }
+
+      list.innerHTML = items.length ? items.map(storyHTML).join('') :
+        `<li class="empty">No stories found.</li>`;
+      attachShareHandlers();
     };
 
-    btns.append(open, src, share);
+    tabs.forEach(b=>{
+      b.onclick = ()=>{
+        tabs.forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        render(b.dataset.tab);
+      };
+    });
 
-    box.append(h, meta, btns);
-    row.appendChild(box);
-    a.appendChild(row);
-    listEl.appendChild(a);
-  }
-}
-
-// tabs
-const tabsEl = document.getElementById('tabs');
-let currentTab = 'all';
-tabsEl.addEventListener('click', (e)=>{
-  const t = e.target.closest('a[data-tab]');
-  if (!t) return;
-  e.preventDefault();
-  for (const x of tabsEl.querySelectorAll('a')) x.classList.remove('active');
-  t.classList.add('active');
-  currentTab = t.dataset.tab;
-  applyFilter();
-});
-
-let DATA = {updated:'', items:[]};
-
-function applyFilter(){
-  const items = DATA.items.slice();
-  const upd = new Date(DATA.updated|| Date.now());
-  updatedEl.textContent = 'Updated — ' + upd.toISOString();
-
-  if (currentTab === 'top7'){
-    const sevenAgo = new Date(); sevenAgo.setUTCDate(sevenAgo.getUTCDate()-7);
-    const pick = items.filter(it => new Date(it.published) >= sevenAgo).sort(byScoreDesc);
-    render(pick);
-    return;
-  }
-
-  // “All” == Today window rules; a category tab also applies Today window
-  const rng = todayRange();
-  let out = items.filter(it => withinRange(it.published, rng.from, rng.to));
-  if (currentTab !== 'all'){
-    out = out.filter(it => (it.category||'').toLowerCase() === currentTab.toLowerCase());
-  }
-  out.sort(byTimeDesc);
-  render(out);
-}
-
-async function boot(){
-  try{
-    const r = await fetch(DATA_URL, {cache:'no-store'});
-    DATA = await r.json();
+    render('all'); // default view per your request (Today window)
   }catch(e){
-    DATA = {updated:new Date().toISOString(), items:[]};
+    list.innerHTML = `<li class="empty">Tip: ensure <code>/data/news.json</code> exists with { updated, items:[...] }.</li>`;
   }
-  applyFilter();
 }
-
-boot();
+load();
 </script>
 </body>
 </html>
