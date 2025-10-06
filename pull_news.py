@@ -1,230 +1,144 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-PTD Today – News Aggregator
----------------------------
-Pulls sector news from trustworthy RSS/Atom feeds, normalizes, ranks,
-writes:
-  - data/news.json
-  - data/shortlinks.json
-  - s/<id>.html shortlink pages (with OG tags)
-  
-Categories supported on the site:
-  Grid, Substations, Protection, Cables, HVDC, Renewables, Policy
-
-Notes:
-- Uses OpenGraph <meta> to discover thumbnail images.
-- Adds referrer-safe fallback image /assets/og-default.png at render time.
-- Ranking = simple recency + source weight; you can tune WEIGHTS below.
-"""
-
-import os, json, time, hashlib, re
+import hashlib, json, os, re
 from datetime import datetime, timedelta, timezone
-import requests
-from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 import feedparser
+import requests
 
-SITE = "https://ptdtoday.com"
-FALLBACK_IMG = "/assets/og-default.png"
-OUT_NEWS = "data/news.json"
-OUT_SHORTS = "data/shortlinks.json"
-SHORTS_DIR = "s"
+OUT_DIR = "data"
+SHORT_DIR = "s"
+os.makedirs(OUT_DIR, exist_ok=True)
+os.makedirs(SHORT_DIR, exist_ok=True)
 
-# ---------- Sources (add/remove freely) ----------
-# Each tuple: (feed_url, default_category, source_name)
+# --------- Feeds (stable, publicly available) ----------
 FEEDS = [
-    # Sector publishers
-    ("https://www.utilitydive.com/feeds/news/",           "Grid",         "Utility Dive"),
-    ("https://www.datacenterdynamics.com/en/rss/",        "Grid",         "DataCenterDynamics"),
-    ("https://www.reuters.com/finance/energy/rss",        "Policy",       "Reuters Energy"),
-    ("https://www.tdworld.com/rss",                       "Grid",         "T&D World"),
-    ("https://www.greentechmedia.com/rss",                "Renewables",   "Greentech Media"),  # if 410/redirects, it’ll just skip
-    
-    # Company newsrooms (some don’t publish often; still helpful)
-    ("https://www.gevernova.com/newsroom/rss.xml",        "Grid",         "GE Vernova"),
-    ("https://www.siemens-energy.com/global/en/newsroom/_jcr_content.rss.xml", "Grid", "Siemens Energy"),
-    ("https://www.hitachienergy.com/rss/news",            "Grid",         "Hitachi Energy"),
-    ("https://blog.schneider-electric.com/feed/",         "Protection",   "Schneider Electric"),
-    ("https://newsroom.xcelenergy.com/releases.rss",      "Policy",       "Xcel Energy"),
-    ("https://www.duke-energy.com/rss/newsreleases",      "Policy",       "Duke Energy"),
+  # Data Center Dynamics (great sector overlap)
+  "https://www.datacenterdynamics.com/en/rss/",
+  # Utility Dive – Grid and policy
+  "https://www.utilitydive.com/feeds/news/",
+  # Reuters Technology (AI & infra items)
+  "https://feeds.reuters.com/reuters/technologyNews",
+  # GE Vernova newsroom (RSS)
+  "https://www.gevernova.com/rss.xml",
+  # Hitachi Energy newsroom (RSS)
+  "https://www.hitachienergy.com/rss/news.xml",
+  # Siemens Energy newsroom
+  "https://press.siemens-energy.com/en/pressreleases/feed",
 ]
 
-# ---------- Optional heuristics to refine category ----------
-KEYMAP = [
-    (r"\bhvdc\b",               "HVDC"),
-    (r"\bsubstation|switchgear|breaker|relay\b", "Substations"),
-    (r"\bprotection|relaying|protection and control\b", "Protection"),
-    (r"\bcable|cabling|underground cable|subsea cable\b", "Cables"),
-    (r"\bwind|solar|renewable|pv\b",             "Renewables"),
-    (r"\bferc|doe|epa|policy|regulator|regulation\b", "Policy"),
-    (r"\bgrid|transmission|distribution|tsos?|dsos?\b", "Grid"),
+# Category heuristics
+CAT_RULES = [
+  ("HVDC", r"\bhvdc\b"),
+  ("Substations", r"\bsubstation"),
+  ("Protection", r"protection|relay|iec\s*61850|scada"),
+  ("Cables", r"cable|xlpe|subsea"),
+  ("Renewables", r"renewable|solar|wind|hydro|geothermal|ppa|offshore"),
+  ("Grid", r"grid|transmission|interconnector|substation|capacity|datacenter|data\s*center"),
+  ("Policy", r"ferc|regulator|policy|tariff|legislation|doe|ppa|incentive|permitting"),
 ]
 
-# ---------- Per-source weights for simple ranking ----------
-WEIGHTS = {
-    "Utility Dive": 1.1,
-    "DataCenterDynamics": 1.05,
-    "Reuters Energy": 1.05,
-    "T&D World": 1.0,
-    "GE Vernova": 0.95,
-    "Siemens Energy": 0.95,
-    "Hitachi Energy": 0.95,
-    "Schneider Electric": 0.9,
-    "Xcel Energy": 0.9,
-    "Duke Energy": 0.9,
-}
+def classify(title, summary, source):
+  text = f"{title} {summary} {source}".lower()
+  for cat, rx in CAT_RULES:
+    if re.search(rx, text):
+      return cat
+  return "Grid"
 
-# ---------- Helpers ----------
-def now_utc_iso():
-    return datetime.now(timezone.utc).isoformat()
+def best_image(entry):
+  # try media thumbnails first
+  if 'media_thumbnail' in entry and entry.media_thumbnail:
+    return entry.media_thumbnail[0]['url']
+  if 'media_content' in entry and entry.media_content:
+    return entry.media_content[0].get('url')
+  # look inside summary
+  if 'summary' in entry:
+    m = re.search(r'<img[^>]+src="([^"]+)"', entry.summary, re.I)
+    if m: return m.group(1)
+  return None
 
-def sha(s: str) -> str:
-    return hashlib.sha1(s.encode("utf-8")).hexdigest()[:6]
+def hash_id(url, title):
+  h = hashlib.sha1((url + '|' + title).encode('utf-8')).hexdigest()
+  return h[:7]  # short, good enough
 
-def pick_category(title: str, default_cat: str) -> str:
-    t = (title or "").lower()
-    for pat, cat in KEYMAP:
-        if re.search(pat, t):
-            return cat
-    return default_cat
+def fetch_all():
+  items = []
+  for url in FEEDS:
+    f = feedparser.parse(url)
+    for e in f.entries[:30]:
+      title = e.get('title','').strip()
+      link  = e.get('link','').strip()
+      if not title or not link:
+        continue
+      published = None
+      if 'published_parsed' in e and e.published_parsed:
+        published = datetime(*e.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+      else:
+        published = datetime.now(timezone.utc).isoformat()
+      src = urlparse(link).hostname or 'news'
+      img = best_image(e)
+      cat = classify(title, e.get('summary',''), src)
+      score = 0.25
+      # simple boost if keywords present
+      if re.search(r'\bhvdc|substation|interconnector|offshore|grid\b', title.lower()):
+        score += 0.2
+      item = {
+        "id": hash_id(link, title),
+        "title": title,
+        "url": link,
+        "image": img,
+        "published": published,
+        "source": src,
+        "category": cat,
+        "score": score
+      }
+      items.append(item)
+  # keep most recent first
+  items.sort(key=lambda x: x['published'], reverse=True)
+  return items
 
-def to_iso(parsed):
-    # Try to convert feedparser time to ISO
-    try:
-        dt = datetime(*parsed[:6], tzinfo=timezone.utc)
-        return dt.isoformat()
-    except Exception:
-        return now_utc_iso()
+def write_json(items):
+  updated = datetime.now(timezone.utc).isoformat()
+  with open(os.path.join(OUT_DIR, "news.json"), "w", encoding="utf-8") as f:
+    json.dump({"updated":updated, "items":items}, f, ensure_ascii=False, indent=2)
 
-def fetch_og(url: str) -> dict:
-    """Grab OG <meta> for image/title; return dict with 'image','title' best-effort."""
-    out = {"image": "", "title": ""}
-    try:
-        r = requests.get(url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
-        if r.ok:
-            soup = BeautifulSoup(r.text, "html.parser")
-            og_img = soup.find("meta", property="og:image")
-            og_title = soup.find("meta", property="og:title")
-            if og_img and og_img.get("content"):
-                out["image"] = og_img["content"]
-            if og_title and og_title.get("content"):
-                out["title"] = og_title["content"]
-    except Exception:
-        pass
-    return out
-
-def score_item(source: str, published_iso: str) -> float:
-    """Recency + weight."""
-    w = WEIGHTS.get(source, 1.0)
-    try:
-        age_h = (datetime.now(timezone.utc) - datetime.fromisoformat(published_iso)).total_seconds()/3600.0
-    except Exception:
-        age_h = 0.0
-    # fresher is higher; min guard to avoid division by zero
-    rec = 1.0 / (1.0 + max(0.1, age_h/24.0))
-    return round(rec * w, 4)
-
-# ---------- Shortlink page writer ----------
-REDIRECT_TEMPLATE = """<!doctype html>
+def build_short_pages(items):
+  # also build /data/shortlinks.json for reference (optional)
+  sl = {}
+  for it in items:
+    sl[it['id']] = {"url": it["url"], "title": it["title"], "image": it.get("image")}
+    ogimg = it.get("image") or "https://ptdtoday.com/assets/og-default.png"
+    html = f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>%%TITLE%% — PTD Today</title>
-<meta http-equiv="refresh" content="0; url=%%ORIG%%">
-<meta property="og:title" content="%%TITLE%%">
-<meta property="og:image" content="%%IMAGE%%">
-<meta property="og:description" content="Open on PTD Today, then continue to the original source.">
+<title>{it['title']} | PTD Today</title>
+<meta http-equiv="refresh" content="0;url={it['url']}">
+<link rel="canonical" href="{it['url']}">
+<meta property="og:title" content="{it['title']}">
+<meta property="og:description" content="Read this on PTD Today, then continue to the original source.">
+<meta property="og:image" content="{ogimg}">
 <meta property="og:type" content="article">
-<meta property="og:url" content="%%SELF%%">
+<meta property="og:url" content="https://ptdtoday.com/s/{it['id']}.html">
 <meta name="twitter:card" content="summary_large_image">
-<style>body{font-family:Georgia,serif;margin:40px;line-height:1.5}</style>
+<meta name="twitter:title" content="{it['title']}">
+<meta name="twitter:image" content="{ogimg}">
 </head>
 <body>
-  <p>Redirecting to the original article…</p>
-  <p><a href="%%ORIG%%">Continue</a></p>
+<p>Redirecting to the original story… <a href="{it['url']}">Continue</a></p>
 </body>
-</html>
-"""
+</html>"""
+    with open(os.path.join(SHORT_DIR, f"{it['id']}.html"), "w", encoding="utf-8") as f:
+      f.write(html)
+  with open(os.path.join(OUT_DIR, "shortlinks.json"), "w", encoding="utf-8") as f:
+    json.dump(sl, f, ensure_ascii=False, indent=2)
 
-def write_shortlink_page(short_id: str, original: str, title: str, image: str):
-    os.makedirs(SHORTS_DIR, exist_ok=True)
-    html = (REDIRECT_TEMPLATE
-            .replace("%%ORIG%%", original)
-            .replace("%%TITLE%%", title or "PTD Today")
-            .replace("%%IMAGE%%", image or (SITE + FALLBACK_IMG))
-            .replace("%%SELF%%", f"{SITE}/s/{short_id}.html"))
-    with open(os.path.join(SHORTS_DIR, f"{short_id}.html"), "w", encoding="utf-8") as f:
-        f.write(html)
-
-# ---------- Main ----------
 def main():
-    items = []
-    seen = set()
-
-    print("Fetching feeds...")
-    for feed_url, default_cat, source in FEEDS:
-        try:
-            fp = feedparser.parse(feed_url)
-        except Exception:
-            continue
-        for e in fp.entries[:40]:
-            link = e.get("link") or e.get("id") or ""
-            title = (e.get("title") or "").strip()
-            if not link or not title: 
-                continue
-            key = (link, title)
-            if key in seen: 
-                continue
-            seen.add(key)
-
-            # published
-            pub_iso = to_iso(e.get("published_parsed") or e.get("updated_parsed") or time.gmtime())
-
-            # guess category from title/keywords
-            cat = pick_category(title, default_cat)
-
-            # basic og fetch (to get image; title may improve)
-            og = fetch_og(link)
-            image = og.get("image") or ""
-            if og.get("title"):
-                title = og["title"].strip()
-
-            items.append({
-                "title": title,
-                "original": link,
-                "source": source,
-                "published": pub_iso,
-                "category": cat,
-                "image": image,
-            })
-
-    # sort newest first
-    items.sort(key=lambda x: x["published"], reverse=True)
-
-    # score and limit (keep a healthy number)
-    for it in items:
-        it["score"] = score_item(it["source"], it["published"])
-
-    items = items[:120]
-
-    # build shortlinks & map
-    shortlinks = {}
-    for it in items:
-        sid = sha(it["original"])
-        shortlinks[sid] = it["original"]
-        write_shortlink_page(sid, it["original"], it["title"], it.get("image") or "")
-        it["id"] = sid  # keep in JSON for debugging/joins if you want
-
-    # write JSONs
-    os.makedirs("data", exist_ok=True)
-    with open(OUT_NEWS, "w", encoding="utf-8") as f:
-        json.dump({"updated": now_utc_iso(), "items": items}, f, indent=2)
-
-    with open(OUT_SHORTS, "w", encoding="utf-8") as f:
-        json.dump(shortlinks, f, indent=2)
-
-    print(f"Wrote {OUT_NEWS} with {len(items)} items, and {len(shortlinks)} shortlinks.")
+  items = fetch_all()
+  # hard keep: last 400 items (enough for 7d window typically)
+  items = items[:400]
+  write_json(items)
+  build_short_pages(items)
+  print(f"OK — {len(items)} items")
 
 if __name__ == "__main__":
-    main()
+  main()
