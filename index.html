@@ -1,193 +1,376 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>PTD Today — Daily Energy & Power News</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Daily curation across grid, substations, protection, cables, HVDC, renewables, policy, AI, and data centers.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>⚡️</text></svg>">
+
+<!-- Look & feel (WSJ-ish, centered, compact thumbs) -->
 <style>
-  :root{--ink:#1b1b1b;--muted:#6b6b6b;--bg:#e9dfcf;--card:#f6efe3;--pill:#e1d6c4;--brand:#1d2a57;}
-  html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,'Times New Roman',serif}
-  .wrap{max-width:920px;margin:0 auto;padding:24px}
-  h1{font:700 56px/1.05 Georgia,serif;margin:16px 0 4px}
-  .tagline{color:var(--muted);font-style:italic;margin:0 0 16px}
-  h2{font:700 28px/1.2 Georgia,serif;margin:10px 0 14px}
-  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 14px}
-  .tab{background:var(--pill);border-radius:22px;padding:8px 14px;cursor:pointer;border:1px solid #cdbfa9}
-  .tab[aria-selected="true"]{background:#fff;border-color:#b9aa90}
-  .stamp{display:inline-block;background:#fff;border:1px solid #cfbea5;border-radius:999px;padding:10px 16px;margin:6px 0 18px;color:#7a6a52}
-  .list{display:flex;flex-direction:column;gap:18px}
-  .card{background:var(--card);border:1px solid #dbcdb7;border-radius:14px;overflow:hidden;display:grid;grid-template-columns:120px 1fr;gap:16px;padding:14px}
-  .thumb{width:120px;height:90px;background:#ddd;border-radius:8px;object-fit:cover}
-  .meta{color:#6c5e4a;font-size:.92rem;margin:.15rem 0 .55rem}
-  .title{font:700 26px/1.2 Georgia,serif;margin:.15rem 0;text-decoration:none;color:#142b61}
-  .title:hover{text-decoration:underline}
-  .btnrow{display:flex;flex-wrap:wrap;gap:10px;margin:.3rem 0}
-  .btn{border:1px solid #b9aa90;background:#fff;border-radius:999px;padding:8px 14px;text-decoration:none;color:#2a2a2a}
-  .btn.primary{background:#fff;border-color:#7f6b4d}
-  footer{color:#7b6d5a;text-align:center;margin:30px 0 10px}
-  @media (max-width:640px){
-    .card{grid-template-columns:94px 1fr}
-    .thumb{width:94px;height:70px}
-    .title{font-size:22px}
+  :root{
+    --paper:#e8dfcf;        /* page background */
+    --sheet:#fbf7ef;        /* story card */
+    --ink:#20170f;          /* text */
+    --ink-soft:#6b5e4b;
+    --accent:#0b3d91;       /* title links */
+    --pill:#dbcfb9;
+    --pill-active:#c2b49b;
+    --ring:#b6a88f;
   }
-  dialog{border:none;border-radius:16px;padding:0;max-width:420px;width:92vw}
-  .sheet{padding:8px}
-  .sheet h3{margin:10px 10px 6px 12px;font:700 16px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial}
-  .opt{display:block;width:100%;text-align:left;padding:12px 16px;border:none;background:#fff;border-top:1px solid #eee;font:600 16px/1.2 system-ui}
+  html,body{margin:0;padding:0}
+  body{
+    font-family: Georgia, "Times New Roman", serif;
+    background: radial-gradient(1200px 400px at 50% -10%, #efe7d8, var(--paper));
+    color: var(--ink);
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:20px 16px}
+  header{margin:8px 0 8px 0;text-align:left}
+  h1{font-size:56px;letter-spacing:.5px;margin:6px 0 2px}
+  .tag{margin:0 0 18px 2px;color:var(--ink-soft);font-style:italic}
+  h2{font-size:28px;margin:0 0 10px}
+  /* tabs */
+  .tabs{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px}
+  .tab{
+    border:0;cursor:pointer;font-weight:700;
+    padding:8px 14px;border-radius:22px;background:var(--pill);
+  }
+  .tab[aria-selected="true"]{background:var(--pill-active)}
+  /* updated pill */
+  .stamp{display:inline-block;margin:8px 0 14px;padding:8px 12px;border-radius:18px;
+    background:var(--sheet);box-shadow:0 0 0 1px var(--ring) inset;color:var(--ink-soft)}
+  /* stories */
+  .list{display:flex;flex-direction:column;gap:14px;margin:0;padding:0;list-style:none}
+  .card{
+    display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:start;
+    background:var(--sheet);border-radius:10px;padding:12px 12px 10px;
+    box-shadow:0 1px 0 rgba(0,0,0,.05), 0 0 0 1px #e4dcca inset;
+  }
+  .thumb{
+    width:88px;height:88px;border-radius:6px;object-fit:cover;background:#d9d2c3;
+  }
+  .kicker{font-size:12px;letter-spacing:.08em;color:var(--ink-soft);margin:2px 0 6px}
+  .title{margin:0 0 6px}
+  .title a{color:var(--accent);text-decoration:none}
+  .meta{font-size:13px;color:var(--ink-soft);margin:2px 0 4px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .btn{
+    appearance:none;border:1px solid var(--ring);background:var(--paper);
+    border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:600;
+  }
+  .btn:hover{background:#efe6d6}
+  .muted{opacity:.85}
+  footer{color:var(--ink-soft);font-size:13px;text-align:center;margin:20px 0 8px}
+  /* share modal */
+  .sheet{
+    position:fixed;left:0;right:0;bottom:-100%;z-index:50;background:var(--sheet);
+    box-shadow:0 -12px 24px rgba(0,0,0,.15);border-top-left-radius:16px;border-top-right-radius:16px;
+    transition:bottom .25s ease;max-width:980px;margin:0 auto
+  }
+  .sheet.open{bottom:0}
+  .sheet .hdr{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #eadfcf}
+  .sheet h3{margin:0;font-size:18px}
+  .share-list{display:flex;flex-direction:column;margin:6px 0 10px}
+  .share-list a,.share-list button{
+    text-align:left;padding:14px 16px;border:0;background:transparent;border-bottom:1px solid #efe4d3;
+    font-size:16px;cursor:pointer
+  }
+  .close{color:#6b5e4b;background:transparent;border:0;font-size:16px;cursor:pointer}
+  /* responsive */
+  @media (max-width:560px){
+    h1{font-size:44px}
+    .card{grid-template-columns:76px 1fr}
+    .thumb{width:76px;height:76px}
+  }
 </style>
 </head>
+
 <body>
-<div class="wrap">
-  <h1>PTD Today</h1>
-  <p class="tagline">First to Know. First to Lead.</p>
-  <h2>Daily Energy &amp; Power News</h2>
+  <div class="wrap">
+    <header>
+      <h1>PTD Today</h1>
+      <div class="tag">First to Know. First to Lead.</div>
+      <h2>Daily Energy & Power News</h2>
+    </header>
 
-  <div class="tabs" id="tabs">
-    <button class="tab" data-cat="all" aria-selected="true">All</button>
-    <button class="tab" data-cat="top">Top (7d)</button>
-    <button class="tab" data-cat="grid">Grid</button>
-    <button class="tab" data-cat="substations">Substations</button>
-    <button class="tab" data-cat="protection">Protection</button>
-    <button class="tab" data-cat="cables">Cables</button>
-    <button class="tab" data-cat="hvdc">HVDC</button>
-    <button class="tab" data-cat="renewables">Renewables</button>
-    <button class="tab" data-cat="policy">Policy</button>
-    <button class="tab" data-cat="ai">AI</button>
-    <button class="tab" data-cat="datacenters">Data Centers</button>
+    <!-- Tabs -->
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Categories">
+      <button class="tab" role="tab" aria-selected="true" data-cat="all">All</button>
+      <button class="tab" role="tab" data-cat="top7">Top (7d)</button>
+      <button class="tab" role="tab" data-cat="grid">Grid</button>
+      <button class="tab" role="tab" data-cat="substations">Substations</button>
+      <button class="tab" role="tab" data-cat="protection">Protection</button>
+      <button class="tab" role="tab" data-cat="cables">Cables</button>
+      <button class="tab" role="tab" data-cat="hvdc">HVDC</button>
+      <button class="tab" role="tab" data-cat="renewables">Renewables</button>
+      <button class="tab" role="tab" data-cat="policy">Policy</button>
+      <button class="tab" role="tab" data-cat="ai">AI</button>
+      <button class="tab" role="tab" data-cat="datacenters">Data Centers</button>
+    </nav>
+
+    <div class="stamp" id="stamp">Updated — …</div>
+
+    <!-- Stories -->
+    <ul class="list" id="list"></ul>
+
+    <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
   </div>
 
-  <div class="stamp" id="stamp">Updated — </div>
-  <div class="list" id="list"></div>
-
-  <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
-</div>
-
-<dialog id="shareDlg">
-  <div class="sheet">
-    <h3>Share</h3>
-    <button class="opt" data-share="linkedin">LinkedIn</button>
-    <button class="opt" data-share="x">X (Twitter)</button>
-    <button class="opt" data-share="facebook">Facebook</button>
-    <button class="opt" data-share="reddit">Reddit</button>
-    <button class="opt" data-share="copy">Copy link</button>
-    <button class="opt" data-share="email">Email</button>
-    <button class="opt" id="closeShare">Close ×</button>
+  <!-- Share modal -->
+  <div class="sheet" id="shareSheet" aria-hidden="true">
+    <div class="hdr">
+      <h3>Share</h3>
+      <button class="close" id="shareClose">Close ×</button>
+    </div>
+    <div class="share-list" id="shareList">
+      <!-- populated by JS -->
+    </div>
   </div>
-</dialog>
 
 <script>
-const LIST = document.getElementById('list');
-const STAMP = document.getElementById('stamp');
-const TABS  = document.getElementById('tabs');
-const SHARE = document.getElementById('shareDlg');
-let STATE = { items: [], cat: 'all', share: null };
+/* ============================================================
+   Helpers
+============================================================ */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => document.querySelectorAll(sel);
+const LIST = $('#list');
+const STAMP = $('#stamp');
+const SHEET = $('#shareSheet');
+const SHARE_LIST = $('#shareList');
+const SHARE_CLOSE = $('#shareClose');
 
-function fmtDate(iso){ const d = new Date(iso); return d.toISOString().replace('Z','+00:00'); }
-function within(d, s, e){ const t=+new Date(d); return t>=+s && t<=+e; }
+// Safe accessors
+const safe = (v, d='') => (v===undefined||v===null)?d:v;
+const fmtNum = n => (typeof n==='number' ? n.toFixed(3) : safe(n,''));
+const toISO = v => {
+  try { return new Date(v).toISOString(); } catch(e){ return ''; }
+};
 
-// Weekend window for "All"
-function todayWindow(now=new Date()){
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const dow = d.getUTCDay();
-  let start = new Date(d), end = new Date(d); end.setUTCHours(23,59,59,999);
-  if (dow===0) start.setUTCDate(start.getUTCDate()-2);       // Sun => Fri..Sun
-  else if (dow===1) start.setUTCDate(start.getUTCDate()-3);  // Mon => Fri..Mon
-  else start.setUTCDate(start.getUTCDate()-1);               // Tue–Sat => prev day..today
-  return [start, end];
-}
-// Strict last 7 days (incl today) for "Top (7d)"
-function last7Window(now=new Date()){
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23,59,59,999));
-  const start = new Date(end); start.setUTCDate(end.getUTCDate()-6);
-  return [start, end];
-}
+// Compute TODAY window by rule we agreed
+function todayWindow(now = new Date()){
+  const day = now.getDay(); // 0 Sun .. 6 Sat
+  const start = new Date(now); start.setHours(0,0,0,0);
+  const end   = new Date(now); end.setHours(23,59,59,999);
 
-function card(it){
-  const sUrl = `/s/${it.id}.html`;
-  return `
-  <article class="card">
-    <img class="thumb" referrerpolicy="no-referrer" onerror="this.src='/assets/og-default.png'"
-         src="${it.image || '/assets/og-default.png'}" alt="">
-    <div>
-      <div class="meta">${it.cat.toUpperCase()} • ${new URL(it.url).hostname} • ${fmtDate(it.date)} • Score: ${it.score.toFixed(3)}</div>
-      <a class="title" href="${sUrl}">${it.title}</a>
-      <div class="btnrow">
-        <a class="btn primary" href="${sUrl}">Open on PTD Today</a>
-        <a class="btn" href="${it.url}" target="_blank" rel="noopener">Source</a>
-        <button class="btn" data-share-link="${sUrl}" data-share-title="${it.title}">Share</button>
-      </div>
-    </div>
-  </article>`;
-}
+  const addDays = (d, n)=>{ const x=new Date(d); x.setDate(x.getDate()+n); return x; };
 
-function render(cat, items){
-  let out = [];
-  const now = new Date();
-  if (cat==='top'){
-    const [s,e] = last7Window(now);
-    out = items.filter(x=>within(x.date,s,e));
-  } else {
-    const [s,e] = todayWindow(now);
-    out = items.filter(x=>within(x.date,s,e));
-    if (cat!=='all') out = out.filter(x=>x.cat===cat);
+  let from = new Date(start), to = new Date(end);
+
+  if (day===6){            // Saturday: Fri+Sat
+    from = addDays(start,-1);
+  } else if (day===0){     // Sunday: Fri+Sat+Sun
+    from = addDays(start,-2);
+  } else if (day===1){     // Monday: Fri..Mon
+    from = addDays(start,-3);
+  } else if (day===2){     // Tuesday: Mon+Tue
+    from = addDays(start,-1);
+  } else {                 // Wed/Thu/Fri: just today
+    // from already today
   }
-  LIST.innerHTML = out.map(card).join('') || `<p style="color:#7b6d5a">No stories found.</p>`;
+  return {from, to};
 }
 
-function setTab(cat){
-  STATE.cat = cat || 'all';
-  for (const b of TABS.querySelectorAll('.tab')){
-    b.setAttribute('aria-selected', b.dataset.cat===STATE.cat ? 'true':'false');
-  }
+function sevenDaysWindow(now = new Date()){
+  const to   = new Date(now); to.setHours(23,59,59,999);
+  const from = new Date(now); from.setDate(from.getDate()-6); from.setHours(0,0,0,0);
+  return {from, to};
 }
 
-(async function init(){
-  const res  = await fetch('/data/news.json', {cache:'no-store'});
-  const data = await res.json();
-  const items = (data.items||[]).slice(0,500);
-  STATE.items = items;
-  STAMP.textContent = 'Updated — ' + fmtDate(data.updated);
+function inRange(d, from, to){
+  const t = new Date(d).getTime();
+  return t>=from.getTime() && t<=to.getTime();
+}
 
-  setTab('all'); render('all', items);
+function catMatch(itemCat, wanted){
+  if (!wanted || wanted==='all') return true;
+  if (wanted==='top7') return true;
+  return (safe(itemCat,'').toLowerCase() === wanted);
+}
 
-  TABS.addEventListener('click', ev=>{
-    const b = ev.target.closest('.tab'); if(!b) return;
-    const cat = b.dataset.cat;
-    setTab(cat);
-    history.replaceState(null,'',cat==='all' ? location.pathname : `?cat=${cat}`);
-    render(cat, STATE.items);
-  });
+function buildShareTargets(title, ptdUrl){
+  // Use ptdUrl only (as requested) — point everything to PTD link
+  const encT = encodeURIComponent(title);
+  const encU = encodeURIComponent(ptdUrl);
+  return [
+    {label:'LinkedIn',  href:`https://www.linkedin.com/sharing/share-offsite/?url=${encU}`},
+    {label:'X (Twitter)', href:`https://twitter.com/intent/tweet?text=${encT}&url=${encU}`},
+    {label:'Facebook', href:`https://www.facebook.com/sharer/sharer.php?u=${encU}`},
+    {label:'Reddit',   href:`https://www.reddit.com/submit?url=${encU}&title=${encT}`},
+    {label:'Copy link', action:'copy'},
+    {label:'Email',    href:`mailto:?subject=${encT}&body=${encU}`}
+  ];
+}
 
-  document.body.addEventListener('click', ev=>{
-    const btn = ev.target.closest('[data-share-link]');
-    if(!btn) return;
-    STATE.share = { url: btn.dataset.shareLink, title: btn.dataset.shareTitle };
-    SHARE.showModal();
-  });
-
-  SHARE.addEventListener('click', ev=>{
-    if(!ev.target.dataset.share) return;
-    const { url, title } = STATE.share || {};
-    const full = 'https://ptdtoday.com' + url;
-    const map = {
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(full)}`,
-      x:        `https://twitter.com/intent/tweet?url=${encodeURIComponent(full)}&text=${encodeURIComponent(title)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(full)}`,
-      reddit:   `https://www.reddit.com/submit?url=${encodeURIComponent(full)}&title=${encodeURIComponent(title)}`
-    };
-    const action = ev.target.dataset.share;
-    if(action === 'copy'){
-      navigator.clipboard.writeText(full).then(()=>alert('Link copied'));
-    }else if(action === 'email'){
-      location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(full)}`;
-    }else{
-      window.open(map[action], '_blank','noopener');
+function openShare(title, ptdUrl){
+  SHARE_LIST.innerHTML = '';
+  const targets = buildShareTargets(title, ptdUrl);
+  targets.forEach(t=>{
+    if (t.action==='copy'){
+      const b = document.createElement('button');
+      b.textContent = 'Copy link';
+      b.onclick = async ()=>{ try{ await navigator.clipboard.writeText(ptdUrl); alert('Link copied: ' + ptdUrl); }catch(e){ prompt('Copy link:', ptdUrl); } };
+      SHARE_LIST.appendChild(b);
+    } else {
+      const a = document.createElement('a');
+      a.textContent = t.label;
+      a.href = t.href; a.target = '_blank'; a.rel = 'noopener';
+      SHARE_LIST.appendChild(a);
     }
-    SHARE.close();
   });
-  document.getElementById('closeShare').onclick = ()=>SHARE.close();
+  SHEET.classList.add('open');
+  SHEET.setAttribute('aria-hidden','false');
+}
+SHARE_CLOSE.addEventListener('click', ()=>{ SHEET.classList.remove('open'); SHEET.setAttribute('aria-hidden','true'); });
+
+/* ============================================================
+   Fetch + Render
+============================================================ */
+let ALL_ITEMS = [];
+
+async function fetchNews(){
+  const res = await fetch('/data/news.json?ts=' + Date.now());
+  const data = await res.json().catch(()=>({}));
+  STAMP.textContent = 'Updated — ' + (data.updated || new Date().toISOString());
+  ALL_ITEMS = Array.isArray(data.items) ? data.items : [];
+}
+
+function thumbOf(it){
+  // Prefer item.image; otherwise try OG fallback from source; else placeholder
+  const ph = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="88" height="88"><rect width="100%" height="100%" fill="%23d9d2c3"/><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="18" fill="%237a6e5a">📰</text></svg>';
+  return safe(it.image, ph);
+}
+
+function ptdLinkOf(it){
+  // Use item.short if present; else /s/<id>.html if id exists; else fallback to source
+  if (it.short) return it.short;
+  if (it.id)    return '/s/' + it.id + '.html';
+  return it.link || '#';
+}
+
+function render(cat){
+  LIST.innerHTML = '';
+
+  // choose time window
+  const now = new Date();
+  let items = [...ALL_ITEMS];
+
+  if (cat === 'top7'){
+    const win = sevenDaysWindow(now);
+    items = items.filter(it => inRange(it.date, win.from, win.to));
+  } else {
+    // "All" and any category use TODAY-window rule
+    const win = todayWindow(now);
+    items = items.filter(it => inRange(it.date, win.from, win.to));
+  }
+
+  // category filter (except for top7 which already set above)
+  if (cat && cat !== 'all' && cat !== 'top7'){
+    items = items.filter(it => catMatch(it.category, cat));
+  }
+
+  // Sort newest first
+  items.sort((a,b)=> new Date(b.date) - new Date(a.date));
+
+  if (items.length === 0){
+    LIST.innerHTML = '<li class="muted" style="text-align:center;padding:24px 6px">No stories found.</li>';
+    return;
+  }
+
+  for (const it of items){
+    const li = document.createElement('li');
+    li.className = 'card';
+
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.src = thumbOf(it);
+    img.alt = 'thumbnail';
+
+    // robust error fallback if remote thumbs block hotlinking
+    img.onerror = ()=>{ img.src = thumbOf({}); };
+
+    const body = document.createElement('div');
+    const kicker = document.createElement('div');
+    kicker.className = 'kicker';
+    const catText = safe(it.category,'').toUpperCase();
+    const srcText = safe(it.source,'').replace(/^www\./,'');
+    kicker.textContent = (catText?catText+' • ':'') + (srcText||'') + (it.date ? ' • ' + toISO(it.date) : '');
+
+    const h3 = document.createElement('h3');
+    h3.className = 'title';
+    const a = document.createElement('a');
+    a.href = it.link || '#';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = safe(it.title,'Untitled');
+    h3.appendChild(a);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = 'Score: ' + fmtNum(it.score);
+
+    const btns = document.createElement('div'); btns.className = 'btns';
+
+    const openPtd = document.createElement('a');
+    openPtd.className = 'btn';
+    openPtd.textContent = 'Open on PTD Today';
+    openPtd.href = ptdLinkOf(it);
+    openPtd.target = '_blank'; openPtd.rel='noopener';
+
+    const sourceBtn = document.createElement('a');
+    sourceBtn.className = 'btn'; sourceBtn.textContent = 'Source';
+    sourceBtn.href = it.link || '#'; sourceBtn.target = '_blank'; sourceBtn.rel='noopener';
+
+    const shareBtn = document.createElement('button');
+    shareBtn.className = 'btn'; shareBtn.textContent = 'Share';
+    shareBtn.addEventListener('click', ()=>{
+      const shareUrl = location.origin + ptdLinkOf(it).replace(location.origin,'');
+      // Prefer native share if available
+      if (navigator.share){
+        navigator.share({title: it.title, url: shareUrl}).catch(()=>{ openShare(it.title, shareUrl); });
+      } else {
+        openShare(it.title, shareUrl);
+      }
+    });
+
+    btns.append(openPtd, sourceBtn, shareBtn);
+    body.append(kicker, h3, meta, btns);
+    li.append(img, body);
+    LIST.appendChild(li);
+  }
+}
+
+function setActive(cat){
+  $$('#tabs .tab').forEach(b=> b.setAttribute('aria-selected', String(b.dataset.cat===cat)));
+}
+
+/* ============================================================
+   Boot
+============================================================ */
+(async function init(){
+  // Deep link by ?cat=grid or #ai
+  const url = new URL(location.href);
+  let cat = (url.searchParams.get('cat') || location.hash.replace('#','') || 'all').toLowerCase();
+
+  await fetchNews();
+  setActive(cat);
+  render(cat);
+
+  // tab clicks
+  $$('#tabs .tab').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const c = b.dataset.cat;
+      setActive(c);
+      history.replaceState(null,'', c==='all' ? location.pathname : `?cat=${encodeURIComponent(c)}`);
+      render(c);
+    });
+  });
+
+  // auto-refresh every 3h
+  setInterval(async ()=>{
+    await fetchNews();
+    // keep current tab
+    const current = $('#tabs .tab[aria-selected="true"]')?.dataset.cat || 'all';
+    render(current);
+  }, 3*60*60*1000);
 })();
 </script>
 </body>
