@@ -1,164 +1,167 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-from __future__ import annotations
-import json, os, re, hashlib
+import hashlib, json, os, re, time, uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
+import feedparser, requests
+from bs4 import BeautifulSoup
+from dateutil import parser as dtp
 
-UTC = timezone.utc
-ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(ROOT, "data")
-NEWS_JSON  = os.path.join(DATA, "news.json")
-BOOT_JSON  = os.path.join(DATA, "bootstrap.json")
-SHORTS_JSON= os.path.join(DATA, "shortlinks.json")
-SHORT_DIR  = os.path.join(ROOT, "s")
-os.makedirs(DATA, exist_ok=True)
-os.makedirs(SHORT_DIR, exist_ok=True)
+ROOT = os.path.dirname(__file__)
+DATA_DIR = os.path.join(ROOT, "data")
+S_DIR = os.path.join(ROOT, "s")
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(S_DIR, exist_ok=True)
 
-SHORT_BASE = "https://ptdtoday.com/s/"
-RETENTION_DAYS = 30
+FALLBACK_IMG = "/assets/og-default.png"  # used when page has no OG image
 
-SVG_PLACEHOLDER = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
-                   "width='160' height='120'%3E%3Crect width='100%25' height='100%25' "
-                   "fill='%23efe7d7'/%3E%3Cpath d='M15 90 L60 50 L85 72 L110 58 L145 90 Z' "
-                   "fill='%23d7c9b1'/%3E%3C/svg%3E")
+# ---- Sources (direct publisher feeds so your links are original) ----
+SOURCES = [
+    # Data Center Dynamics (publisher)
+    "https://www.datacenterdynamics.com/en/rss/",
+    # Utility Dive (energy/data center/power)
+    "https://www.utilitydive.com/rss/",
+    # Reuters energy
+    "https://feeds.reuters.com/reuters/energyNews",
+    # Benzinga news (business/markets)
+    "https://www.benzinga.com/rss",
+]
 
-def now_utc(): return datetime.now(UTC)
-def iso(dt):    return dt.astimezone(UTC).isoformat().replace("+00:00","Z")
-def start_of_day(dt): return datetime(dt.year,dt.month,dt.day,tzinfo=UTC)
-
-def window_all(today):
-    sod = start_of_day(today); dow = sod.weekday()  # Mon=0..Sun=6
-    if dow==0:  # Monday -> Friday..Monday
-        return (sod - timedelta(days=3), today)
-    if dow==6:  # Sunday -> Friday..Sunday
-        return (sod - timedelta(days=2), today)
-    return (sod - timedelta(days=1), today)
-
-def window_7d(today): return (today - timedelta(days=7), today)
-
-def within(win, when_iso):
-    try:
-        t = datetime.fromisoformat(when_iso.replace("Z","+00:00")).astimezone(UTC)
-        return win[0] <= t <= win[1]
-    except Exception:
-        return False
-
-def load_json(path, default):
-    try:
-        with open(path,"r",encoding="utf-8") as f: return json.load(f)
-    except Exception: return default
-
-def save_json(path,obj):
-    with open(path,"w",encoding="utf-8") as f: json.dump(obj,f,ensure_ascii=False,indent=2)
-
-def small_id(seed:str)->str: return hashlib.sha1(seed.encode("utf-8")).hexdigest()[:6]
-def host_of(u:str)->str:
-    try:
-        h = urlparse(u).netloc
-        return re.sub(r"^www\.", "", h)
-    except Exception:
-        return ""
-
-CAT_MAP = {
-    "grid":"grid","substations":"substations","protection":"protection",
-    "cables":"cables","hvdc":"hvdc","renewables":"renewables","policy":"policy",
-    "ai":"ai","artificial intelligence":"ai","machine learning":"ai",
-    "data center":"datacenters","data centers":"datacenters",
-    "datacenter":"datacenters","datacenters":"datacenters",
-    "data centre":"datacenters","data centres":"datacenters",
+# ---- Categorization via simple keyword mapping ----
+CAT_RULES = {
+    "grid":       ["grid", "transmission", "distribution", "pjm", "ercot", "ferc"],
+    "substations":["substation", "transformer", "switchgear", "relay", "breaker"],
+    "protection": ["protection", "relay", "fault", "arc flash", "safety"],
+    "cables":     ["cable", "underground", "subsea", "hv cable", "xlpe"],
+    "hvdc":       ["hvdc", "high-voltage direct", "converter station", "interconnector"],
+    "renewables": ["solar", "wind", "renewable", "hydrogen", "ppa", "geothermal"],
+    "policy":     ["policy", "regulation", "white house", "doe", "ferc"],
+    "ai":         ["ai", "artificial intelligence", "model", "gpu", "nvidia"],
+    "datacenters":["data center", "datacenter", "hyperscale", "colocation", "server farm"],
 }
-def map_cat(raw:str)->str:
-    k = (raw or "").strip().lower()
-    if k in CAT_MAP: return CAT_MAP[k]
-    for key,val in CAT_MAP.items():
-        if key in k: return val
+
+def pick_cat(text: str) -> str:
+    t = text.lower()
+    for cat, terms in CAT_RULES.items():
+        if any(k in t for k in terms):
+            return cat
+    # sensible defaults based on site
+    if "datacenterdynamics" in t: return "datacenters"
+    if "utilitydive" in t: return "grid"
     return "grid"
 
-def normalize(it:dict)->dict:
-    o = dict(it)
-    o["title"] = (o.get("title") or "").strip() or "Untitled"
-    o["url"]   = o.get("url") or ""
-    o["image"] = o.get("image") or SVG_PLACEHOLDER
-    o["category"] = map_cat(o.get("category") or "")
-    o["source"] = o.get("source") or host_of(o["url"])
-    o["id"] = o.get("id") or small_id(o["url"]+o["title"])
-    pub = o.get("published")
-    dt = None
-    if isinstance(pub,str):
-        try: dt = datetime.fromisoformat(pub.replace("Z","+00:00")).astimezone(UTC)
-        except Exception: dt = None
-    elif isinstance(pub,datetime):
-        dt = pub.astimezone(UTC)
-    o["published"] = iso(dt or now_utc())
-    try: o["score"] = float(o.get("score",0))
-    except Exception: o["score"] = 0.0
-    return o
+def og_image(url: str) -> str:
+    try:
+        r = requests.get(url, timeout=10, headers={"User-Agent":"Mozilla/5.0"})
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "lxml")
+        tag = soup.find("meta", property="og:image") or soup.find("meta", attrs={"name":"og:image"})
+        if tag:
+            content = tag.get("content") or tag.get("value")
+            if content and content.strip():
+                return content.strip()
+    except Exception:
+        pass
+    return FALLBACK_IMG
 
-def collect_items()->list[dict]:
-    return []  # your real scrapers plug in here; index works either way
+def short_id(url: str) -> str:
+    return hashlib.sha1(url.encode("utf-8")).hexdigest()[:6]
 
-SHORT_TMPL = """<!doctype html><meta charset="utf-8">
-<meta property="og:title" content="{title}">
-<meta property="og:description" content="{desc}">
-<meta property="og:image" content="{image}">
-<meta property="og:url" content="{short}">
+def write_shortlink(item):
+    """Create s/<id>.html with correct OG tags so LinkedIn/X show previews."""
+    tid = item["id"]
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{item['title']}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta property="og:title" content="{item['title']}">
+<meta property="og:description" content="{item.get('summary','').replace('"','')[:180]}">
+<meta property="og:image" content="{item['image']}">
+<meta property="og:url" content="https://ptdtoday.com/s/{tid}.html">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="canonical" href="{orig}">
-<script>location.replace("{orig}");</script>
-"""
-def write_short(sid:str, item:dict, short_url:str):
-    html = SHORT_TMPL.format(
-        title=item["title"], desc=item.get("source") or host_of(item["url"]),
-        image=item["image"], short=short_url, orig=item["url"]
-    )
-    with open(os.path.join(SHORT_DIR,f"{sid}.html"),"w",encoding="utf-8") as f:
+<link rel="canonical" href="{item['url']}">
+<style>html,body{{margin:0}} .jump{{font:16px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial}} .wrap{{max-width:720px;margin:18vh auto;padding:0 20px}} a.btn{{display:inline-block;border:1px solid #333;padding:.7em 1em;border-radius:10px;text-decoration:none}} img{{max-width:100%;height:auto;border-radius:10px}}</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="jump">You’re heading to the original article on <strong>{urlparse(item['url']).netloc}</strong>.</p>
+  <p><a class="btn" href="{item['url']}">Continue to source →</a></p>
+  <p style="margin-top:2rem"><img src="{item['image']}" alt=""></p>
+</div>
+<script>location.replace({json.dumps(item["url"])})</script>
+</body>
+</html>"""
+    with open(os.path.join(S_DIR, f"{tid}.html"), "w", encoding="utf-8") as f:
         f.write(html)
 
-def main():
-    now = now_utc()
-    existing = load_json(NEWS_JSON, {"updated": iso(now), "items": []})
-    old_items = existing.get("items", [])
-    key_map = {(it.get("url") or it.get("id")): it for it in old_items if (it.get("url") or it.get("id"))}
+def fetch():
+    seen = set()
+    items = []
+    for feed in SOURCES:
+        d = feedparser.parse(feed)
+        for e in d.entries[:80]:
+            link = e.get("link") or e.get("id")
+            title = (e.get("title") or "").strip()
+            if not link or not title:
+                continue
+            key = short_id(link)
+            if key in seen:
+                continue
+            seen.add(key)
 
-    fresh_raw = collect_items()
-    fresh = [normalize(x) for x in fresh_raw]
+            # date
+            dt = None
+            for cand in (e.get("published"), e.get("updated"), e.get("created")):
+                if cand:
+                    try:
+                        dt = dtp.parse(cand)
+                        break
+                    except Exception:
+                        pass
+            if not dt:
+                dt = datetime.now(timezone.utc)
 
-    if not fresh and not old_items:
-        boot = load_json(BOOT_JSON, [])
-        if boot:
-            fresh = [normalize(x) for x in boot]
-            print(f"[bootstrap] loaded {len(fresh)} items")
+            # fetch OG image (only once per domain in case of rate limit)
+            img = og_image(link)
 
-    if not fresh:
-        save_json(NEWS_JSON, {"updated": iso(now), "items": old_items})
-        print(f"[keep] {len(old_items)} existing items, no new fetch")
-        return
+            # summary
+            summary = (e.get("summary") or e.get("description") or "").strip()
+            cat = pick_cat(f"{title} {summary} {link}")
 
-    for it in fresh:
-        k = it.get("url") or it.get("id")
-        key_map[k] = it
-    merged = list(key_map.values())
+            items.append({
+                "id": key,
+                "title": title,
+                "url": link,
+                "image": img,
+                "site": urlparse(link).netloc,
+                "cat": cat,
+                "score": round(0.25 + hash(key) % 750 / 1000, 3),  # lightweight stable pseudo-score
+                "date": dt.astimezone(timezone.utc).isoformat(),
+                "summary": summary[:500],
+            })
 
-    cutoff = now - timedelta(days=30)
-    merged = [it for it in merged if within((cutoff, now), it["published"])]
-    merged.sort(key=lambda x:x["published"], reverse=True)
+    # newest first; keep at most 300
+    items.sort(key=lambda x: x["date"], reverse=True)
+    return items[:300]
 
-    short_map = load_json(SHORTS_JSON, {})
-    changed = False
-    win_all = window_all(now)
-    for it in merged:
-        if within(win_all, it["published"]):
-            sid = it["id"]
-            if sid not in short_map:
-                short_map[sid] = SHORT_BASE + f"{sid}.html"; changed=True
-            write_short(sid, it, short_map[sid])
-    if changed: save_json(SHORTS_JSON, short_map)
+def save(items):
+    updated = datetime.now(timezone.utc).isoformat()
+    # write shortlink pages first
+    for it in items:
+        write_shortlink(it)
 
-    save_json(NEWS_JSON, {"updated": iso(now), "items": merged})
-    print(f"[write] {len(merged)} total items")
+    # and the json that index.html reads
+    with open(os.path.join(DATA_DIR, "news.json"), "w", encoding="utf-8") as f:
+        json.dump({"updated": updated, "items": items}, f, ensure_ascii=False)
+
+    # optional map id->short for debugging
+    with open(os.path.join(DATA_DIR, "shortlinks.json"), "w", encoding="utf-8") as f:
+        json.dump({it["id"]: f"/s/{it['id']}.html" for it in items}, f)
 
 if __name__ == "__main__":
-    if not os.path.exists(SHORTS_JSON): save_json(SHORTS_JSON, {})
-    main()
+    print("Fetching feeds...")
+    items = fetch()
+    print(f"{len(items)} items")
+    save(items)
+    print("Done.")
