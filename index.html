@@ -99,7 +99,18 @@ let CURRENT = 'all';
 
 /* ---------- Utilities ---------- */
 
-// your weekend/day window
+// Map many possible image keys
+function getImage(it){
+  return it.image || it.img || it.thumbnail || it.thumb || it.picture || it.image_url || '';
+}
+
+// Thumbnail via proxy (keep URL EXACTLY as provided)
+function prox(u){
+  if(!u) return '';
+  return 'https://wsrv.nl/?w=330&h=220&fit=cover&url=' + encodeURIComponent(u);
+}
+
+// your weekend/day window (unchanged)
 function computeWindow(now=new Date()){
   const d = new Date(now);
   const wd = d.getUTCDay(); // 0 Sun .. 6 Sat
@@ -121,17 +132,9 @@ function computeWindow(now=new Date()){
   return {start,end};
 }
 
-// strict last 7 days check
 function within7d(iso){
   const t = Date.parse(iso);
   return (Date.now() - t) <= 7*24*3600*1000;
-}
-
-// reliable thumbnail via proxy (prevents hotlink/CORS blocks)
-function prox(u){
-  if(!u) return '';
-  const clean = u.replace(/^https?:\/\//,'');
-  return 'https://wsrv.nl/?w=330&h=220&fit=cover&url=' + encodeURIComponent(clean);
 }
 
 function setTab(cat){
@@ -158,8 +161,9 @@ function openShareSheet(link){
 }
 
 function cardHTML(it){
-  const thumb = it.image ? `<img src="${prox(it.image)}" alt="">` : '';
-  const when  = new Date(it.date).toISOString().replace('.000Z','Z');
+  const rawImg = getImage(it);
+  const thumb  = rawImg ? `<img src="${prox(rawImg)}" alt="">` : '';
+  const when   = new Date(it.date).toISOString().replace('.000Z','Z');
   return `
   <article class="card">
     <div class="thumb">${thumb || '<span style="font-size:22px;color:#7f7769">🗞️</span>'}</div>
@@ -180,7 +184,7 @@ function render(cat){
   let view = base.slice();
 
   if (cat==='top'){
-    // Use WEEK; if WEEK is absent, fall back to strict 7d from TODAY
+    // Prefer WEEK file; if missing, compute strict 7d from whatever we have
     if (!Array.isArray(WEEK)) view = TODAY.filter(x => within7d(x.date));
     view = view.sort((a,b)=> (b.score||0)-(a.score||0));
   } else {
@@ -216,7 +220,7 @@ function render(cat){
     TODAY = Array.isArray(data.items) ? data.items : [];
     STAMP.textContent = 'Updated — ' + (data.updated || new Date().toISOString());
 
-    // opportunistically load 7d file
+    // try 7d file
     try{
       const r7  = await fetch('/data/news_7d.json', {cache:'no-store'});
       if (r7.ok){
@@ -225,13 +229,13 @@ function render(cat){
       }
     }catch(_){ /* optional */ }
 
-    // Initial render (deep link support ?cat=grid)
+    // deep link ?cat=
     const url  = new URL(location.href);
     const deep = (url.searchParams.get('cat') || 'all').toLowerCase();
     setTab(deep);
     render(deep);
 
-    // Tab switching
+    // tab switching
     TABS.addEventListener('click', ev=>{
       const b = ev.target.closest('.tab'); if(!b) return;
       const cat = b.dataset.cat;
