@@ -1,245 +1,505 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>PTD Today — Daily Energy & Power News</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#dfd3bd">
-<meta name="description" content="Daily Energy & Power News. First to Know. First to Lead.">
-<link rel="icon" href="data:,">
-<style>
-  :root{
-    --paper:#e6dcc7; --ink:#1c1b18; --muted:#6e675c;
-    --pill:#d9ccb3;  --link:#153e9f; --card:#efe7d4; --pillOn:#eadfc8;
-  }
-  html,body{margin:0;background:var(--paper);color:var(--ink);font-family:Georgia,'Times New Roman',serif}
-  .wrap{max-width:900px;margin:0 auto;padding:26px 18px 60px}
-  header h1{font-size:56px;line-height:1.05;margin:10px 0 6px}
-  header p.tag{margin:0 0 22px;color:var(--muted);font-style:italic;font-size:20px}
-  h2.kicker{margin:0 0 16px;font-size:28px;letter-spacing:.3px}
-  .tabs{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 18px}
-  .tab{padding:10px 14px;border-radius:999px;background:var(--pill);cursor:pointer;font-weight:600}
-  .tab.active{background:var(--pillOn);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
-  .stamp{display:inline-block;background:var(--card);border-radius:999px;padding:10px 14px;margin:8px 0 18px;color:var(--muted)}
-  .list{display:flex;flex-direction:column;gap:22px}
-  .card{display:grid;grid-template-columns:110px 1fr;gap:16px;background:var(--card);border-radius:16px;padding:16px}
-  .thumb{width:110px;height:84px;border-radius:8px;background:#d7cfbb;display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .thumb img{width:100%;height:100%;object-fit:cover}
-  .meta{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-  .title{margin:0 0 8px;font-size:24px;line-height:1.15}
-  .title a{color:var(--link);text-decoration:none}
-  .title a:hover{text-decoration:underline}
-  .actions{display:flex;flex-wrap:wrap;gap:8px}
-  .btn{background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:999px;padding:9px 14px;font-weight:600;cursor:pointer}
-  .btn:active{transform:translateY(1px)}
-  footer{margin:36px 0 0;color:var(--muted);text-align:center}
-  dialog{border:none;border-radius:14px;padding:0;box-shadow:0 14px 60px rgba(0,0,0,.25)}
-  .sheet{padding:14px}
-  .sheet h3{margin:10px 12px 8px}
-  .sheet .sbtn{display:block;width:100%;text-align:left;padding:12px 14px;border:0;background:#fff}
-  .sheet .sbtn + .sbtn{border-top:1px solid #eee}
-  @media (max-width:560px){
-    .card{grid-template-columns:88px 1fr}
-    .thumb{width:88px;height:72px}
-    .title{font-size:20px}
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PTD Today — Daily Energy & Power News</title>
+  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, Protection, HVDC, Renewables, Policy, AI and Data Centers." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><rect width='256' height='256' rx='48' fill='%23e7dcc8'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='124' font-family='Georgia,Times,serif' fill='%232b2b2b'>P</text></svg>">
+
+  <style>
+    /* =========================
+       PTD Today — WSJ-style skin
+       ========================= */
+
+    :root{
+      --bg:#E7DCC8;
+      --bg-2:#EFE6D6;
+      --ink:#2B2B2B;
+      --muted:#6F675D;
+      --brand:#143A79;          /* headline links */
+      --pill:#D6C9B3;
+      --pill-ink:#1f2f46;
+      --pill-active:#c6b497;
+      --card:#F6EFE3;
+      --card-border:#e1d7c6;
+      --btn:#e8ddcb;
+      --btn-ink:#143A79;
+      --shadow:0 10px 24px rgba(0,0,0,.05);
+      --radius:18px;
+    }
+
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg);
+      color:var(--ink); font-family: Georgia, "Times New Roman", Times, serif;
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    }
+
+    .wrap{max-width:980px; margin:0 auto; padding:28px 18px 80px}
+
+    header h1{
+      font-size:56px; line-height:1; margin:0 0 6px; letter-spacing:.2px
+    }
+    header .motto{
+      margin:0 0 22px; color:var(--muted); font-style:italic; font-size:22px;
+    }
+
+    h2.section{
+      margin: 2px 0 16px; font-size:40px; line-height:1.1;
+    }
+
+    /* Pills (filters / tabs) */
+    .pills{ display:flex; flex-wrap:wrap; gap:12px; margin: 6px 0 14px }
+    .pill{
+      appearance:none; border:0; cursor:pointer; padding:10px 16px;
+      background:var(--pill); color:var(--pill-ink);
+      border-radius: 28px; font-size:16px; line-height:1; box-shadow:var(--shadow);
+      transition:.2s transform ease, .2s background ease;
+      user-select:none;
+    }
+    .pill:hover{ transform:translateY(-1px) }
+    .pill[aria-selected="true"]{ background:var(--pill-active); font-weight:700 }
+
+    /* Status bar */
+    .status{
+      margin:14px 0 26px; background: var(--bg-2);
+      border-radius: 16px; padding:12px 16px; display:flex; align-items:center; gap:10px;
+      color:var(--muted); font-size:15px; box-shadow:var(--shadow);
+    }
+    .status .dot{ width:10px; height:10px; border-radius:50%; background:#48a868; display:inline-block }
+
+    /* Cards */
+    .grid{ display:grid; grid-template-columns: 1fr; gap:18px }
+    @media (min-width:680px){ .grid{ grid-template-columns: 1fr 1fr } }
+
+    article.card{
+      background:var(--card); border:1px solid var(--card-border);
+      border-radius: var(--radius); padding:16px; box-shadow:var(--shadow);
+      display:grid; grid-template-columns: 92px 1fr; gap:14px; align-items:start;
+    }
+
+    .thumb{
+      width:92px; height:92px; border-radius:12px; overflow:hidden; background:#d8ccb7;
+      display:flex; align-items:center; justify-content:center; border:1px solid var(--card-border)
+    }
+    .thumb img{ width:100%; height:100%; object-fit:cover; display:block }
+    .thumb .ph{
+      font-size:11px; line-height:1.15; color:#635a50; text-align:center; padding:6px
+    }
+
+    .meta{
+      color:var(--muted); font-size:13px; letter-spacing:.15px; margin:0 0 6px
+    }
+
+    .headline{
+      margin:0 0 10px; font-size:22px; line-height:1.18; font-weight:700
+    }
+    .headline a{ color:var(--brand); text-decoration:none }
+    .headline a:hover{ text-decoration:underline }
+
+    .cta-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px }
+    .btn{
+      background: var(--btn); color: var(--btn-ink);
+      padding:9px 12px; border-radius: 26px; border:1px solid var(--card-border);
+      text-decoration:none; font-weight:700; font-size:14px
+    }
+    .btn.secondary{ font-weight:600 }
+    .btn.linkish{ background: transparent; border:0; padding:0; color: var(--brand); text-decoration:underline; cursor:pointer }
+
+    /* Empty state */
+    .empty{
+      padding: 48px 16px; margin: 6px 0 36px;
+      background: var(--bg-2); border-radius: 16px; text-align:center; color: var(--muted);
+      border:1px dashed #c9bda9
+    }
+
+    /* Footer */
+    footer{ margin-top:36px; color:var(--muted); font-size:15px }
+
+    /* Small top nav on mobile bottom bar overlap spacing */
+    .spacer{ height:40px }
+  </style>
 </head>
 <body>
   <div class="wrap">
     <header>
       <h1>PTD Today</h1>
-      <p class="tag">First to Know. First to Lead.</p>
-      <h2 class="kicker">Daily Energy &amp; Power News</h2>
+      <p class="motto">First to Know. First to Lead.</p>
+      <h2 class="section">Daily Energy &amp; Power News</h2>
     </header>
 
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-cat="all">All</button>
-      <button class="tab" data-cat="top">Top (7d)</button>
-      <button class="tab" data-cat="grid">Grid</button>
-      <button class="tab" data-cat="substations">Substations</button>
-      <button class="tab" data-cat="protection">Protection</button>
-      <button class="tab" data-cat="cables">Cables</button>
-      <button class="tab" data-cat="hvdc">HVDC</button>
-      <button class="tab" data-cat="renewables">Renewables</button>
-      <button class="tab" data-cat="policy">Policy</button>
-      <button class="tab" data-cat="ai">AI</button>
-      <button class="tab" data-cat="datacenters">Data Centers</button>
+    <!-- Tabs + topic filters -->
+    <nav class="pills" id="tabs">
+      <button class="pill" data-tab="all" aria-selected="true">All</button>
+      <button class="pill" data-tab="top7d">Top (7d)</button>
+      <button class="pill" data-filter="Grid">Grid</button>
+      <button class="pill" data-filter="Substations">Substations</button>
+      <button class="pill" data-filter="Protection">Protection</button>
+      <button class="pill" data-filter="Cables">Cables</button>
+      <button class="pill" data-filter="HVDC">HVDC</button>
+      <button class="pill" data-filter="Renewables">Renewables</button>
+      <button class="pill" data-filter="Policy">Policy</button>
+      <button class="pill" data-filter="AI">AI</button>
+      <button class="pill" data-filter="Data Centers">Data Centers</button>
     </nav>
 
-    <div class="stamp" id="stamp">Updated —</div>
-    <section class="list" id="list"></section>
+    <div class="status" id="status">
+      <span class="dot"></span>
+      <span id="updated">Loading…</span>
+    </div>
 
-    <footer>© 2025 PTD Today • Headlines link to their original publishers.</footer>
+    <!-- Results -->
+    <section id="results" class="grid" aria-live="polite"></section>
+    <div id="empty" class="empty" style="display:none">No stories found.</div>
+
+    <footer>
+      <p>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
+    </footer>
+    <div class="spacer"></div>
   </div>
 
-  <!-- Share sheet -->
-  <dialog id="shareDlg">
-    <div class="sheet">
-      <h3>Share</h3>
-      <button class="sbtn" data-share="linkedin">LinkedIn</button>
-      <button class="sbtn" data-share="x">X (Twitter)</button>
-      <button class="sbtn" data-share="facebook">Facebook</button>
-      <button class="sbtn" data-share="reddit">Reddit</button>
-      <button class="sbtn" data-share="copy">Copy link</button>
-      <button class="sbtn" data-share="email">Email</button>
-      <button class="sbtn" id="closeShare">Close ×</button>
-    </div>
-  </dialog>
+  <script>
+  /* ============================================================
+     PTD Today index logic
+     - Robustly loads /data/news.json  (recent)
+     - Loads /data/7d.json for Top (7d)
+     - Normalizes item shapes
+     - Renders thumbnails with fallbacks
+     - Topic filters + deep-linkable tabs via ?tab=top7d&topic=HVDC
+     ============================================================ */
 
-<script>
-const LIST  = document.getElementById('list');
-const STAMP = document.getElementById('stamp');
-const TABS  = document.getElementById('tabs');
-const SHARE = document.getElementById('shareDlg');
+  (function(){
+    const $ = (sel, node=document)=>node.querySelector(sel);
+    const $$ = (sel, node=document)=>[...node.querySelectorAll(sel)];
 
-let TODAY = [];     // from /data/news.json  (your daily/weekend logic)
-let WEEK  = null;   // from /data/news_7d.json (strict last 7 days)
-let CURRENT = 'all';
+    const RESULTS = $('#results');
+    const EMPTY = $('#empty');
+    const STATUS = $('#status');
+    const UPDATED = $('#updated');
+    const TABS = $('#tabs');
 
-/* ---------- Utilities ---------- */
+    const NOW_ISO = new Date().toISOString();
+    $('#yr').textContent = String(new Date().getFullYear());
 
-function getImage(it){
-  return it.image || it.img || it.thumbnail || it.thumb || it.picture || it.image_url || '';
-}
+    // ---- Configuration
+    const DATA_RECENT = '/data/news.json';
+    const DATA_TOP7D  = '/data/7d.json';
 
-function prox(u){
-  if(!u) return '';
-  return 'https://wsrv.nl/?w=330&h=220&fit=cover&url=' + encodeURIComponent(u);
-}
+    // Category synonyms mapping to keep filters working even if data varies
+    const CANON = {
+      'GRID':'Grid','SUBSTATION':'Substations','SUBSTATIONS':'Substations',
+      'PROTECTION':'Protection','CABLE':'Cables','CABLES':'Cables',
+      'HVDC':'HVDC','RENEWABLE':'Renewables','RENEWABLES':'Renewables',
+      'POLICY':'Policy','AI':'AI','DATA CENTER':'Data Centers','DATA CENTERS':'Data Centers',
+      'DATACENTER':'Data Centers','DATACENTERS':'Data Centers','DC':'Data Centers'
+    };
 
-// unchanged: Fri–Mon window logic
-function computeWindow(now=new Date()){
-  const d = new Date(now);
-  const wd = d.getUTCDay();
-  const start = new Date(d); const end = new Date(d);
-  if (wd === 6){
-    start.setUTCDate(d.getUTCDate()-1); start.setUTCHours(0,0,0,0);
-    end.setUTCHours(23,59,59,999);
-  } else if (wd === 0){
-    start.setUTCDate(d.getUTCDate()-2); start.setUTCHours(0,0,0,0);
-    end.setUTCHours(23,59,59,999);
-  } else if (wd === 1){
-    start.setUTCDate(d.getUTCDate()-3); start.setUTCHours(0,0,0,0);
-    end.setUTCHours(23,59,59,999);
-  } else {
-    start.setUTCHours(0,0,0,0);
-    end.setUTCHours(23,59,59,999);
-  }
-  return {start,end};
-}
+    // Keep state
+    let ALL_ITEMS = [];    // recent news
+    let TOP_ITEMS = [];    // top 7d
+    let activeTab = 'all';
+    let activeTopic = '';  // e.g., "HVDC"
 
-function within7d(iso){
-  const t = Date.parse(iso);
-  return (Date.now() - t) <= 7*24*3600*1000;
-}
+    // Utilities
+    const toCanon = (val='')=>{
+      if(!val) return '';
+      const key = String(val).trim().toUpperCase();
+      return CANON[key] || CANON[key.replace(/S$/,'')] || (val && val[0].toUpperCase()+val.slice(1));
+    };
 
-function setTab(cat){
-  CURRENT = cat;
-  [...TABS.querySelectorAll('.tab')]
-    .forEach(b => b.classList.toggle('active', b.dataset.cat===cat));
-}
+    const parseDate = (v)=>{
+      const s = v || '';
+      try{
+        if(!s) return null;
+        return new Date(s);
+      }catch(e){ return null; }
+    };
 
-function openShareSheet(link){
-  SHARE.showModal();
-  SHARE.onclick = (e)=>{
-    const btn = e.target.closest('[data-share]'); if(!btn) return;
-    const what = btn.dataset.share;
-    const u = encodeURIComponent(link);
-    if(what==='linkedin') location.href = `https://www.linkedin.com/sharing/share-offsite/?url=${u}`;
-    if(what==='x')        location.href = `https://twitter.com/intent/tweet?url=${u}`;
-    if(what==='facebook') location.href = `https://www.facebook.com/sharer/sharer.php?u=${u}`;
-    if(what==='reddit')   location.href = `https://www.reddit.com/submit?url=${u}`;
-    if(what==='copy')     navigator.clipboard.writeText(link);
-    if(what==='email')    location.href = `mailto:?subject=PTD Today&body=${u}`;
-    SHARE.close();
-  };
-  document.getElementById('closeShare').onclick = ()=>SHARE.close();
-}
+    const fmtDate = (d)=>{
+      // 2025-10-07T11:45:24Z => "2025-10-07 11:45Z"
+      try{
+        const iso = d.toISOString();
+        return iso.replace('T',' ').replace(/:\d\dZ$/,'Z');
+      }catch(e){ return NOW_ISO.replace('T',' ').replace(/:\d\dZ$/,'Z'); }
+    };
 
-function cardHTML(it){
-  const rawImg = getImage(it);
-  const thumb  = rawImg ? `<img src="${prox(rawImg)}" alt="">` : '';
-  const when   = new Date(it.date).toISOString().replace('.000Z','Z');
-  return `
-  <article class="card">
-    <div class="thumb">${thumb || '<span style="font-size:22px;color:#7f7769">🗞️</span>'}</div>
-    <div>
-      <div class="meta">${(it.category||'').toUpperCase()} • ${it.source||''} • ${when} • Score: ${Number(it.score||0).toFixed(3)}</div>
-      <h3 class="title"><a href="${it.url}" target="_blank" rel="noopener">${it.title}</a></h3>
-      <div class="actions">
-        <a class="btn" href="${it.short || it.url}" target="_blank" rel="noopener">Open on PTD Today</a>
-        <a class="btn" href="${it.url}"   target="_blank" rel="noopener">Source</a>
-        <button class="btn" data-share="${it.short || it.url}">Share</button>
-      </div>
-    </div>
-  </article>`;
-}
+    const pick = (obj, keys)=>keys.map(k=>obj[k]).find(v=>v!==undefined && v!==null);
 
-function render(cat){
-  let base = (cat==='top' && Array.isArray(WEEK)) ? WEEK : TODAY;
-  let view = base.slice();
+    // Normalize an incoming story item to our internal shape
+    const normalize = (raw)=>{
+      const title = pick(raw, ['title','headline','name']) || '';
+      const url   = pick(raw, ['url','link','href']) || '#';
+      const publisher = pick(raw, ['publisher','source','domain','site']) || '';
+      const categoryRaw = pick(raw, ['category','topic','section','tags']) || '';
+      const pdate = pick(raw, ['published','date','time','published_at']);
+      const score = pick(raw, ['score','rank','weight']);
+      const image = pick(raw, ['image','image_url','img','thumbnail']);
 
-  if (cat==='top'){
-    if (!Array.isArray(WEEK)) view = TODAY.filter(x => within7d(x.date));
-    view = view.sort((a,b)=> (b.score||0)-(a.score||0));
-  } else {
-    if (cat!=='all'){
-      const want = cat.toLowerCase();
-      view = view.filter(x => (x.category||'').toLowerCase() === want);
-    }
-    const {start,end} = computeWindow(new Date());
-    const lo = start.getTime(), hi = end.getTime();
-    view = view.filter(x=> {
-      const t = Date.parse(x.date);
-      return t>=lo && t<=hi;
-    }).sort((a,b)=> Date.parse(b.date)-Date.parse(a.date));
-  }
-
-  LIST.innerHTML = view.length
-    ? view.map(cardHTML).join('')
-    : `<p style="color:#6e675c;text-align:center;margin:40px 0;">No stories found.</p>`;
-
-  LIST.querySelectorAll('button[data-share]').forEach(b=>{
-    b.addEventListener('click', ()=>openShareSheet(b.dataset.share));
-  });
-}
-
-/* ---------- Boot ---------- */
-(async function(){
-  try{
-    const res  = await fetch('/data/news.json', {cache:'no-store'});
-    const data = await res.json();
-    TODAY = Array.isArray(data.items) ? data.items : [];
-    STAMP.textContent = 'Updated — ' + (data.updated || new Date().toISOString());
-
-    try{
-      const r7  = await fetch('/data/news_7d.json', {cache:'no-store'});
-      if (r7.ok){
-        const d7 = await r7.json();
-        if (Array.isArray(d7.items)) WEEK = d7.items;
+      // category: string or array
+      let cat = '';
+      if (Array.isArray(categoryRaw)) {
+        cat = toCanon(categoryRaw[0]||'');
+      } else if (typeof categoryRaw === 'string') {
+        // split on commas / slashes if needed
+        const first = categoryRaw.split(/[,\|/]/)[0];
+        cat = toCanon(first);
       }
-    }catch(_){}
 
-    const url  = new URL(location.href);
-    const deep = (url.searchParams.get('cat') || 'all').toLowerCase();
-    setTab(deep);
-    render(deep);
+      return {
+        title: String(title).trim(),
+        url: String(url).trim(),
+        publisher: String(publisher).replace(/^https?:\/\/(www\.)?/,'').trim(),
+        category: cat || '',
+        date: parseDate(pdate) || null,
+        score: (typeof score === 'number' ? score : null),
+        image: (image && String(image).trim()) || ''
+      };
+    };
 
-    TABS.addEventListener('click', ev=>{
-      const b = ev.target.closest('.tab'); if(!b) return;
-      const cat = b.dataset.cat;
-      setTab(cat);
-      history.replaceState(null,'', cat==='all' ? location.pathname : `?cat=${cat}`);
-      render(cat);
+    // Fallback tiny SVG thumb (kept inline so no external fetch)
+    const placeholderSVG = encodeURIComponent(
+      `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
+        <rect width='100%' height='100%' fill='#e8ddcb'/>
+        <g fill='#6f675d' font-family='Georgia,serif' font-size='14'>
+          <text x='50%' y='46%' text-anchor='middle'>PTD</text>
+          <text x='50%' y='60%' text-anchor='middle'>No Image</text>
+        </g>
+      </svg>`
+    );
+
+    // Renderers
+    const renderList = (items)=>{
+      RESULTS.innerHTML = '';
+      if(!items || items.length===0){
+        RESULTS.style.display = 'none';
+        EMPTY.style.display = 'block';
+        return;
+      }
+      EMPTY.style.display = 'none';
+      RESULTS.style.display = 'grid';
+
+      const frag = document.createDocumentFragment();
+
+      items.forEach(item=>{
+        const card = document.createElement('article');
+        card.className = 'card';
+        const metaBits = [];
+        if(item.category) metaBits.push(item.category.toUpperCase());
+        if(item.publisher) metaBits.push(item.publisher.toLowerCase());
+        if(item.date) metaBits.push(fmtDate(item.date)+'Z'.replace('ZZ','Z'));
+        if(item.score !== null) metaBits.push('SCORE: '+Number(item.score).toFixed(3));
+
+        const metaText = metaBits.join(' • ');
+
+        const imgHTML = item.image
+          ? `<img loading="lazy" src="${escapeHtml(item.image)}" alt="">`
+          : `<div class="ph">No Image</div>`;
+
+        card.innerHTML = `
+          <div class="thumb">${imgHTML}</div>
+          <div class="content">
+            <div class="meta">${escapeHtml(metaText)}</div>
+            <h3 class="headline"><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener"> ${escapeHtml(item.title)} </a></h3>
+            <div class="cta-row">
+              <a class="btn" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Open on PTD Today</a>
+              <a class="btn secondary" href="${sourceLink(item)}" target="_blank" rel="noopener">Source</a>
+              <button class="btn linkish" data-share='${encodeURIComponent(JSON.stringify({title:item.title,url:item.url}))}'>Share</button>
+            </div>
+          </div>
+        `;
+
+        // Handle broken/missing image visually
+        const imgEl = card.querySelector('img');
+        if(imgEl){
+          imgEl.addEventListener('error', ()=>{
+            card.querySelector('.thumb').innerHTML =
+              `<img src="data:image/svg+xml,${placeholderSVG}" alt="">`;
+          });
+        } else {
+          // if there's no img, inject placeholder SVG directly for layout stability
+          card.querySelector('.thumb').innerHTML =
+            `<img src="data:image/svg+xml,${placeholderSVG}" alt="">`;
+        }
+
+        frag.appendChild(card);
+      });
+
+      RESULTS.appendChild(frag);
+
+      // Share buttons (Web Share API if available)
+      $$('.btn.linkish', RESULTS).forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          try{
+            const data = JSON.parse(decodeURIComponent(btn.getAttribute('data-share')));
+            if(navigator.share){
+              await navigator.share({title:data.title, url:data.url});
+            }else{
+              await navigator.clipboard.writeText(data.url);
+              btn.textContent = 'Copied';
+              setTimeout(()=>btn.textContent='Share',1200);
+            }
+          }catch(e){}
+        });
+      });
+    };
+
+    const sourceLink = (item)=>{
+      // If we have a publisher, try to build a simple homepage link; otherwise fallback to the article url
+      if(item.publisher){
+        return 'https://' + item.publisher.replace(/^https?:\/\//,'').replace(/\/.+$/,'');
+      }
+      return item.url || '#';
+    };
+
+    // Tab engine
+    const setActiveTab = (tab)=> {
+      activeTab = tab;
+      $$('.pill[data-tab]').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===tab ? 'true':'false'));
+      // persist in URL
+      const qp = new URLSearchParams(location.search);
+      qp.set('tab', tab);
+      if(activeTopic) qp.set('topic', activeTopic);
+      else qp.delete('topic');
+      history.replaceState(null,'','?'+qp.toString());
+
+      filterAndRender();
+    };
+
+    const setActiveTopic = (topic)=>{
+      activeTopic = topic || '';
+      $$('.pill[data-filter]').forEach(b=>{
+        b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true':'false');
+      });
+      const qp = new URLSearchParams(location.search);
+      if(activeTopic) qp.set('topic', activeTopic);
+      else qp.delete('topic');
+      qp.set('tab', activeTab || 'all');
+      history.replaceState(null,'','?'+qp.toString());
+
+      filterAndRender();
+    };
+
+    const filterAndRender = ()=>{
+      const base = (activeTab==='top7d') ? TOP_ITEMS : ALL_ITEMS;
+      let list = base;
+
+      if(activeTopic){
+        list = list.filter(x=> (x.category||'').toLowerCase() === activeTopic.toLowerCase());
+      }
+
+      // Sort: Top tab by score desc then date desc; All tab by date desc then score
+      list = list.slice().sort((a,b)=>{
+        const ad = a.date ? a.date.getTime() : 0;
+        const bd = b.date ? b.date.getTime() : 0;
+        if(activeTab==='top7d'){
+          const as = (a.score ?? -999);
+          const bs = (b.score ?? -999);
+          if(bs!==as) return bs-as;
+          return bd-ad;
+        }
+        return bd-ad || ((b.score ?? -999) - (a.score ?? -999));
+      });
+
+      renderList(list);
+    };
+
+    // Event bindings
+    TABS.addEventListener('click', (ev)=>{
+      const b = ev.target.closest('.pill');
+      if(!b) return;
+
+      if(b.dataset.tab){
+        setActiveTab(b.dataset.tab);
+      }else if(b.dataset.filter){
+        setActiveTopic(b.dataset.filter);
+      }
     });
 
-  }catch(err){
-    console.error(err);
-    STAMP.textContent = 'Updated — error loading /data/news.json';
-    LIST.innerHTML = `<p style="color:#a00;text-align:center">Could not load news.json. Ensure it exists and is valid JSON.</p>`;
-  }
-})();
-</script>
+    // Loading + status helpers
+    const setUpdated = (d)=>{
+      UPDATED.textContent = 'Updated — ' + fmtDate(d || new Date()) + 'Z';
+    };
+
+    const escapeHtml = (s)=> String(s)
+      .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+      .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+
+    // Fetch with fallback and tight error messages on the page (no silent failure)
+    async function loadJson(url){
+      try{
+        const res = await fetch(url, {cache:'no-store'});
+        if(!res.ok) throw new Error('HTTP '+res.status);
+        const data = await res.json();
+        return data;
+      }catch(err){
+        console.error('Fetch failed for', url, err);
+        return null;
+      }
+    }
+
+    // When JSON carries a "meta.updated" use it; else derive latest
+    const deriveUpdated = (arr, metaUpdated)=>{
+      if(metaUpdated){
+        const d = parseDate(metaUpdated);
+        if(d) return d;
+      }
+      const latest = arr.reduce((m,x)=>{
+        if(x.date && (!m || x.date > m)) return x.date;
+        return m;
+      }, null);
+      return latest || new Date();
+    };
+
+    async function boot(){
+      // Read query params to respect deep links
+      const qp = new URLSearchParams(location.search);
+      const qTab = qp.get('tab');
+      const qTopic = qp.get('topic');
+
+      setUpdated(new Date()); // provisional
+
+      // Parallel loads
+      const [recentRaw, topRaw] = await Promise.all([ loadJson(DATA_RECENT), loadJson(DATA_TOP7D) ]);
+
+      // Normalize arrays that may be under "items" or the root
+      const recentArr = (recentRaw && (recentRaw.items || recentRaw.data || recentRaw.stories || recentRaw)) || [];
+      const topArr    = (topRaw    && (topRaw.items    || topRaw.data    || topRaw.stories    || topRaw))    || [];
+
+      ALL_ITEMS = recentArr.map(normalize).filter(x=>x.title && x.url);
+      TOP_ITEMS = topArr.map(normalize).filter(x=>x.title && x.url);
+
+      // If recent is empty but top has data, still avoid "No stories found" by defaulting tab to top7d
+      if(ALL_ITEMS.length===0 && TOP_ITEMS.length>0){ activeTab='top7d'; }
+
+      // Respect query params (only if valid)
+      if(qTab && (qTab==='all' || qTab==='top7d')) activeTab = qTab;
+      if(qTopic) activeTopic = toCanon(qTopic);
+
+      // reflect selected states on UI
+      $$('.pill[data-tab]').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===activeTab ? 'true':'false'));
+      $$('.pill[data-filter]').forEach(b=> b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true':'false'));
+
+      // Updated stamp from data when possible
+      const ud = deriveUpdated(
+        (activeTab==='top7d' ? TOP_ITEMS : ALL_ITEMS),
+        pick(recentRaw||{}, ['updated','lastUpdated','meta?.updated']) || pick(topRaw||{}, ['updated','lastUpdated'])
+      );
+      setUpdated(ud);
+
+      filterAndRender();
+
+      // If both feeds are empty, keep the page honest
+      if(ALL_ITEMS.length===0 && TOP_ITEMS.length===0){
+        RESULTS.style.display = 'none';
+        EMPTY.style.display = 'block';
+        EMPTY.textContent = 'No stories found (check /data/news.json and /data/7d.json).';
+      }
+    }
+
+    // Kick off
+    boot();
+  })();
+  </script>
 </body>
 </html>
