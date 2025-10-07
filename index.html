@@ -1,505 +1,201 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PTD Today — Daily Energy & Power News</title>
-  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, Protection, HVDC, Renewables, Policy, AI and Data Centers." />
+  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, HVDC, Renewables, Policy, AI, and Data Centers.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><rect width='256' height='256' rx='48' fill='%23e7dcc8'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='124' font-family='Georgia,Times,serif' fill='%232b2b2b'>P</text></svg>">
 
   <style>
-    /* =========================
-       PTD Today — WSJ-style skin
-       ========================= */
+    /* ===============================
+       PTD Today — WSJ-style interface
+       =============================== */
 
-    :root{
-      --bg:#E7DCC8;
-      --bg-2:#EFE6D6;
-      --ink:#2B2B2B;
-      --muted:#6F675D;
-      --brand:#143A79;          /* headline links */
-      --pill:#D6C9B3;
-      --pill-ink:#1f2f46;
-      --pill-active:#c6b497;
-      --card:#F6EFE3;
-      --card-border:#e1d7c6;
-      --btn:#e8ddcb;
-      --btn-ink:#143A79;
-      --shadow:0 10px 24px rgba(0,0,0,.05);
-      --radius:18px;
+    :root {
+      --bg:#E7DCC8; --bg2:#EFE6D6; --ink:#2B2B2B;
+      --muted:#6F675D; --brand:#143A79;
+      --pill:#D6C9B3; --pill-active:#c6b497;
+      --card:#F6EFE3; --border:#e1d7c6;
+      --radius:18px; --shadow:0 10px 24px rgba(0,0,0,.05);
     }
 
-    html,body{height:100%}
-    body{
-      margin:0; background:var(--bg);
-      color:var(--ink); font-family: Georgia, "Times New Roman", Times, serif;
-      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    body {
+      margin:0; background:var(--bg); color:var(--ink);
+      font-family:Georgia, "Times New Roman", Times, serif;
+      -webkit-font-smoothing:antialiased;
     }
 
-    .wrap{max-width:980px; margin:0 auto; padding:28px 18px 80px}
+    .wrap { max-width:960px; margin:auto; padding:32px 16px 100px; }
 
-    header h1{
-      font-size:56px; line-height:1; margin:0 0 6px; letter-spacing:.2px
-    }
-    header .motto{
-      margin:0 0 22px; color:var(--muted); font-style:italic; font-size:22px;
-    }
+    h1 { font-size:56px; margin:0; }
+    .motto { font-style:italic; color:var(--muted); margin-bottom:24px; }
+    h2 { font-size:40px; margin:0 0 16px; }
 
-    h2.section{
-      margin: 2px 0 16px; font-size:40px; line-height:1.1;
+    /* Tabs */
+    .pills { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+    .pill {
+      border:0; padding:10px 16px; border-radius:24px; cursor:pointer;
+      background:var(--pill); color:#1f2f46; font-size:16px;
+      box-shadow:var(--shadow); transition:.15s background;
     }
-
-    /* Pills (filters / tabs) */
-    .pills{ display:flex; flex-wrap:wrap; gap:12px; margin: 6px 0 14px }
-    .pill{
-      appearance:none; border:0; cursor:pointer; padding:10px 16px;
-      background:var(--pill); color:var(--pill-ink);
-      border-radius: 28px; font-size:16px; line-height:1; box-shadow:var(--shadow);
-      transition:.2s transform ease, .2s background ease;
-      user-select:none;
-    }
-    .pill:hover{ transform:translateY(-1px) }
-    .pill[aria-selected="true"]{ background:var(--pill-active); font-weight:700 }
+    .pill:hover { background:var(--pill-active); }
+    .pill[aria-selected="true"] { background:var(--pill-active); font-weight:700; }
 
     /* Status bar */
-    .status{
-      margin:14px 0 26px; background: var(--bg-2);
-      border-radius: 16px; padding:12px 16px; display:flex; align-items:center; gap:10px;
-      color:var(--muted); font-size:15px; box-shadow:var(--shadow);
+    .status {
+      display:flex; align-items:center; gap:10px;
+      background:var(--bg2); border-radius:16px; padding:10px 16px;
+      margin-bottom:20px; font-size:15px; color:var(--muted);
+      box-shadow:var(--shadow);
     }
-    .status .dot{ width:10px; height:10px; border-radius:50%; background:#48a868; display:inline-block }
+    .dot { width:10px; height:10px; border-radius:50%; background:#48a868; }
 
     /* Cards */
-    .grid{ display:grid; grid-template-columns: 1fr; gap:18px }
-    @media (min-width:680px){ .grid{ grid-template-columns: 1fr 1fr } }
+    .grid { display:grid; grid-template-columns:1fr; gap:18px; }
+    @media (min-width:680px){ .grid{ grid-template-columns:1fr 1fr; } }
 
-    article.card{
-      background:var(--card); border:1px solid var(--card-border);
-      border-radius: var(--radius); padding:16px; box-shadow:var(--shadow);
-      display:grid; grid-template-columns: 92px 1fr; gap:14px; align-items:start;
+    .card {
+      display:grid; grid-template-columns:90px 1fr; gap:14px;
+      background:var(--card); border:1px solid var(--border);
+      border-radius:var(--radius); box-shadow:var(--shadow); padding:16px;
+    }
+    .thumb { width:90px; height:90px; overflow:hidden; border-radius:12px; background:#ddd; display:flex; align-items:center; justify-content:center; }
+    .thumb img { width:100%; height:100%; object-fit:cover; }
+    .meta { font-size:13px; color:var(--muted); margin-bottom:4px; }
+    .headline { font-size:20px; margin:0 0 10px; }
+    .headline a { color:var(--brand); text-decoration:none; }
+    .headline a:hover { text-decoration:underline; }
+
+    .cta-row { display:flex; flex-wrap:wrap; gap:8px; }
+    .btn {
+      padding:8px 12px; border-radius:24px; border:1px solid var(--border);
+      background:var(--bg2); color:var(--brand); text-decoration:none;
+      font-weight:600; font-size:14px;
     }
 
-    .thumb{
-      width:92px; height:92px; border-radius:12px; overflow:hidden; background:#d8ccb7;
-      display:flex; align-items:center; justify-content:center; border:1px solid var(--card-border)
-    }
-    .thumb img{ width:100%; height:100%; object-fit:cover; display:block }
-    .thumb .ph{
-      font-size:11px; line-height:1.15; color:#635a50; text-align:center; padding:6px
+    .empty {
+      text-align:center; background:var(--bg2);
+      padding:48px 12px; border-radius:16px;
+      border:1px dashed var(--border); color:var(--muted);
     }
 
-    .meta{
-      color:var(--muted); font-size:13px; letter-spacing:.15px; margin:0 0 6px
-    }
-
-    .headline{
-      margin:0 0 10px; font-size:22px; line-height:1.18; font-weight:700
-    }
-    .headline a{ color:var(--brand); text-decoration:none }
-    .headline a:hover{ text-decoration:underline }
-
-    .cta-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px }
-    .btn{
-      background: var(--btn); color: var(--btn-ink);
-      padding:9px 12px; border-radius: 26px; border:1px solid var(--card-border);
-      text-decoration:none; font-weight:700; font-size:14px
-    }
-    .btn.secondary{ font-weight:600 }
-    .btn.linkish{ background: transparent; border:0; padding:0; color: var(--brand); text-decoration:underline; cursor:pointer }
-
-    /* Empty state */
-    .empty{
-      padding: 48px 16px; margin: 6px 0 36px;
-      background: var(--bg-2); border-radius: 16px; text-align:center; color: var(--muted);
-      border:1px dashed #c9bda9
-    }
-
-    /* Footer */
-    footer{ margin-top:36px; color:var(--muted); font-size:15px }
-
-    /* Small top nav on mobile bottom bar overlap spacing */
-    .spacer{ height:40px }
+    footer { margin-top:40px; color:var(--muted); font-size:15px; text-align:center; }
   </style>
 </head>
+
 <body>
-  <div class="wrap">
-    <header>
-      <h1>PTD Today</h1>
-      <p class="motto">First to Know. First to Lead.</p>
-      <h2 class="section">Daily Energy &amp; Power News</h2>
-    </header>
+<div class="wrap">
+  <h1>PTD Today</h1>
+  <p class="motto">First to Know. First to Lead.</p>
+  <h2>Daily Energy &amp; Power News</h2>
 
-    <!-- Tabs + topic filters -->
-    <nav class="pills" id="tabs">
-      <button class="pill" data-tab="all" aria-selected="true">All</button>
-      <button class="pill" data-tab="top7d">Top (7d)</button>
-      <button class="pill" data-filter="Grid">Grid</button>
-      <button class="pill" data-filter="Substations">Substations</button>
-      <button class="pill" data-filter="Protection">Protection</button>
-      <button class="pill" data-filter="Cables">Cables</button>
-      <button class="pill" data-filter="HVDC">HVDC</button>
-      <button class="pill" data-filter="Renewables">Renewables</button>
-      <button class="pill" data-filter="Policy">Policy</button>
-      <button class="pill" data-filter="AI">AI</button>
-      <button class="pill" data-filter="Data Centers">Data Centers</button>
-    </nav>
+  <nav class="pills" id="tabs">
+    <button class="pill" data-tab="all" aria-selected="true">All</button>
+    <button class="pill" data-tab="top7d">Top (7d)</button>
+    <button class="pill" data-filter="Grid">Grid</button>
+    <button class="pill" data-filter="Substations">Substations</button>
+    <button class="pill" data-filter="Protection">Protection</button>
+    <button class="pill" data-filter="Cables">Cables</button>
+    <button class="pill" data-filter="HVDC">HVDC</button>
+    <button class="pill" data-filter="Renewables">Renewables</button>
+    <button class="pill" data-filter="Policy">Policy</button>
+    <button class="pill" data-filter="AI">AI</button>
+    <button class="pill" data-filter="Data Centers">Data Centers</button>
+  </nav>
 
-    <div class="status" id="status">
-      <span class="dot"></span>
-      <span id="updated">Loading…</span>
-    </div>
+  <div class="status"><span class="dot"></span><span id="updated">Loading…</span></div>
 
-    <!-- Results -->
-    <section id="results" class="grid" aria-live="polite"></section>
-    <div id="empty" class="empty" style="display:none">No stories found.</div>
+  <section id="results" class="grid"></section>
+  <div id="empty" class="empty" style="display:none">No stories found.</div>
 
-    <footer>
-      <p>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
-    </footer>
-    <div class="spacer"></div>
-  </div>
+  <footer>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</footer>
+</div>
 
-  <script>
-  /* ============================================================
-     PTD Today index logic
-     - Robustly loads /data/news.json  (recent)
-     - Loads /data/7d.json for Top (7d)
-     - Normalizes item shapes
-     - Renders thumbnails with fallbacks
-     - Topic filters + deep-linkable tabs via ?tab=top7d&topic=HVDC
-     ============================================================ */
+<script>
+(function(){
+  const RESULTS=document.getElementById("results");
+  const EMPTY=document.getElementById("empty");
+  const UPDATED=document.getElementById("updated");
+  document.getElementById("yr").textContent=new Date().getFullYear();
 
-  (function(){
-    const $ = (sel, node=document)=>node.querySelector(sel);
-    const $$ = (sel, node=document)=>[...node.querySelectorAll(sel)];
+  const CANON={GRID:"Grid",SUBSTATION:"Substations",SUBSTATIONS:"Substations",
+    PROTECTION:"Protection",CABLE:"Cables",CABLES:"Cables",HVDC:"HVDC",
+    RENEWABLE:"Renewables",RENEWABLES:"Renewables",POLICY:"Policy",AI:"AI",
+    DATACENTER:"Data Centers","DATA CENTER":"Data Centers","DATA CENTERS":"Data Centers"};
 
-    const RESULTS = $('#results');
-    const EMPTY = $('#empty');
-    const STATUS = $('#status');
-    const UPDATED = $('#updated');
-    const TABS = $('#tabs');
+  let ALL=[],TOP=[],activeTab="all",activeTopic="";
 
-    const NOW_ISO = new Date().toISOString();
-    $('#yr').textContent = String(new Date().getFullYear());
+  const canon=v=>CANON[(v||"").trim().toUpperCase()]||v;
+  const pDate=v=>v?new Date(v):null;
+  const fDate=d=>d?d.toISOString().replace("T"," ").replace(/:\d\dZ$/,"Z"):"";
 
-    // ---- Configuration
-    const DATA_RECENT = '/data/news.json';
-    const DATA_TOP7D  = '/data/7d.json';
+  async function load(url){
+    try{const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw 0;return await r.json();}catch(e){return null;}
+  }
 
-    // Category synonyms mapping to keep filters working even if data varies
-    const CANON = {
-      'GRID':'Grid','SUBSTATION':'Substations','SUBSTATIONS':'Substations',
-      'PROTECTION':'Protection','CABLE':'Cables','CABLES':'Cables',
-      'HVDC':'HVDC','RENEWABLE':'Renewables','RENEWABLES':'Renewables',
-      'POLICY':'Policy','AI':'AI','DATA CENTER':'Data Centers','DATA CENTERS':'Data Centers',
-      'DATACENTER':'Data Centers','DATACENTERS':'Data Centers','DC':'Data Centers'
+  const normalize=o=>{
+    const title=o.title||o.headline||"";
+    const url=o.url||o.link||"#";
+    const cat=Array.isArray(o.category)?canon(o.category[0]):canon(o.category);
+    return {
+      title, url,
+      publisher:(o.publisher||o.source||"").replace(/^https?:\/\/(www\.)?/,""),
+      category:cat||"",
+      date:pDate(o.published||o.date||o.time),
+      score:typeof o.score==="number"?o.score:null,
+      image:o.image||o.image_url||""
     };
+  };
 
-    // Keep state
-    let ALL_ITEMS = [];    // recent news
-    let TOP_ITEMS = [];    // top 7d
-    let activeTab = 'all';
-    let activeTopic = '';  // e.g., "HVDC"
-
-    // Utilities
-    const toCanon = (val='')=>{
-      if(!val) return '';
-      const key = String(val).trim().toUpperCase();
-      return CANON[key] || CANON[key.replace(/S$/,'')] || (val && val[0].toUpperCase()+val.slice(1));
-    };
-
-    const parseDate = (v)=>{
-      const s = v || '';
-      try{
-        if(!s) return null;
-        return new Date(s);
-      }catch(e){ return null; }
-    };
-
-    const fmtDate = (d)=>{
-      // 2025-10-07T11:45:24Z => "2025-10-07 11:45Z"
-      try{
-        const iso = d.toISOString();
-        return iso.replace('T',' ').replace(/:\d\dZ$/,'Z');
-      }catch(e){ return NOW_ISO.replace('T',' ').replace(/:\d\dZ$/,'Z'); }
-    };
-
-    const pick = (obj, keys)=>keys.map(k=>obj[k]).find(v=>v!==undefined && v!==null);
-
-    // Normalize an incoming story item to our internal shape
-    const normalize = (raw)=>{
-      const title = pick(raw, ['title','headline','name']) || '';
-      const url   = pick(raw, ['url','link','href']) || '#';
-      const publisher = pick(raw, ['publisher','source','domain','site']) || '';
-      const categoryRaw = pick(raw, ['category','topic','section','tags']) || '';
-      const pdate = pick(raw, ['published','date','time','published_at']);
-      const score = pick(raw, ['score','rank','weight']);
-      const image = pick(raw, ['image','image_url','img','thumbnail']);
-
-      // category: string or array
-      let cat = '';
-      if (Array.isArray(categoryRaw)) {
-        cat = toCanon(categoryRaw[0]||'');
-      } else if (typeof categoryRaw === 'string') {
-        // split on commas / slashes if needed
-        const first = categoryRaw.split(/[,\|/]/)[0];
-        cat = toCanon(first);
-      }
-
-      return {
-        title: String(title).trim(),
-        url: String(url).trim(),
-        publisher: String(publisher).replace(/^https?:\/\/(www\.)?/,'').trim(),
-        category: cat || '',
-        date: parseDate(pdate) || null,
-        score: (typeof score === 'number' ? score : null),
-        image: (image && String(image).trim()) || ''
-      };
-    };
-
-    // Fallback tiny SVG thumb (kept inline so no external fetch)
-    const placeholderSVG = encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
-        <rect width='100%' height='100%' fill='#e8ddcb'/>
-        <g fill='#6f675d' font-family='Georgia,serif' font-size='14'>
-          <text x='50%' y='46%' text-anchor='middle'>PTD</text>
-          <text x='50%' y='60%' text-anchor='middle'>No Image</text>
-        </g>
-      </svg>`
-    );
-
-    // Renderers
-    const renderList = (items)=>{
-      RESULTS.innerHTML = '';
-      if(!items || items.length===0){
-        RESULTS.style.display = 'none';
-        EMPTY.style.display = 'block';
-        return;
-      }
-      EMPTY.style.display = 'none';
-      RESULTS.style.display = 'grid';
-
-      const frag = document.createDocumentFragment();
-
-      items.forEach(item=>{
-        const card = document.createElement('article');
-        card.className = 'card';
-        const metaBits = [];
-        if(item.category) metaBits.push(item.category.toUpperCase());
-        if(item.publisher) metaBits.push(item.publisher.toLowerCase());
-        if(item.date) metaBits.push(fmtDate(item.date)+'Z'.replace('ZZ','Z'));
-        if(item.score !== null) metaBits.push('SCORE: '+Number(item.score).toFixed(3));
-
-        const metaText = metaBits.join(' • ');
-
-        const imgHTML = item.image
-          ? `<img loading="lazy" src="${escapeHtml(item.image)}" alt="">`
-          : `<div class="ph">No Image</div>`;
-
-        card.innerHTML = `
-          <div class="thumb">${imgHTML}</div>
-          <div class="content">
-            <div class="meta">${escapeHtml(metaText)}</div>
-            <h3 class="headline"><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener"> ${escapeHtml(item.title)} </a></h3>
-            <div class="cta-row">
-              <a class="btn" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Open on PTD Today</a>
-              <a class="btn secondary" href="${sourceLink(item)}" target="_blank" rel="noopener">Source</a>
-              <button class="btn linkish" data-share='${encodeURIComponent(JSON.stringify({title:item.title,url:item.url}))}'>Share</button>
-            </div>
+  const render=list=>{
+    RESULTS.innerHTML="";
+    if(!list.length){EMPTY.style.display="block";return;}
+    EMPTY.style.display="none";
+    const frag=document.createDocumentFragment();
+    list.forEach(x=>{
+      const art=document.createElement("article");art.className="card";
+      const meta=[x.category.toUpperCase(),x.publisher.toLowerCase(),fDate(x.date),x.score?("SCORE: "+x.score.toFixed(3)):""].filter(Boolean).join(" • ");
+      art.innerHTML=`
+        <div class="thumb">${x.image?`<img src="${x.image}" alt="">`:`<svg width="80" height="80"><rect width="100%" height="100%" fill="#d8ccb7"/><text x="50%" y="55%" font-size="12" fill="#6f675d" text-anchor="middle">No Image</text></svg>`}</div>
+        <div>
+          <div class="meta">${meta}</div>
+          <h3 class="headline"><a href="${x.url}" target="_blank">${x.title}</a></h3>
+          <div class="cta-row">
+            <a class="btn" href="${x.url}" target="_blank">Open</a>
+            <a class="btn" href="https://${x.publisher}" target="_blank">Source</a>
           </div>
-        `;
-
-        // Handle broken/missing image visually
-        const imgEl = card.querySelector('img');
-        if(imgEl){
-          imgEl.addEventListener('error', ()=>{
-            card.querySelector('.thumb').innerHTML =
-              `<img src="data:image/svg+xml,${placeholderSVG}" alt="">`;
-          });
-        } else {
-          // if there's no img, inject placeholder SVG directly for layout stability
-          card.querySelector('.thumb').innerHTML =
-            `<img src="data:image/svg+xml,${placeholderSVG}" alt="">`;
-        }
-
-        frag.appendChild(card);
-      });
-
-      RESULTS.appendChild(frag);
-
-      // Share buttons (Web Share API if available)
-      $$('.btn.linkish', RESULTS).forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          try{
-            const data = JSON.parse(decodeURIComponent(btn.getAttribute('data-share')));
-            if(navigator.share){
-              await navigator.share({title:data.title, url:data.url});
-            }else{
-              await navigator.clipboard.writeText(data.url);
-              btn.textContent = 'Copied';
-              setTimeout(()=>btn.textContent='Share',1200);
-            }
-          }catch(e){}
-        });
-      });
-    };
-
-    const sourceLink = (item)=>{
-      // If we have a publisher, try to build a simple homepage link; otherwise fallback to the article url
-      if(item.publisher){
-        return 'https://' + item.publisher.replace(/^https?:\/\//,'').replace(/\/.+$/,'');
-      }
-      return item.url || '#';
-    };
-
-    // Tab engine
-    const setActiveTab = (tab)=> {
-      activeTab = tab;
-      $$('.pill[data-tab]').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===tab ? 'true':'false'));
-      // persist in URL
-      const qp = new URLSearchParams(location.search);
-      qp.set('tab', tab);
-      if(activeTopic) qp.set('topic', activeTopic);
-      else qp.delete('topic');
-      history.replaceState(null,'','?'+qp.toString());
-
-      filterAndRender();
-    };
-
-    const setActiveTopic = (topic)=>{
-      activeTopic = topic || '';
-      $$('.pill[data-filter]').forEach(b=>{
-        b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true':'false');
-      });
-      const qp = new URLSearchParams(location.search);
-      if(activeTopic) qp.set('topic', activeTopic);
-      else qp.delete('topic');
-      qp.set('tab', activeTab || 'all');
-      history.replaceState(null,'','?'+qp.toString());
-
-      filterAndRender();
-    };
-
-    const filterAndRender = ()=>{
-      const base = (activeTab==='top7d') ? TOP_ITEMS : ALL_ITEMS;
-      let list = base;
-
-      if(activeTopic){
-        list = list.filter(x=> (x.category||'').toLowerCase() === activeTopic.toLowerCase());
-      }
-
-      // Sort: Top tab by score desc then date desc; All tab by date desc then score
-      list = list.slice().sort((a,b)=>{
-        const ad = a.date ? a.date.getTime() : 0;
-        const bd = b.date ? b.date.getTime() : 0;
-        if(activeTab==='top7d'){
-          const as = (a.score ?? -999);
-          const bs = (b.score ?? -999);
-          if(bs!==as) return bs-as;
-          return bd-ad;
-        }
-        return bd-ad || ((b.score ?? -999) - (a.score ?? -999));
-      });
-
-      renderList(list);
-    };
-
-    // Event bindings
-    TABS.addEventListener('click', (ev)=>{
-      const b = ev.target.closest('.pill');
-      if(!b) return;
-
-      if(b.dataset.tab){
-        setActiveTab(b.dataset.tab);
-      }else if(b.dataset.filter){
-        setActiveTopic(b.dataset.filter);
-      }
+        </div>`;
+      frag.appendChild(art);
     });
+    RESULTS.appendChild(frag);
+  };
 
-    // Loading + status helpers
-    const setUpdated = (d)=>{
-      UPDATED.textContent = 'Updated — ' + fmtDate(d || new Date()) + 'Z';
-    };
+  const filterRender=()=>{
+    let base=activeTab==="top7d"?TOP:ALL;
+    if(activeTopic)base=base.filter(x=>x.category.toLowerCase()===activeTopic.toLowerCase());
+    base.sort((a,b)=>{
+      if(activeTab==="top7d")return (b.score||0)-(a.score||0)||b.date-a.date;
+      return b.date-a.date;
+    });
+    render(base);
+  };
 
-    const escapeHtml = (s)=> String(s)
-      .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
-      .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+  document.getElementById("tabs").addEventListener("click",e=>{
+    const b=e.target.closest(".pill"); if(!b)return;
+    if(b.dataset.tab){activeTab=b.dataset.tab;document.querySelectorAll("[data-tab]").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===activeTab));}
+    if(b.dataset.filter){activeTopic=b.dataset.filter;document.querySelectorAll("[data-filter]").forEach(x=>x.setAttribute("aria-selected",x.dataset.filter===activeTopic));}
+    filterRender();
+  });
 
-    // Fetch with fallback and tight error messages on the page (no silent failure)
-    async function loadJson(url){
-      try{
-        const res = await fetch(url, {cache:'no-store'});
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const data = await res.json();
-        return data;
-      }catch(err){
-        console.error('Fetch failed for', url, err);
-        return null;
-      }
-    }
-
-    // When JSON carries a "meta.updated" use it; else derive latest
-    const deriveUpdated = (arr, metaUpdated)=>{
-      if(metaUpdated){
-        const d = parseDate(metaUpdated);
-        if(d) return d;
-      }
-      const latest = arr.reduce((m,x)=>{
-        if(x.date && (!m || x.date > m)) return x.date;
-        return m;
-      }, null);
-      return latest || new Date();
-    };
-
-    async function boot(){
-      // Read query params to respect deep links
-      const qp = new URLSearchParams(location.search);
-      const qTab = qp.get('tab');
-      const qTopic = qp.get('topic');
-
-      setUpdated(new Date()); // provisional
-
-      // Parallel loads
-      const [recentRaw, topRaw] = await Promise.all([ loadJson(DATA_RECENT), loadJson(DATA_TOP7D) ]);
-
-      // Normalize arrays that may be under "items" or the root
-      const recentArr = (recentRaw && (recentRaw.items || recentRaw.data || recentRaw.stories || recentRaw)) || [];
-      const topArr    = (topRaw    && (topRaw.items    || topRaw.data    || topRaw.stories    || topRaw))    || [];
-
-      ALL_ITEMS = recentArr.map(normalize).filter(x=>x.title && x.url);
-      TOP_ITEMS = topArr.map(normalize).filter(x=>x.title && x.url);
-
-      // If recent is empty but top has data, still avoid "No stories found" by defaulting tab to top7d
-      if(ALL_ITEMS.length===0 && TOP_ITEMS.length>0){ activeTab='top7d'; }
-
-      // Respect query params (only if valid)
-      if(qTab && (qTab==='all' || qTab==='top7d')) activeTab = qTab;
-      if(qTopic) activeTopic = toCanon(qTopic);
-
-      // reflect selected states on UI
-      $$('.pill[data-tab]').forEach(b=> b.setAttribute('aria-selected', b.dataset.tab===activeTab ? 'true':'false'));
-      $$('.pill[data-filter]').forEach(b=> b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true':'false'));
-
-      // Updated stamp from data when possible
-      const ud = deriveUpdated(
-        (activeTab==='top7d' ? TOP_ITEMS : ALL_ITEMS),
-        pick(recentRaw||{}, ['updated','lastUpdated','meta?.updated']) || pick(topRaw||{}, ['updated','lastUpdated'])
-      );
-      setUpdated(ud);
-
-      filterAndRender();
-
-      // If both feeds are empty, keep the page honest
-      if(ALL_ITEMS.length===0 && TOP_ITEMS.length===0){
-        RESULTS.style.display = 'none';
-        EMPTY.style.display = 'block';
-        EMPTY.textContent = 'No stories found (check /data/news.json and /data/7d.json).';
-      }
-    }
-
-    // Kick off
-    boot();
+  (async()=>{
+    const [n7d, news]=await Promise.all([load("/data/7d.json"),load("/data/news.json")]);
+    TOP=(n7d?.items||n7d||[]).map(normalize);
+    ALL=(news?.items||news||[]).map(normalize);
+    UPDATED.textContent="Updated — "+fDate(new Date());
+    filterRender();
   })();
-  </script>
+})();
+</script>
 </body>
 </html>
