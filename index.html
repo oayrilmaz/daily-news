@@ -1,201 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Energy & Power News</title>
-  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, HVDC, Renewables, Policy, AI, and Data Centers.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'><rect width='256' height='256' rx='48' fill='%23e7dcc8'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='124' font-family='Georgia,Times,serif' fill='%232b2b2b'>P</text></svg>">
-
-  <style>
-    /* ===============================
-       PTD Today — WSJ-style interface
-       =============================== */
-
-    :root {
-      --bg:#E7DCC8; --bg2:#EFE6D6; --ink:#2B2B2B;
-      --muted:#6F675D; --brand:#143A79;
-      --pill:#D6C9B3; --pill-active:#c6b497;
-      --card:#F6EFE3; --border:#e1d7c6;
-      --radius:18px; --shadow:0 10px 24px rgba(0,0,0,.05);
-    }
-
-    body {
-      margin:0; background:var(--bg); color:var(--ink);
-      font-family:Georgia, "Times New Roman", Times, serif;
-      -webkit-font-smoothing:antialiased;
-    }
-
-    .wrap { max-width:960px; margin:auto; padding:32px 16px 100px; }
-
-    h1 { font-size:56px; margin:0; }
-    .motto { font-style:italic; color:var(--muted); margin-bottom:24px; }
-    h2 { font-size:40px; margin:0 0 16px; }
-
-    /* Tabs */
-    .pills { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
-    .pill {
-      border:0; padding:10px 16px; border-radius:24px; cursor:pointer;
-      background:var(--pill); color:#1f2f46; font-size:16px;
-      box-shadow:var(--shadow); transition:.15s background;
-    }
-    .pill:hover { background:var(--pill-active); }
-    .pill[aria-selected="true"] { background:var(--pill-active); font-weight:700; }
-
-    /* Status bar */
-    .status {
-      display:flex; align-items:center; gap:10px;
-      background:var(--bg2); border-radius:16px; padding:10px 16px;
-      margin-bottom:20px; font-size:15px; color:var(--muted);
-      box-shadow:var(--shadow);
-    }
-    .dot { width:10px; height:10px; border-radius:50%; background:#48a868; }
-
-    /* Cards */
-    .grid { display:grid; grid-template-columns:1fr; gap:18px; }
-    @media (min-width:680px){ .grid{ grid-template-columns:1fr 1fr; } }
-
-    .card {
-      display:grid; grid-template-columns:90px 1fr; gap:14px;
-      background:var(--card); border:1px solid var(--border);
-      border-radius:var(--radius); box-shadow:var(--shadow); padding:16px;
-    }
-    .thumb { width:90px; height:90px; overflow:hidden; border-radius:12px; background:#ddd; display:flex; align-items:center; justify-content:center; }
-    .thumb img { width:100%; height:100%; object-fit:cover; }
-    .meta { font-size:13px; color:var(--muted); margin-bottom:4px; }
-    .headline { font-size:20px; margin:0 0 10px; }
-    .headline a { color:var(--brand); text-decoration:none; }
-    .headline a:hover { text-decoration:underline; }
-
-    .cta-row { display:flex; flex-wrap:wrap; gap:8px; }
-    .btn {
-      padding:8px 12px; border-radius:24px; border:1px solid var(--border);
-      background:var(--bg2); color:var(--brand); text-decoration:none;
-      font-weight:600; font-size:14px;
-    }
-
-    .empty {
-      text-align:center; background:var(--bg2);
-      padding:48px 12px; border-radius:16px;
-      border:1px dashed var(--border); color:var(--muted);
-    }
-
-    footer { margin-top:40px; color:var(--muted); font-size:15px; text-align:center; }
-  </style>
+  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, Protection, HVDC, Renewables, Policy, AI and Data Centers." />
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#E7DCC8" />
+  <link rel="preload" href="/assets/main.css" as="style" />
+  <link rel="stylesheet" href="/assets/main.css" />
 </head>
-
 <body>
-<div class="wrap">
-  <h1>PTD Today</h1>
-  <p class="motto">First to Know. First to Lead.</p>
-  <h2>Daily Energy &amp; Power News</h2>
+  <div class="wrap">
+    <header>
+      <h1>PTD Today</h1>
+      <p class="motto">First to Know. First to Lead.</p>
+      <h2 class="section">Daily Energy &amp; Power News</h2>
+    </header>
 
-  <nav class="pills" id="tabs">
-    <button class="pill" data-tab="all" aria-selected="true">All</button>
-    <button class="pill" data-tab="top7d">Top (7d)</button>
-    <button class="pill" data-filter="Grid">Grid</button>
-    <button class="pill" data-filter="Substations">Substations</button>
-    <button class="pill" data-filter="Protection">Protection</button>
-    <button class="pill" data-filter="Cables">Cables</button>
-    <button class="pill" data-filter="HVDC">HVDC</button>
-    <button class="pill" data-filter="Renewables">Renewables</button>
-    <button class="pill" data-filter="Policy">Policy</button>
-    <button class="pill" data-filter="AI">AI</button>
-    <button class="pill" data-filter="Data Centers">Data Centers</button>
-  </nav>
+    <!-- Tabs + topic filters -->
+    <nav class="pills" id="tabs" aria-label="Filters">
+      <button class="pill" data-tab="all" aria-selected="true">All</button>
+      <button class="pill" data-tab="top7d">Top (7d)</button>
+      <button class="pill" data-filter="Grid">Grid</button>
+      <button class="pill" data-filter="Substations">Substations</button>
+      <button class="pill" data-filter="Protection">Protection</button>
+      <button class="pill" data-filter="Cables">Cables</button>
+      <button class="pill" data-filter="HVDC">HVDC</button>
+      <button class="pill" data-filter="Renewables">Renewables</button>
+      <button class="pill" data-filter="Policy">Policy</button>
+      <button class="pill" data-filter="AI">AI</button>
+      <button class="pill" data-filter="Data Centers">Data Centers</button>
+    </nav>
 
-  <div class="status"><span class="dot"></span><span id="updated">Loading…</span></div>
+    <div class="status" id="status">
+      <span class="dot"></span>
+      <span id="updated">Loading…</span>
+    </div>
 
-  <section id="results" class="grid"></section>
-  <div id="empty" class="empty" style="display:none">No stories found.</div>
+    <!-- Results -->
+    <section id="results" class="grid" aria-live="polite"></section>
+    <div id="empty" class="empty" style="display:none">No stories found.</div>
 
-  <footer>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</footer>
-</div>
+    <footer>
+      <p>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
+    </footer>
+    <div class="spacer"></div>
+  </div>
 
-<script>
-(function(){
-  const RESULTS=document.getElementById("results");
-  const EMPTY=document.getElementById("empty");
-  const UPDATED=document.getElementById("updated");
-  document.getElementById("yr").textContent=new Date().getFullYear();
-
-  const CANON={GRID:"Grid",SUBSTATION:"Substations",SUBSTATIONS:"Substations",
-    PROTECTION:"Protection",CABLE:"Cables",CABLES:"Cables",HVDC:"HVDC",
-    RENEWABLE:"Renewables",RENEWABLES:"Renewables",POLICY:"Policy",AI:"AI",
-    DATACENTER:"Data Centers","DATA CENTER":"Data Centers","DATA CENTERS":"Data Centers"};
-
-  let ALL=[],TOP=[],activeTab="all",activeTopic="";
-
-  const canon=v=>CANON[(v||"").trim().toUpperCase()]||v;
-  const pDate=v=>v?new Date(v):null;
-  const fDate=d=>d?d.toISOString().replace("T"," ").replace(/:\d\dZ$/,"Z"):"";
-
-  async function load(url){
-    try{const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw 0;return await r.json();}catch(e){return null;}
-  }
-
-  const normalize=o=>{
-    const title=o.title||o.headline||"";
-    const url=o.url||o.link||"#";
-    const cat=Array.isArray(o.category)?canon(o.category[0]):canon(o.category);
-    return {
-      title, url,
-      publisher:(o.publisher||o.source||"").replace(/^https?:\/\/(www\.)?/,""),
-      category:cat||"",
-      date:pDate(o.published||o.date||o.time),
-      score:typeof o.score==="number"?o.score:null,
-      image:o.image||o.image_url||""
-    };
-  };
-
-  const render=list=>{
-    RESULTS.innerHTML="";
-    if(!list.length){EMPTY.style.display="block";return;}
-    EMPTY.style.display="none";
-    const frag=document.createDocumentFragment();
-    list.forEach(x=>{
-      const art=document.createElement("article");art.className="card";
-      const meta=[x.category.toUpperCase(),x.publisher.toLowerCase(),fDate(x.date),x.score?("SCORE: "+x.score.toFixed(3)):""].filter(Boolean).join(" • ");
-      art.innerHTML=`
-        <div class="thumb">${x.image?`<img src="${x.image}" alt="">`:`<svg width="80" height="80"><rect width="100%" height="100%" fill="#d8ccb7"/><text x="50%" y="55%" font-size="12" fill="#6f675d" text-anchor="middle">No Image</text></svg>`}</div>
-        <div>
-          <div class="meta">${meta}</div>
-          <h3 class="headline"><a href="${x.url}" target="_blank">${x.title}</a></h3>
-          <div class="cta-row">
-            <a class="btn" href="${x.url}" target="_blank">Open</a>
-            <a class="btn" href="https://${x.publisher}" target="_blank">Source</a>
-          </div>
-        </div>`;
-      frag.appendChild(art);
-    });
-    RESULTS.appendChild(frag);
-  };
-
-  const filterRender=()=>{
-    let base=activeTab==="top7d"?TOP:ALL;
-    if(activeTopic)base=base.filter(x=>x.category.toLowerCase()===activeTopic.toLowerCase());
-    base.sort((a,b)=>{
-      if(activeTab==="top7d")return (b.score||0)-(a.score||0)||b.date-a.date;
-      return b.date-a.date;
-    });
-    render(base);
-  };
-
-  document.getElementById("tabs").addEventListener("click",e=>{
-    const b=e.target.closest(".pill"); if(!b)return;
-    if(b.dataset.tab){activeTab=b.dataset.tab;document.querySelectorAll("[data-tab]").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===activeTab));}
-    if(b.dataset.filter){activeTopic=b.dataset.filter;document.querySelectorAll("[data-filter]").forEach(x=>x.setAttribute("aria-selected",x.dataset.filter===activeTopic));}
-    filterRender();
-  });
-
-  (async()=>{
-    const [n7d, news]=await Promise.all([load("/data/7d.json"),load("/data/news.json")]);
-    TOP=(n7d?.items||n7d||[]).map(normalize);
-    ALL=(news?.items||news||[]).map(normalize);
-    UPDATED.textContent="Updated — "+fDate(new Date());
-    filterRender();
-  })();
-})();
-</script>
+  <script src="/assets/app.js" defer></script>
 </body>
 </html>
