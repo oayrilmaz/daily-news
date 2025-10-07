@@ -1,0 +1,23 @@
+name: Build & Refresh data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *" # every 3 hours
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm -v
+      - run: node scripts/build.mjs
+      - name: Commit JSON
+        run: |
+          git config user.name "ptd-bot"
+          git config user.email "ptd-bot@users.noreply.github.com"
+          git add data/*.json
+          git commit -m "auto: refresh news feeds" || echo "no changes"
+          git push
