@@ -201,11 +201,12 @@
   };
 
   (async function boot(){
+    // Query params (deep links)
     const qp = new URLSearchParams(location.search);
     const qTab = qp.get('tab');
     const qTopic = qp.get('topic');
 
-    setUpdated(new Date());
+    setUpdated(new Date()); // provisional
 
     const [recentRaw, topRaw] = await Promise.all([ loadJson(DATA_RECENT), loadJson(DATA_TOP7D) ]);
     const recentArr = (recentRaw && (recentRaw.items||recentRaw.data||recentRaw.stories||recentRaw)) || [];
@@ -232,4 +233,9 @@
       EMPTY.textContent='No stories found (check /data/news.json and /data/7d.json).';
     }
   })();
+
+  // PWA basics
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  }
 })();
