@@ -99,33 +99,30 @@ let CURRENT = 'all';
 
 /* ---------- Utilities ---------- */
 
-// Map many possible image keys
 function getImage(it){
   return it.image || it.img || it.thumbnail || it.thumb || it.picture || it.image_url || '';
 }
 
-// Thumbnail via proxy (keep URL EXACTLY as provided)
 function prox(u){
   if(!u) return '';
   return 'https://wsrv.nl/?w=330&h=220&fit=cover&url=' + encodeURIComponent(u);
 }
 
-// your weekend/day window (unchanged)
+// unchanged: Fri–Mon window logic
 function computeWindow(now=new Date()){
   const d = new Date(now);
-  const wd = d.getUTCDay(); // 0 Sun .. 6 Sat
+  const wd = d.getUTCDay();
   const start = new Date(d); const end = new Date(d);
-
-  if (wd === 6){          // Saturday => Friday + Saturday
+  if (wd === 6){
     start.setUTCDate(d.getUTCDate()-1); start.setUTCHours(0,0,0,0);
     end.setUTCHours(23,59,59,999);
-  } else if (wd === 0){   // Sunday => Fri + Sat + Sun
+  } else if (wd === 0){
     start.setUTCDate(d.getUTCDate()-2); start.setUTCHours(0,0,0,0);
     end.setUTCHours(23,59,59,999);
-  } else if (wd === 1){   // Monday => Fri + Sat + Sun + Mon
+  } else if (wd === 1){
     start.setUTCDate(d.getUTCDate()-3); start.setUTCHours(0,0,0,0);
     end.setUTCHours(23,59,59,999);
-  } else {                // Tue–Fri => current day only
+  } else {
     start.setUTCHours(0,0,0,0);
     end.setUTCHours(23,59,59,999);
   }
@@ -184,16 +181,13 @@ function render(cat){
   let view = base.slice();
 
   if (cat==='top'){
-    // Prefer WEEK file; if missing, compute strict 7d from whatever we have
     if (!Array.isArray(WEEK)) view = TODAY.filter(x => within7d(x.date));
     view = view.sort((a,b)=> (b.score||0)-(a.score||0));
   } else {
-    // category filter
     if (cat!=='all'){
       const want = cat.toLowerCase();
       view = view.filter(x => (x.category||'').toLowerCase() === want);
     }
-    // enforce your daily/weekend window on TODAY set
     const {start,end} = computeWindow(new Date());
     const lo = start.getTime(), hi = end.getTime();
     view = view.filter(x=> {
@@ -214,28 +208,24 @@ function render(cat){
 /* ---------- Boot ---------- */
 (async function(){
   try{
-    // load today's window
     const res  = await fetch('/data/news.json', {cache:'no-store'});
     const data = await res.json();
     TODAY = Array.isArray(data.items) ? data.items : [];
     STAMP.textContent = 'Updated — ' + (data.updated || new Date().toISOString());
 
-    // try 7d file
     try{
       const r7  = await fetch('/data/news_7d.json', {cache:'no-store'});
       if (r7.ok){
         const d7 = await r7.json();
         if (Array.isArray(d7.items)) WEEK = d7.items;
       }
-    }catch(_){ /* optional */ }
+    }catch(_){}
 
-    // deep link ?cat=
     const url  = new URL(location.href);
     const deep = (url.searchParams.get('cat') || 'all').toLowerCase();
     setTab(deep);
     render(deep);
 
-    // tab switching
     TABS.addEventListener('click', ev=>{
       const b = ev.target.closest('.tab'); if(!b) return;
       const cat = b.dataset.cat;
