@@ -1,45 +1,77 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>%%TITLE%% — PTD Today</title>
-
-  <!-- Open Graph for social previews -->
-  <meta property="og:type" content="article">
-  <meta property="og:site_name" content="PTD Today">
-  <meta property="og:title" content="%%TITLE%%">
-  <meta property="og:description" content="%%DESC%%">
-  <meta property="og:image" content="%%IMG%%">
-  <meta property="og:url" content="%%CANON%%">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="stylesheet" href="/assets/main.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#d9c9aa" />
+  <title>PTD Today — Article</title>
+  <link rel="stylesheet" href="/assets/main.css" />
+  <meta property="og:title" content="PTD Today — Article" />
+  <meta property="og:image" content="/assets/og-default.png" />
+  <meta property="og:description" content="Energy & Power Transmission News" />
 </head>
 <body>
-  <div class="masthead" style="text-align:center">
-    <h1 class="brand">PTD Today</h1>
+  <header class="site-header">
+    <h1><a href="/">PTD Today</a></h1>
     <p class="motto">First to Know. First to Lead.</p>
-    <h2 class="tagline">You’re opening a story via PTD Today.</h2>
-  </div>
+  </header>
 
-  <main class="list" style="max-width:760px">
-    <article class="story">
-      <div class="thumb" style="flex:0 0 180px;height:120px">
-        <img src="%%IMG%%" referrerpolicy="no-referrer" alt="">
-      </div>
-      <div class="txt">
-        <h3 class="h" style="margin:0 0 10px;font-size:30px"><a href="%%ORIG%%">%%TITLE%%</a></h3>
-        <p>We’ll take you to the source:</p>
-        <div class="actions">
-          <a class="btn" href="%%ORIG%%">Continue to original article</a>
-          <a class="btn outline" href="/">Back to PTD Today</a>
-        </div>
-      </div>
+  <main id="article-view">
+    <div id="loading">Loading article...</div>
+    <article id="article" style="display:none;">
+      <h2 id="title"></h2>
+      <div id="meta"></div>
+      <img id="image" alt="" />
+      <p id="summary"></p>
+      <p><a id="source" href="#" target="_blank" rel="noopener">Read full article on source site →</a></p>
     </article>
   </main>
 
-  <!-- Safety redirect after a short delay -->
-  <script>setTimeout(()=>{location.replace("%%ORIG%%")},1200)</script>
+  <footer>
+    <p>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
+  </footer>
+
+  <script>
+  // simple viewer
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  async function loadArticle() {
+    const p = new URLSearchParams(location.search);
+    const id = p.get('id');
+    if (!id) {
+      document.getElementById('loading').textContent = 'No article selected.';
+      return;
+    }
+
+    try {
+      const res = await fetch('/data/news.json');
+      const data = await res.json();
+      const story = data.find(item => encodeURIComponent(item.title).toLowerCase().includes(id.toLowerCase()));
+
+      if (!story) {
+        document.getElementById('loading').textContent = 'Article not found.';
+        return;
+      }
+
+      document.getElementById('title').textContent = story.title;
+      document.getElementById('meta').textContent = `${story.publisher || ''} • ${story.category || ''}`;
+      document.getElementById('summary').textContent = story.summary || '';
+      if (story.image) {
+        document.getElementById('image').src = story.image;
+      } else {
+        document.getElementById('image').style.display = 'none';
+      }
+      document.getElementById('source').href = story.url;
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('article').style.display = 'block';
+      document.title = `PTD Today — ${story.title}`;
+    } catch (e) {
+      document.getElementById('loading').textContent = 'Error loading article.';
+    }
+  }
+
+  loadArticle();
+  </script>
 </body>
 </html>
