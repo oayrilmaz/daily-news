@@ -3,23 +3,25 @@
 <head>
   <!-- =========================================================
        PTD Today — Daily Energy & Power News
-       Production-grade index.html
+       index.html (no-search, long-form, production-ready)
        ========================================================= -->
 
+  <!-- ---------------- Meta / Basics ---------------- -->
   <meta charset="utf-8" />
   <meta http-equiv="x-ua-compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <title>PTD Today — Daily Energy &amp; Power News</title>
-  <meta name="description" content="PTD Today: Daily Energy & Power News across Grid, Substations, Protection, Cables, HVDC, Renewables, Policy, AI, Data Centers, Transport, Equipment, and Lead Times. First to Know. First to Lead." />
+  <meta name="description"
+        content="PTD Today: Daily Energy & Power News across Grid, Substations, Protection, Cables, HVDC, Renewables, Policy, AI, Data Centers, Transport, Equipment, and Lead Times. First to Know. First to Lead." />
   <meta name="theme-color" content="#E7DCC8" />
   <meta name="color-scheme" content="light only" />
 
-  <!-- Canonical & robots -->
+  <!-- ---------------- Canonical / Robots ------------- -->
   <link rel="canonical" href="https://ptdtoday.com/">
   <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
 
-  <!-- Open Graph -->
+  <!-- ---------------- Open Graph -------------------- -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="PTD Today — Daily Energy & Power News" />
@@ -27,25 +29,22 @@
   <meta property="og:image" content="/assets/og-default.png" />
   <meta property="og:url" content="https://ptdtoday.com/" />
 
-  <!-- Twitter -->
+  <!-- ---------------- Twitter Cards ----------------- -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="PTD Today — Daily Energy & Power News" />
   <meta name="twitter:description" content="First to Know. First to Lead." />
   <meta name="twitter:image" content="/assets/og-default.png" />
 
-  <!-- Icons / PWA -->
+  <!-- ---------------- Icons / PWA ------------------- -->
   <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
   <link rel="manifest" href="/manifest.webmanifest" />
 
-  <!-- Preloads -->
+  <!-- ---------------- CSS (main) -------------------- -->
   <link rel="preload" href="/assets/main.css" as="style" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
-  <!-- Styles -->
   <link rel="stylesheet" href="/assets/main.css" />
 
   <!-- =========================================================
-       JSON-LD structured data
+       JSON-LD (structured data)
        ========================================================= -->
   <script type="application/ld+json">
   {
@@ -58,20 +57,15 @@
       "@type": "Organization",
       "name": "PTD Today",
       "url": "https://ptdtoday.com/"
-    },
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://ptdtoday.com/?q={search_term_string}",
-      "query-input": "required name=search_term_string"
     }
   }
   </script>
 
   <!-- =========================================================
-       Inline head-only CSS adjustments (layout-safe)
+       Small, safe, inline adjustments for perfect centering
        ========================================================= -->
   <style>
-    /* Minimal head overrides to complement /assets/main.css */
+    /* Header centering + clickable title underline on hover */
     header.site-header { text-align:center; margin-bottom: 8px; }
     header.site-header h1 { margin: 0 0 6px; font-size:56px; line-height:1; letter-spacing:.2px; }
     header.site-header h1 a { color: inherit; text-decoration: none; }
@@ -79,7 +73,7 @@
     header.site-header .motto { margin: 0 0 22px; color: #6F675D; font-style: italic; font-size: 22px; }
     h2.section { text-align:center; }
     .site-title-row { display:flex; justify-content:center; }
-    /* Skip link accessibility */
+    /* skip link for accessibility */
     .skip-link {
       position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;
     }
@@ -87,33 +81,24 @@
       position:static; width:auto; height:auto; padding:8px 12px; background:#fff3cd; border-radius:8px;
       box-shadow:0 2px 12px rgba(0,0,0,.15);
     }
-    /* Search bar (optional, non-blocking) */
-    .searchbar {
-      display:flex; gap:8px; align-items:center; justify-content:center;
-      margin: 6px 0 18px;
-    }
-    .searchbar input {
-      width:min(680px, 92vw); padding:10px 12px; border-radius:10px; border:1px solid #d8ccb7; background:#f6efe3;
-      font-size:16px;
-    }
-    .searchbar button {
-      padding:10px 14px; border-radius:10px; border:1px solid #d8ccb7; background:#e8ddcb; color:#143A79; font-weight:700;
-      cursor:pointer;
-    }
   </style>
 </head>
 
 <body>
   <!-- =========================================================
-       Accessibility: skip link to results
+       Accessibility: “Skip to news list”
        ========================================================= -->
   <a href="#results" class="skip-link">Skip to news list</a>
 
+  <!-- =========================================================
+       Page Wrap
+       ========================================================= -->
   <div class="wrap" id="top">
+
     <!-- =======================================================
          Header (centered + clickable title)
          ======================================================= -->
-    <header class="site-header" role="banner">
+    <header class="site-header" role="banner" aria-label="Site header">
       <div class="site-title-row">
         <h1><a href="/" aria-label="Go to PTD Today Home">PTD Today</a></h1>
       </div>
@@ -122,19 +107,10 @@
     </header>
 
     <!-- =======================================================
-         Optional search (client-side filter)
-         ======================================================= -->
-    <form class="searchbar" role="search" aria-label="Search headlines" onsubmit="return false;">
-      <label class="sr-only" for="q">Search</label>
-      <input id="q" name="q" type="search" placeholder="Search headlines (e.g., HVDC, STATCOM, CoreWeave)…" autocomplete="off" />
-      <button id="qbtn" type="button" aria-label="Search">Search</button>
-      <button id="qclear" type="button" aria-label="Clear search">Clear</button>
-    </form>
-
-    <!-- =======================================================
-         Filter tabs (All / Top7d + topics)
+         Filter Pills: Tabs + Topics
          ======================================================= -->
     <nav class="pills" id="tabs" aria-label="Filters and topics" role="navigation">
+      <!-- Primary tabs -->
       <button class="pill" data-tab="all" aria-selected="true">All</button>
       <button class="pill" data-tab="top7d">Top (7d)</button>
 
@@ -147,18 +123,18 @@
       <button class="pill" data-filter="Renewables">Renewables</button>
       <button class="pill" data-filter="Policy">Policy</button>
 
-      <!-- Digital + infra -->
+      <!-- Digital & infrastructure -->
       <button class="pill" data-filter="AI">AI</button>
       <button class="pill" data-filter="Data Centers">Data Centers</button>
 
-      <!-- Extra topics requested -->
+      <!-- Additional topics you requested -->
       <button class="pill" data-filter="Transport">Transport</button>
       <button class="pill" data-filter="Equipment">Equipment</button>
       <button class="pill" data-filter="Lead Times">Lead Times</button>
     </nav>
 
     <!-- =======================================================
-         Status bar (last updated)
+         Status Bar (Updated — YYYY-MM-DD HH:MMZ)
          ======================================================= -->
     <div class="status" id="status" role="status" aria-live="polite">
       <span class="dot" aria-hidden="true"></span>
@@ -166,33 +142,41 @@
     </div>
 
     <!-- =======================================================
-         Results list (cards injected here)
+         Main Results Region
          ======================================================= -->
-    <main id="main" role="main">
+    <main id="main" role="main" aria-label="News list">
+      <!-- Cards are injected into #results by /assets/app.js -->
       <section id="results" class="grid" aria-live="polite" aria-busy="true"></section>
+      <!-- Empty state message -->
       <div id="empty" class="empty" style="display:none">No stories found.</div>
     </main>
 
     <!-- =======================================================
          Footer
          ======================================================= -->
-    <footer role="contentinfo">
+    <footer role="contentinfo" aria-label="Site footer">
       <hr style="border:0;height:1px;background:#e1d7c6;margin:28px 0;">
-      <nav aria-label="Footer" style="text-align:center;margin-bottom:12px">
+
+      <nav aria-label="Footer links" style="text-align:center;margin-bottom:12px">
         <a href="/" style="margin:0 8px;color:#143A79;text-decoration:none">Home</a>
         <a href="/sitemap.xml" style="margin:0 8px;color:#143A79;text-decoration:none">Sitemap</a>
         <a href="/robots.txt" style="margin:0 8px;color:#143A79;text-decoration:none">Robots</a>
-        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fptdtoday.com%2F" target="_blank" rel="noopener" style="margin:0 8px;color:#143A79;text-decoration:none">Share</a>
+        <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fptdtoday.com%2F"
+           target="_blank" rel="noopener" style="margin:0 8px;color:#143A79;text-decoration:none">Share</a>
       </nav>
-      <p style="text-align:center">© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
+
+      <p style="text-align:center">
+        © <span id="yr"></span> PTD Today • Headlines link to their original publishers.
+      </p>
     </footer>
 
-    <!-- Spacer so iOS bottom bar doesn't overlap -->
+    <!-- Spacer so mobile bottom bars don’t overlap the footer -->
     <div class="spacer" aria-hidden="true"></div>
-  </div>
+
+  </div> <!-- /wrap -->
 
   <!-- =========================================================
-       Templates (optional future use)
+       Templates (kept for future; not used directly today)
        ========================================================= -->
   <template id="card-template">
     <article class="card">
@@ -220,26 +204,7 @@
   </noscript>
 
   <!-- =========================================================
-       Bootstrapping variables (for app.js)
-       ========================================================= -->
-  <script>
-    // Expose minimal config if needed by /assets/app.js later
-    window.__PTD__ = {
-      endpoints: {
-        recent: '/data/news.json',
-        top7dCandidates: ['/data/7d.json','/data/news_7d.json']
-      }
-    };
-  </script>
-
-  <!-- =========================================================
-       Main application script
-       ========================================================= -->
-  <script src="/assets/app.js" defer></script>
-
-  <!-- =========================================================
-       Tiny inline script just for the footer year & search hooks
-       (kept here to avoid coupling with app.js rendering path)
+       Minimal inline boot: year + endpoint config for app.js
        ========================================================= -->
   <script>
     (function(){
@@ -247,31 +212,23 @@
       var yr = document.getElementById('yr');
       if (yr) yr.textContent = new Date().getFullYear();
 
-      // Search UI (client-side filter trigger via query param)
-      var q = document.getElementById('q');
-      var qbtn = document.getElementById('qbtn');
-      var qclear = document.getElementById('qclear');
-
-      function setQueryParam(k,v){
-        var sp = new URLSearchParams(location.search);
-        if (v) sp.set(k,v); else sp.delete(k);
-        history.replaceState(null,'','?'+sp.toString());
-        // app.js listens to activeTopic/tab; for text search we dispatch event
-        window.dispatchEvent(new CustomEvent('ptd:search', { detail: { q:v||'' } }));
-      }
-
-      if (qbtn) qbtn.addEventListener('click', function(){ setQueryParam('q', q.value.trim()); });
-      if (q) q.addEventListener('keydown', function(e){ if(e.key==='Enter'){ setQueryParam('q', q.value.trim()); } });
-      if (qclear) qclear.addEventListener('click', function(){ q.value=''; setQueryParam('q',''); });
-
-      // Pre-fill from URL if present
-      var sp = new URLSearchParams(location.search);
-      var qv = sp.get('q'); if (qv && q) q.value = qv;
+      // Expose endpoints to /assets/app.js (also works if absent)
+      window.__PTD__ = {
+        endpoints: {
+          recent: '/data/news.json',
+          top7dCandidates: ['/data/7d.json','/data/news_7d.json']
+        }
+      };
     })();
   </script>
 
   <!-- =========================================================
-       End of file
+       Main application script (renders the news)
+       ========================================================= -->
+  <script src="/assets/app.js" defer></script>
+
+  <!-- =========================================================
+       End of File
        ========================================================= -->
 </body>
 </html>
