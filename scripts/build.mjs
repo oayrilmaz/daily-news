@@ -1,284 +1,219 @@
-// scripts/build.mjs
-// PTD Today — Rolling 7-day archive builder (Node 20+; no external deps)
+// ===========================================================
+// PTD Today Builder — Rolling 7-Day Archive Version
+// ===========================================================
 //
-// Key difference from the basic version:
-// - Reads existing data/7d.json and data/news.json (if present)
-// - Merges newly fetched items with stored ones
-// - Trims to a true rolling 7 days so Top (7d) is always a full week
+// This script:
+// 1. Fetches multiple RSS/Atom/JSON feeds.
+// 2. Normalizes & merges new items with existing /data/7d.json.
+// 3. Keeps a rolling 7 days of news (so even old items remain visible).
+// 4. Saves:
+//      - /data/news.json → past 72 hours only
+//      - /data/7d.json   → full rolling 7 days
 //
-// Usage:
-//   node scripts/build.mjs
+// Run manually: node scripts/build.mjs
+// Auto via GitHub Actions: every 3 hours
 //
-// In GitHub Actions:
-//   - uses: actions/setup-node@v4
-//     with: { node-version: "20" }
-//   - run: node scripts/build.mjs
-//
-// Optional ENV:
-//   FEEDS        -> comma-separated feed URLs (override defaults)
-//   RECENT_HOURS -> default 72
-//   TOP7D_LIMIT  -> default 250 (enough for a busy week)
+// Node 20+ (no external dependencies)
 
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-/* ---------------------- Config ---------------------- */
-
-const DEFAULT_FEEDS = [
-  'https://www.utilitydive.com/feeds/news/',
-  'https://www.datacenterdynamics.com/en/rss/',
-  // Add more to increase coverage:
-  // 'https://www.pv-magazine.com/feed/',
-  // 'https://www.offshorewind.biz/feed/',
-  // 'https://www.rechargenews.com/rss/',
-  // 'https://www.ferc.gov/rss.xml',
-  // 'https://feeds.arstechnica.com/arstechnica/technology-lab'
-];
-const FEEDS = (process.env.FEEDS?.split(',').map(s => s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
-
-const DOMAIN_WEIGHT = {
-  'utilitydive.com': 1.00,
-  'datacenterdynamics.com': 0.90,
-  // Add more domains & weights as you like
-};
-
-const RECENT_HOURS = Number(process.env.RECENT_HOURS || 72);   // for data/news.json
-const TOP7D_LIMIT  = Number(process.env.TOP7D_LIMIT  || 250);  // generous cap for week
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const OUT_DIR    = path.resolve(__dirname, '../data');
-const NEWS_PATH  = path.join(OUT_DIR, 'news.json');
-const TOP7_PATH  = path.join(OUT_DIR, '7d.json');
+const __dirname = path.dirname(__filename);
 
-/* ---------------------- Helpers ---------------------- */
+const DATA_DIR = path.resolve(__dirname, "../data");
+const NEWS_PATH = path.join(DATA_DIR, "news.json");
+const WEEK_PATH = path.join(DATA_DIR, "7d.json");
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const FEEDS = [
+  "https://www.utilitydive.com/feeds/news/",
+  "https://www.datacenterdynamics.com/en/rss/",
+  "https://www.pv-magazine.com/feed/",
+  "https://www.offshorewind.biz/feed/",
+  "https://www.rechargenews.com/rss/",
+  "https://www.ferc.gov/rss.xml",
+  "https://feeds.arstechnica.com/arstechnica/technology-lab",
+  "https://www.energy.gov/rss",
+  "https://www.greentechmedia.com/rss",
+];
 
-function domainOf(u) {
-  try { return new URL(u).hostname.replace(/^www\./,'').toLowerCase(); }
-  catch { return ''; }
-}
+const HRS_72 = 72 * 3600 * 1000;
+const HRS_7D = 7 * 24 * 3600 * 1000;
 
-function safeISO(x) {
+// -----------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const clean = (s = "") => s.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+const safeISO = (x) => {
   const d = new Date(x || Date.now());
-  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  return isNaN(d) ? new Date().toISOString() : d.toISOString();
+};
+
+function domainOf(url = "") {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
-function hoursAgo(iso) {
-  const t = new Date(iso).getTime();
-  return (Date.now() - t) / 36e5;
+function guessCategory(title = "", url = "") {
+  const s = (title + " " + url).toLowerCase();
+  if (s.includes("hvdc")) return "HVDC";
+  if (s.includes("substation")) return "Substations";
+  if (s.includes("protection")) return "Protection";
+  if (s.includes("cable")) return "Cables";
+  if (s.includes("policy") || s.includes("ferc")) return "Policy";
+  if (s.includes("renewable") || s.includes("solar") || s.includes("wind"))
+    return "Renewables";
+  if (s.includes("ai") || s.includes("machine learning")) return "AI";
+  if (s.includes("data center") || s.includes("datacenter"))
+    return "Data Centers";
+  if (s.includes("transport") || s.includes("shipping")) return "Transport";
+  if (s.includes("transformer") || s.includes("switchgear"))
+    return "Equipment";
+  if (s.includes("lead time") || s.includes("supply chain"))
+    return "Lead Times";
+  if (s.includes("grid") || s.includes("transmission")) return "Grid";
+  return "Grid";
 }
 
-function sevenDaysAgoISO() {
-  return new Date(Date.now() - 7*24*3600*1000).toISOString();
+function scoreItem(url, published) {
+  const ageHrs = (Date.now() - new Date(published).getTime()) / 36e5;
+  return Math.max(0, 10 - ageHrs / 12); // simple recency score
 }
 
-function guessCategory(title = '', url = '') {
-  const s = (title + ' ' + url).toLowerCase();
-  if (s.includes('hvdc')) return 'HVDC';
-  if (s.includes('substation')) return 'Substations';
-  if (s.includes('protection')) return 'Protection';
-  if (s.includes('cable')) return 'Cables';
-  if (s.includes('policy') || s.includes('regulat')) return 'Policy';
-  if (s.includes('data center') || s.includes('datacenter')) return 'Data Centers';
-  if (s.includes('ai') || s.includes('machine learning') || s.includes('genai')) return 'AI';
-  if (s.includes('renewable') || s.includes('solar') || s.includes('wind')) return 'Renewables';
-  if (s.includes('transport') || s.includes('transit') || s.includes('rail') || s.includes('shipping')) return 'Transport';
-  if (s.includes('transformer') || s.includes('switchgear') || s.includes('breaker') || s.includes('equipment') || s.includes('statcom')) return 'Equipment';
-  if (s.includes('lead time') || s.includes('supply chain') || s.includes('backlog') || s.includes('delivery time') || s.includes('order book')) return 'Lead Times';
-  if (s.includes('grid') || s.includes('transmission') || s.includes('distribution')) return 'Grid';
-  return 'Grid';
-}
-
-function scoreItem(url, publishedISO) {
-  const d  = domainOf(url);
-  const w  = DOMAIN_WEIGHT[d] ?? 0.5;
-  const ah = Math.max(1, hoursAgo(publishedISO));
-  return (w / ah) * 10;
-}
-
-/* ---------------------- Parsers ---------------------- */
-
-function parseRSS(xml) {
-  const items = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
-  return items.map(b => {
-    const get = tag => (b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))||[])[1]?.trim() || '';
-    const cd  = s => s.replace(/<!\[CDATA\[|\]\]>/g,'').trim();
-    const title = cd(get('title'));
-    let link = cd(get('link')); if (!link) link = cd(get('guid'));
-    const pub  = get('pubDate') || get('updated') || get('date') || '';
-    const desc = cd(get('description'));
-    const imgMatch = desc.match(/<img[^>]*src=["']([^"']+)["']/i);
-    const image = imgMatch?.[1] || '';
-    return { title, url: link, published: safeISO(pub), image };
-  }).filter(x => x.title && x.url);
-}
-
-function parseAtom(xml) {
-  const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
-  return entries.map(b => {
-    const get = tag => (b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'))||[])[1]?.trim() || '';
-    const cd  = s => s.replace(/<!\[CDATA\[|\]\]>/g,'').trim();
-    const title = cd(get('title'));
-    let link = '';
-    const linkTags = b.match(/<link\b[^>]*>/gi) || [];
-    for (const lt of linkTags) {
-      const rel  = (lt.match(/\brel=["']([^"']+)["']/i)||[])[1]?.toLowerCase() || 'alternate';
-      const href = (lt.match(/\bhref=["']([^"']+)["']/i)||[])[1];
-      if (href && (rel === 'alternate' || rel === 'self')) { link = href; break; }
-    }
-    const pub = get('updated') || get('published') || '';
-    const imgMatch = b.match(/<media:content[^>]*url=["']([^"']+)["']/i) || b.match(/<img[^>]*src=["']([^"']+)["']/i);
-    const image = imgMatch?.[1] || '';
-    return { title, url: link, published: safeISO(pub), image };
-  }).filter(x => x.title && x.url);
-}
-
-function parseJSONFeed(jsonText) {
-  let j; try { j = JSON.parse(jsonText); } catch { return []; }
-  const items = Array.isArray(j) ? j : (j.items || []);
-  return items.map(it => {
-    const title = String(it.title || '').trim();
-    const url   = String(it.url || it.external_url || it.link || '').trim();
-    const pub   = safeISO(it.date_published || it.published || it.date || it.updated);
-    const image = it.image || it.banner_image || it.thumbnail || '';
-    return { title, url, published: pub, image };
-  }).filter(x => x.title && x.url);
-}
-
-function detectAndParse(body, contentType = '') {
-  const ct = contentType.toLowerCase();
-  if (ct.includes('application/json') || ct.includes('json')) return parseJSONFeed(body);
-  if (/<rss\b/i.test(body) || /<channel\b/i.test(body)) return parseRSS(body);
-  if (/<feed\b/i.test(body) || /<entry\b/i.test(body))   return parseAtom(body);
-  return parseRSS(body);
-}
-
-/* ---------------------- Fetch & Build ---------------------- */
-
-async function fetchText(url) {
-  const res = await fetch(url, { headers: { 'user-agent': 'ptd-bot/1.0 (+https://ptdtoday.com)' } });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  const ct  = res.headers.get('content-type') || '';
-  const txt = await res.text();
-  return { txt, ct };
-}
-
-function normalize(raw) {
-  const title = (raw.title || '').trim();
-  const url   = (raw.url || '').trim();
-  const published = safeISO(raw.published);
-  const publisher = domainOf(url);
-  const image = (raw.image || '').trim();
-  return {
-    title, url, publisher,
-    category: guessCategory(title, url),
-    published,
-    score: scoreItem(url, published),
-    image
-  };
-}
-
-async function readJSONIfExists(p) {
-  try { const s = await fs.readFile(p, 'utf8'); return JSON.parse(s); }
-  catch { return null; }
-}
-
-function toItemsArray(maybe) {
-  if (!maybe) return [];
-  if (Array.isArray(maybe)) return maybe;
-  if (Array.isArray(maybe.items)) return maybe.items;
-  return [];
-}
-
-function dedupeByUrl(items) {
+function dedupe(items) {
   const seen = new Set();
-  return items.filter(x=>{
-    const key = (x.url || '').trim();
-    if(!key) return false;
-    if(seen.has(key)) return false;
+  return items.filter((x) => {
+    const key = x.url?.trim();
+    if (!key || seen.has(key)) return false;
     seen.add(key);
     return true;
   });
 }
 
-function clampToWindow(items, msWindow) {
+function clampWindow(items, ms) {
   const now = Date.now();
-  return items.filter(x => {
+  return items.filter((x) => {
     const t = new Date(x.published).getTime();
-    return !Number.isNaN(t) && (now - t) <= msWindow && t <= now;
+    return t && now - t <= ms && t <= now;
   });
 }
 
-function sortByScoreThenDateDesc(a, b) {
-  const s = (b.score ?? 0) - (a.score ?? 0);
-  if (s !== 0) return s;
-  return new Date(b.published) - new Date(a.published);
+function normalize(raw) {
+  const title = clean(raw.title || "");
+  const url = raw.url || raw.link || "";
+  const published = safeISO(raw.published || raw.pubDate);
+  const publisher = domainOf(url);
+  const category = guessCategory(title, url);
+  const image =
+    raw.image ||
+    raw.image_url ||
+    (raw.description?.match(/<img[^>]*src=["']([^"']+)["']/i)?.[1] || "");
+  const score = scoreItem(url, published);
+  return { title, url, publisher, category, published, score, image };
 }
 
-async function main() {
-  console.log('PTD build: fetching feeds…');
+// -----------------------------------------------------------
+// Feed Parsing (RSS/Atom/JSON)
+// -----------------------------------------------------------
 
-  // 1) Fetch fresh items from feeds
-  let fetched = [];
-  for (const feed of FEEDS) {
+function parseFeed(text, url = "") {
+  if (/^\s*{/.test(text)) {
     try {
-      const { txt, ct } = await fetchText(feed);
-      const parsed = detectAndParse(txt, ct);
-      console.log(`  ✓ ${feed}  (${parsed.length} items)`);
-      fetched = fetched.concat(parsed);
-      await sleep(400); // be polite
-    } catch (err) {
-      console.warn(`  ⚠ feed error: ${feed} -> ${err.message}`);
+      const j = JSON.parse(text);
+      const arr = Array.isArray(j) ? j : j.items || [];
+      return arr.map(normalize);
+    } catch {
+      return [];
     }
   }
-  let freshNorm = fetched.map(normalize);
 
-  // 2) Load existing archives (if any)
-  const prevNewsRaw = await readJSONIfExists(NEWS_PATH);
-  const prevTopRaw  = await readJSONIfExists(TOP7_PATH);
-
-  const prevNews = toItemsArray(prevNewsRaw);
-  const prevTop  = toItemsArray(prevTopRaw);
-
-  // 3) Normalize prev items (ensure same shape)
-  const prevNewsNorm = prevNews.map(normalize);
-  const prevTopNorm  = prevTop.map(normalize);
-
-  // 4) Build news.json = freshNorm within RECENT_HOURS (72h)
-  const newsWindowMs = RECENT_HOURS * 3600 * 1000;
-  let newsMerged = dedupeByUrl([ ...freshNorm ]);
-  newsMerged = clampToWindow(newsMerged, newsWindowMs)
-    .sort((a,b)=> new Date(b.published) - new Date(a.published));
-
-  // 5) Build rolling 7d.json = (prevTopNorm ∪ prevNewsNorm ∪ freshNorm), last 7 days
-  const sevenWindowMs = 7 * 24 * 3600 * 1000;
-  let pool = [
-    ...freshNorm,
-    ...prevNewsNorm,   // bring forward anything recent that might roll out of feeds
-    ...prevTopNorm     // keep the last runs so we retain items from early week
-  ];
-
-  // Deduplicate, clamp to 7d, score-sort, cap
-  pool = dedupeByUrl(pool);
-  pool = clampToWindow(pool, sevenWindowMs);
-  pool.sort(sortByScoreThenDateDesc);
-  if (pool.length > TOP7D_LIMIT) pool = pool.slice(0, TOP7D_LIMIT);
-
-  // 6) Write files
-  await fs.mkdir(OUT_DIR, { recursive: true });
-  await fs.writeFile(NEWS_PATH, JSON.stringify(newsMerged, null, 2));
-  await fs.writeFile(TOP7_PATH, JSON.stringify({ updated: new Date().toISOString(), items: pool }, null, 2));
-
-  console.log(`Wrote:
-  - ${path.relative(process.cwd(), NEWS_PATH)} (${newsMerged.length} items)
-  - ${path.relative(process.cwd(), TOP7_PATH)} (${pool.length} items)
-Done.`);
+  const items = text.match(/<item[\s\S]*?<\/item>/gi) || [];
+  return items.map((b) => {
+    const get = (tag) =>
+      (b.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i")) ||
+        [])[1] || "";
+    const title = clean(get("title"));
+    const link = clean(get("link")) || clean(get("guid"));
+    const pub = get("pubDate") || get("date") || get("updated");
+    const desc = get("description");
+    const img =
+      desc.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || "";
+    return normalize({ title, url: link, published: pub, image: img });
+  });
 }
 
-main().catch(err => {
-  console.error('Build failed:', err);
+async function fetchFeed(feed) {
+  try {
+    const res = await fetch(feed);
+    const txt = await res.text();
+    return parseFeed(txt, feed);
+  } catch (e) {
+    console.warn("⚠️ Feed error:", feed, e.message);
+    return [];
+  }
+}
+
+// -----------------------------------------------------------
+// Build
+// -----------------------------------------------------------
+
+async function readOld(file) {
+  try {
+    const txt = await fs.readFile(file, "utf8");
+    const j = JSON.parse(txt);
+    return Array.isArray(j) ? j : j.items || [];
+  } catch {
+    return [];
+  }
+}
+
+async function build() {
+  console.log("📰 PTD Builder: Fetching feeds...");
+
+  let fetched = [];
+  for (const f of FEEDS) {
+    const arr = await fetchFeed(f);
+    console.log(`  ${f} → ${arr.length} items`);
+    fetched = fetched.concat(arr);
+    await sleep(400);
+  }
+
+  const fresh = dedupe(fetched);
+  console.log(`Fetched total unique: ${fresh.length}`);
+
+  // Load previous data
+  const old7d = await readOld(WEEK_PATH);
+  const oldNews = await readOld(NEWS_PATH);
+
+  // Combine everything for archive
+  let pool = dedupe([...fresh, ...old7d, ...oldNews]);
+  pool = clampWindow(pool, HRS_7D);
+  pool.sort((a, b) => b.score - a.score || new Date(b.published) - new Date(a.published));
+
+  const news72 = clampWindow(pool, HRS_72);
+
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.writeFile(
+    WEEK_PATH,
+    JSON.stringify({ updated: new Date().toISOString(), items: pool }, null, 2)
+  );
+  await fs.writeFile(NEWS_PATH, JSON.stringify(news72, null, 2));
+
+  console.log(`✅ Saved:
+  • /data/news.json → ${news72.length} items (72h)
+  • /data/7d.json   → ${pool.length} items (7d rolling)
+  Done ✅`);
+}
+
+// -----------------------------------------------------------
+
+build().catch((e) => {
+  console.error("❌ Build failed:", e);
   process.exit(1);
 });
