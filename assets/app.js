@@ -1,4 +1,4 @@
-/* PTD Today front-end logic
+/* PTD Today front-end logic (with B1+B2 timestamp fixes)
    - Loads /data/news.json (recent) and /data/7d.json (top)
    - Normalizes fields and categories
    - Deep-link tabs via ?tab=top7d&topic=HVDC
@@ -35,8 +35,18 @@
   };
 
   const parseDate = v => v ? new Date(v) : null;
-  const fmtDate   = d => d ? d.toISOString().replace('T',' ').replace(/:\d\dZ$/,'Z') : '';
-  const pick      = (obj, keys)=>keys.map(k=>obj?.[k]).find(v=>v!==undefined && v!==null);
+
+  // B2 — format ISO without duplicating Z (renders "... HH:MMZ")
+  const fmtDate = d => {
+    if(!d) return '';
+    // "2025-10-07T09:32:00.000Z" -> "2025-10-07 09:32Z"
+    return d.toISOString()
+      .replace('T',' ')
+      .replace(/:\d\d\.\d{3}Z$/,'Z')   // drop milliseconds
+      .replace(/:\d\dZ$/,'Z');         // ensure single trailing Z
+  };
+
+  const pick = (obj, keys)=>keys.map(k=>obj?.[k]).find(v=>v!==undefined && v!==null);
 
   // Normalize story objects from varied sources
   const normalize = raw=>{
@@ -95,7 +105,8 @@
       const metaBits=[];
       if(item.category) metaBits.push(item.category.toUpperCase());
       if(item.publisher) metaBits.push(item.publisher.toLowerCase());
-      if(item.date) metaBits.push(fmtDate(item.date)+'Z'.replace('ZZ','Z'));
+      // B1 — do NOT append 'Z' here; fmtDate already returns "...Z"
+      if(item.date) metaBits.push(fmtDate(item.date));
       if(item.score!==null) metaBits.push('SCORE: '+Number(item.score).toFixed(3));
       const metaText = metaBits.join(' • ');
 
@@ -187,7 +198,8 @@
     else if(b.dataset.filter) setActiveTopic(b.dataset.filter);
   });
 
-  const setUpdated = d => UPDATED.textContent = 'Updated — ' + (d?fmtDate(d):fmtDate(new Date())) + 'Z';
+  // B1 — no extra 'Z' appended here
+  const setUpdated = d => UPDATED.textContent = 'Updated — ' + (d ? fmtDate(d) : fmtDate(new Date()));
 
   async function loadJson(url){
     try{ const res = await fetch(url, {cache:'no-store'}); if(!res.ok) throw new Error('HTTP '+res.status); return await res.json(); }
@@ -201,12 +213,11 @@
   };
 
   (async function boot(){
-    // Query params (deep links)
     const qp = new URLSearchParams(location.search);
     const qTab = qp.get('tab');
     const qTopic = qp.get('topic');
 
-    setUpdated(new Date()); // provisional
+    setUpdated(new Date());
 
     const [recentRaw, topRaw] = await Promise.all([ loadJson(DATA_RECENT), loadJson(DATA_TOP7D) ]);
     const recentArr = (recentRaw && (recentRaw.items||recentRaw.data||recentRaw.stories||recentRaw)) || [];
@@ -234,7 +245,7 @@
     }
   })();
 
-  // PWA basics
+  // Optional PWA registration (safe no-op if file missing)
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
   }
