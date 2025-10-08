@@ -1,10 +1,12 @@
-/* PTD Today front-end logic — no-search version
+/* PTD Today front-end logic — fixed “All” + true 7-day aggregation
    - Loads /data/news.json and /data/7d.json (or /data/news_7d.json)
-   - Normalizes categories (incl. Transport, Equipment, Lead Times, AI)
-   - Deep-link tabs via ?tab=top7d&topic=AI
-   - Thumbnails with fallback SVG
-   - LinkedIn share popup + Copy Link fallback
-   - Robust: ignores future-dated items; auto-switches to Top(7d) if All is empty
+   - Builds:
+       ALL_ITEMS  := union(recent, top) within last 72h (so “All” really has today+recent)
+       TOP_ITEMS  := union(recent, top) within last 7d, sorted by score/date
+   - “All” tab now clears topic filters automatically
+   - Robust normalizer (Transport, Equipment, Lead Times, AI)
+   - Thumbnails with placeholder
+   - LinkedIn share popup + Copy Link
 */
 
 (function(){
@@ -14,14 +16,15 @@
   const RESULTS = $('#results');
   const EMPTY   = $('#empty');
   const UPDATED = $('#updated');
-  $('#yr') && ($('#yr').textContent = String(new Date().getFullYear()));
+  const YEAR_EL = $('#yr');
+  if (YEAR_EL) YEAR_EL.textContent = String(new Date().getFullYear());
 
   // Endpoints (allow override from window.__PTD__)
   const cfg = (window.__PTD__ && window.__PTD__.endpoints) || {};
   const DATA_RECENT = cfg.recent || '/data/news.json';
   const TOP7D_CANDIDATES = cfg.top7dCandidates || ['/data/7d.json','/data/news_7d.json'];
 
-  // Canonical categories
+  // Category canonicalization (adds Transport, Equipment, Lead Times)
   const CANON = {
     'GRID':'Grid','SUBSTATION':'Substations','SUBSTATIONS':'Substations',
     'PROTECTION':'Protection','CABLE':'Cables','CABLES':'Cables',
@@ -29,8 +32,10 @@
     'POLICY':'Policy','AI':'AI',
     'DATA CENTER':'Data Centers','DATA CENTERS':'Data Centers',
     'DATACENTER':'Data Centers','DATACENTERS':'Data Centers','DC':'Data Centers',
-    'TRANSPORT':'Transport','EQUIPMENT':'Equipment','LEAD TIME':'Lead Times','LEAD TIMES':'Lead Times'
+    'TRANSPORT':'Transport','EQUIPMENT':'Equipment',
+    'LEAD TIME':'Lead Times','LEAD TIMES':'Lead Times'
   };
+
   const toCanon = (val='')=>{
     if(!val) return '';
     const key = String(val).trim().toUpperCase();
@@ -40,28 +45,31 @@
   };
 
   const parseDate = v => v ? new Date(v) : null;
+  const nowISO = ()=> new Date().toISOString();
   const fmtDate = d => d ? d.toISOString().replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z').replace(/:\d\dZ$/,'Z') : '';
-
-  function inferCategory(title='', url=''){
-    const s=(String(title)+' '+String(url)).toLowerCase();
-    if(/\bhvdc\b/.test(s)) return 'HVDC';
-    if(/substation|iec 61850|bay control/.test(s)) return 'Substations';
-    if(/protection relay|distance protection|iec 60255|fault|arc flash/.test(s)) return 'Protection';
-    if(/cable|xlpe|subsea|hvac cable/.test(s)) return 'Cables';
-    if(/renewable|solar|wind|pv|geothermal|green hydrogen/.test(s)) return 'Renewables';
-    if(/policy|ferc|doe|nrel|commission|regulat/.test(s)) return 'Policy';
-    if(/\bai\b|machine learning|genai|llm|foundation model/.test(s)) return 'AI';
-    if(/data ?center|hyperscale|colocation|coreweave|cooling/.test(s)) return 'Data Centers';
-    if(/transport|transit|rail|port|shipping|ev fleet|charging/.test(s)) return 'Transport';
-    if(/transformer|breaker|switchgear|statcom|smes|synchronous condenser|equipment/.test(s)) return 'Equipment';
-    if(/lead time|backlog|supply chain|delivery time|order book|capacity constraints/.test(s)) return 'Lead Times';
-    if(/grid|transmission|distribution|miso|pjm|ercot|substation/.test(s)) return 'Grid';
-    return '';
-  }
 
   const pick = (o, ks)=>ks.map(k=>o?.[k]).find(v=>v!==undefined && v!==null);
 
-  const normalize = raw => {
+  // Heuristic category inference from title/url
+  function inferCategory(title='', url='') {
+    const s=(String(title)+' '+String(url)).toLowerCase();
+    if (/\bhvdc\b/.test(s)) return 'HVDC';
+    if (/substation|iec 61850|bay control/.test(s)) return 'Substations';
+    if (/protection relay|distance protection|iec 60255|fault|arc flash/.test(s)) return 'Protection';
+    if (/cable|xlpe|subsea|hvac cable/.test(s)) return 'Cables';
+    if (/renewable|solar|wind|pv|geothermal|green hydrogen/.test(s)) return 'Renewables';
+    if (/policy|ferc|doe|nrel|commission|regulat/.test(s)) return 'Policy';
+    if (/\bai\b|machine learning|genai|llm|foundation model/.test(s)) return 'AI';
+    if (/data ?center|hyperscale|colocation|coreweave|cooling/.test(s)) return 'Data Centers';
+    if (/transport|transit|rail|port|shipping|ev fleet|charging/.test(s)) return 'Transport';
+    if (/transformer|breaker|switchgear|statcom|smes|synchronous condenser|equipment/.test(s)) return 'Equipment';
+    if (/lead time|backlog|supply chain|delivery time|order book|capacity constraints/.test(s)) return 'Lead Times';
+    if (/grid|transmission|distribution|miso|pjm|ercot|substation/.test(s)) return 'Grid';
+    return '';
+  }
+
+  // Normalize an incoming item
+  const normalize = raw=>{
     const title = pick(raw,['title','headline','name']) || '';
     const url   = pick(raw,['url','link','href']) || '#';
     const publisher = (pick(raw,['publisher','source','domain','site','site_name']) || '')
@@ -76,7 +84,7 @@
     else if (typeof categoryRaw==='string') cat = toCanon(categoryRaw.split(/[,\|/]/)[0]);
     if (!cat) cat = inferCategory(title, url) || 'Grid';
 
-    // clamp future dates
+    // Guard against future-dated feed items
     const d = parseDate(pdate) || null;
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
@@ -92,7 +100,15 @@
     };
   };
 
-  // Placeholder image (SVG)
+  // Simple score fallback (freshness-prioritized)
+  function fallbackScore(item){
+    if (typeof item.score === 'number') return item.score;
+    if (!item.date) return 0;
+    const ageH = Math.max(1, (Date.now() - item.date.getTime())/36e5);
+    return 10 / ageH; // newer = higher
+  }
+
+  // Placeholder SVG thumbnail
   const placeholderSVG = encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
        <rect width='100%' height='100%' fill='#e8ddcb'/>
@@ -179,30 +195,153 @@
     list = list.slice().sort((a,b)=>{
       const ad=a.date? a.date.getTime():0, bd=b.date? b.date.getTime():0;
       if(activeTab==='top7d'){
-        const as=(a.score??-999), bs=(b.score??-999);
+        const as=fallbackScore(a), bs=fallbackScore(b);
         if(bs!==as) return bs-as;
         return bd-ad;
       }
-      return bd-ad || ((b.score??-999)-(a.score??-999));
+      return bd-ad || (fallbackScore(b)-fallbackScore(a));
     });
 
     renderList(list);
   };
 
+  // Clicking a tab
   const setActiveTab = tab=>{
     activeTab=tab;
+
+    // IMPORTANT: “All” must clear topic filters so everything shows.
+    if(tab==='all'){ activeTopic=''; }
+
+    // Update UI selection
     $$('.pill[data-tab]').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===tab ? 'true' : 'false'));
+    $$('.pill[data-filter]').forEach(b=>b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true' : 'false'));
+
+    // Update URL
     const qp = new URLSearchParams(location.search);
     qp.set('tab', tab);
     if(activeTopic) qp.set('topic', activeTopic); else qp.delete('topic');
     history.replaceState(null,'','?'+qp.toString());
+
     filterAndRender();
   };
 
+  // Clicking a topic pill
   const setActiveTopic = topic=>{
     activeTopic = topic || '';
     $$('.pill[data-filter]').forEach(b=>b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true' : 'false'));
+
     const qp = new URLSearchParams(location.search);
     if(activeTopic) qp.set('topic', activeTopic); else qp.delete('topic');
     qp.set('tab', activeTab||'all');
-    history.replaceState(null,'','?'+qp.to
+    history.replaceState(null,'','?'+qp.toString());
+
+    filterAndRender();
+  };
+
+  $('#tabs').addEventListener('click', ev=>{
+    const b = ev.target.closest('.pill'); if(!b) return;
+    if(b.dataset.tab) setActiveTab(b.dataset.tab);
+    else if(b.dataset.filter) setActiveTopic(b.dataset.filter);
+  });
+
+  const setUpdated = d => UPDATED.textContent = 'Updated — ' + (d ? fmtDate(d) : fmtDate(new Date()));
+
+  async function fetchJson(url){
+    try{ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return await r.json(); }
+    catch{ return null; }
+  }
+
+  async function loadTopRaw(){
+    for(const u of TOP7D_CANDIDATES){
+      const j = await fetchJson(u);
+      if(j) return j;
+    }
+    return null;
+  }
+
+  // Merge + dedupe (by URL, fallback key)
+  function dedupeMerge(arrA, arrB){
+    const out=[]; const seen=new Set();
+    const add = it=>{
+      if(!it || !it.title || !it.url) return;
+      const key = (it.url || '') || (it.title+'|'+(it.publisher||''));
+      if(seen.has(key)) return;
+      seen.add(key); out.push(it);
+    };
+    arrA.forEach(add); arrB.forEach(add);
+    return out;
+  }
+
+  const SEVEN_D_MS = 7*24*3600*1000;
+  const RECENT_MS  = 72*3600*1000;
+
+  function clampWindow(items, ms){
+    const now = Date.now();
+    return items.filter(x=> !x.date || (now - x.date.getTime()) <= ms);
+  }
+
+  function deriveUpdated(items, meta){
+    const now = new Date();
+    if(meta){ const d=new Date(meta); if(!Number.isNaN(d.getTime()) && d<=now) return d; }
+    const latest = items.reduce((m,x)=> (x.date && x.date<=now && (!m || x.date>m)) ? x.date : m, null);
+    return latest || now;
+  }
+
+  (async function boot(){
+    setUpdated(new Date()); // provisional
+
+    const [recentRaw, topRaw] = await Promise.all([ fetchJson(DATA_RECENT), loadTopRaw() ]);
+    const recentArr = (recentRaw && (recentRaw.items||recentRaw.data||recentRaw.stories||recentRaw)) || [];
+    const topArr    = (topRaw    && (topRaw.items   ||topRaw.data   ||topRaw.stories   ||topRaw))    || [];
+
+    // Normalize each list
+    let R = recentArr.map(normalize).filter(x=>x.title && x.url);
+    let T = topArr.map(normalize).filter(x=>x.title && x.url);
+
+    // Union of both sources (ensures 7d actually has multi-day span)
+    const UNION = dedupeMerge(R, T);
+
+    // Clamp “future” out, just in case
+    const now = Date.now();
+    const noFuture = it => (!it.date || it.date.getTime() <= now);
+    R = R.filter(noFuture);
+    T = T.filter(noFuture);
+    const U = UNION.filter(noFuture);
+
+    // Build views
+    ALL_ITEMS = clampWindow(U, RECENT_MS);        // last 72h from the union
+    TOP_ITEMS = clampWindow(U, SEVEN_D_MS);       // true last 7d from the union
+
+    // If recent is empty but 7d has content, default to 7d
+    if (ALL_ITEMS.length===0 && TOP_ITEMS.length>0) activeTab='top7d';
+
+    // Deep-link support
+    const qp = new URLSearchParams(location.search);
+    const qTab = qp.get('tab');
+    const qTopic = qp.get('topic');
+    if(qTab && (qTab==='all'||qTab==='top7d')) activeTab=qTab;
+    if(qTopic) activeTopic=toCanon(qTopic);
+
+    // Reflect selection UI
+    $$('.pill[data-tab]').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===activeTab ? 'true' : 'false'));
+    $$('.pill[data-filter]').forEach(b=>b.setAttribute('aria-selected', b.dataset.filter===activeTopic ? 'true' : 'false'));
+
+    // Updated timestamp: prefer meta, else latest in current view
+    const metaUpdated = (recentRaw && (recentRaw.updated||recentRaw.lastUpdated)) || (topRaw && (topRaw.updated||topRaw.lastUpdated));
+    setUpdated(deriveUpdated(activeTab==='top7d' ? TOP_ITEMS : ALL_ITEMS, metaUpdated));
+
+    filterAndRender();
+
+    // Final guard if absolutely nothing came through
+    if(ALL_ITEMS.length===0 && TOP_ITEMS.length===0){
+      RESULTS.style.display='none';
+      EMPTY.style.display='block';
+      EMPTY.textContent='No stories found (check /data/news.json and /data/7d.json).';
+    }
+  })();
+
+  // Optional PWA registration (safe no-op if missing)
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  }
+})();
