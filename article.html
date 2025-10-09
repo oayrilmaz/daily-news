@@ -1,77 +1,75 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#d9c9aa" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>PTD Today — Article</title>
-  <link rel="stylesheet" href="/assets/main.css" />
-  <meta property="og:title" content="PTD Today — Article" />
-  <meta property="og:image" content="/assets/og-default.png" />
-  <meta property="og:description" content="Energy & Power Transmission News" />
+
+  <meta name="description" content="PTD Today article view. First to Know. First to Lead.">
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="PTD Today"/>
+  <meta property="og:title" content="PTD Today — Article"/>
+  <meta property="og:description" content="Open the article and source."/>
+  <meta property="og:image" content="/assets/og-default.png"/>
+
+  <link rel="stylesheet" href="/assets/main.css">
+  <style>
+    .article-wrap { max-width: 820px; margin: 34px auto; padding: 0 16px; }
+    .hero { width:100%; height:280px; object-fit:cover; border-radius:8px; border:1px solid #d9ccb3; background:#f2eadc; }
+    .back { display:inline-block; margin-top:10px; color:#143A79; }
+    .meta-mini { color:#6f675d; font-size:13px; margin:6px 0 12px; }
+  </style>
 </head>
 <body>
-  <header class="site-header">
-    <h1><a href="/">PTD Today</a></h1>
-    <p class="motto">First to Know. First to Lead.</p>
-  </header>
-
-  <main id="article-view">
-    <div id="loading">Loading article...</div>
-    <article id="article" style="display:none;">
-      <h2 id="title"></h2>
-      <div id="meta"></div>
-      <img id="image" alt="" />
-      <p id="summary"></p>
-      <p><a id="source" href="#" target="_blank" rel="noopener">Read full article on source site →</a></p>
-    </article>
-  </main>
-
-  <footer>
-    <p>© <span id="yr"></span> PTD Today • Headlines link to their original publishers.</p>
-  </footer>
+  <div class="article-wrap">
+    <a class="back" href="/">← Back to PTD Today</a>
+    <h1 id="title">PTD Today — Article</h1>
+    <div class="meta-mini" id="meta"></div>
+    <img id="hero" class="hero" alt="Article image"/>
+    <div class="cta-row" style="margin-top:14px;">
+      <a class="btn" id="open">Open Article</a>
+      <a class="btn secondary" id="source" target="_blank" rel="noopener">Source</a>
+      <button class="btn linkish" id="share">Share</button>
+    </div>
+    <p style="margin-top:14px;color:#6f675d;">You’re viewing this on PTD Today. Click <strong>Source</strong> to visit the original publisher.</p>
+  </div>
 
   <script>
-  // simple viewer
-  document.getElementById('yr').textContent = new Date().getFullYear();
+    (function(){
+      const sp = new URLSearchParams(location.search);
+      const u   = sp.get('u') || '/';
+      const t   = sp.get('t') || 'PTD Today — Article';
+      const p   = sp.get('p') || '';
+      const c   = sp.get('c') || '';
+      const d   = sp.get('d') || '';
+      const img = sp.get('img') || '';
 
-  async function loadArticle() {
-    const p = new URLSearchParams(location.search);
-    const id = p.get('id');
-    if (!id) {
-      document.getElementById('loading').textContent = 'No article selected.';
-      return;
-    }
+      const titleEl = document.getElementById('title');
+      const metaEl  = document.getElementById('meta');
+      const hero    = document.getElementById('hero');
+      const openBtn = document.getElementById('open');
+      const srcBtn  = document.getElementById('source');
+      const share   = document.getElementById('share');
 
-    try {
-      const res = await fetch('/data/news.json');
-      const data = await res.json();
-      const story = data.find(item => encodeURIComponent(item.title).toLowerCase().includes(id.toLowerCase()));
+      titleEl.textContent = t;
+      metaEl.textContent  = [c.toUpperCase(), p, d ? d.replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z').replace(/:\d\dZ$/,'Z') : ''].filter(Boolean).join(' • ');
+      hero.src = img || '/assets/og-default.png';
+      openBtn.href = u;
+      srcBtn.href  = u;
 
-      if (!story) {
-        document.getElementById('loading').textContent = 'Article not found.';
-        return;
-      }
-
-      document.getElementById('title').textContent = story.title;
-      document.getElementById('meta').textContent = `${story.publisher || ''} • ${story.category || ''}`;
-      document.getElementById('summary').textContent = story.summary || '';
-      if (story.image) {
-        document.getElementById('image').src = story.image;
-      } else {
-        document.getElementById('image').style.display = 'none';
-      }
-      document.getElementById('source').href = story.url;
-
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('article').style.display = 'block';
-      document.title = `PTD Today — ${story.title}`;
-    } catch (e) {
-      document.getElementById('loading').textContent = 'Error loading article.';
-    }
-  }
-
-  loadArticle();
+      share.addEventListener('click', async ()=>{
+        const url = location.href;
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: t, url });
+          } else {
+            await navigator.clipboard.writeText(url);
+            share.textContent = 'Copied';
+            setTimeout(()=>share.textContent='Share', 1200);
+          }
+        } catch {}
+      });
+    })();
   </script>
 </body>
 </html>
