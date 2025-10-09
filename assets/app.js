@@ -1,9 +1,4 @@
-/* PTD Today — minimal front-end
-   - No filters. Shows today + yesterday (last 48h) from /data/news.json.
-   - Single “Share” button: links to PTD article page, not the external source.
-   - Thumbnails: story image if present, else publisher favicon via Google S2.
-*/
-
+/* PTD Today — no filters, today+yesterday, short share links */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
@@ -11,16 +6,12 @@
   const RESULTS = $('#results');
   const EMPTY   = $('#empty');
   const UPDATED = $('#updated');
-
   const cfg = (window.__PTD__ && window.__PTD__.endpoints) || {};
   const DATA_RECENT = cfg.recent || '/data/news.json';
 
-  // Helpers
   const pick = (o, ks)=>ks.map(k=>o?.[k]).find(v=>v!==undefined && v!==null);
   const parseDate = v => v ? new Date(v) : null;
-  const fmtDate = d => d
-    ? d.toISOString().replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z').replace(/:\d\dZ$/,'Z')
-    : '';
+  const fmtDate = d => d ? d.toISOString().replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z').replace(/:\d\dZ$/,'Z') : '';
   const domainOf = url => { try { return new URL(url).hostname.replace(/^www\./,'').toLowerCase(); } catch { return ''; } };
 
   function bestImage(item){
@@ -39,22 +30,11 @@
     const category = pick(raw,['category','topic','section']) || '';
     const score = pick(raw,['score','rank','weight','hotness']);
     const image = pick(raw,['image','image_url','img','thumbnail','thumb']) || '';
+    const share = pick(raw,['share']); // /s/<id>/
     const d = parseDate(pdate) || null;
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
-    return { title, url, publisher, category, date, score: (typeof score==='number'?score:null), image };
-  }
-
-  function articleUrl(item){
-    const u = new URL('/article.html', location.origin);
-    // pass through details for the article page
-    u.searchParams.set('u', item.url);
-    if (item.title)     u.searchParams.set('t', item.title);
-    if (item.publisher) u.searchParams.set('p', item.publisher);
-    if (item.category)  u.searchParams.set('c', item.category);
-    if (item.image)     u.searchParams.set('img', item.image);
-    if (item.date)      u.searchParams.set('d', item.date.toISOString());
-    return u.toString();
+    return { title, url, publisher, category, date, score: (typeof score==='number'?score:null), image, share };
   }
 
   function render(items){
@@ -64,27 +44,24 @@
 
     const frag = document.createDocumentFragment();
     items.forEach(item=>{
-      const card = document.createElement('article');
-      card.className = 'card';
+      const shareUrl = item.share || `/article.html?u=${encodeURIComponent(item.url)}&t=${encodeURIComponent(item.title)}&p=${encodeURIComponent(item.publisher||'')}&c=${encodeURIComponent(item.category||'')}&img=${encodeURIComponent(item.image||'')}&d=${encodeURIComponent(item.date?item.date.toISOString():'')}`;
+      const metaBits = [
+        (item.category||'').toUpperCase(),
+        item.publisher||'',
+        item.date ? fmtDate(item.date) : '',
+        (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
+      ].filter(Boolean).join(' • ');
 
-      const metaBits = [];
-      if(item.category) metaBits.push(item.category.toUpperCase());
-      if(item.publisher) metaBits.push(item.publisher);
-      if(item.date) metaBits.push(fmtDate(item.date));
-      if(item.score!==null) metaBits.push('SCORE: '+Number(item.score).toFixed(3));
-      const metaText = metaBits.join(' • ');
-
-      const imgURL = bestImage(item);
-
+      const card = document.createElement('article'); card.className='card';
       card.innerHTML = `
-        <div class="thumb"><img loading="lazy" src="${imgURL}" alt=""></div>
+        <div class="thumb"><img loading="lazy" src="${bestImage(item)}" alt=""></div>
         <div class="content">
-          <div class="meta">${metaText}</div>
-          <h3 class="headline"><a href="${articleUrl(item)}">${item.title}</a></h3>
+          <div class="meta">${metaBits}</div>
+          <h3 class="headline"><a href="${shareUrl}">${item.title}</a></h3>
           <div class="cta-row">
-            <a class="btn" href="${articleUrl(item)}">Open Article</a>
+            <a class="btn" href="${shareUrl}">Open Article</a>
             <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">Source</a>
-            <button class="btn linkish share" data-url="${articleUrl(item)}">Share</button>
+            <button class="btn linkish share" data-url="${shareUrl}">Share</button>
           </div>
         </div>
       `;
@@ -98,14 +75,9 @@
         const url = btn.getAttribute('data-url');
         const title = 'PTD Today — Daily Energy & Power News';
         try {
-          if (navigator.share) {
-            await navigator.share({ title, url });
-          } else {
-            await navigator.clipboard.writeText(url);
-            btn.textContent = 'Copied';
-            setTimeout(()=>btn.textContent='Share',1200);
-          }
-        } catch { /* ignore */ }
+          if (navigator.share) { await navigator.share({ title, url }); }
+          else { await navigator.clipboard.writeText(url); btn.textContent='Copied'; setTimeout(()=>btn.textContent='Share',1200); }
+        } catch {}
       });
     });
   }
@@ -116,34 +88,29 @@
   }
 
   async function fetchJson(url){
-    try {
-      const r = await fetch(url, { cache:'no-store' });
-      if (!r.ok) throw 0;
-      return await r.json();
-    } catch { return null; }
+    try{ const r=await fetch(url,{cache:'no-store'}); if(!r.ok) throw 0; return await r.json(); }
+    catch{ return null; }
   }
 
   (async function boot(){
     setUpdated(new Date());
     const raw = await fetchJson(DATA_RECENT);
-    const arr = (raw && (raw.items||raw.data||raw.stories||raw)) || [];
+    const arr = (raw && (raw.items||raw.data||raw.stories||raw)) || raw || [];
     let items = arr.map(normalize).filter(x=>x.title && x.url);
 
-    // only today + yesterday (48h)
+    // last 48h
     const now = Date.now();
     items = items.filter(x => !x.date || (now - x.date.getTime()) <= 48*3600*1000);
 
-    // sort by date desc (then score)
+    // sort newest first
     items.sort((a,b)=>{
       const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
-      if (bd!==ad) return bd-ad;
+      if(bd!==ad) return bd-ad;
       return (b.score??0) - (a.score??0);
     });
 
-    // Update “Updated — …” using the freshest we kept
     const latest = items.reduce((m,x)=> (x.date && (!m || x.date>m)) ? x.date : m, null);
     setUpdated(latest || new Date());
-
     render(items);
 
     if(items.length===0){
@@ -153,7 +120,6 @@
     }
   })();
 
-  // Optional PWA
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
   }
