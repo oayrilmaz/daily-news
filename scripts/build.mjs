@@ -1,29 +1,30 @@
 // ===========================================================
-// PTD Today Builder — with OG image scraping (Node 20+, no deps)
-// ===========================================================
-//
+// PTD Today Builder — shortlinks + static OG pages + thumb scrape
+// Node 20+; no external dependencies
 // Outputs:
-//   - /data/news.json  → last 48 hours (used by the no-filter UI)
-//   - /data/7d.json    → last 7 days (kept for archive; optional)
-//
-// Thumbnails:
-//   - If an item has no image, we fetch the article HTML and try:
-//       og:image → twitter:image → link[rel=image_src]
-//   - If still missing, the front-end falls back to site favicon.
-//
-// Run locally:   node scripts/build.mjs
-// In Actions:    node-version: 20, then run this script.
-//
-// Env (optional):
-//   FEEDS           comma-separated list of feed URLs (overrides defaults)
-//   RECENT_HOURS    default 48 (today+yesterday)
-//   MAX_ENRICH      default 40 (cap how many articles we scrape per run)
+//   data/news.json  -> last 48h (used by homepage)
+//   data/7d.json    -> last 7 days (kept for archive/option)
+//   s/<id>/index.html -> static share pages with OG tags
+// ===========================================================
 
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 
-// ---------- Config ----------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+
+const ROOT        = path.resolve(__dirname, "..");
+const OUT_DATA    = path.join(ROOT, "data");
+const OUT_SHORT   = path.join(ROOT, "s");
+const NEWS_PATH   = path.join(OUT_DATA, "news.json");
+const WEEK_PATH   = path.join(OUT_DATA, "7d.json");
+const SHORT_MAP   = path.join(OUT_DATA, "shortlinks.json");
+
+const SITE_ORIGIN = "https://ptdtoday.com"; // change if you use a different host
+
+// ---------- Feeds & limits ----------
 const DEFAULT_FEEDS = [
   "https://www.utilitydive.com/feeds/news/",
   "https://www.datacenterdynamics.com/en/rss/",
@@ -33,21 +34,15 @@ const DEFAULT_FEEDS = [
   "https://www.ferc.gov/rss.xml",
   "https://www.energy.gov/rss"
 ];
-
 const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
-const RECENT_HOURS = Number(process.env.RECENT_HOURS || 48);
-const MAX_ENRICH = Number(process.env.MAX_ENRICH || 40);  // don’t hammer sources
-const CONCURRENCY = 5;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-const OUT_DIR    = path.resolve(__dirname, "../data");
-const NEWS_PATH  = path.join(OUT_DIR, "news.json");
-const TOP7_PATH  = path.join(OUT_DIR, "7d.json");
+const RECENT_HOURS = Number(process.env.RECENT_HOURS || 48);
+const CONCURRENCY  = 6;   // parallel HTML fetches
+const MAX_ENRICH   = Number(process.env.MAX_ENRICH || 60); // cap enrichment per run
 
 // ---------- Helpers ----------
 const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-const clamp = (n,a,b)=>Math.max(a,Math.min(b,n));
+const clean = (s="") => s.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
 
 function safeISO(x) {
   const d = new Date(x || Date.now());
@@ -55,7 +50,7 @@ function safeISO(x) {
 }
 function hoursAgo(iso) {
   const t = new Date(iso).getTime();
-  return (Date.now() - t)/36e5;
+  return (Date.now() - t) / 36e5;
 }
 function domainOf(url="") {
   try { return new URL(url).hostname.replace(/^www\./,"").toLowerCase(); }
@@ -69,8 +64,8 @@ function guessCategory(title="", url="") {
   if (s.includes("cable")) return "Cables";
   if (s.includes("policy") || s.includes("ferc") || s.includes("commission")) return "Policy";
   if (s.includes("renewable") || s.includes("solar") || s.includes("wind")) return "Renewables";
-  if (s.includes("data center") || s.includes("datacenter")) return "Data Centers";
   if (/\bai\b|machine learning|genai|llm/.test(s)) return "AI";
+  if (s.includes("data center") || s.includes("datacenter")) return "Data Centers";
   if (s.includes("transformer") || s.includes("switchgear") || s.includes("breaker") || s.includes("statcom")) return "Equipment";
   if (s.includes("transport") || s.includes("shipping") || s.includes("rail")) return "Transport";
   if (s.includes("lead time") || s.includes("supply chain") || s.includes("backlog")) return "Lead Times";
@@ -79,27 +74,36 @@ function guessCategory(title="", url="") {
 }
 function scoreItem(url, published) {
   const ageH = Math.max(1, hoursAgo(published));
-  return 10/ageH; // simple freshness score
+  return 10/ageH;
 }
-function dedupeByUrl(items) {
-  const seen = new Set();
+function dedupeByUrl(items){
+  const seen=new Set();
   return items.filter(x=>{
-    const k=(x.url||"").trim(); if(!k || seen.has(k)) return false;
+    const k=(x.url||"").trim();
+    if(!k || seen.has(k)) return false;
     seen.add(k); return true;
   });
 }
-function clampWindow(items, ms) {
-  const now = Date.now();
+function clampWindow(items, ms){
+  const now=Date.now();
   return items.filter(x=>{
-    const t = new Date(x.published).getTime();
+    const t=new Date(x.published).getTime();
     return t && t<=now && (now - t) <= ms;
   });
 }
-function sortByDateDesc(a,b){ return new Date(b.published) - new Date(a.published); }
+function sortByDateDesc(a,b){ return new Date(b.published)-new Date(a.published); }
+const isLogoPath = u => /logo|sprite|favicon|brand|og-image-default/i.test(u || "");
+
+// ---------- Fetch ----------
+async function fetchText(url){
+  const res = await fetch(url, { headers: { "user-agent":"ptd-bot/1.0 (+https://ptdtoday.com)" } });
+  if(!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  const ct = res.headers.get("content-type") || "";
+  const txt = await res.text();
+  return { txt, ct };
+}
 
 // ---------- Feed parsing ----------
-function clean(s=""){ return s.replace(/<!\[CDATA\[|\]\]>/g,"").trim(); }
-
 function parseRSS(xml) {
   const rows = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
   return rows.map(b=>{
@@ -130,7 +134,7 @@ function parseAtom(xml) {
   }).filter(x=>x.title && x.url);
 }
 function parseJSONFeed(txt) {
-  let j; try { j=JSON.parse(txt); } catch { return []; }
+  let j; try{ j=JSON.parse(txt); }catch{ return []; }
   const arr = Array.isArray(j) ? j : (j.items || []);
   return arr.map(it=>{
     const title = String(it.title||"").trim();
@@ -140,26 +144,16 @@ function parseJSONFeed(txt) {
     return { title, url, published: pub, image };
   }).filter(x=>x.title && x.url);
 }
-function detectAndParse(body, ct="") {
-  const contentType = ct.toLowerCase();
+function detectAndParse(body, ct=""){
+  const contentType=ct.toLowerCase();
   if (contentType.includes("json") || /^\s*{/.test(body)) return parseJSONFeed(body);
   if (/<rss\b/i.test(body) || /<channel\b/i.test(body)) return parseRSS(body);
   if (/<feed\b/i.test(body) || /<entry\b/i.test(body))   return parseAtom(body);
   return parseRSS(body);
 }
 
-// ---------- Network ----------
-async function fetchText(url) {
-  const res = await fetch(url, {
-    headers: { "user-agent":"ptd-bot/1.0 (+https://ptdtoday.com)" }
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-  const ct  = res.headers.get("content-type") || "";
-  const txt = await res.text();
-  return { txt, ct };
-}
-
-function normalize(raw) {
+// ---------- Normalize ----------
+function normalize(raw){
   const title = (raw.title || "").trim();
   const url   = (raw.url || "").trim();
   const published = safeISO(raw.published);
@@ -170,69 +164,181 @@ function normalize(raw) {
   return { title, url, publisher, category, published, score, image };
 }
 
-// ---------- OG image enrichment ----------
-function extractOgImage(html) {
-  const get = (re) => (html.match(re)||[])[1] || "";
-  // Prefer og:image, then twitter:image, then image_src
-  return (
-    get(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-    get(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i) ||
-    get(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i)
-  );
+// ---------- OG image scraper (best-effort) ----------
+function extractImageFromHtml(html) {
+  const pick = (re) => (html.match(re)||[])[1] || "";
+
+  const cands = [
+    /<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+property=["']article:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']parsely-image-url["'][^>]+content=["']([^"']+)["']/i,
+    /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i
+  ];
+  for (const re of cands) {
+    const u = pick(re);
+    if (u && !isLogoPath(u)) return u;
+  }
+
+  // fallback: first content image that doesn't look like a logo/sprite
+  const imgs = [...html.matchAll(/<img\b[^>]*src=["']([^"']+)["'][^>]*>/gi)].map(m=>m[1]);
+  const good = imgs.find(u => u && !isLogoPath(u));
+  return good || "";
 }
-async function enrichImages(items) {
-  const targets = items.filter(x => !x.image).slice(0, MAX_ENRICH);
-  const q = [...targets];
-  async function worker() {
-    while (q.length) {
-      const it = q.shift();
+
+async function enrichImages(items){
+  const targets = items.filter(x=>!x.image).slice(0, MAX_ENRICH);
+  const q=[...targets];
+
+  async function worker(){
+    while(q.length){
+      const it=q.shift();
       try {
         const { txt } = await fetchText(it.url);
-        const og = extractOgImage(txt);
-        if (og) it.image = og;
+        const cand = extractImageFromHtml(txt);
+        if (cand) it.image=cand;
       } catch {}
-      await sleep(150);
+      await sleep(120);
     }
   }
-  const workers = Array.from({length: CONCURRENCY}, worker);
-  await Promise.all(workers);
+  await Promise.all(Array.from({length:CONCURRENCY}, worker));
   return items;
 }
 
+// ---------- Shortlink ID + page generation ----------
+function shortIdFor(url){
+  return crypto.createHash("sha1").update(url).digest("base64url").slice(0,10);
+}
+
+function staticSharePage({ id, title, image, sourceUrl, publisher, category, publishedISO }){
+  const shareUrl = `${SITE_ORIGIN}/s/${id}/`;
+  const desc = "First to Know. First to Lead.";
+  const img  = image || `${SITE_ORIGIN}/assets/og-default.png`;
+  const dt   = publishedISO ? new Date(publishedISO).toISOString().replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z').replace(/:\d\dZ$/,'Z') : '';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)} — PTD Today</title>
+<meta name="description" content="${desc}">
+<link rel="canonical" href="${shareUrl}">
+<!-- OpenGraph -->
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="PTD Today">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${desc}">
+<meta property="og:image" content="${escapeHtml(img)}">
+<meta property="og:url" content="${shareUrl}">
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escapeHtml(title)}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${escapeHtml(img)}">
+<link rel="stylesheet" href="/assets/main.css">
+<style>
+.wrap{max-width:820px;margin:34px auto;padding:0 16px;}
+.hero{width:100%;height:280px;object-fit:cover;border-radius:8px;border:1px solid #d9ccb3;background:#f2eadc;}
+.meta{color:#6f675d;font-size:13px;margin:6px 0 12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a href="/" class="btn linkish">← Back to PTD Today</a>
+  <h1 style="margin:10px 0 6px;">${escapeHtml(title)}</h1>
+  <div class="meta">${escapeHtml((category||'').toUpperCase())} • ${escapeHtml(publisher||'')} • ${escapeHtml(dt)}</div>
+  <img class="hero" src="${escapeHtml(img)}" alt="">
+  <div class="cta-row" style="margin-top:14px;">
+    <a class="btn" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Open Article</a>
+    <a class="btn secondary" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener">Source</a>
+    <button class="btn linkish" onclick="share()">Share</button>
+  </div>
+  <p style="margin-top:14px;color:#6f675d;">You’re on PTD Today. Click <strong>Source</strong> to visit the original publisher.</p>
+</div>
+<script>
+function share(){
+  const url=location.href, title=document.title;
+  if(navigator.share){ navigator.share({title,url}).catch(()=>{}); }
+  else {
+    navigator.clipboard.writeText(url).then(()=>{
+      alert('Link copied to clipboard');
+    }).catch(()=>{});
+  }
+}
+</script>
+</body>
+</html>`;
+}
+
+function escapeHtml(s=""){
+  return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+}
+
 // ---------- Build ----------
-async function build() {
+async function build(){
   console.log("PTD build: fetching feeds…");
-  let fetched = [];
-  for (const feed of FEEDS) {
-    try {
-      const { txt, ct } = await fetchText(feed);
+  let fetched=[];
+  for(const f of FEEDS){
+    try{
+      const { txt, ct } = await fetchText(f);
       const items = detectAndParse(txt, ct);
-      console.log(`  ✓ ${feed} (${items.length})`);
+      console.log(`  ✓ ${f} (${items.length})`);
       fetched = fetched.concat(items);
-      await sleep(250);
-    } catch (e) {
-      console.warn(`  ⚠ ${feed}: ${e.message}`);
+      await sleep(200);
+    }catch(e){
+      console.warn(`  ⚠ ${f}: ${e.message}`);
     }
   }
 
+  // Normalize & enrich
   let norm = dedupeByUrl(fetched.map(normalize));
-  // Enrich missing thumbnails
   await enrichImages(norm);
 
-  // Windows
+  // Prepare windows
   const recentMs = RECENT_HOURS * 3600 * 1000;
   const sevenMs  = 7 * 24 * 3600 * 1000;
 
   let news = clampWindow(norm, recentMs).sort(sortByDateDesc);
   let week = clampWindow(norm, sevenMs).sort(sortByDateDesc);
 
-  await fs.mkdir(OUT_DIR, { recursive: true });
+  // Create shortlinks + static pages
+  await fs.mkdir(OUT_DATA, { recursive: true });
+  await fs.mkdir(OUT_SHORT, { recursive: true });
+
+  const shortMap = {};
+  for (const it of news) {
+    const id  = shortIdFor(it.url);
+    const dir = path.join(OUT_SHORT, id);
+    await fs.mkdir(dir, { recursive: true });
+
+    const page = staticSharePage({
+      id,
+      title: it.title,
+      image: it.image,
+      sourceUrl: it.url,
+      publisher: it.publisher,
+      category: it.category,
+      publishedISO: it.published
+    });
+    await fs.writeFile(path.join(dir, "index.html"), page);
+    shortMap[id] = { url: it.url, title: it.title, image: it.image, publisher: it.publisher, category: it.category, published: it.published };
+    // annotate news item with share path
+    it.share = `/s/${id}/`;
+    it.sid   = id;
+  }
+
+  // Save data files
   await fs.writeFile(NEWS_PATH, JSON.stringify(news, null, 2));
-  await fs.writeFile(TOP7_PATH, JSON.stringify({ updated: new Date().toISOString(), items: week }, null, 2));
+  await fs.writeFile(WEEK_PATH, JSON.stringify({ updated: new Date().toISOString(), items: week }, null, 2));
+  await fs.writeFile(SHORT_MAP, JSON.stringify(shortMap, null, 2));
 
   console.log(`Wrote:
-  - ${path.relative(process.cwd(), NEWS_PATH)} (${news.length} items, ${RECENT_HOURS}h)
-  - ${path.relative(process.cwd(), TOP7_PATH)} (${week.length} items, 7d)
+  - ${path.relative(ROOT, NEWS_PATH)} (${news.length} items, ${RECENT_HOURS}h)
+  - ${path.relative(ROOT, WEEK_PATH)} (${week.length} items, 7d)
+  - ${path.relative(ROOT, OUT_SHORT)}/<id>/index.html (static OG pages)
+  - ${path.relative(ROOT, SHORT_MAP)} (map)
 Done.`);
 }
 
