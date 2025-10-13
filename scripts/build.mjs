@@ -1,6 +1,6 @@
 // ====================================================================
 // PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
-// Channel policies + manual smart-allow + shorts filter + debug
+// Channel policies + playlist fallback + smart-allow + shorts filter + debug
 // Node 20+
 // ====================================================================
 
@@ -59,7 +59,7 @@ const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) |
 
 // ---------- YouTube channels ----------
 const YT = {
-  // OEMs / Utilities / Vendors (always strict; they’re already focused)
+  // OEMs / Utilities / Vendors (already focused)
   SIEMENS:   "UC0jLzOK3mWr4YcUuG3KzZmw",
   HITACHI:   "UC4l7cLFsPzQYdMwvZRVqNag",
   ABB:       "UCJ2Kx0pPZzJyaRlwviCJPdA",
@@ -67,7 +67,8 @@ const YT = {
 
   // Business / Market desks
   BLOOMBERG: "UCUMZ7gohGI9HcU9VNsr2FJQ",
-  CNBC:      "UCvJJ_dzjViJCoLf5uKUTwoA",
+  CNBC:      "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC Television (common)
+  CNBC_ALT:  "UCrp_UI8XtuYfpiqluWLD7Lw", // CNBC (alt/general)
   WSJ:       "UCW6-BQWFA70DyycZ57JKias",
   REUTERS:   "UChqUTb7kYRX8-EiaN3XFrSQ",
   BBC:       "UC16niRr50-MSBwiO3YDb3RA"
@@ -76,9 +77,7 @@ const YT = {
 const YT_CHANNELS = (process.env.YT_CHANNELS?.split(",").map(s=>s.trim()).filter(Boolean)) ||
   Object.values(YT);
 
-// Channel policies:
-// - soft = whether channel can pass the softer include net if strict failed
-// - requireCore = whether we require a core energy/datacenter word to appear
+// Channel policies
 const CHANNEL_POLICIES = {
   [YT.SIEMENS]:   { soft:false, requireCore:false },
   [YT.HITACHI]:   { soft:false, requireCore:false },
@@ -87,6 +86,7 @@ const CHANNEL_POLICIES = {
 
   [YT.BLOOMBERG]: { soft:true,  requireCore:true },
   [YT.CNBC]:      { soft:true,  requireCore:true },
+  [YT.CNBC_ALT]:  { soft:true,  requireCore:true },
   [YT.WSJ]:       { soft:false, requireCore:true },
   [YT.REUTERS]:   { soft:false, requireCore:true },
   [YT.BBC]:       { soft:false, requireCore:true }
@@ -254,6 +254,16 @@ function parseYouTubeRSS(xml){
   }).filter(x=>x.title && x.url);
 }
 
+// Build both URLs for a channel: channel feed + uploads playlist feed
+function youTubeFeedUrlsForChannelId(channelId){
+  const feeds = [`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`];
+  if (channelId.startsWith("UC")) {
+    const playlistId = "UU" + channelId.slice(2);
+    feeds.push(`https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`);
+  }
+  return feeds;
+}
+
 // ====================================================================
 // IMAGE ENRICHMENT (articles)
 // ====================================================================
@@ -365,7 +375,6 @@ const testExclude = (t) => RX_EXCLUDE.some(rx=>rx.test(t));
 function passesYouTubePolicy(blob, policy){
   if (testExclude(blob)) return false;
 
-  // Always let very relevant smart-allow pass
   if (testSmart(blob)) {
     if (policy.requireCore && !testCore(blob)) return false;
     return true;
@@ -404,32 +413,45 @@ async function build(){
     }catch(e){ console.warn(`  ⚠ ${f}: ${e.message}`); }
   }
 
-  // 2) YouTube (7-day window, policy filtering, proxy fallback)
+  // 2) YouTube (7-day window, policy filtering, proxy + playlist fallback)
   console.log("🔹 YouTube (past", YT_HOURS/24, "days):");
   for(const ch of YT_CHANNELS){
-    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`;
+    const feeds = youTubeFeedUrlsForChannelId(ch);
     const policy = CHANNEL_POLICIES[ch] || { soft:false, requireCore:false };
-    try{
-      const { txt } = await fetchTextWithProxies(url, { "accept-language":"en-US,en;q=0.8" }, 3);
-      const all = parseYouTubeRSS(txt)
-        .filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
-        .sort((a,b)=> new Date(b.published) - new Date(a.published));
-
-      ytDebug.push({ channel: ch, count: all.length, sample: all.slice(0,5) });
-
-      const kept=[];
-      for (const v of all){
-        const blob = `${v.title} ${v.description}`.toLowerCase();
-        if (passesYouTubePolicy(blob, policy)) {
-          kept.push(v);
-          if (kept.length >= YT_MAX_PER_CHANNEL) break;
-        }
+    let all = [];
+    for (const feedUrl of feeds){
+      try{
+        const { txt } = await fetchTextWithProxies(feedUrl, { "accept-language":"en-US,en;q=0.8" }, 3);
+        const got = parseYouTubeRSS(txt);
+        all.push(...got);
+        await sleep(120);
+      }catch(e){
+        console.warn(`  ⚠ YT feed ${feedUrl}: ${e.message}`);
       }
+    }
 
-      items.push(...kept);
-      console.log(`  ✓ ${ch} fetched ${all.length} | kept ${kept.length} (soft=${policy.soft}, core=${policy.requireCore})`);
-      await sleep(150);
-    }catch(e){ console.warn(`  ⚠ YT ${ch}: ${e.message}`); }
+    // de-dupe by videoId
+    const seen = new Set();
+    all = all.filter(v => (v.videoId && !seen.has(v.videoId) && seen.add(v.videoId)));
+
+    // time filter + newest first
+    all = all.filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
+             .sort((a,b)=> new Date(b.published) - new Date(a.published));
+
+    ytDebug.push({ channel: ch, feeds, count: all.length, sample: all.slice(0,5) });
+
+    const kept=[];
+    for (const v of all){
+      const blob = `${v.title} ${v.description}`.toLowerCase();
+      if (passesYouTubePolicy(blob, policy)) {
+        kept.push(v);
+        if (kept.length >= YT_MAX_PER_CHANNEL) break;
+      }
+    }
+
+    items.push(...kept);
+    console.log(`  ✓ ${ch} kept ${kept.length} / ${all.length} (soft=${policy.soft}, core=${policy.requireCore})`);
+    await sleep(150);
   }
 
   // Normalize
