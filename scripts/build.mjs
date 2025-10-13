@@ -1,5 +1,5 @@
 // ===========================================================
-// PTD Today Builder — Articles + Topic-Filtered YouTube
+// PTD Today Builder — Articles + Topic-Strict YouTube
 // Node 20+
 // ===========================================================
 
@@ -21,10 +21,9 @@ const SITE_ORIGIN = "https://ptdtoday.com";
 const GA_ID = "G-TVKD1RLFE5";
 
 // ---------- Config ----------
-const RECENT_HOURS = Number(process.env.RECENT_HOURS || 60);   // ~2.5 days to avoid UTC gaps
+const RECENT_HOURS = Number(process.env.RECENT_HOURS || 60); // ~2.5 days to avoid UTC edges
 const CONCURRENCY  = 6;
-const YT_MAX_PER_CHANNEL     = Number(process.env.YT_MAX_PER_CHANNEL || 3);
-const YT_FALLBACK_PER_CHAN   = 1;   // if no strict match, keep up to 1 broadly energy-related item
+const YT_MAX_PER_CHANNEL = Number(process.env.YT_MAX_PER_CHANNEL || 4);
 
 // Publisher feeds
 const DEFAULT_FEEDS = [
@@ -38,7 +37,7 @@ const DEFAULT_FEEDS = [
 ];
 const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
 
-// YouTube channels (trusted)
+// YouTube channels (trusted large publishers). Filtering below will keep only on-topic clips.
 const DEFAULT_YT_CHANNELS = [
   "UCupvZG-5ko_eiXAupbDfxWw", // CNN
   "UChqUTb7kYRX8-EiaN3XFrSQ", // Reuters
@@ -54,24 +53,39 @@ const YT_CHANNELS =
   || DEFAULT_YT_CHANNELS;
 
 // ---------- Topic filters ----------
-const RX_STRICT = [
-  /grid|transmission|distribution|substation|statcom|synch?ronous condenser/i,
-  /hvdc|hvac(?!\s*repair)/i,
-  /renewables?|solar|wind|offshore wind|geothermal|hydro(power)?|pumped storage/i,
-  /battery|batteries|storage|lithium|gigafactory|smr|nuclear(?! family)/i,
-  /ferc|capacity market|rto|iso|pjm|miso|ercot|caiso|isone|nyiso|ofgem|acem/i,
-  /electricity|power market|power prices|capacity prices|ancillary services/i,
-  /data ?centers?|hyperscale|colocation|server farm|gpu cluster|foundry|semiconductor/i,
-  /ai.*(energy|power|datacenter)|gpu.*(power|energy)|datacenter.*ai/i,
-  /utility|rate case|transmission line|interconnection queue|resilience|blackout|load shedding/i,
-  /hydrogen.*(electrolyzer|ammonia|pipeline)/i,
-  /cables?|subsea cable|interconnector|intertie/i,
-  /transformer|switchgear|breaker|protection relay|relay testing|iec 61850/i,
-  /supply chain.*(lead time|backlog|capacity)/i,
+const RX_INCLUDE = [
+  // grid & T&D
+  /\b(grid|transmission|distribution|substation|statcom|synchronous condenser|microgrid|interconnection)\b/i,
+  // HVDC/HVAC
+  /\b(hvdc|hvac transmission)\b/i,
+  // renewables
+  /\b(renewable|solar|pv|wind|offshore wind|geothermal|hydropower|pumped storage)\b/i,
+  // storage / batteries / nuclear / hydrogen
+  /\b(battery|batteries|energy storage|lithium|gigafactory|smr|small modular reactor|nuclear)\b/i,
+  /\b(hydrogen|electrolyzer|ammonia pipeline)\b/i,
+  // markets & policy (US/UK)
+  /\b(ferc|capacity market|rto|iso|pjm|miso|ercot|caiso|iso-?ne|nyiso|ofgem)\b/i,
+  /\b(electricity|power prices|capacity prices|ancillary services)\b/i,
+  // data centers / AI-power
+  /\b(data ?centers?|hyperscale|colocation|server farm|gpu (cluster|power|cooling)|pue|liquid cooling)\b/i,
+  /\b(ai).*(energy|power|datacenter)|\bdatacenter\b.*\b(ai|gpu)\b/i,
+  // equipment & cables
+  /\b(transformer|switchgear|breaker|protection relay|iec\s*61850|subsea cable|interconnector|intertie|conductor|hv cable|u?hv\b)\b/i,
+  // supply chain / lead times
+  /\b(supply chain).*(lead time|backlog|capacity|shortage)\b/i,
 ];
 
-const RX_BROAD = [
-  /energy|electric|power|grid|renewable|solar|wind|battery|nuclear|hydrogen|datacenter|data center/i
+const RX_EXCLUDE = [
+  // politics / general news
+  /\b(trump|biden|harris|election|democrat|republican|congress|senate|supreme court|white house)\b/i,
+  // conflict / crime
+  /\b(israel|gaza|ukraine|russia|war|shooting|police|crime|homicide|kidnapping)\b/i,
+  // accidents unless grid-related
+  /\b(plane|aircraft|crash|collision|fire|explosion)\b(?!.*\b(grid|utility|substation|power|outage)\b)/i,
+  // sports / entertainment
+  /\b(nfl|nba|mlb|soccer|football|hollywood|celebrity|music video|trailer)\b/i,
+  // weather unless grid-related
+  /\b(hurricane|storm|tornado|blizzard|heatwave)\b(?!.*\b(grid|utility|power|outage)\b)/i
 ];
 
 // ---------- Helpers ----------
@@ -123,22 +137,19 @@ function parseRSS(xml){
   }).filter(x=>x.title&&x.url);
 }
 
-const ytFeedUrl = id => `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
 function parseYouTubeRSS(xml){
   const entries=xml.match(/<entry[\s\S]*?<\/entry>/gi)||[];
   return entries.map(e=>{
-    const t = clean((e.match(/<title>([\s\S]*?)<\/title>/i)||[])[1]||"");
-    const id= (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i)||[])[1]||"";
-    const pub=safeISO((e.match(/<published>([\s\S]*?)<\/published>/i)||[])[1]);
-    const ch = clean((e.match(/<name>([\s\S]*?)<\/name>/i)||[])[1]||"");
-    // best-effort description (not always present)
-    const desc = clean(
+    const title = clean((e.match(/<title>([\s\S]*?)<\/title>/i)||[])[1]||"");
+    const id    = (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i)||[])[1]||"";
+    const pub   = safeISO((e.match(/<published>([\s\S]*?)<\/published>/i)||[])[1]);
+    const ch    = clean((e.match(/<name>([\s\S]*?)<\/name>/i)||[])[1]||"");
+    const desc  = clean(
       (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i)||[])[1] ||
       (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i)||[])[1] || ""
     );
     return {
-      title:t,
-      description:desc,
+      title, description: desc,
       url:`https://www.youtube.com/watch?v=${id}`,
       published:pub,
       image:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
@@ -219,12 +230,13 @@ function staticPage(it){
 </div></body></html>`;
 }
 
-// ---------- Topic match ----------
-function matchesStrict(text){
-  return RX_STRICT.some(rx=>rx.test(text));
-}
-function matchesBroad(text){
-  return RX_BROAD.some(rx=>rx.test(text));
+// ---------- Topic test ----------
+function onTopic(text){
+  if (!text) return false;
+  // exclude first: if any exclude hits, drop it
+  if (RX_EXCLUDE.some(rx=>rx.test(text))) return false;
+  // include: require at least one strict include keyword
+  return RX_INCLUDE.some(rx=>rx.test(text));
 }
 
 // ---------- Build ----------
@@ -243,26 +255,25 @@ async function build(){
     }catch(e){ console.warn(`  ⚠ ${f}: ${e.message}`); }
   }
 
-  // 2) YouTube — strict topic filtering using title + description
+  // 2) YouTube — strict topic filtering on title + description
   console.log("YouTube:");
-  for (const ch of YT_CHANNELS){
-    const url = ytFeedUrl(ch);
+  for(const ch of YT_CHANNELS){
+    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`;
     try{
       const { txt } = await fetchText(url, { "accept-language":"en-US,en;q=0.8" }, 4);
       const all = parseYouTubeRSS(txt)
         .filter(v => (Date.now() - new Date(v.published).getTime()) <= RECENT_HOURS*3600*1000)
         .sort((a,b)=> new Date(b.published) - new Date(a.published));
 
-      const strict = [];
-      const fallback = [];
-      for (const v of all){
+      const chosen = [];
+      for(const v of all){
         const blob = `${v.title} ${v.description}`.toLowerCase();
-        if (matchesStrict(blob)) strict.push(v);
-        else if (fallback.length < YT_FALLBACK_PER_CHAN && matchesBroad(blob)) fallback.push(v);
+        if (onTopic(blob)) {
+          chosen.push(v);
+          if (chosen.length >= YT_MAX_PER_CHANNEL) break;
+        }
       }
-
-      const chosen = [...strict.slice(0, YT_MAX_PER_CHANNEL), ...fallback];
-      console.log(`  ✓ ${ch}  strict:${strict.length} kept:${chosen.length}`);
+      console.log(`  ✓ ${ch} kept:${chosen.length} of ${all.length}`);
       items.push(...chosen);
       await sleep(150);
     }catch(e){ console.warn(`  ⚠ YT ${ch}: ${e.message}`); }
@@ -290,7 +301,7 @@ async function build(){
     type: "article"
   });
 
-  // Dedupe + enrich images for articles
+  // Dedupe + enrich images
   items = dedupe(items).sort(sortByDateDesc);
   await enrichArticleImages(items, 50);
 
