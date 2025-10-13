@@ -1,5 +1,6 @@
 // ====================================================================
-// PTD Today Builder — Articles (≈60h) + YouTube (past 7 days, topic filtered)
+// PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
+// With proxy fallbacks + debug dump for YouTube + two-pass filtering
 // Node 20+
 // ====================================================================
 
@@ -17,6 +18,7 @@ const OUT_SHORT  = path.join(ROOT, "s");
 const NEWS_PATH  = path.join(OUT_DATA, "news.json");
 const WEEK_PATH  = path.join(OUT_DATA, "7d.json");
 const SHORT_MAP  = path.join(OUT_DATA, "shortlinks.json");
+const YT_DEBUG   = path.join(OUT_DATA, "youtube_raw.json");
 
 // ---------- Site ----------
 const SITE_ORIGIN = "https://ptdtoday.com";
@@ -34,8 +36,16 @@ const YT_HOURS = Number(process.env.YT_HOURS || 24 * 7);
 
 // Concurrency / caps
 const CONCURRENCY        = Number(process.env.CONCURRENCY || 6);
-const YT_MAX_PER_CHANNEL = Number(process.env.YT_MAX_PER_CHANNEL || 6);
+const YT_MAX_PER_CHANNEL = Number(process.env.YT_MAX_PER_CHANNEL || 8);
 const ENRICH_MAX         = Number(process.env.MAX_ENRICH || 50);
+
+// Optional: custom proxies via env (comma-separated with {URL} token)
+// Example:
+//   PROXIES="https://r.jina.ai/http://{URL},https://r.jina.ai/https://{URL}"
+const PROXIES = (process.env.PROXIES?.split(",").map(s=>s.trim()).filter(Boolean)) || [
+  "https://r.jina.ai/http://{URL}",
+  "https://r.jina.ai/https://{URL}"
+];
 
 // ---------- Publisher RSS feeds ----------
 const DEFAULT_FEEDS = [
@@ -56,7 +66,8 @@ const ENERGY_FOCUSED_YT_CHANNELS = [
   "UC4l7cLFsPzQYdMwvZRVqNag", // Hitachi Energy
   "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB
   "UCvB8R7oZJxge5tR3MUpxYfw", // Schneider Electric
-  // Business / Market desks
+
+  // Business / Market desks (frequent energy segments)
   "UCUMZ7gohGI9HcU9VNsr2FJQ", // Bloomberg TV
   "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC TV
   "UCW6-BQWFA70DyycZ57JKias", // WSJ
@@ -68,11 +79,11 @@ const YT_CHANNELS =
   || ENERGY_FOCUSED_YT_CHANNELS;
 
 // ====================================================================
-// TOPIC FILTERS (split into small, safe regexes)
+// TOPIC FILTERS
 // ====================================================================
 
-// Include — mapped to your domains
-const RX_INCLUDE = [
+// Primary includes — strict (your domain language)
+const RX_INCLUDE_STRICT = [
   // Transmission & Grid
   /\b(grid|transmission|distribution|substation|overhead\s+line|interconnector|intertie)\b/i,
   /\b(transformer|autotransformer|switchgear|breaker|protection\s+relay)\b/i,
@@ -88,14 +99,6 @@ const RX_INCLUDE = [
   /\b(battery|batteries|bess|energy\s+storage|lithium|grid[-\s]?forming)\b/i,
   /\b(virtual\s+power\s+plant|vpp|vehicle[-\s]?to[-\s]?grid|v2g|microgrid)\b/i,
 
-  // Data centers / AI power
-  /\bdata\s*cent(?:er|re)s?\b/i,
-  /\b(hyperscale|colocation|server\s+farm)\b/i,
-  /\bgpu\s+(cluster|power|cooling)\b/i,
-  /\b(pue|liquid\s+cooling|immersion\s+cooling)\b/i,
-  /ai.*\b(energy|power|data\s*cent(?:er|re)s?)\b/i,
-  /data\s*cent(?:er|re)s?.*\b(ai|gpu)\b/i,
-
   // Industrial large loads
   /\b(semiconductor|foundry|fab|refinery|mining|smelter|steel|cement|rail|metro|traction|port|airport)\b/i,
 
@@ -109,10 +112,23 @@ const RX_INCLUDE = [
   /\b(subsea\s+cable|hv\s+cable|xlpe|hvac\s+cable|conductor)\b/i,
 
   // Supply chain / lead times
-  /\bsupply\s+chain.*\b(lead\s*time|capacity|backlog|shortage|procurement)\b/i
+  /\bsupply\s+chain.*\b(lead\s*time|capacity|backlog|shortage|procurement)\b/i,
+
+  // Data centers / AI power / Semiconductors (BROADER)
+  /\b(ai|artificial\s+intelligence|machine\s+learning|gpu|nvidia|semiconductor|chip|foundry|fabrication|server|rack|data\s*cent(?:er|re)s?|hyperscale|colocation|supercomputer|hpc|cloud|ai\s+infrastructure|pue|liquid\s+cooling|immersion\s+cooling)\b/i
 ];
 
-// Exclude — remove unrelated general content
+// Secondary includes — softer net for YT (only if strict keeps 0 for a channel)
+const RX_INCLUDE_SOFT = [
+  /\b(power|electric(ity|al)?|energy|utility|utilities)\b/i,
+  /\b(grid|transmission|substation|hvdc|converter|bess|battery|storage)\b/i,
+  /\b(data\s*center|datacentre|hyperscale|colocation|gpu|ai)\b/i,
+  /\b(nuclear|smr|solar|pv|wind|offshore|hydrogen|electrolyzer|hydro)\b/i,
+  /\b(cables?|transformer|switchgear|reactive|statcom|condenser)\b/i,
+  /\b(nvidia|chip(s)?|semiconductor|foundry|fab)\b/i
+];
+
+// Excludes — remove unrelated general content
 const RX_EXCLUDE = [
   /\b(trump|biden|harris|election|congress|parliament|president|democrat|republican|politics|campaign)\b/i,
   /\b(israel|gaza|ukraine|russia|war|conflict|attack|terror|police|crime|shooting|murder|trial|court)\b/i,
@@ -135,8 +151,21 @@ function sortByDateDesc(a,b){ return new Date(b.published)-new Date(a.published)
 const isLogoPath = u => /logo|sprite|favicon|brand|og-image-default/i.test(u||"");
 
 // ====================================================================
-// NETWORK + PARSERS
-// ====================================================================
+//
+// NETWORK + PARSERS (with proxy fallback for YT)
+//
+/*  PROXY FORMAT:
+    - Use {URL} token which will be replaced with the raw URL or the URL without protocol
+    - Examples we support out-of-the-box:
+      "https://r.jina.ai/http://{URL}"
+      "https://r.jina.ai/https://{URL}"
+*/
+
+function buildProxyUrl(proxyPattern, url){
+  if (!proxyPattern.includes("{URL}")) return proxyPattern + encodeURIComponent(url);
+  const raw = url.replace(/^https?:\/\//, "");
+  return proxyPattern.replace("{URL}", raw);
+}
 
 async function fetchText(url, headers = {}, retries = 3){
   const h = {
@@ -153,6 +182,23 @@ async function fetchText(url, headers = {}, retries = 3){
       if(i===retries-1) throw e;
       await sleep(400*(i+1));
     }
+  }
+}
+
+async function fetchTextWithProxies(url, headers = {}, retries = 2){
+  try {
+    return await fetchText(url, headers, retries);
+  } catch (e) {
+    // Try proxies
+    for (const p of PROXIES){
+      const proxyUrl = buildProxyUrl(p, url);
+      try {
+        const res = await fetchText(proxyUrl, headers, 1);
+        // r.jina.ai returns text; good enough for our regex-based parsing
+        return res;
+      } catch {}
+    }
+    throw e;
   }
 }
 
@@ -293,14 +339,12 @@ function share(){
 }
 
 // ====================================================================
-// TOPIC TEST
+// TOPIC TESTS
 // ====================================================================
 
-function onTopic(text){
-  if (!text) return false;
-  if (RX_EXCLUDE.some(rx=>rx.test(text))) return false;
-  return RX_INCLUDE.some(rx=>rx.test(text));
-}
+const testExclude = (text) => RX_EXCLUDE.some(rx=>rx.test(text));
+const testStrict  = (text) => RX_INCLUDE_STRICT.some(rx=>rx.test(text));
+const testSoft    = (text) => RX_INCLUDE_SOFT.some(rx=>rx.test(text));
 
 // ====================================================================
 // BUILD
@@ -308,6 +352,7 @@ function onTopic(text){
 
 async function build(){
   let items=[];
+  const ytDebug = [];
 
   // 1) Publishers (≈60h)
   console.log("🔹 Publishers:");
@@ -321,26 +366,43 @@ async function build(){
     }catch(e){ console.warn(`  ⚠ ${f}: ${e.message}`); }
   }
 
-  // 2) YouTube (7-day window, strict topic filtering)
+  // 2) YouTube (7-day window, two-pass filter, proxy fallback)
   console.log("🔹 YouTube (past", YT_HOURS/24, "days):");
   for(const ch of YT_CHANNELS){
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`;
     try{
-      const { txt } = await fetchText(url, { "accept-language":"en-US,en;q=0.8" }, 4);
+      const { txt } = await fetchTextWithProxies(url, { "accept-language":"en-US,en;q=0.8" }, 3);
       const all = parseYouTubeRSS(txt)
         .filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
         .sort((a,b)=> new Date(b.published) - new Date(a.published));
 
-      const chosen = [];
-      for(const v of all){
+      // keep raw for debug
+      ytDebug.push({ channel: ch, count: all.length, sample: all.slice(0,5) });
+
+      const keptStrict = [];
+      for (const v of all){
         const blob = `${v.title} ${v.description}`.toLowerCase();
-        if (onTopic(blob)) {
-          chosen.push(v);
-          if (chosen.length >= YT_MAX_PER_CHANNEL) break;
+        if (!testExclude(blob) && testStrict(blob)) {
+          keptStrict.push(v);
+          if (keptStrict.length >= YT_MAX_PER_CHANNEL) break;
         }
       }
-      items.push(...chosen);
-      console.log(`  ✓ ${ch} kept ${chosen.length}/${all.length}`);
+
+      let kept = keptStrict;
+      if (kept.length === 0) {
+        const keptSoft = [];
+        for (const v of all){
+          const blob = `${v.title} ${v.description}`.toLowerCase();
+          if (!testExclude(blob) && testSoft(blob)) {
+            keptSoft.push(v);
+            if (keptSoft.length >= YT_MAX_PER_CHANNEL) break;
+          }
+        }
+        kept = keptSoft;
+      }
+
+      items.push(...kept);
+      console.log(`  ✓ ${ch} fetched ${all.length} | kept ${kept.length} (${kept === keptStrict ? "strict" : "soft"})`);
       await sleep(150);
     }catch(e){ console.warn(`  ⚠ YT ${ch}: ${e.message}`); }
   }
@@ -373,7 +435,7 @@ async function build(){
   // Enrich article thumbnails (best-effort)
   await enrichArticleImages(items);
 
-  // ---------- FIX: type-aware windows ----------
+  // ---------- Type-aware windows ----------
   const now = Date.now();
   const isRecent = (it) => {
     const ageMs = now - new Date(it.published).getTime();
@@ -402,16 +464,18 @@ async function build(){
     };
   }
 
-  // Write data
+  // Write data + debug
   await fs.writeFile(NEWS_PATH, JSON.stringify(recent, null, 2));
   await fs.writeFile(WEEK_PATH, JSON.stringify({ updated: new Date().toISOString(), items: week }, null, 2));
   await fs.writeFile(SHORT_MAP, JSON.stringify(shortMap, null, 2));
+  await fs.writeFile(YT_DEBUG, JSON.stringify(ytDebug, null, 2));
 
   console.log(`Wrote:
   - data/news.json (${recent.length})
   - data/7d.json
-  - s/<id>/index.html (${Object.keys(shortMap).length})
   - data/shortlinks.json
+  - data/youtube_raw.json (debug)
+  - s/<id>/index.html (${Object.keys(shortMap).length})
 Done.`);
 }
 
