@@ -373,12 +373,16 @@ async function build(){
   // Enrich article thumbnails (best-effort)
   await enrichArticleImages(items);
 
-  // Slice windows for outputs
-  const recentWindowMs = RECENT_HOURS * 3600 * 1000;
-  const weekWindowMs   = 7 * 24 * 3600 * 1000;
+  // ---------- FIX: type-aware windows ----------
   const now = Date.now();
-  const recent = items.filter(x => now - new Date(x.published).getTime() <= recentWindowMs);
-  const week   = items.filter(x => now - new Date(x.published).getTime() <= weekWindowMs);
+  const isRecent = (it) => {
+    const ageMs = now - new Date(it.published).getTime();
+    const limit = (it.type === "video" ? YT_HOURS : RECENT_HOURS) * 3600 * 1000;
+    return ageMs <= limit;
+  };
+
+  const recent = items.filter(isRecent);
+  const week   = items.filter(x => now - new Date(x.published).getTime() <= 7 * 24 * 3600 * 1000);
 
   // Shortlinks for recent items
   await fs.mkdir(OUT_DATA, { recursive: true });
