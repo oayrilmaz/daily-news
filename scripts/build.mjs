@@ -1,10 +1,10 @@
 // ===========================================================
 // PTD Today Builder — Articles + YouTube Videos
-// - Feeds from publishers (RSS/Atom/JSON)
-// - YouTube channel RSS (no API key)
-// - Thumbnail enrichment for articles
-// - Static shortlink pages /s/<id>/ with OG (article or video)
-// - GA4 tag injected into short pages
+// - Pulls publisher feeds (RSS/Atom/JSON)
+// - Pulls YouTube channel RSS (no API key)
+// - Enriches article images (best-effort OG scrape)
+// - Generates short /s/<id>/ pages with OG + GA
+// - Writes data/news.json (last 48h) and data/7d.json (week)
 // Node 20+
 // ===========================================================
 
@@ -26,7 +26,7 @@ const SHORT_MAP  = path.join(OUT_DATA, "shortlinks.json");
 const SITE_ORIGIN = "https://ptdtoday.com";
 const GA_ID = "G-TVKD1RLFE5";
 
-// ---------- Source feeds (publishers) ----------
+// ---------- Publisher feeds ----------
 const DEFAULT_FEEDS = [
   "https://www.utilitydive.com/feeds/news/",
   "https://www.datacenterdynamics.com/en/rss/",
@@ -36,8 +36,6 @@ const DEFAULT_FEEDS = [
   "https://www.ferc.gov/rss.xml",
   "https://www.energy.gov/rss"
 ];
-
-// Allow override with env FEEDS="url1,url2"
 const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
 
 // ---------- YouTube channels (trusted) ----------
@@ -45,33 +43,27 @@ const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) |
    https://www.youtube.com/feeds/videos.xml?channel_id=<CHANNEL_ID>
 */
 const DEFAULT_YT_CHANNELS = [
-  // News
   "UCupvZG-5ko_eiXAupbDfxWw", // CNN
   "UChqUTb7kYRX8-EiaN3XFrSQ", // Reuters
-  "UCXIJgqnII2ZOINSWNOGFThA", // Fox News
-  "UCvJJ_dzjViJCoLf5uKUTwoA", // Fox Business
-  "UCvJJ_dzjViJCoLf5uKUTwoA", // (dup safeguard ok)
-  "UCn7kS1Mdr1R9oZ8r0T7w3ug", // CNBC Television
+  "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC Television
   "UC16niRr50-MSBwiO3YDb3RA", // BBC News
+  "UCx6h-dWzJ5NpAlja1YsApdg", // Fox Business
   "UCUMZ7gohGI9HcU9VNsr2FJQ", // Bloomberg Television
   "UCW6-BQWFA70DyycZ57JKias", // Wall Street Journal
   "UCo3TQcnm5KxV5eU2l3GKOAw"  // Financial Times
 ];
-
-// Allow override with env YT_CHANNELS="id1,id2"
 const YT_CHANNELS =
   (process.env.YT_CHANNELS?.split(",").map(s=>s.trim()).filter(Boolean))
   || DEFAULT_YT_CHANNELS;
 
-// ---------- Time windows & limits ----------
+// ---------- Windows & limits ----------
 const RECENT_HOURS = Number(process.env.RECENT_HOURS || 48); // today + yesterday
 const ENRICH_MAX   = Number(process.env.MAX_ENRICH   || 60); // article-image enrichment cap
 const CONCURRENCY  = 6;
 
-// ---------- Keyword filter for YouTube relevance ----------
+// ---------- YouTube relevance keywords ----------
 const YT_KEYWORDS = [
-  /grid|transmission|substation|distribution|switchgear|transformer/i,
-  /hvdc|hvadc/i,
+  /grid|transmission|substation|distribution|statcom|hvdc|hvadc/i,
   /renewables?|solar|wind|geothermal|storage|battery|batteries/i,
   /energy policy|ferc|capacity market|rto|iso|pjm|miso|ercot|caiso|nyiso|isone/i,
   /electricity|power market|power prices|capacity prices|wholesale|ancillary/i,
@@ -106,7 +98,7 @@ async function fetchText(url){
 }
 
 // ===========================================================
-// Feed parsing (publishers)
+// Parse publisher feeds
 // ===========================================================
 function parseRSS(xml){
   const rows = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
@@ -156,7 +148,7 @@ function detectAndParse(body, ct=""){
 }
 
 // ===========================================================
-// YouTube channel RSS parsing
+// YouTube RSS parsing
 // ===========================================================
 function ytFeedUrl(channelId){
   return `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`;
@@ -169,7 +161,7 @@ function parseYouTubeRSS(xml){
     const pub   = (b.match(/<published>([\s\S]*?)<\/published>/i)||[])[1] || "";
     const vid   = (b.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i)||[])[1] || "";
     const chan  = clean((b.match(/<name>([\s\S]*?)<\/name>/i)||[])[1]||"");
-    const thumb = `https://i.ytimg.com/vi/${vid}/hqdefault.jpg`;
+    const thumb = vid ? `https://i.ytimg.com/vi/${vid}/hqdefault.jpg` : "";
     return {
       title, url: link || (vid ? `https://www.youtube.com/watch?v=${vid}` : ""),
       published: safeISO(pub), image: thumb, type:"video", publisher: chan, videoId: vid
@@ -177,7 +169,7 @@ function parseYouTubeRSS(xml){
   }).filter(x=>x.title && x.url);
 }
 function ytRelevant(item){
-  const text = `${item.title}`; // could include more fields
+  const text = `${item.title}`;
   return YT_KEYWORDS.some(rx => rx.test(text));
 }
 
@@ -281,7 +273,7 @@ function staticSharePage(item){
 <meta name="twitter:image" content="${escapeHtml(img)}">`;
 
   const bodyContent = (item.type === "video" && item.videoId)
-    ? `<div class="meta">${escapeHtml((item.category||'').toUpperCase())} • ${escapeHtml(item.publisher||'')} • ${escapeHtml(dt)}</div>
+    ? `<div class="meta">${escapeHtml((item.category||'').toUpperCase())} • ${escapeHtml(item.publisher||'YouTube')} • ${escapeHtml(dt)}</div>
        <div class="video-wrap" style="aspect-ratio:16/9; background:#000; border:1px solid #d9ccb3; border-radius:8px; overflow:hidden;">
          <iframe width="100%" height="100%" src="https://www.youtube.com/embed/${escapeHtml(item.videoId)}"
                  title="${escapeHtml(title)}" frameborder="0"
