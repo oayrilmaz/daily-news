@@ -1,4 +1,4 @@
-/* PTD Today — no filters, today+yesterday, short share links */
+/* PTD Today — today+yesterday, articles + YouTube videos, short share links */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
@@ -22,19 +22,20 @@
   }
 
   function normalize(raw){
-    const title = pick(raw,['title','headline','name']) || '';
-    const url   = pick(raw,['url','link','href']) || '#';
-    const pdate = pick(raw,['published','date','time','pubDate','published_at']);
-    const publisher = (pick(raw,['publisher','source','domain','site','site_name']) || '')
-      .replace(/^https?:\/\/(www\.)?/,'').trim().toLowerCase();
-    const category = pick(raw,['category','topic','section']) || '';
-    const score = pick(raw,['score','rank','weight','hotness']);
-    const image = pick(raw,['image','image_url','img','thumbnail','thumb']) || '';
+    const title = pick(raw,['title']) || '';
+    const url   = pick(raw,['url']) || '#';
+    const pdate = pick(raw,['published']);
+    const publisher = (pick(raw,['publisher']) || '').replace(/^https?:\/\/(www\.)?/,'').trim().toLowerCase();
+    const category = pick(raw,['category']) || '';
+    const score = pick(raw,['score']);
+    const image = pick(raw,['image']) || '';
     const share = pick(raw,['share']); // /s/<id>/
+    const type  = pick(raw,['type']) || 'article';
+    const videoId = pick(raw,['videoId']) || '';
     const d = parseDate(pdate) || null;
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
-    return { title, url, publisher, category, date, score: (typeof score==='number'?score:null), image, share };
+    return { title, url, publisher, category, date, score: (typeof score==='number'?score:null), image, share, type, videoId };
   }
 
   function render(items){
@@ -52,15 +53,21 @@
         (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
       ].filter(Boolean).join(' • ');
 
+      const isVideo = item.type === 'video';
+      const ctaLabel = isVideo ? 'Watch' : 'Open Article';
+
       const card = document.createElement('article'); card.className='card';
       card.innerHTML = `
-        <div class="thumb"><img loading="lazy" src="${bestImage(item)}" alt=""></div>
+        <div class="thumb ${isVideo ? 'is-video' : ''}">
+          <img loading="lazy" src="${bestImage(item)}" alt="">
+          ${isVideo ? '<span class="play-badge" aria-hidden="true">▶</span>' : ''}
+        </div>
         <div class="content">
           <div class="meta">${metaBits}</div>
           <h3 class="headline"><a href="${shareUrl}">${item.title}</a></h3>
           <div class="cta-row">
-            <a class="btn" href="${shareUrl}">Open Article</a>
-            <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">Source</a>
+            <a class="btn" href="${shareUrl}">${ctaLabel}</a>
+            <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">${isVideo ? 'YouTube' : 'Source'}</a>
             <button class="btn linkish share" data-url="${shareUrl}">Share</button>
           </div>
         </div>
