@@ -1,6 +1,6 @@
 // ====================================================================
 // PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
-// With proxy fallbacks + debug dump for YouTube + two-pass filtering
+// Channel policies + manual smart-allow + shorts filter + debug
 // Node 20+
 // ====================================================================
 
@@ -39,9 +39,7 @@ const CONCURRENCY        = Number(process.env.CONCURRENCY || 6);
 const YT_MAX_PER_CHANNEL = Number(process.env.YT_MAX_PER_CHANNEL || 8);
 const ENRICH_MAX         = Number(process.env.MAX_ENRICH || 50);
 
-// Optional: custom proxies via env (comma-separated with {URL} token)
-// Example:
-//   PROXIES="https://r.jina.ai/http://{URL},https://r.jina.ai/https://{URL}"
+// Optional proxies (RSS fallback on GH runners)
 const PROXIES = (process.env.PROXIES?.split(",").map(s=>s.trim()).filter(Boolean)) || [
   "https://r.jina.ai/http://{URL}",
   "https://r.jina.ai/https://{URL}"
@@ -59,30 +57,46 @@ const DEFAULT_FEEDS = [
 ];
 const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
 
-// ---------- YouTube channels (ENERGY-FOCUSED) ----------
-const ENERGY_FOCUSED_YT_CHANNELS = [
-  // OEMs / Utilities / Vendors
-  "UC0jLzOK3mWr4YcUuG3KzZmw", // Siemens Energy
-  "UC4l7cLFsPzQYdMwvZRVqNag", // Hitachi Energy
-  "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB
-  "UCvB8R7oZJxge5tR3MUpxYfw", // Schneider Electric
+// ---------- YouTube channels ----------
+const YT = {
+  // OEMs / Utilities / Vendors (always strict; they’re already focused)
+  SIEMENS:   "UC0jLzOK3mWr4YcUuG3KzZmw",
+  HITACHI:   "UC4l7cLFsPzQYdMwvZRVqNag",
+  ABB:       "UCJ2Kx0pPZzJyaRlwviCJPdA",
+  SCHNEIDER: "UCvB8R7oZJxge5tR3MUpxYfw",
 
-  // Business / Market desks (frequent energy segments)
-  "UCUMZ7gohGI9HcU9VNsr2FJQ", // Bloomberg TV
-  "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC TV
-  "UCW6-BQWFA70DyycZ57JKias", // WSJ
-  "UChqUTb7kYRX8-EiaN3XFrSQ", // Reuters
-  "UC16niRr50-MSBwiO3YDb3RA"  // BBC News
-];
-const YT_CHANNELS =
-  (process.env.YT_CHANNELS?.split(",").map(s=>s.trim()).filter(Boolean))
-  || ENERGY_FOCUSED_YT_CHANNELS;
+  // Business / Market desks
+  BLOOMBERG: "UCUMZ7gohGI9HcU9VNsr2FJQ",
+  CNBC:      "UCvJJ_dzjViJCoLf5uKUTwoA",
+  WSJ:       "UCW6-BQWFA70DyycZ57JKias",
+  REUTERS:   "UChqUTb7kYRX8-EiaN3XFrSQ",
+  BBC:       "UC16niRr50-MSBwiO3YDb3RA"
+};
+
+const YT_CHANNELS = (process.env.YT_CHANNELS?.split(",").map(s=>s.trim()).filter(Boolean)) ||
+  Object.values(YT);
+
+// Channel policies:
+// - soft = whether channel can pass the softer include net if strict failed
+// - requireCore = whether we require a core energy/datacenter word to appear
+const CHANNEL_POLICIES = {
+  [YT.SIEMENS]:   { soft:false, requireCore:false },
+  [YT.HITACHI]:   { soft:false, requireCore:false },
+  [YT.ABB]:       { soft:false, requireCore:false },
+  [YT.SCHNEIDER]: { soft:false, requireCore:false },
+
+  [YT.BLOOMBERG]: { soft:true,  requireCore:true },
+  [YT.CNBC]:      { soft:true,  requireCore:true },
+  [YT.WSJ]:       { soft:false, requireCore:true },
+  [YT.REUTERS]:   { soft:false, requireCore:true },
+  [YT.BBC]:       { soft:false, requireCore:true }
+};
 
 // ====================================================================
 // TOPIC FILTERS
 // ====================================================================
 
-// Primary includes — strict (your domain language)
+// Strict domain language
 const RX_INCLUDE_STRICT = [
   // Transmission & Grid
   /\b(grid|transmission|distribution|substation|overhead\s+line|interconnector|intertie)\b/i,
@@ -99,7 +113,7 @@ const RX_INCLUDE_STRICT = [
   /\b(battery|batteries|bess|energy\s+storage|lithium|grid[-\s]?forming)\b/i,
   /\b(virtual\s+power\s+plant|vpp|vehicle[-\s]?to[-\s]?grid|v2g|microgrid)\b/i,
 
-  // Industrial large loads
+  // Industrial loads
   /\b(semiconductor|foundry|fab|refinery|mining|smelter|steel|cement|rail|metro|traction|port|airport)\b/i,
 
   // Policy & Markets
@@ -114,11 +128,11 @@ const RX_INCLUDE_STRICT = [
   // Supply chain / lead times
   /\bsupply\s+chain.*\b(lead\s*time|capacity|backlog|shortage|procurement)\b/i,
 
-  // Data centers / AI power / Semiconductors (BROADER)
-  /\b(ai|artificial\s+intelligence|machine\s+learning|gpu|nvidia|semiconductor|chip|foundry|fabrication|server|rack|data\s*cent(?:er|re)s?|hyperscale|colocation|supercomputer|hpc|cloud|ai\s+infrastructure|pue|liquid\s+cooling|immersion\s+cooling)\b/i
+  // Data centers / AI power / Semiconductors (broad but relevant)
+  /\b(ai|artificial\s+intelligence|machine\s+learning|gpu|nvidia|semiconductor|chip|server|rack|data\s*cent(?:er|re)s?|hyperscale|colocation|supercomputer|hpc|cloud|ai\s+infrastructure|pue|liquid\s+cooling|immersion\s+cooling)\b/i
 ];
 
-// Secondary includes — softer net for YT (only if strict keeps 0 for a channel)
+// Softer net (only if strict fails AND policy.soft = true)
 const RX_INCLUDE_SOFT = [
   /\b(power|electric(ity|al)?|energy|utility|utilities)\b/i,
   /\b(grid|transmission|substation|hvdc|converter|bess|battery|storage)\b/i,
@@ -128,12 +142,24 @@ const RX_INCLUDE_SOFT = [
   /\b(nvidia|chip(s)?|semiconductor|foundry|fab)\b/i
 ];
 
-// Excludes — remove unrelated general content
+// Core “must-have” for general news channels (avoid geopolitics)
+const RX_CORE = /\b(power|electric(ity|al)?|grid|utility|data\s*cent(?:er|re)|datacentre|hyperscale|colocation|gpu|nvidia|ai|hvdc|battery|bess|hydrogen|solar|wind|nuclear|substation|transformer|transmission|converter|cooling|pue)\b/i;
+
+// Manual smart-allow: very specific combos we care about
+const RX_SMART_ALLOW = [
+  /nvidia.*data\s*cent/i,
+  /data\s*cent.*nvidia/i,
+  /ai.*data\s*cent/i,
+  /gpu.*(power|electric|grid)/i
+];
+
+// Excludes
 const RX_EXCLUDE = [
   /\b(trump|biden|harris|election|congress|parliament|president|democrat|republican|politics|campaign)\b/i,
   /\b(israel|gaza|ukraine|russia|war|conflict|attack|terror|police|crime|shooting|murder|trial|court)\b/i,
   /\b(plane|aircraft|crash|collision|celebrity|hollywood|entertainment|music|movie|trailer|gossip|nfl|nba|mlb|soccer|football)\b/i,
-  /\b(hurricane|storm|flood|tornado|earthquake|wildfire|blizzard|heatwave)\b(?!.*\b(grid|utility|power|outage)\b)/i
+  /\b(hurricane|storm|flood|tornado|earthquake|wildfire|blizzard|heatwave)\b(?!.*\b(grid|utility|power|outage)\b)/i,
+  /#shorts|\bshorts\b/i
 ];
 
 // ====================================================================
@@ -151,15 +177,8 @@ function sortByDateDesc(a,b){ return new Date(b.published)-new Date(a.published)
 const isLogoPath = u => /logo|sprite|favicon|brand|og-image-default/i.test(u||"");
 
 // ====================================================================
-//
-// NETWORK + PARSERS (with proxy fallback for YT)
-//
-/*  PROXY FORMAT:
-    - Use {URL} token which will be replaced with the raw URL or the URL without protocol
-    - Examples we support out-of-the-box:
-      "https://r.jina.ai/http://{URL}"
-      "https://r.jina.ai/https://{URL}"
-*/
+// NETWORK + PARSERS (with proxy fallback)
+// ====================================================================
 
 function buildProxyUrl(proxyPattern, url){
   if (!proxyPattern.includes("{URL}")) return proxyPattern + encodeURIComponent(url);
@@ -186,17 +205,11 @@ async function fetchText(url, headers = {}, retries = 3){
 }
 
 async function fetchTextWithProxies(url, headers = {}, retries = 2){
-  try {
-    return await fetchText(url, headers, retries);
-  } catch (e) {
-    // Try proxies
+  try { return await fetchText(url, headers, retries); }
+  catch (e) {
     for (const p of PROXIES){
-      const proxyUrl = buildProxyUrl(p, url);
-      try {
-        const res = await fetchText(proxyUrl, headers, 1);
-        // r.jina.ai returns text; good enough for our regex-based parsing
-        return res;
-      } catch {}
+      try { return await fetchText(buildProxyUrl(p,url), headers, 1); }
+      catch {}
     }
     throw e;
   }
@@ -339,12 +352,37 @@ function share(){
 }
 
 // ====================================================================
-// TOPIC TESTS
+// FILTER HELPERS
 // ====================================================================
 
-const testExclude = (text) => RX_EXCLUDE.some(rx=>rx.test(text));
-const testStrict  = (text) => RX_INCLUDE_STRICT.some(rx=>rx.test(text));
-const testSoft    = (text) => RX_INCLUDE_SOFT.some(rx=>rx.test(text));
+const testStrict  = (t) => RX_INCLUDE_STRICT.some(rx=>rx.test(t));
+const testSoft    = (t) => RX_INCLUDE_SOFT.some(rx=>rx.test(t));
+const testCore    = (t) => RX_CORE.test(t);
+const testSmart   = (t) => RX_SMART_ALLOW.some(rx=>rx.test(t));
+const testExclude = (t) => RX_EXCLUDE.some(rx=>rx.test(t));
+
+// Decide if a YT item passes for a given channel policy
+function passesYouTubePolicy(blob, policy){
+  if (testExclude(blob)) return false;
+
+  // Always let very relevant smart-allow pass
+  if (testSmart(blob)) {
+    if (policy.requireCore && !testCore(blob)) return false;
+    return true;
+  }
+
+  if (testStrict(blob)) {
+    if (policy.requireCore && !testCore(blob)) return false;
+    return true;
+  }
+
+  if (policy.soft && testSoft(blob)) {
+    if (policy.requireCore && !testCore(blob)) return false;
+    return true;
+  }
+
+  return false;
+}
 
 // ====================================================================
 // BUILD
@@ -366,43 +404,30 @@ async function build(){
     }catch(e){ console.warn(`  ⚠ ${f}: ${e.message}`); }
   }
 
-  // 2) YouTube (7-day window, two-pass filter, proxy fallback)
+  // 2) YouTube (7-day window, policy filtering, proxy fallback)
   console.log("🔹 YouTube (past", YT_HOURS/24, "days):");
   for(const ch of YT_CHANNELS){
     const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${ch}`;
+    const policy = CHANNEL_POLICIES[ch] || { soft:false, requireCore:false };
     try{
       const { txt } = await fetchTextWithProxies(url, { "accept-language":"en-US,en;q=0.8" }, 3);
       const all = parseYouTubeRSS(txt)
         .filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
         .sort((a,b)=> new Date(b.published) - new Date(a.published));
 
-      // keep raw for debug
       ytDebug.push({ channel: ch, count: all.length, sample: all.slice(0,5) });
 
-      const keptStrict = [];
+      const kept=[];
       for (const v of all){
         const blob = `${v.title} ${v.description}`.toLowerCase();
-        if (!testExclude(blob) && testStrict(blob)) {
-          keptStrict.push(v);
-          if (keptStrict.length >= YT_MAX_PER_CHANNEL) break;
+        if (passesYouTubePolicy(blob, policy)) {
+          kept.push(v);
+          if (kept.length >= YT_MAX_PER_CHANNEL) break;
         }
-      }
-
-      let kept = keptStrict;
-      if (kept.length === 0) {
-        const keptSoft = [];
-        for (const v of all){
-          const blob = `${v.title} ${v.description}`.toLowerCase();
-          if (!testExclude(blob) && testSoft(blob)) {
-            keptSoft.push(v);
-            if (keptSoft.length >= YT_MAX_PER_CHANNEL) break;
-          }
-        }
-        kept = keptSoft;
       }
 
       items.push(...kept);
-      console.log(`  ✓ ${ch} fetched ${all.length} | kept ${kept.length} (${kept === keptStrict ? "strict" : "soft"})`);
+      console.log(`  ✓ ${ch} fetched ${all.length} | kept ${kept.length} (soft=${policy.soft}, core=${policy.requireCore})`);
       await sleep(150);
     }catch(e){ console.warn(`  ⚠ YT ${ch}: ${e.message}`); }
   }
@@ -432,7 +457,7 @@ async function build(){
   // Dedupe + sort
   items = dedupeByUrl(items).sort(sortByDateDesc);
 
-  // Enrich article thumbnails (best-effort)
+  // Enrich article thumbnails
   await enrichArticleImages(items);
 
   // ---------- Type-aware windows ----------
@@ -446,7 +471,7 @@ async function build(){
   const recent = items.filter(isRecent);
   const week   = items.filter(x => now - new Date(x.published).getTime() <= 7 * 24 * 3600 * 1000);
 
-  // Shortlinks for recent items
+  // Shortlinks for recent
   await fs.mkdir(OUT_DATA, { recursive: true });
   await fs.mkdir(OUT_SHORT, { recursive: true });
   const shortMap = {};
