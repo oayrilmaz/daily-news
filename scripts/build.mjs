@@ -1,6 +1,6 @@
 // ====================================================================
-// PTD Today Builder — Articles (≈60h) + YouTube (7 days, topic filtered)
-// Node 20+ runtime
+// PTD Today Builder — Articles (≈60h) + YouTube (past 7 days, topic filtered)
+// Node 20+
 // ====================================================================
 
 import fs from "node:fs/promises";
@@ -29,7 +29,7 @@ const GA_ID = "G-TVKD1RLFE5";
 // Articles window: today + yesterday (buffered)
 const RECENT_HOURS = Number(process.env.RECENT_HOURS || 60);
 
-// YouTube window: past 7 days (you asked for “YouTube only = past week”)
+// YouTube window: past 7 days
 const YT_HOURS = Number(process.env.YT_HOURS || 24 * 7);
 
 // Concurrency / caps
@@ -50,59 +50,69 @@ const DEFAULT_FEEDS = [
 const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) || DEFAULT_FEEDS;
 
 // ---------- YouTube channels (ENERGY-FOCUSED) ----------
-/* These are selected to maximize on-topic content (power, grid, renewables, data centers):
-   - OEMs/utilities/infra, and business channels that frequently post energy segments.
-   You can override with env YT_CHANNELS="id1,id2,..." if desired.
-*/
 const ENERGY_FOCUSED_YT_CHANNELS = [
   // OEMs / Utilities / Vendors
   "UC0jLzOK3mWr4YcUuG3KzZmw", // Siemens Energy
   "UC4l7cLFsPzQYdMwvZRVqNag", // Hitachi Energy
-  "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB (Power & Automation)
+  "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB
   "UCvB8R7oZJxge5tR3MUpxYfw", // Schneider Electric
-  "UCw0a7I6QF9nYb0V3QqL2clQ", // GE Vernova (if changed later, override via env)
-
-  // Business / Market energy-heavy desks
-  "UCUMZ7gohGI9HcU9VNsr2FJQ", // Bloomberg Television
-  "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC Television
-  "UCW6-BQWFA70DyycZ57JKias", // Wall Street Journal
+  // Business / Market desks
+  "UCUMZ7gohGI9HcU9VNsr2FJQ", // Bloomberg TV
+  "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC TV
+  "UCW6-BQWFA70DyycZ57JKias", // WSJ
   "UChqUTb7kYRX8-EiaN3XFrSQ", // Reuters
   "UC16niRr50-MSBwiO3YDb3RA"  // BBC News
 ];
-
 const YT_CHANNELS =
   (process.env.YT_CHANNELS?.split(",").map(s=>s.trim()).filter(Boolean))
   || ENERGY_FOCUSED_YT_CHANNELS;
 
 // ====================================================================
-// TOPIC FILTERS (strict include + hard exclude)
+// TOPIC FILTERS (split into small, safe regexes)
 // ====================================================================
 
-// Include – mapped to your 10 domains (grid, HVDC, renewables, data centers, AI power, policy, equipment, cables, lead times, etc.)
+// Include — mapped to your domains
 const RX_INCLUDE = [
-  // Transmission & Grid / FACTS / HV
-  /\b(grid|transmission|distribution|substation|statcom|synchronous condenser|synch?rophasor|pmu|reactive power|fact?s|tcsr|tcsc|upfc|interconnector|intertie|u?hv|conductor|overhead line)\b/i,
+  // Transmission & Grid
+  /\b(grid|transmission|distribution|substation|overhead\s+line|interconnector|intertie)\b/i,
+  /\b(transformer|autotransformer|switchgear|breaker|protection\s+relay)\b/i,
+  /\b(statcom|synchronous\s+condenser|reactive\s+power|facts|tcsr|tcsc|upfc|pmu|synchrophasor)\b/i,
+
   // HVDC/HVAC
-  /\b(hvdc|hvac transmission|converter station|vsc|csc)\b/i,
+  /\b(hvdc|hvac\s+transmission|converter\s+station|vsc|csc)\b/i,
+
   // Renewables & Generation
-  /\b(renewable|solar|pv|wind|offshore wind|hydro(power)?|geothermal|biomass|smr|small modular reactor|nuclear)\b/i,
+  /\b(renewable|solar|pv|wind|offshore\s+wind|hydro(?:power)?|geothermal|biomass|nuclear|smr|small\s+modular\s+reactor)\b/i,
+
   // Storage / Grid Edge
-  /\b(battery|batteries|bess|energy storage|lithium|grid-forming|virtual power plant|vpp|vehicle-to-grid|v2g|microgrid)\b/i,
+  /\b(battery|batteries|bess|energy\s+storage|lithium|grid[-\s]?forming)\b/i,
+  /\b(virtual\s+power\s+plant|vpp|vehicle[-\s]?to[-\s]?grid|v2g|microgrid)\b/i,
+
   // Data centers / AI power
-  /\b(data ?center|datacentre|hyperscale|colocation|server farm|gpu (cluster|power|cooling)|pue|liquid cooling|immersion cooling|ai.*(energy|power|datacenter)|datacenter.*(ai|gpu)\b/i,
+  /\bdata\s*cent(?:er|re)s?\b/i,
+  /\b(hyperscale|colocation|server\s+farm)\b/i,
+  /\bgpu\s+(cluster|power|cooling)\b/i,
+  /\b(pue|liquid\s+cooling|immersion\s+cooling)\b/i,
+  /ai.*\b(energy|power|data\s*cent(?:er|re)s?)\b/i,
+  /data\s*cent(?:er|re)s?.*\b(ai|gpu)\b/i,
+
   // Industrial large loads
   /\b(semiconductor|foundry|fab|refinery|mining|smelter|steel|cement|rail|metro|traction|port|airport)\b/i,
+
   // Policy & Markets
-  /\b(ferc|rto|iso|pjm|miso|ercot|caiso|iso[- ]?ne|nyiso|ofgem|grid code|capacity market|ancillary services)\b/i,
+  /\b(ferc|rto|iso|pjm|miso|ercot|caiso|iso[-\s]?ne|nyiso|ofgem|grid\s+code|capacity\s+market|ancillary\s+services)\b/i,
+
   // Automation & Monitoring
-  /\b(scada|ems|dms|adms|derms|wams|digital twin|condition monitoring|predictive maintenance|iec\s*61850)\b/i,
+  /\b(scada|ems|dms|adms|derms|wams|digital\s+twin|condition\s+monitoring|predictive\s+maintenance|iec\s*61850)\b/i,
+
   // Equipment & Cables
-  /\b(transformer|autotransformer|switchgear|breaker|protection relay|subsea cable|hv cable|xlpe|hvac cable)\b/i,
+  /\b(subsea\s+cable|hv\s+cable|xlpe|hvac\s+cable|conductor)\b/i,
+
   // Supply chain / lead times
-  /\b(supply chain).*(lead time|capacity|backlog|shortage|procurement)\b/i
+  /\bsupply\s+chain.*\b(lead\s*time|capacity|backlog|shortage|procurement)\b/i
 ];
 
-// Exclude – remove general politics/crime/accidents/sports/entertainment weather unless grid-related
+// Exclude — remove unrelated general content
 const RX_EXCLUDE = [
   /\b(trump|biden|harris|election|congress|parliament|president|democrat|republican|politics|campaign)\b/i,
   /\b(israel|gaza|ukraine|russia|war|conflict|attack|terror|police|crime|shooting|murder|trial|court)\b/i,
