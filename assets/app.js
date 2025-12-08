@@ -1,5 +1,5 @@
 /* PTD Today — render Today+Yesterday articles + YouTube; unified Share.
-   LEGAL-SAFE VERSION (no external article images)
+   LEGAL-SAFE VERSION (shows thumbnails only for YouTube videos)
 */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
@@ -64,16 +64,18 @@
     const category  = (raw.category   || '').trim();
     const type      = raw.type || 'article';
     const videoId   = raw.videoId || '';
-    // image is intentionally ignored for rendering to avoid copyright issues
+
+    // only keep image for videos (potentially YouTube); ignore article images
+    const image = (type === 'video') ? (raw.image || '') : '';
+
     const d = parseDate(raw.published);
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
 
-    // share URL stays as-is (article.html wrapper)
     const share = raw.share || `/article.html?u=${encodeURIComponent(url)}`;
     const score = typeof raw.score === 'number' ? raw.score : null;
 
-    return { title, url, publisher, category, date, share, score, type, videoId };
+    return { title, url, publisher, category, date, share, score, type, videoId, image };
   }
 
   function render(items){
@@ -93,6 +95,7 @@
 
     for (const item of items){
       const isVideo = item.type === 'video';
+
       const metaBits = [
         (item.category || '').toUpperCase(),
         item.publisher || domainOf(item.url),
@@ -102,11 +105,19 @@
 
       const { cls, label } = categoryInfo(item);
 
+      // show thumbnail only if:
+      //  - it is a video AND
+      //  - url points to YouTube AND
+      //  - we have an image URL
+      const isYouTube = /youtube\.com|youtu\.be/i.test(item.url);
+      const showVideoThumb = isVideo && isYouTube && !!item.image;
+
       const card = document.createElement('article');
       card.className = 'card';
 
       card.innerHTML = `
         <div class="thumb ${cls} ${isVideo ? 'is-video' : ''}">
+          ${showVideoThumb ? `<img loading="lazy" src="${item.image}" alt="">` : ''}
           <span class="thumb-tag">${label}</span>
           ${isVideo ? '<span class="play-badge" aria-hidden="true">▶</span>' : ''}
         </div>
@@ -140,9 +151,7 @@
             btn.textContent = 'Copied';
             setTimeout(() => { btn.textContent = 'Share'; }, 1200);
           }
-        } catch {
-          // silent fail
-        }
+        } catch {}
       });
     });
   }
