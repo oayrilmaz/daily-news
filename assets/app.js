@@ -1,5 +1,5 @@
 /* PTD Today — render Today+Yesterday articles + YouTube; unified Share.
-   LEGAL-SAFE VERSION (shows thumbnails only for YouTube videos)
+   LEGAL-SAFE VERSION (videos use YouTube thumbs, articles use gradients/AI)
 */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
@@ -65,14 +65,16 @@
     const type      = raw.type || 'article';
     const videoId   = raw.videoId || '';
 
-    // only keep image for videos (potentially YouTube); ignore article images
+    // only keep image for videos (YouTube thumbs); ignore article images
     const image = (type === 'video') ? (raw.image || '') : '';
 
-    const d = parseDate(raw.published);
+    const d   = parseDate(raw.published);
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
 
-    const share = raw.share || `/article.html?u=${encodeURIComponent(url)}`;
+    // 🔴 IMPORTANT: always use our safe wrapper; ignore raw.share
+    const share = `/article.html?u=${encodeURIComponent(url)}&t=${encodeURIComponent(title)}&c=${encodeURIComponent(category)}`;
+
     const score = typeof raw.score === 'number' ? raw.score : null;
 
     return { title, url, publisher, category, date, share, score, type, videoId, image };
@@ -105,10 +107,6 @@
 
       const { cls, label } = categoryInfo(item);
 
-      // show thumbnail only if:
-      //  - it is a video AND
-      //  - url points to YouTube AND
-      //  - we have an image URL
       const isYouTube = /youtube\.com|youtu\.be/i.test(item.url);
       const showVideoThumb = isVideo && isYouTube && !!item.image;
 
