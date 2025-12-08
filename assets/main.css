@@ -102,7 +102,9 @@ a:hover { text-decoration: underline; }
 }
 
 /* =========================================================
-   SAFE THUMBNAIL SYSTEM (NO COPYRIGHT IMAGES)
+   SAFE THUMBNAIL SYSTEM
+   - Gradient thumbnails for articles
+   - YouTube thumbnails for videos only
    ========================================================= */
 
 .thumb {
@@ -114,16 +116,16 @@ a:hover { text-decoration: underline; }
   align-items: flex-end;
   justify-content: flex-start;
   padding: 10px 12px;
-  border-radius: 0;
   overflow: hidden;
+  border-radius: 0;
 }
 
-/* --- generic fallback gradient (if no category) --- */
+/* Gradient fallback for articles (default) */
 .thumb.generic {
   background: radial-gradient(circle at top left, #ffd27f, #f08a5d, #374785);
 }
 
-/* --- category-specific gradients --- */
+/* Category gradients */
 .thumb.solar {
   background: radial-gradient(circle at top, #ffe259, #ffa751);
 }
@@ -140,8 +142,21 @@ a:hover { text-decoration: underline; }
   background: radial-gradient(circle at top, #30cfd0, #330867);
 }
 
-/* --- Thumbnail tag --- */
+/* Show image ONLY for video items (YouTube thumbnails) */
+.thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  z-index: 1;
+}
+
+/* Thumbnail label */
 .thumb-tag {
+  position: relative;
+  z-index: 2;
   display: inline-block;
   padding: 6px 10px;
   border-radius: 14px;
@@ -152,9 +167,10 @@ a:hover { text-decoration: underline; }
   backdrop-filter: blur(1px);
 }
 
-/* --- Video play badge overlay --- */
+/* Video play badge */
 .thumb.is-video .play-badge {
   position: absolute;
+  z-index: 3;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -186,11 +202,6 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-/* REMOVE OLD IMAGE HANDLING — NO MORE <img> */
-.thumb img {
-  display: none !important;
 }
 
 .content {
@@ -229,9 +240,11 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
   text-decoration: none;
 }
+
 .btn.secondary {
   background: #efe6d6;
 }
+
 .btn.linkish {
   background: transparent;
   border: 0;
@@ -239,6 +252,7 @@ a:hover { text-decoration: underline; }
   font-size: 13px;
   padding: 8px 8px;
 }
+
 .btn:hover {
   background: #d6c8af;
 }
