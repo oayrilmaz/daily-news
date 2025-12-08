@@ -6,146 +6,162 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#E7DCC8">
   <link rel="stylesheet" href="/assets/main.css">
+
   <style>
-    .article-wrap {
-      max-width: 820px;
-      margin: 30px auto 40px;
-      padding: 0 16px;
+    body { background: #e8ddcb; font-family: Georgia, serif; }
+
+    .wrap {
+      max-width: 830px;
+      margin: 30px auto 50px;
+      padding: 0 20px;
     }
-    .article-back {
-      font-size: 14px;
-      margin-bottom: 16px;
+
+    .back {
+      font-size: 15px;
+      margin-bottom: 18px;
+      display: inline-block;
     }
-    .article-headline {
-      font-size: 28px;
+
+    h1 {
+      font-size: 30px;
+      margin: 0 0 20px;
       line-height: 1.25;
-      margin: 4px 0 22px;
     }
-    .article-card {
+
+    .box {
       background: #f7f2e8;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      padding: 18px 18px 20px;
+      border: 1px solid #d9ccb3;
+      border-radius: 10px;
+      padding: 18px;
     }
-    .article-thumb {
+
+    .media {
       width: 100%;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: 16/9;
+      background-size: cover;
+      background-position: center;
       border-radius: 6px;
       margin-bottom: 16px;
-      position: relative;
       overflow: hidden;
-      background: radial-gradient(circle at top left, #ffd27f, #f08a5d, #374785);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: relative;
     }
-    .article-thumb iframe {
+
+    iframe {
       width: 100%;
       height: 100%;
       border: 0;
     }
-    .article-note {
-      margin-top: 18px;
+
+    .note {
       font-size: 14px;
-      color: var(--muted);
+      color: #6f675d;
+      margin-top: 14px;
     }
-    .article-cta {
+
+    .cta {
+      margin-top: 14px;
       display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 10px;
+      gap: 10px;
+    }
+
+    .btn {
+      border: 1px solid #d9ccb3;
+      background: #ddd0b8;
+      color: #143A79;
+      padding: 9px 14px;
+      border-radius: 18px;
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .btn.linkish {
+      background: transparent;
+      border: none;
+      color: #143A79;
+      cursor: pointer;
     }
   </style>
 </head>
+
 <body>
-  <div class="article-wrap">
-    <div class="article-back">
-      <a href="/" aria-label="Back to PTD Today">&larr; Back to PTD Today</a>
+<div class="wrap">
+
+  <a class="back" href="/">← Back to PTD Today</a>
+  <h1 id="title">PTD Today Article</h1>
+
+  <div class="box">
+    <div id="media" class="media"></div>
+
+    <div class="cta">
+      <a id="open" class="btn" href="#" target="_blank">Open Article</a>
+      <button id="share" class="btn linkish">Share</button>
     </div>
 
-    <h1 id="article-title" class="article-headline">PTD Today Article</h1>
-
-    <div class="article-card">
-      <div id="article-media" class="article-thumb"></div>
-
-      <div class="article-cta">
-        <a id="open-link" class="btn" href="#" target="_blank" rel="noopener">Open Article</a>
-        <button id="share-btn" class="btn linkish">Share</button>
-      </div>
-
-      <p class="article-note">
-        You're on PTD Today. Click above to visit the original publisher.
-      </p>
-    </div>
+    <p class="note">
+      You’re on PTD Today. Click above to visit the original publisher.
+    </p>
   </div>
+</div>
 
-  <script>
-    (function(){
-      const params = new URLSearchParams(location.search);
-      const rawU   = params.get('u') || '';
-      const rawT   = params.get('t') || '';
+<script>
+(function() {
+  const params = new URLSearchParams(location.search);
+  const url = decodeURIComponent(params.get("u") || "");
+  const title = decodeURIComponent(params.get("t") || "");
 
-      const url    = rawU ? decodeURIComponent(rawU) : '';
-      const title  = rawT ? decodeURIComponent(rawT) : '';
+  const titleEl = document.getElementById("title");
+  const mediaEl = document.getElementById("media");
+  const openEl  = document.getElementById("open");
+  const shareEl = document.getElementById("share");
 
-      const titleEl = document.getElementById('article-title');
-      const mediaEl = document.getElementById('article-media');
-      const openEl  = document.getElementById('open-link');
-      const shareEl = document.getElementById('share-btn');
+  if (title) {
+    titleEl.textContent = title;
+    document.title = title + " — PTD Today";
+  }
 
-      if (title) {
-        document.title = title + ' — PTD Today';
-        titleEl.textContent = title;
-      }
+  if (url) openEl.href = url;
 
-      if (url) {
-        openEl.href = url;
+  // Detect YouTube videos
+  const isYT = /youtube\.com|youtu\.be/i.test(url);
+
+  if (isYT) {
+    // Extract ID
+    let id = "";
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes("youtu.be")) {
+        id = u.pathname.slice(1);
       } else {
-        openEl.style.display = 'none';
+        id = new URLSearchParams(u.search).get("v") || "";
       }
+    } catch (e) {}
 
-      // Only embed if YouTube URL (legal via YouTube’s terms)
-      if (url && /youtube\.com|youtu\.be/i.test(url)) {
-        let videoId = '';
-        try {
-          const u = new URL(url);
-          if (u.hostname.includes('youtu.be')) {
-            videoId = u.pathname.replace('/','');
-          } else {
-            videoId = new URLSearchParams(u.search).get('v') || '';
-          }
-        } catch {}
+    if (id) {
+      mediaEl.innerHTML =
+        `<iframe src="https://www.youtube.com/embed/${id}" 
+                 allowfullscreen loading="lazy"></iframe>`;
+    }
+  } else {
+    // Use AI-generated fallback image for articles
+    mediaEl.style.backgroundImage =
+      "url('/assets/ai/default-news.jpg')";
+  }
 
-        if (videoId) {
-          mediaEl.innerHTML =
-            '<iframe src="https://www.youtube.com/embed/' +
-            encodeURIComponent(videoId) +
-            '" allowfullscreen loading="lazy"></iframe>';
-        } else {
-          mediaEl.textContent = 'Video unavailable. Use the button above to open on YouTube.';
-        }
+  shareEl.onclick = async () => {
+    const shareUrl = location.href;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url: shareUrl });
       } else {
-        // Non-YouTube articles: keep only gradient box, no images from publisher
-        mediaEl.textContent = '';
+        await navigator.clipboard.writeText(shareUrl);
+        shareEl.textContent = "Copied";
+        setTimeout(() => shareEl.textContent = "Share", 1200);
       }
+    } catch {}
+  };
 
-      if (shareEl && url) {
-        shareEl.addEventListener('click', async () => {
-          const shareUrl = location.href;
-          try {
-            if (navigator.share) {
-              await navigator.share({ title: title || 'PTD Today', url: shareUrl });
-            } else if (navigator.clipboard && navigator.clipboard.writeText) {
-              await navigator.clipboard.writeText(shareUrl);
-              shareEl.textContent = 'Copied';
-              setTimeout(()=> shareEl.textContent = 'Share', 1200);
-            }
-          } catch {}
-        });
-      } else if (shareEl) {
-        shareEl.style.display = 'none';
-      }
-    })();
-  </script>
+})();
+</script>
+
 </body>
 </html>
