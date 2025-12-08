@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#E7DCC8">
   <link rel="stylesheet" href="/assets/main.css">
 
+  <!-- PTD Today SAFE ARTICLE v2 -->
   <style>
     body { background: #e8ddcb; font-family: Georgia, serif; }
 
@@ -38,12 +39,14 @@
     .media {
       width: 100%;
       aspect-ratio: 16/9;
-      background-size: cover;
-      background-position: center;
       border-radius: 6px;
       margin-bottom: 16px;
       overflow: hidden;
       position: relative;
+      background:
+        radial-gradient(circle at top left, #ffd27f, #f08a5d, #374785);
+      background-size: cover;
+      background-position: center;
     }
 
     iframe {
@@ -62,6 +65,7 @@
       margin-top: 14px;
       display: flex;
       gap: 10px;
+      flex-wrap: wrap;
     }
 
     .btn {
@@ -93,7 +97,7 @@
     <div id="media" class="media"></div>
 
     <div class="cta">
-      <a id="open" class="btn" href="#" target="_blank">Open Article</a>
+      <a id="open" class="btn" href="#" target="_blank" rel="noopener">Open Article</a>
       <button id="share" class="btn linkish">Share</button>
     </div>
 
@@ -106,7 +110,7 @@
 <script>
 (function() {
   const params = new URLSearchParams(location.search);
-  const url = decodeURIComponent(params.get("u") || "");
+  const url   = decodeURIComponent(params.get("u") || "");
   const title = decodeURIComponent(params.get("t") || "");
 
   const titleEl = document.getElementById("title");
@@ -121,11 +125,9 @@
 
   if (url) openEl.href = url;
 
-  // Detect YouTube videos
+  // YouTube gets an embedded player; everything else uses AI/gradient
   const isYT = /youtube\.com|youtu\.be/i.test(url);
-
   if (isYT) {
-    // Extract ID
     let id = "";
     try {
       const u = new URL(url);
@@ -134,17 +136,15 @@
       } else {
         id = new URLSearchParams(u.search).get("v") || "";
       }
-    } catch (e) {}
-
+    } catch {}
     if (id) {
       mediaEl.innerHTML =
-        `<iframe src="https://www.youtube.com/embed/${id}" 
+        `<iframe src="https://www.youtube.com/embed/${id}"
                  allowfullscreen loading="lazy"></iframe>`;
     }
   } else {
-    // Use AI-generated fallback image for articles
-    mediaEl.style.backgroundImage =
-      "url('/assets/ai/default-news.jpg')";
+    // Optional: if you add an AI image, uncomment this:
+    // mediaEl.style.backgroundImage = "url('/assets/ai/generic.jpg')";
   }
 
   shareEl.onclick = async () => {
@@ -152,14 +152,13 @@
     try {
       if (navigator.share) {
         await navigator.share({ title, url: shareUrl });
-      } else {
+      } else if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(shareUrl);
         shareEl.textContent = "Copied";
         setTimeout(() => shareEl.textContent = "Share", 1200);
       }
     } catch {}
   };
-
 })();
 </script>
 
