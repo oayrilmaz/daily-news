@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#E7DCC8">
   <link rel="stylesheet" href="/assets/main.css">
 
-  <!-- PTD Today SAFE ARTICLE v2 -->
+  <!-- PTD Today SAFE ARTICLE v3 -->
   <style>
     body { background: #e8ddcb; font-family: Georgia, serif; }
 
@@ -109,9 +109,10 @@
 
 <script>
 (function() {
-  const params = new URLSearchParams(location.search);
-  const url   = decodeURIComponent(params.get("u") || "");
-  const title = decodeURIComponent(params.get("t") || "");
+  const params   = new URLSearchParams(location.search);
+  const url      = decodeURIComponent(params.get("u") || "");
+  const title    = decodeURIComponent(params.get("t") || "");
+  const category = (params.get("c") || "").toLowerCase();
 
   const titleEl = document.getElementById("title");
   const mediaEl = document.getElementById("media");
@@ -125,7 +126,33 @@
 
   if (url) openEl.href = url;
 
-  // YouTube gets an embedded player; everything else uses AI/gradient
+  // Pick AI / gradient background based on category (if you upload AI images)
+  let bg = ""; // default: keep gradient
+  switch (category) {
+    case "solar":
+    case "pv":
+      bg = "/assets/ai/solar.jpg"; break;
+    case "wind":
+      bg = "/assets/ai/wind.jpg"; break;
+    case "grid":
+    case "transmission":
+    case "substation":
+      bg = "/assets/ai/grid.jpg"; break;
+    case "storage":
+    case "bess":
+    case "battery":
+      bg = "/assets/ai/storage.jpg"; break;
+    case "ai":
+    case "semiconductor":
+    case "chips":
+      bg = "/assets/ai/ai-chip.jpg"; break;
+    default:
+      bg = "/assets/ai/generic.jpg"; break;
+  }
+  // If you haven’t uploaded AI images yet, you can comment out the next line.
+  mediaEl.style.backgroundImage = "url('" + bg + "')";
+
+  // YouTube gets embedded player instead of AI image
   const isYT = /youtube\.com|youtu\.be/i.test(url);
   if (isYT) {
     let id = "";
@@ -141,10 +168,8 @@
       mediaEl.innerHTML =
         `<iframe src="https://www.youtube.com/embed/${id}"
                  allowfullscreen loading="lazy"></iframe>`;
+      mediaEl.style.backgroundImage = "none";
     }
-  } else {
-    // Optional: if you add an AI image, uncomment this:
-    // mediaEl.style.backgroundImage = "url('/assets/ai/generic.jpg')";
   }
 
   shareEl.onclick = async () => {
