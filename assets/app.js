@@ -1,6 +1,4 @@
-/* PTD Today — render Today+Yesterday articles + YouTube; unified Share.
-   LEGAL-SAFE VERSION (videos use YouTube thumbs, articles use gradients/AI)
-*/
+/* PTD Today — Today+Yesterday; text-only articles, YouTube thumbnails for videos */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
@@ -29,32 +27,14 @@
     }
   }
 
-  // Map category to safe thumbnail class + label
-  function categoryInfo(item){
-    const rawCat = (item.category || '').toLowerCase();
-    switch (rawCat) {
-      case 'solar':
-      case 'pv':
-        return { cls: 'solar', label: 'Solar' };
-      case 'wind':
-      case 'offshore wind':
-      case 'onshore wind':
-        return { cls: 'wind', label: 'Offshore & Wind' };
-      case 'grid':
-      case 'transmission':
-      case 'substation':
-        return { cls: 'grid', label: 'Grid & HV' };
-      case 'storage':
-      case 'bess':
-      case 'battery':
-        return { cls: 'storage', label: 'Storage & BESS' };
-      case 'ai':
-      case 'semiconductor':
-      case 'chips':
-        return { cls: 'ai', label: 'AI & Chips' };
-      default:
-        return { cls: 'generic', label: 'Energy & Power News' };
-    }
+  function ytIdFromUrl(url){
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('youtu.be')) {
+        return u.pathname.slice(1);
+      }
+      return new URLSearchParams(u.search).get('v') || '';
+    } catch { return ''; }
   }
 
   function normalize(raw){
@@ -63,21 +43,24 @@
     const publisher = (raw.publisher  || '').trim();
     const category  = (raw.category   || '').trim();
     const type      = raw.type || 'article';
-    const videoId   = raw.videoId || '';
-
-    // only keep image for videos (YouTube thumbs); ignore article images
-    const image = (type === 'video') ? (raw.image || '') : '';
 
     const d   = parseDate(raw.published);
     const now = Date.now();
     const date = (d && d.getTime() > now) ? new Date(now) : d;
 
-    // 🔴 IMPORTANT: always use our safe wrapper; ignore raw.share
-    const share = `/article.html?u=${encodeURIComponent(url)}&t=${encodeURIComponent(title)}&c=${encodeURIComponent(category)}`;
-
     const score = typeof raw.score === 'number' ? raw.score : null;
 
-    return { title, url, publisher, category, date, share, score, type, videoId, image };
+    // share wrapper (same for everything)
+    const share = `/article.html?u=${encodeURIComponent(url)}&t=${encodeURIComponent(title)}`;
+
+    // YouTube thumbnail if possible
+    let thumb = '';
+    if (type === 'video' && /youtube\.com|youtu\.be/i.test(url)) {
+      const vid = ytIdFromUrl(url);
+      if (vid) thumb = `https://img.youtube.com/vi/${encodeURIComponent(vid)}/hqdefault.jpg`;
+    }
+
+    return { title, url, publisher, category, date, score, type, share, thumb };
   }
 
   function render(items){
@@ -105,20 +88,18 @@
         (item.score != null) ? ('SCORE: ' + Number(item.score).toFixed(3)) : ''
       ].filter(Boolean).join(' • ');
 
-      const { cls, label } = categoryInfo(item);
-
-      const isYouTube = /youtube\.com|youtu\.be/i.test(item.url);
-      const showVideoThumb = isVideo && isYouTube && !!item.image;
+      const thumbHtml = isVideo && item.thumb
+        ? `<div class="thumb is-video">
+             <img loading="lazy" src="${item.thumb}" alt="">
+             <span class="play-badge" aria-hidden="true">▶</span>
+           </div>`
+        : '';
 
       const card = document.createElement('article');
       card.className = 'card';
 
       card.innerHTML = `
-        <div class="thumb ${cls} ${isVideo ? 'is-video' : ''}">
-          ${showVideoThumb ? `<img loading="lazy" src="${item.image}" alt="">` : ''}
-          <span class="thumb-tag">${label}</span>
-          ${isVideo ? '<span class="play-badge" aria-hidden="true">▶</span>' : ''}
-        </div>
+        ${thumbHtml}
         <div class="content">
           <div class="meta">${metaBits}</div>
           <h3 class="headline"><a href="${item.share}">${item.title}</a></h3>
