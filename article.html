@@ -1,209 +1,192 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta http-equiv="x-ua-compatible" content="IE=edge" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#E7DCC8" />
-  <meta name="color-scheme" content="light only" />
-  <title>PTD Today — Article</title>
-  <link rel="stylesheet" href="/assets/main.css" />
-  <style>
-    body.article-view {
-      background: #e8ddcb;
-      font-family: Georgia, "Times New Roman", serif;
-      margin: 0;
-      color: #1a1918;
-      -webkit-font-smoothing: antialiased;
-    }
-    .article-wrap {
-      max-width: 900px;
-      margin: 24px auto 40px;
-      padding: 0 16px 40px;
-    }
-    .article-back {
-      display: inline-block;
-      margin-bottom: 14px;
-      font-size: 15px;
-    }
-    .article-title {
-      font-size: 32px;
-      line-height: 1.2;
-      margin: 4px 0 14px;
-    }
-    .article-meta {
-      font-size: 13px;
-      color: #6f675d;
-      margin-bottom: 18px;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-    .hero-shell {
-      margin-bottom: 18px;
-      border-radius: 18px;
-      overflow: hidden;
-      background: #f4ebdd;
-      min-height: 220px; /* ensures nice block even if no video */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .hero-shell.empty {
-      /* neutral panel when there is no video */
-      background: radial-gradient(circle at 0 0, #f2e7d2, #d3bea0);
-    }
-    .hero-shell iframe {
-      width: 100%;
-      height: 360px;
-      border: 0;
-      display: block;
-    }
-    .article-actions {
-      margin: 12px 0 18px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .article-btn {
-      border: 1px solid #d9ccb3;
-      background: #ddd0b8;
-      color: #143a79;
-      padding: 9px 14px;
-      border-radius: 18px;
-      font-size: 14px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .article-btn.secondary {
-      background: #efe6d6;
-    }
-    .article-btn.linkish {
-      background: transparent;
-      border: 0;
-      padding: 9px 8px;
-    }
-    .article-note {
-      font-size: 15px;
-      color: #6f675d;
-      margin-top: 12px;
-    }
-    @media (max-width: 600px){
-      .article-title { font-size: 26px; }
-      .hero-shell iframe { height: 220px; }
-    }
-  </style>
-</head>
-<body class="article-view">
-  <div class="article-wrap">
-    <a href="/" class="article-back">← Back to PTD Today</a>
+/* PTD Today — homepage renderer:
+ * - Articles first, then videos at bottom
+ * - Homepage shows thumbs ONLY for YouTube videos
+ * - Every click goes to article.html?u=..., not /s/...
+ * - "Share" uses the PTD URL, not the publisher URL
+ */
+(function(){
+  const $  = (s, n=document)=>n.querySelector(s);
+  const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
 
-    <h1 id="article-title" class="article-title">Loading…</h1>
-    <div id="article-meta" class="article-meta"></div>
+  const RESULTS = $('#results');
+  const EMPTY   = $('#empty');
+  const UPDATED = $('#updated');
 
-    <div id="hero" class="hero-shell empty"></div>
+  const endpoints   = (window.__PTD__ && window.__PTD__.endpoints) || {};
+  const DATA_RECENT = endpoints.recent || '/data/news.json';
 
-    <div class="article-actions">
-      <a id="btn-open" class="article-btn" href="#" target="_blank" rel="noopener">
-        Open Article
-      </a>
-      <button id="btn-share" class="article-btn linkish">Share</button>
-    </div>
+  const parseDate = v => v ? new Date(v) : null;
+  const fmtDate = d => d
+    ? d.toISOString()
+       .replace('T',' ')
+       .replace(/:\d\d\.\d{3}Z$/,'Z')
+       .replace(/:\d\dZ$/,'Z')
+    : '';
 
-    <p class="article-note">
-      You’re on PTD Today. Click above to visit the original publisher.
-    </p>
-  </div>
+  function domainOf(url){
+    try { return new URL(url).hostname.replace(/^www\./,'').toLowerCase(); }
+    catch { return ''; }
+  }
 
-  <script>
-    (function(){
-      const params = new URLSearchParams(location.search);
-      const targetUrl = params.get('u');
+  // Only videos get a thumbnail on the homepage
+  function bestImage(item){
+    if (item.type === 'video' && item.image) return item.image;
+    return '';
+  }
 
-      const titleEl = document.getElementById('article-title');
-      const metaEl  = document.getElementById('article-meta');
-      const heroEl  = document.getElementById('hero');
-      const openBtn = document.getElementById('btn-open');
-      const shareBtn= document.getElementById('btn-share');
+  function normalize(raw){
+    const title     = String(raw.title||'').trim();
+    const url       = String(raw.url||'').trim();
+    const publisher = (raw.publisher||'').trim();
+    const category  = (raw.category||'').trim();
+    const type      = raw.type || 'article';
+    const videoId   = raw.videoId || '';
+    const image     = raw.image || '';
+    const d         = parseDate(raw.published);
+    const now       = Date.now();
+    const date      = (d && d.getTime() > now) ? new Date(now) : d;
+    const score     = typeof raw.score==='number' ? raw.score : null;
 
-      if (!targetUrl) {
-        titleEl.textContent = 'Article link missing';
-        metaEl.textContent  = '';
-        heroEl.classList.add('empty');
-        openBtn.style.display = 'none';
-        return;
-      }
+    return { title, url, publisher, category, image, date, score, type, videoId };
+  }
 
-      openBtn.href = targetUrl;
+  function render(items){
+    RESULTS.innerHTML = '';
 
-      function safeFmtDate(iso){
-        if (!iso) return '';
-        try {
-          const d = new Date(iso);
-          return d.toISOString().slice(0,19).replace('T',' ') + 'Z';
-        } catch(e){
-          return '';
-        }
-      }
+    if (!items || items.length === 0) {
+      RESULTS.style.display='none';
+      EMPTY.style.display='block';
+      EMPTY.textContent='No stories found for the last 48–60 hours.';
+      return;
+    }
 
-      fetch('/data/news.json', { cache:'no-store' })
-        .then(r => r.ok ? r.json() : [])
-        .then(raw => {
-          const arr = Array.isArray(raw) ? raw : (raw.items || []);
-          const item = arr.find(x => x && x.url === targetUrl) || {};
+    EMPTY.style.display='none';
+    RESULTS.style.display='grid';
 
-          const title     = (item.title || '').trim() || 'Article';
-          const publisher = (item.publisher || '').trim();
-          const category  = (item.category || '').trim();
-          const published = safeFmtDate(item.published);
+    const frag = document.createDocumentFragment();
 
-          titleEl.textContent = title;
-          const bits = [
-            category ? category.toUpperCase() : '',
-            publisher,
-            published
-          ].filter(Boolean);
-          metaEl.textContent = bits.join(' • ');
+    for (const item of items){
+      const isVideo  = item.type === 'video';
+      const shareUrl = `/article.html?u=${encodeURIComponent(item.url)}`;  // 🔒 always our safe page
 
-          // ONLY show YouTube embed for videos; no other images
-          if (item.type === 'video' && item.videoId) {
-            const vid = item.videoId;
-            heroEl.classList.remove('empty');
-            heroEl.innerHTML = `
-              <iframe
-                src="https://www.youtube.com/embed/${encodeURIComponent(vid)}"
-                title="YouTube video player"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen
-              ></iframe>
-            `;
-          } else {
-            // No image for articles – keep neutral panel
-            heroEl.classList.add('empty');
-            heroEl.innerHTML = '';
-          }
-        })
-        .catch(() => {
-          // Fallback – just keep neutral hero + basic title
-          heroEl.classList.add('empty');
-        });
+      const metaBits = [
+        (item.category||'').toUpperCase(),
+        item.publisher || domainOf(item.url),
+        item.date ? fmtDate(item.date) : '',
+        (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
+      ].filter(Boolean).join(' • ');
 
-      // Share current PTD URL (not publisher)
-      shareBtn.addEventListener('click', async () => {
-        const shareUrl = window.location.href;
+      const card = document.createElement('article');
+      card.className = 'card';
+
+      const thumbSrc = bestImage(item);
+      const thumbHtml = thumbSrc
+        ? `<div class="thumb is-video">
+             <img loading="lazy" src="${thumbSrc}" alt="">
+             <span class="play-badge" aria-hidden="true">▶</span>
+           </div>`
+        : '';
+
+      card.innerHTML = `
+        ${thumbHtml}
+        <div class="content">
+          <div class="meta">${metaBits}</div>
+          <h3 class="headline">
+            <a href="${shareUrl}">
+              ${item.title}
+            </a>
+          </h3>
+          <div class="cta-row">
+            <a class="btn" href="${shareUrl}">
+              ${isVideo ? 'Watch' : 'Open Article'}
+            </a>
+            <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">
+              ${isVideo ? 'YouTube' : 'Source'}
+            </a>
+            <button class="btn linkish share" data-share="${shareUrl}">Share</button>
+          </div>
+        </div>
+      `;
+
+      frag.appendChild(card);
+    }
+
+    RESULTS.appendChild(frag);
+
+    // Unified Share button
+    $$('.share', RESULTS).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const rel = btn.getAttribute('data-share') || '/';
+        const fullUrl = new URL(rel, window.location.href).toString();
         try {
           if (navigator.share) {
-            await navigator.share({ title: 'PTD Today', url: shareUrl });
+            await navigator.share({ title: 'PTD Today', url: fullUrl });
           } else if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(shareUrl);
-            const old = shareBtn.textContent;
-            shareBtn.textContent = 'Copied';
-            setTimeout(() => { shareBtn.textContent = old; }, 1200);
+            await navigator.clipboard.writeText(fullUrl);
+            const old = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(() => { btn.textContent = old; }, 1200);
           }
         } catch(e) {
-          // user cancelled; ignore
+          // user cancelled, ignore
         }
       });
-    })();
-  </script>
-</body>
-</html>
+    });
+  }
+
+  function setUpdated(d){
+    UPDATED.textContent = 'Updated — ' + (d ? fmtDate(d) : fmtDate(new Date()));
+  }
+
+  async function fetchJson(url){
+    try{
+      const r = await fetch(url, { cache:'no-store' });
+      if(!r.ok) throw 0;
+      return await r.json();
+    }catch{
+      return null;
+    }
+  }
+
+  (async function boot(){
+    setUpdated(new Date());
+    const raw = await fetchJson(DATA_RECENT);
+
+    if (!raw){
+      RESULTS.style.display='none';
+      EMPTY.style.display='block';
+      EMPTY.textContent='No data file yet. Waiting for the builder to publish /data/news.json';
+      return;
+    }
+
+    const arr = Array.isArray(raw) ? raw : (raw.items || []);
+    let items = arr.map(normalize).filter(x => x.title && x.url);
+
+    // keep roughly last 48–60 hours
+    const now = Date.now();
+    items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60 * 3600 * 1000);
+
+    // Sort newest first, then by score
+    items.sort((a,b)=>{
+      const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
+      if(bd!==ad) return bd-ad;
+      return (b.score??0) - (a.score??0);
+    });
+
+    // Articles first, then videos at bottom
+    const articles = items.filter(x => x.type !== 'video');
+    const videos   = items.filter(x => x.type === 'video');
+    items = [...articles, ...videos];
+
+    const latest = items.reduce(
+      (m,x)=> (x.date && (!m || x.date>m)) ? x.date : m,
+      null
+    );
+    setUpdated(latest || new Date());
+    render(items);
+  })();
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+  }
+})();
