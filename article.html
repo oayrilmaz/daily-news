@@ -6,68 +6,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#E7DCC8">
   <link rel="stylesheet" href="/assets/main.css">
-
-  <!-- PTD Today SAFE ARTICLE v3 -->
   <style>
     body { background: #e8ddcb; font-family: Georgia, serif; }
-
-    .wrap {
-      max-width: 830px;
-      margin: 30px auto 50px;
-      padding: 0 20px;
-    }
-
-    .back {
-      font-size: 15px;
-      margin-bottom: 18px;
-      display: inline-block;
-    }
-
-    h1 {
-      font-size: 30px;
-      margin: 0 0 20px;
-      line-height: 1.25;
-    }
-
+    .wrap { max-width: 830px; margin: 30px auto 50px; padding: 0 20px; }
+    .back { font-size: 15px; margin-bottom: 18px; display: inline-block; }
+    h1 { font-size: 30px; margin: 0 0 20px; line-height: 1.25; }
     .box {
       background: #f7f2e8;
       border: 1px solid #d9ccb3;
       border-radius: 10px;
       padding: 18px;
     }
-
-    .media {
+    .video-frame {
       width: 100%;
       aspect-ratio: 16/9;
       border-radius: 6px;
       margin-bottom: 16px;
       overflow: hidden;
-      position: relative;
-      background:
-        radial-gradient(circle at top left, #ffd27f, #f08a5d, #374785);
-      background-size: cover;
-      background-position: center;
     }
-
-    iframe {
+    .video-frame iframe {
       width: 100%;
       height: 100%;
       border: 0;
     }
-
-    .note {
-      font-size: 14px;
-      color: #6f675d;
-      margin-top: 14px;
-    }
-
-    .cta {
-      margin-top: 14px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
+    .note { font-size: 14px; color: #6f675d; margin-top: 14px; }
+    .cta { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
     .btn {
       border: 1px solid #d9ccb3;
       background: #ddd0b8;
@@ -77,7 +40,6 @@
       font-size: 14px;
       text-decoration: none;
     }
-
     .btn.linkish {
       background: transparent;
       border: none;
@@ -86,15 +48,13 @@
     }
   </style>
 </head>
-
 <body>
 <div class="wrap">
-
   <a class="back" href="/">← Back to PTD Today</a>
   <h1 id="title">PTD Today Article</h1>
 
   <div class="box">
-    <div id="media" class="media"></div>
+    <div id="video" class="video-frame" style="display:none;"></div>
 
     <div class="cta">
       <a id="open" class="btn" href="#" target="_blank" rel="noopener">Open Article</a>
@@ -109,13 +69,12 @@
 
 <script>
 (function() {
-  const params   = new URLSearchParams(location.search);
-  const url      = decodeURIComponent(params.get("u") || "");
-  const title    = decodeURIComponent(params.get("t") || "");
-  const category = (params.get("c") || "").toLowerCase();
+  const params = new URLSearchParams(location.search);
+  const url   = decodeURIComponent(params.get("u") || "");
+  const title = decodeURIComponent(params.get("t") || "");
 
   const titleEl = document.getElementById("title");
-  const mediaEl = document.getElementById("media");
+  const videoEl = document.getElementById("video");
   const openEl  = document.getElementById("open");
   const shareEl = document.getElementById("share");
 
@@ -123,36 +82,9 @@
     titleEl.textContent = title;
     document.title = title + " — PTD Today";
   }
-
   if (url) openEl.href = url;
 
-  // Pick AI / gradient background based on category (if you upload AI images)
-  let bg = ""; // default: keep gradient
-  switch (category) {
-    case "solar":
-    case "pv":
-      bg = "/assets/ai/solar.jpg"; break;
-    case "wind":
-      bg = "/assets/ai/wind.jpg"; break;
-    case "grid":
-    case "transmission":
-    case "substation":
-      bg = "/assets/ai/grid.jpg"; break;
-    case "storage":
-    case "bess":
-    case "battery":
-      bg = "/assets/ai/storage.jpg"; break;
-    case "ai":
-    case "semiconductor":
-    case "chips":
-      bg = "/assets/ai/ai-chip.jpg"; break;
-    default:
-      bg = "/assets/ai/generic.jpg"; break;
-  }
-  // If you haven’t uploaded AI images yet, you can comment out the next line.
-  mediaEl.style.backgroundImage = "url('" + bg + "')";
-
-  // YouTube gets embedded player instead of AI image
+  // If YouTube, embed video
   const isYT = /youtube\.com|youtu\.be/i.test(url);
   if (isYT) {
     let id = "";
@@ -165,10 +97,10 @@
       }
     } catch {}
     if (id) {
-      mediaEl.innerHTML =
+      videoEl.style.display = "block";
+      videoEl.innerHTML =
         `<iframe src="https://www.youtube.com/embed/${id}"
                  allowfullscreen loading="lazy"></iframe>`;
-      mediaEl.style.backgroundImage = "none";
     }
   }
 
@@ -186,6 +118,5 @@
   };
 })();
 </script>
-
 </body>
 </html>
