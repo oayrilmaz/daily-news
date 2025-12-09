@@ -101,16 +101,121 @@
   </div>
 
   <script>
-    (function(){
-      var yr=document.getElementById('yr'); 
-      if(yr) yr.textContent=new Date().getFullYear();
+async function loadNews() {
+  const res = await fetch("data/news.json");
+  const items = await res.json();
 
-      // Home page pulls last 48h items
-      window.__PTD__ = { endpoints: { recent:'/data/news.json' } };
-    })();
-  </script>
+  // Separate
+  const articles = items.filter(i => i.type !== "video");
+  const videos = items.filter(i => i.type === "video");
 
-  <!-- UPDATED app.js (safe thumbnail logic) loads separately -->
-  <script src="/assets/app.js" defer></script>
-</body>
-</html>
+  const container = document.getElementById("news-container");
+  container.innerHTML = "";
+
+  // ============================
+  // 1. RENDER ARTICLES FIRST
+  // ============================
+  renderSection(articles, container);
+
+  // ============================
+  // 2. TITLE: VIDEO SECTION
+  // ============================
+  if (videos.length > 0) {
+    const videoHeader = document.createElement("h2");
+    videoHeader.innerText = "Latest Energy & Power Videos";
+    videoHeader.style.marginTop = "60px";
+    videoHeader.style.marginBottom = "20px";
+    videoHeader.style.fontFamily = "'Georgia', serif";
+    videoHeader.style.fontSize = "28px";
+    container.appendChild(videoHeader);
+  }
+
+  // ============================
+  // 3. RENDER VIDEOS AT BOTTOM
+  // ============================
+  renderSection(videos, container, true); // `true` = video mode
+}
+
+
+// Shared renderer for articles and videos
+function renderSection(list, container, isVideo = false) {
+  for (let i = 0; i < list.length; i += 2) {
+    const row = document.createElement("div");
+    row.className = "news-row";
+
+    // LEFT item
+    row.appendChild(createCard(list[i], isVideo));
+
+    // RIGHT item (if exists, else blank)
+    if (list[i + 1]) {
+      row.appendChild(createCard(list[i + 1], isVideo));
+    } else {
+      // blank placeholder (clean symmetric layout)
+      const blank = document.createElement("div");
+      blank.className = "news-card empty-card";
+      row.appendChild(blank);
+    }
+
+    container.appendChild(row);
+  }
+}
+
+
+// Card generator
+function createCard(item, isVideo = false) {
+  const card = document.createElement("div");
+  card.className = "news-card";
+
+  // *************** IMAGE / THUMBNAIL ***************
+  if (isVideo) {
+    // YouTube thumbnail + play icon overlay
+    card.innerHTML = `
+      <div class="thumb-wrapper">
+        <img class="thumb" src="${item.image}" />
+        <div class="play-btn"></div>
+      </div>
+    `;
+  } else if (item.image) {
+    card.innerHTML = `
+      <div class="thumb-wrapper">
+        <img class="thumb" src="${item.image}" />
+      </div>
+    `;
+  }
+
+  // *************** TEXT CONTENT ***************
+  const meta = document.createElement("div");
+  meta.className = "news-meta";
+  meta.innerHTML = `
+    ${item.category.toUpperCase()} • ${item.publisher} • ${item.published.substring(0, 10)}
+  `;
+  card.appendChild(meta);
+
+  const title = document.createElement("a");
+  title.href = isVideo ? item.url : `article.html?url=${encodeURIComponent(item.url)}`;
+  title.className = "news-title";
+  title.textContent = item.title;
+  card.appendChild(title);
+
+  // *************** BUTTONS ***************
+  const buttons = document.createElement("div");
+  buttons.className = "btn-row";
+
+  if (isVideo) {
+    buttons.innerHTML = `
+      <a class="btn" href="${item.url}" target="_blank">Watch</a>
+      <a class="btn" href="https://youtube.com/watch?v=${item.videoId}" target="_blank">YouTube</a>
+    `;
+  } else {
+    buttons.innerHTML = `
+      <a class="btn" href="${item.url}" target="_blank">Open Article</a>
+      <a class="btn" href="${item.url}" target="_blank">Source</a>
+    `;
+  }
+
+  card.appendChild(buttons);
+  return card;
+}
+
+loadNews();
+</script>
