@@ -13,7 +13,7 @@
   </script>
   <!-- End GA -->
 
-  <!-- Perf hints for thumbnails (YouTube + Google favicon) -->
+  <!-- Perf hints -->
   <link rel="dns-prefetch" href="https://i.ytimg.com">
   <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
   <link rel="dns-prefetch" href="https://www.google.com">
@@ -24,13 +24,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#E7DCC8" />
   <meta name="color-scheme" content="light only" />
-
-  <meta name="description" content="PTD Today: today’s and yesterday’s curated Energy & Power headlines. First to Know. First to Lead.">
+  <meta name="description" content="PTD Today: daily curated Energy & Power headlines. First to Know. First to Lead.">
   <meta name="referrer" content="no-referrer-when-downgrade" />
   <link rel="canonical" href="https://ptdtoday.com/" />
   <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
 
-  <!-- Social fallback -->
+  <!-- Social -->
   <meta property="og:locale" content="en_US" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="PTD Today" />
@@ -51,7 +50,7 @@
   <link rel="preload" href="/assets/main.css" as="style" />
   <link rel="stylesheet" href="/assets/main.css" />
 
-  <!-- Inline layout tweaks -->
+  <!-- small header tweaks -->
   <style>
     header.site-header { text-align:center; margin: 34px 10px 18px; }
     header.site-header h1 { margin: 0 0 6px; font-size: 56px; line-height:1; letter-spacing:.2px; }
@@ -68,7 +67,7 @@
     "@type":"WebSite",
     "name":"PTD Today",
     "url":"https://ptdtoday.com/",
-    "description":"Today’s and yesterday’s Energy & Power headlines curated by PTD Today.",
+    "description":"Daily curated Energy & Power headlines.",
     "publisher":{"@type":"Organization","name":"PTD Today"}
   }
   </script>
@@ -79,143 +78,27 @@
       <h1 class="logo"><a href="/" aria-label="Go to PTD Today home">PTD Today</a></h1>
       <p class="motto">First to Know. First to Lead.</p>
       <h2 class="section">Daily Energy &amp; Power News</h2>
+      <div class="updated" id="updated" role="status" aria-live="polite">Loading...</div>
     </header>
-
-    <div class="updated" id="updated" role="status" aria-live="polite">Loading…</div>
 
     <main id="main" role="main" aria-label="News list" class="main">
       <section id="results" class="results" aria-live="polite" aria-busy="true"></section>
       <div id="empty" class="empty" style="display:none">No stories found.</div>
     </main>
 
-    <!-- UPDATED FULL LEGAL FOOTER -->
     <footer class="footer">
-      <p>© <span id="yr"></span> PTD Today — Curated Energy & Power Headlines.</p>
-      <p>
-        PTD Today displays publicly available content using authorized YouTube embeds,
-        RSS-provided metadata, or PTD-generated visuals. No copyrighted images or full-text
-        articles are stored or hosted on this website. All articles link to their original
-        publishers; all copyrights belong to their respective owners.
-      </p>
+      <p>© <span id="yr"></span> PTD Today — Curated Energy &amp; Power Headlines.</p>
+      <p>PTD Today displays publicly available content using authorized YouTube embeds, RSS-provided metadata, or PTD-generated visuals. No copyrighted images or full-text articles are stored or hosted on this website. All articles link to their original publishers; all copyrights belong to their respective owners.</p>
     </footer>
   </div>
 
   <script>
-async function loadNews() {
-  const res = await fetch("data/news.json");
-  const items = await res.json();
-
-  // Separate
-  const articles = items.filter(i => i.type !== "video");
-  const videos = items.filter(i => i.type === "video");
-
-  const container = document.getElementById("news-container");
-  container.innerHTML = "";
-
-  // ============================
-  // 1. RENDER ARTICLES FIRST
-  // ============================
-  renderSection(articles, container);
-
-  // ============================
-  // 2. TITLE: VIDEO SECTION
-  // ============================
-  if (videos.length > 0) {
-    const videoHeader = document.createElement("h2");
-    videoHeader.innerText = "Latest Energy & Power Videos";
-    videoHeader.style.marginTop = "60px";
-    videoHeader.style.marginBottom = "20px";
-    videoHeader.style.fontFamily = "'Georgia', serif";
-    videoHeader.style.fontSize = "28px";
-    container.appendChild(videoHeader);
-  }
-
-  // ============================
-  // 3. RENDER VIDEOS AT BOTTOM
-  // ============================
-  renderSection(videos, container, true); // `true` = video mode
-}
-
-
-// Shared renderer for articles and videos
-function renderSection(list, container, isVideo = false) {
-  for (let i = 0; i < list.length; i += 2) {
-    const row = document.createElement("div");
-    row.className = "news-row";
-
-    // LEFT item
-    row.appendChild(createCard(list[i], isVideo));
-
-    // RIGHT item (if exists, else blank)
-    if (list[i + 1]) {
-      row.appendChild(createCard(list[i + 1], isVideo));
-    } else {
-      // blank placeholder (clean symmetric layout)
-      const blank = document.createElement("div");
-      blank.className = "news-card empty-card";
-      row.appendChild(blank);
-    }
-
-    container.appendChild(row);
-  }
-}
-
-
-// Card generator
-function createCard(item, isVideo = false) {
-  const card = document.createElement("div");
-  card.className = "news-card";
-
-  // *************** IMAGE / THUMBNAIL ***************
-  if (isVideo) {
-    // YouTube thumbnail + play icon overlay
-    card.innerHTML = `
-      <div class="thumb-wrapper">
-        <img class="thumb" src="${item.image}" />
-        <div class="play-btn"></div>
-      </div>
-    `;
-  } else if (item.image) {
-    card.innerHTML = `
-      <div class="thumb-wrapper">
-        <img class="thumb" src="${item.image}" />
-      </div>
-    `;
-  }
-
-  // *************** TEXT CONTENT ***************
-  const meta = document.createElement("div");
-  meta.className = "news-meta";
-  meta.innerHTML = `
-    ${item.category.toUpperCase()} • ${item.publisher} • ${item.published.substring(0, 10)}
-  `;
-  card.appendChild(meta);
-
-  const title = document.createElement("a");
-  title.href = isVideo ? item.url : `article.html?url=${encodeURIComponent(item.url)}`;
-  title.className = "news-title";
-  title.textContent = item.title;
-  card.appendChild(title);
-
-  // *************** BUTTONS ***************
-  const buttons = document.createElement("div");
-  buttons.className = "btn-row";
-
-  if (isVideo) {
-    buttons.innerHTML = `
-      <a class="btn" href="${item.url}" target="_blank">Watch</a>
-      <a class="btn" href="https://youtube.com/watch?v=${item.videoId}" target="_blank">YouTube</a>
-    `;
-  } else {
-    buttons.innerHTML = `
-      <a class="btn" href="${item.url}" target="_blank">Open Article</a>
-      <a class="btn" href="${item.url}" target="_blank">Source</a>
-    `;
-  }
-
-  card.appendChild(buttons);
-  return card;
-}
-
-loadNews();
-</script>
+    (function(){
+      var yr=document.getElementById('yr'); 
+      if(yr) yr.textContent=new Date().getFullYear();
+      window.__PTD__ = { endpoints: { recent:'/data/news.json' } };
+    })();
+  </script>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
