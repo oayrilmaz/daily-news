@@ -1,4 +1,4 @@
-/* PTD Today — render Today+Yesterday articles + YouTube; unified Share. */
+/* PTD Today — render Today+Yesterday articles + YouTube; unified Share + internal page. */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
@@ -7,7 +7,7 @@
   const EMPTY   = $('#empty');
   const UPDATED = $('#updated');
 
-  const endpoints = (window.__PTD__ && window.__PTD__.endpoints) || {};
+  const endpoints   = (window.__PTD__ && window.__PTD__.endpoints) || {};
   const DATA_RECENT = endpoints.recent || '/data/news.json';
 
   const parseDate = v => v ? new Date(v) : null;
@@ -23,8 +23,8 @@
     catch { return ''; }
   }
 
+  // We only show thumbs for video on the homepage
   function bestImage(item){
-    // keep YouTube thumbs, otherwise nothing (articles are text-only now)
     if (item.type === 'video' && item.image) return item.image;
     return '';
   }
@@ -34,30 +34,40 @@
     const url   = String(raw.url||'').trim();
     const publisher = (raw.publisher||'').trim();
     const category  = (raw.category||'').trim();
-    const type  = raw.type || 'article';
-    const videoId = raw.videoId || '';
-    const image = raw.image || '';
-    const d = parseDate(raw.published);
-    const now = Date.now();
-    const date = (d && d.getTime() > now) ? new Date(now) : d;
-    const score = typeof raw.score==='number' ? raw.score : null;
-    return { title, url, publisher, category, image, date, score, type, videoId };
+    const type      = raw.type || 'article';
+    const videoId   = raw.videoId || '';
+    const image     = raw.image || '';
+    const d         = parseDate(raw.published);
+    const now       = Date.now();
+    const date      = (d && d.getTime() > now) ? new Date(now) : d;
+    const score     = typeof raw.score==='number' ? raw.score : null;
+
+    // Use existing shortlink/share if present, else default to article.html
+    const share = (raw.share && String(raw.share).trim())
+      ? String(raw.share).trim()
+      : `/article.html?u=${encodeURIComponent(url)}`;
+
+    return { title, url, publisher, category, image, date, score, type, videoId, share };
   }
 
   function render(items){
-    RESULTS.innerHTML='';
-    if(!items || items.length===0){
+    RESULTS.innerHTML = '';
+
+    if (!items || items.length === 0) {
       RESULTS.style.display='none';
       EMPTY.style.display='block';
       EMPTY.textContent='No stories found for the last 48–60 hours.';
       return;
     }
+
     EMPTY.style.display='none';
     RESULTS.style.display='grid';
 
     const frag = document.createDocumentFragment();
-    for(const item of items){
+
+    for (const item of items){
       const isVideo = item.type === 'video';
+
       const metaBits = [
         (item.category||'').toUpperCase(),
         item.publisher || domainOf(item.url),
@@ -65,10 +75,10 @@
         (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
       ].filter(Boolean).join(' • ');
 
-      const card = document.createElement('article'); 
-      card.className='card';
+      const card = document.createElement('article');
+      card.className = 'card';
 
-      const imgHtml = (isVideo && bestImage(item))
+      const thumbHtml = (isVideo && bestImage(item))
         ? `<div class="thumb is-video">
              <img loading="lazy" src="${bestImage(item)}" alt="">
              <span class="play-badge" aria-hidden="true">▶</span>
@@ -76,26 +86,50 @@
         : '';
 
       card.innerHTML = `
-        ${imgHtml}
+        ${thumbHtml}
         <div class="content">
           <div class="meta">${metaBits}</div>
           <h3 class="headline">
-            <a href="${item.url}" target="_blank" rel="noopener">
+            <a href="${item.share}">
               ${item.title}
             </a>
           </h3>
           <div class="cta-row">
-            <a class="btn" href="${item.url}" target="_blank" rel="noopener">
+            <a class="btn" href="${item.share}">
               ${isVideo ? 'Watch' : 'Open Article'}
             </a>
-            ${isVideo ? `<a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">YouTube</a>` 
-                      : `<a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">Source</a>`}
+            <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">
+              ${isVideo ? 'YouTube' : 'Source'}
+            </a>
+            <button class="btn linkish share" data-share="${item.share}">Share</button>
           </div>
         </div>
       `;
+
       frag.appendChild(card);
     }
+
     RESULTS.appendChild(frag);
+
+    // Re-attach unified Share handlers
+    $$('.share', RESULTS).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const rel = btn.getAttribute('data-share') || '/';
+        const fullUrl = new URL(rel, window.location.href).toString();
+        try {
+          if (navigator.share) {
+            await navigator.share({ title: 'PTD Today', url: fullUrl });
+          } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(fullUrl);
+            const old = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(() => { btn.textContent = old; }, 1200);
+          }
+        } catch (e) {
+          // user cancelled share; ignore
+        }
+      });
+    });
   }
 
   function setUpdated(d){
@@ -115,7 +149,8 @@
   (async function boot(){
     setUpdated(new Date());
     const raw = await fetchJson(DATA_RECENT);
-    if(!raw){
+
+    if (!raw){
       RESULTS.style.display='none';
       EMPTY.style.display='block';
       EMPTY.textContent='No data file yet. Waiting for the builder to publish /data/news.json';
@@ -123,25 +158,28 @@
     }
 
     const arr = Array.isArray(raw) ? raw : (raw.items || []);
-    let items = arr.map(normalize).filter(x=>x.title && x.url);
+    let items = arr.map(normalize).filter(x => x.title && x.url);
 
-    // keep ~48–60 hours
+    // keep roughly last 48–60 hours
     const now = Date.now();
-    items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60*3600*1000);
+    items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60 * 3600 * 1000);
 
-    // sort newest first, then score
+    // sort newest first, then by score
     items.sort((a,b)=>{
       const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
       if(bd!==ad) return bd-ad;
       return (b.score??0) - (a.score??0);
     });
 
-    // ***** NEW: put all articles first, then all videos *****
+    // ✅ Articles first, then videos at the bottom
     const articles = items.filter(x => x.type !== 'video');
     const videos   = items.filter(x => x.type === 'video');
     items = [...articles, ...videos];
 
-    const latest = items.reduce((m,x)=> (x.date && (!m || x.date>m)) ? x.date : m, null);
+    const latest = items.reduce(
+      (m,x)=> (x.date && (!m || x.date>m)) ? x.date : m,
+      null
+    );
     setUpdated(latest || new Date());
     render(items);
   })();
