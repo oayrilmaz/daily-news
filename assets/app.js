@@ -1,18 +1,15 @@
 /* PTD Today — 2-column layout:
    Left: Videos then Articles (continue immediately)
    Right: Articles
-   Masonry-balanced articles to minimize blank space.
+   Masonry-balanced articles using scrollHeight (fixes empty right column / grid stretch).
 */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
-  const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
 
   const GRID          = $('#ptdGrid');
   const VIDEOS_EL     = $('#videos');
   const ARTS_LEFT_EL  = $('#articlesLeft');
   const ARTS_RIGHT_EL = $('#articlesRight');
-
-  // Backward-compat (hidden)
   const RESULTS_FALLBACK = $('#results');
 
   const EMPTY   = $('#empty');
@@ -34,7 +31,6 @@
     catch { return ''; }
   }
 
-  // Only show thumbs for video on the homepage
   function bestImage(item){
     if (item.type === 'video' && item.image) return item.image;
     return '';
@@ -138,8 +134,7 @@
       </div>
     `;
 
-    // Attach share handler on the card (no second pass needed)
-    const btn = $('.share', card);
+    const btn = card.querySelector('.share');
     if (btn){
       btn.addEventListener('click', async () => {
         const rel = btn.getAttribute('data-share') || '/';
@@ -168,27 +163,27 @@
     VIDEOS_EL.appendChild(frag);
   }
 
-  // Masonry distribution: always append next article to the shorter column
+  // ✅ Key fix: use scrollHeight (content height) not offsetHeight (grid-stretched)
+  const contentHeight = (el) => (el ? el.scrollHeight : 0);
+
   function renderArticlesMasonry(articles){
     if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
 
     ARTS_LEFT_EL.innerHTML = '';
     ARTS_RIGHT_EL.innerHTML = '';
 
-    // Build nodes first
-    const nodes = articles.map(buildCard);
+    for (const a of articles){
+      const node = buildCard(a);
 
-    // Append using a simple greedy height balance
-    for (const node of nodes){
-      const leftH  = ARTS_LEFT_EL.offsetHeight;
-      const rightH = ARTS_RIGHT_EL.offsetHeight;
+      const leftH  = contentHeight(ARTS_LEFT_EL);
+      const rightH = contentHeight(ARTS_RIGHT_EL);
 
       if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
       else ARTS_RIGHT_EL.appendChild(node);
     }
   }
 
-  // If fonts load late, rebalance once after initial paint
+  // Rebalance once after layout settles (fonts/images can change heights)
   function rebalanceOnce(){
     if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
     const all = [...ARTS_LEFT_EL.children, ...ARTS_RIGHT_EL.children];
@@ -197,12 +192,12 @@
     ARTS_LEFT_EL.innerHTML = '';
     ARTS_RIGHT_EL.innerHTML = '';
 
-    all.forEach(node => {
-      const leftH  = ARTS_LEFT_EL.offsetHeight;
-      const rightH = ARTS_RIGHT_EL.offsetHeight;
+    for (const node of all){
+      const leftH  = contentHeight(ARTS_LEFT_EL);
+      const rightH = contentHeight(ARTS_RIGHT_EL);
       if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
       else ARTS_RIGHT_EL.appendChild(node);
-    });
+    }
   }
 
   (async function boot(){
@@ -228,17 +223,14 @@
       return;
     }
 
-    // sort newest first, then by score
+    // newest first, then by score
     items.sort((a,b)=>{
       const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
       if(bd!==ad) return bd-ad;
       return (b.score??0) - (a.score??0);
     });
 
-    const latest = items.reduce(
-      (m,x)=> (x.date && (!m || x.date>m)) ? x.date : m,
-      null
-    );
+    const latest = items.reduce((m,x)=> (x.date && (!m || x.date>m)) ? x.date : m, null);
     setUpdated(latest || new Date());
 
     const articles = items.filter(x => x.type !== 'video');
@@ -247,26 +239,21 @@
     hideEmpty();
 
     const hasNewLayout = VIDEOS_EL && ARTS_LEFT_EL && ARTS_RIGHT_EL;
-
     if (hasNewLayout){
       renderVideos(videos);
-
-      // Key change: masonry-balanced articles across BOTH columns
-      // (left starts right after last video, right continues too)
       renderArticlesMasonry(articles);
 
       if (GRID) GRID.setAttribute('aria-busy','false');
 
-      // One rebalance after paint to reduce blanks if font metrics change
-      requestAnimationFrame(() => setTimeout(rebalanceOnce, 120));
+      requestAnimationFrame(() => setTimeout(rebalanceOnce, 180));
       return;
     }
 
-    // Fallback: old single list
+    // fallback
     if (RESULTS_FALLBACK){
-      RESULTS_FALLBACK.innerHTML = '';
       const frag = document.createDocumentFragment();
-      for (const x of [...articles, ...videos]) frag.appendChild(buildCard(x));
+      for (const x of items) frag.appendChild(buildCard(x));
+      RESULTS_FALLBACK.innerHTML = '';
       RESULTS_FALLBACK.appendChild(frag);
       RESULTS_FALLBACK.style.display = 'grid';
       if (GRID) GRID.setAttribute('aria-busy','false');
