@@ -1,14 +1,28 @@
-/* PTD Today — render Today+Yesterday articles + YouTube; unified Share + internal page. */
+/* PTD Today — 2-column layout:
+   Left: YouTube videos (top) + Articles continue (bottom)
+   Right: Articles (top)
+   Keeps unified Share + internal article page links. */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
 
-  const RESULTS = $('#results');
+  // New containers (from updated index.html)
+  const GRID          = $('#ptdGrid');
+  const VIDEOS_EL     = $('#videos');
+  const ARTS_LEFT_EL  = $('#articlesLeft');
+  const ARTS_RIGHT_EL = $('#articlesRight');
+
+  // Backward-compat container (still exists hidden in your updated index)
+  const RESULTS_FALLBACK = $('#results');
+
   const EMPTY   = $('#empty');
   const UPDATED = $('#updated');
 
   const endpoints   = (window.__PTD__ && window.__PTD__.endpoints) || {};
   const DATA_RECENT = endpoints.recent || '/data/news.json';
+
+  // How many articles should appear in the TOP-RIGHT block before continuing on the left
+  const TOP_RIGHT_ARTICLE_COUNT = 12;
 
   const parseDate = v => v ? new Date(v) : null;
   const fmtDate = d => d
@@ -23,7 +37,7 @@
     catch { return ''; }
   }
 
-  // We only show thumbs for video on the homepage
+  // Only show thumbs for video on the homepage (allowed)
   function bestImage(item){
     if (item.type === 'video' && item.image) return item.image;
     return '';
@@ -50,18 +64,51 @@
     return { title, url, publisher, category, image, date, score, type, videoId, share };
   }
 
-  function render(items){
-    RESULTS.innerHTML = '';
+  function setUpdated(d){
+    if (!UPDATED) return;
+    UPDATED.textContent = 'Updated — ' + (d ? fmtDate(d) : fmtDate(new Date()));
+  }
 
-    if (!items || items.length === 0) {
-      RESULTS.style.display='none';
-      EMPTY.style.display='block';
-      EMPTY.textContent='No stories found for the last 48–60 hours.';
-      return;
+  async function fetchJson(url){
+    try{
+      const r = await fetch(url, { cache:'no-store' });
+      if(!r.ok) throw 0;
+      return await r.json();
+    }catch{
+      return null;
     }
+  }
 
-    EMPTY.style.display='none';
-    RESULTS.style.display='grid';
+  function clearContainers(){
+    if (VIDEOS_EL) VIDEOS_EL.innerHTML = '';
+    if (ARTS_LEFT_EL) ARTS_LEFT_EL.innerHTML = '';
+    if (ARTS_RIGHT_EL) ARTS_RIGHT_EL.innerHTML = '';
+    if (RESULTS_FALLBACK) RESULTS_FALLBACK.innerHTML = '';
+  }
+
+  function showEmpty(msg){
+    if (GRID) GRID.setAttribute('aria-busy','false');
+    if (EMPTY){
+      EMPTY.style.display = 'block';
+      EMPTY.textContent = msg || 'No stories found.';
+    }
+    // Hide columns if present
+    if (VIDEOS_EL) VIDEOS_EL.style.display = 'none';
+    if (ARTS_LEFT_EL) ARTS_LEFT_EL.style.display = 'none';
+    if (ARTS_RIGHT_EL) ARTS_RIGHT_EL.style.display = 'none';
+    if (RESULTS_FALLBACK) RESULTS_FALLBACK.style.display = 'none';
+  }
+
+  function hideEmpty(){
+    if (EMPTY) EMPTY.style.display = 'none';
+    if (VIDEOS_EL) VIDEOS_EL.style.display = '';
+    if (ARTS_LEFT_EL) ARTS_LEFT_EL.style.display = '';
+    if (ARTS_RIGHT_EL) ARTS_RIGHT_EL.style.display = '';
+  }
+
+  function renderList(container, items){
+    if (!container) return;
+    container.innerHTML = '';
 
     const frag = document.createDocumentFragment();
 
@@ -109,10 +156,10 @@
       frag.appendChild(card);
     }
 
-    RESULTS.appendChild(frag);
+    container.appendChild(frag);
 
-    // Re-attach unified Share handlers
-    $$('.share', RESULTS).forEach(btn => {
+    // Unified Share handlers (scoped to this container)
+    $$('.share', container).forEach(btn => {
       btn.addEventListener('click', async () => {
         const rel = btn.getAttribute('data-share') || '/';
         const fullUrl = new URL(rel, window.location.href).toString();
@@ -132,28 +179,34 @@
     });
   }
 
-  function setUpdated(d){
-    UPDATED.textContent = 'Updated — ' + (d ? fmtDate(d) : fmtDate(new Date()));
-  }
+  function splitArticlesForSketch(articles){
+    // Right column gets the top block of articles.
+    const topRight = articles.slice(0, TOP_RIGHT_ARTICLE_COUNT);
+    const remaining = articles.slice(TOP_RIGHT_ARTICLE_COUNT);
 
-  async function fetchJson(url){
-    try{
-      const r = await fetch(url, { cache:'no-store' });
-      if(!r.ok) throw 0;
-      return await r.json();
-    }catch{
-      return null;
-    }
+    // After videos end: articles continue on the left, while right continues too.
+    // We'll start filling LEFT first, then alternate to RIGHT.
+    const leftContinue = [];
+    const rightContinue = [];
+
+    remaining.forEach((a, i) => {
+      if (i % 2 === 0) leftContinue.push(a);
+      else rightContinue.push(a);
+    });
+
+    return { topRight, leftContinue, rightContinue };
   }
 
   (async function boot(){
     setUpdated(new Date());
+    clearContainers();
+
+    if (GRID) GRID.setAttribute('aria-busy','true');
+
     const raw = await fetchJson(DATA_RECENT);
 
     if (!raw){
-      RESULTS.style.display='none';
-      EMPTY.style.display='block';
-      EMPTY.textContent='No data file yet. Waiting for the builder to publish /data/news.json';
+      showEmpty('No data file yet. Waiting for the builder to publish /data/news.json');
       return;
     }
 
@@ -164,6 +217,11 @@
     const now = Date.now();
     items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60 * 3600 * 1000);
 
+    if (!items.length){
+      showEmpty('No stories found for the last 48–60 hours.');
+      return;
+    }
+
     // sort newest first, then by score
     items.sort((a,b)=>{
       const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
@@ -171,17 +229,43 @@
       return (b.score??0) - (a.score??0);
     });
 
-    // ✅ Articles first, then videos at the bottom
-    const articles = items.filter(x => x.type !== 'video');
-    const videos   = items.filter(x => x.type === 'video');
-    items = [...articles, ...videos];
-
     const latest = items.reduce(
       (m,x)=> (x.date && (!m || x.date>m)) ? x.date : m,
       null
     );
     setUpdated(latest || new Date());
-    render(items);
+
+    // Separate videos & articles
+    const articles = items.filter(x => x.type !== 'video');
+    const videos   = items.filter(x => x.type === 'video');
+
+    hideEmpty();
+
+    // If the new containers exist, use the sketch layout.
+    const hasNewLayout = VIDEOS_EL && ARTS_LEFT_EL && ARTS_RIGHT_EL;
+
+    if (hasNewLayout){
+      const { topRight, leftContinue, rightContinue } = splitArticlesForSketch(articles);
+
+      renderList(VIDEOS_EL, videos);                 // Left/top
+      renderList(ARTS_RIGHT_EL, [...topRight, ...rightContinue]); // Right: top articles + continued
+      renderList(ARTS_LEFT_EL, leftContinue);        // Left/bottom continuation
+
+      if (GRID) GRID.setAttribute('aria-busy','false');
+      return;
+    }
+
+    // Fallback (old behavior): Articles first, then videos at the bottom in #results
+    if (RESULTS_FALLBACK){
+      const merged = [...articles, ...videos];
+      renderList(RESULTS_FALLBACK, merged);
+      RESULTS_FALLBACK.style.display = 'grid';
+      if (GRID) GRID.setAttribute('aria-busy','false');
+      return;
+    }
+
+    // If no containers found at all, show empty
+    showEmpty('Layout containers not found in HTML.');
   })();
 
   if('serviceWorker' in navigator){
