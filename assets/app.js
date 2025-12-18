@@ -1,18 +1,18 @@
 /* PTD Today — 2-column layout:
-   Left: YouTube videos (top) + Articles continue (bottom)
-   Right: Articles (top)
-   Keeps unified Share + internal article page links. */
+   Left: Videos then Articles (continue immediately)
+   Right: Articles
+   Masonry-balanced articles to minimize blank space.
+*/
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
   const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
 
-  // New containers (from updated index.html)
   const GRID          = $('#ptdGrid');
   const VIDEOS_EL     = $('#videos');
   const ARTS_LEFT_EL  = $('#articlesLeft');
   const ARTS_RIGHT_EL = $('#articlesRight');
 
-  // Backward-compat container (still exists hidden in your updated index)
+  // Backward-compat (hidden)
   const RESULTS_FALLBACK = $('#results');
 
   const EMPTY   = $('#empty');
@@ -20,9 +20,6 @@
 
   const endpoints   = (window.__PTD__ && window.__PTD__.endpoints) || {};
   const DATA_RECENT = endpoints.recent || '/data/news.json';
-
-  // How many articles should appear in the TOP-RIGHT block before continuing on the left
-  const TOP_RIGHT_ARTICLE_COUNT = 12;
 
   const parseDate = v => v ? new Date(v) : null;
   const fmtDate = d => d
@@ -37,7 +34,7 @@
     catch { return ''; }
   }
 
-  // Only show thumbs for video on the homepage (allowed)
+  // Only show thumbs for video on the homepage
   function bestImage(item){
     if (item.type === 'video' && item.image) return item.image;
     return '';
@@ -56,7 +53,6 @@
     const date      = (d && d.getTime() > now) ? new Date(now) : d;
     const score     = typeof raw.score==='number' ? raw.score : null;
 
-    // Use existing shortlink/share if present, else default to article.html
     const share = (raw.share && String(raw.share).trim())
       ? String(raw.share).trim()
       : `/article.html?u=${encodeURIComponent(url)}`;
@@ -92,7 +88,6 @@
       EMPTY.style.display = 'block';
       EMPTY.textContent = msg || 'No stories found.';
     }
-    // Hide columns if present
     if (VIDEOS_EL) VIDEOS_EL.style.display = 'none';
     if (ARTS_LEFT_EL) ARTS_LEFT_EL.style.display = 'none';
     if (ARTS_RIGHT_EL) ARTS_RIGHT_EL.style.display = 'none';
@@ -106,60 +101,46 @@
     if (ARTS_RIGHT_EL) ARTS_RIGHT_EL.style.display = '';
   }
 
-  function renderList(container, items){
-    if (!container) return;
-    container.innerHTML = '';
+  function buildCard(item){
+    const isVideo = item.type === 'video';
 
-    const frag = document.createDocumentFragment();
+    const metaBits = [
+      (item.category||'').toUpperCase(),
+      item.publisher || domainOf(item.url),
+      item.date ? fmtDate(item.date) : '',
+      (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
+    ].filter(Boolean).join(' • ');
 
-    for (const item of items){
-      const isVideo = item.type === 'video';
+    const card = document.createElement('article');
+    card.className = 'card';
 
-      const metaBits = [
-        (item.category||'').toUpperCase(),
-        item.publisher || domainOf(item.url),
-        item.date ? fmtDate(item.date) : '',
-        (item.score!=null) ? ('SCORE: '+Number(item.score).toFixed(3)) : ''
-      ].filter(Boolean).join(' • ');
+    const thumbHtml = (isVideo && bestImage(item))
+      ? `<div class="thumb is-video">
+           <img loading="lazy" src="${bestImage(item)}" alt="">
+           <span class="play-badge" aria-hidden="true">▶</span>
+         </div>`
+      : '';
 
-      const card = document.createElement('article');
-      card.className = 'card';
-
-      const thumbHtml = (isVideo && bestImage(item))
-        ? `<div class="thumb is-video">
-             <img loading="lazy" src="${bestImage(item)}" alt="">
-             <span class="play-badge" aria-hidden="true">▶</span>
-           </div>`
-        : '';
-
-      card.innerHTML = `
-        ${thumbHtml}
-        <div class="content">
-          <div class="meta">${metaBits}</div>
-          <h3 class="headline">
-            <a href="${item.share}">
-              ${item.title}
-            </a>
-          </h3>
-          <div class="cta-row">
-            <a class="btn" href="${item.share}">
-              ${isVideo ? 'Watch' : 'Open Article'}
-            </a>
-            <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">
-              ${isVideo ? 'YouTube' : 'Source'}
-            </a>
-            <button class="btn linkish share" data-share="${item.share}">Share</button>
-          </div>
+    card.innerHTML = `
+      ${thumbHtml}
+      <div class="content">
+        <div class="meta">${metaBits}</div>
+        <h3 class="headline">
+          <a href="${item.share}">${item.title}</a>
+        </h3>
+        <div class="cta-row">
+          <a class="btn" href="${item.share}">${isVideo ? 'Watch' : 'Open Article'}</a>
+          <a class="btn secondary" href="${item.url}" target="_blank" rel="noopener">
+            ${isVideo ? 'YouTube' : 'Source'}
+          </a>
+          <button class="btn linkish share" data-share="${item.share}">Share</button>
         </div>
-      `;
+      </div>
+    `;
 
-      frag.appendChild(card);
-    }
-
-    container.appendChild(frag);
-
-    // Unified Share handlers (scoped to this container)
-    $$('.share', container).forEach(btn => {
+    // Attach share handler on the card (no second pass needed)
+    const btn = $('.share', card);
+    if (btn){
       btn.addEventListener('click', async () => {
         const rel = btn.getAttribute('data-share') || '/';
         const fullUrl = new URL(rel, window.location.href).toString();
@@ -172,39 +153,64 @@
             btn.textContent = 'Copied';
             setTimeout(() => { btn.textContent = old; }, 1200);
           }
-        } catch (e) {
-          // user cancelled share; ignore
-        }
+        } catch (e) {}
       });
-    });
+    }
+
+    return card;
   }
 
-  function splitArticlesForSketch(articles){
-    // Right column gets the top block of articles.
-    const topRight = articles.slice(0, TOP_RIGHT_ARTICLE_COUNT);
-    const remaining = articles.slice(TOP_RIGHT_ARTICLE_COUNT);
+  function renderVideos(videos){
+    if (!VIDEOS_EL) return;
+    VIDEOS_EL.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for (const v of videos) frag.appendChild(buildCard(v));
+    VIDEOS_EL.appendChild(frag);
+  }
 
-    // After videos end: articles continue on the left, while right continues too.
-    // We'll start filling LEFT first, then alternate to RIGHT.
-    const leftContinue = [];
-    const rightContinue = [];
+  // Masonry distribution: always append next article to the shorter column
+  function renderArticlesMasonry(articles){
+    if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
 
-    remaining.forEach((a, i) => {
-      if (i % 2 === 0) leftContinue.push(a);
-      else rightContinue.push(a);
+    ARTS_LEFT_EL.innerHTML = '';
+    ARTS_RIGHT_EL.innerHTML = '';
+
+    // Build nodes first
+    const nodes = articles.map(buildCard);
+
+    // Append using a simple greedy height balance
+    for (const node of nodes){
+      const leftH  = ARTS_LEFT_EL.offsetHeight;
+      const rightH = ARTS_RIGHT_EL.offsetHeight;
+
+      if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
+      else ARTS_RIGHT_EL.appendChild(node);
+    }
+  }
+
+  // If fonts load late, rebalance once after initial paint
+  function rebalanceOnce(){
+    if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
+    const all = [...ARTS_LEFT_EL.children, ...ARTS_RIGHT_EL.children];
+    if (!all.length) return;
+
+    ARTS_LEFT_EL.innerHTML = '';
+    ARTS_RIGHT_EL.innerHTML = '';
+
+    all.forEach(node => {
+      const leftH  = ARTS_LEFT_EL.offsetHeight;
+      const rightH = ARTS_RIGHT_EL.offsetHeight;
+      if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
+      else ARTS_RIGHT_EL.appendChild(node);
     });
-
-    return { topRight, leftContinue, rightContinue };
   }
 
   (async function boot(){
     setUpdated(new Date());
     clearContainers();
-
     if (GRID) GRID.setAttribute('aria-busy','true');
 
     const raw = await fetchJson(DATA_RECENT);
-
     if (!raw){
       showEmpty('No data file yet. Waiting for the builder to publish /data/news.json');
       return;
@@ -213,7 +219,7 @@
     const arr = Array.isArray(raw) ? raw : (raw.items || []);
     let items = arr.map(normalize).filter(x => x.title && x.url);
 
-    // keep roughly last 48–60 hours
+    // last 48–60 hours
     const now = Date.now();
     items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60 * 3600 * 1000);
 
@@ -235,36 +241,38 @@
     );
     setUpdated(latest || new Date());
 
-    // Separate videos & articles
     const articles = items.filter(x => x.type !== 'video');
     const videos   = items.filter(x => x.type === 'video');
 
     hideEmpty();
 
-    // If the new containers exist, use the sketch layout.
     const hasNewLayout = VIDEOS_EL && ARTS_LEFT_EL && ARTS_RIGHT_EL;
 
     if (hasNewLayout){
-      const { topRight, leftContinue, rightContinue } = splitArticlesForSketch(articles);
+      renderVideos(videos);
 
-      renderList(VIDEOS_EL, videos);                 // Left/top
-      renderList(ARTS_RIGHT_EL, [...topRight, ...rightContinue]); // Right: top articles + continued
-      renderList(ARTS_LEFT_EL, leftContinue);        // Left/bottom continuation
+      // Key change: masonry-balanced articles across BOTH columns
+      // (left starts right after last video, right continues too)
+      renderArticlesMasonry(articles);
 
       if (GRID) GRID.setAttribute('aria-busy','false');
+
+      // One rebalance after paint to reduce blanks if font metrics change
+      requestAnimationFrame(() => setTimeout(rebalanceOnce, 120));
       return;
     }
 
-    // Fallback (old behavior): Articles first, then videos at the bottom in #results
+    // Fallback: old single list
     if (RESULTS_FALLBACK){
-      const merged = [...articles, ...videos];
-      renderList(RESULTS_FALLBACK, merged);
+      RESULTS_FALLBACK.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      for (const x of [...articles, ...videos]) frag.appendChild(buildCard(x));
+      RESULTS_FALLBACK.appendChild(frag);
       RESULTS_FALLBACK.style.display = 'grid';
       if (GRID) GRID.setAttribute('aria-busy','false');
       return;
     }
 
-    // If no containers found at all, show empty
     showEmpty('Layout containers not found in HTML.');
   })();
 
