@@ -50,7 +50,7 @@
   <link rel="preload" href="/assets/main.css" as="style" />
   <link rel="stylesheet" href="/assets/main.css" />
 
-  <!-- small header tweaks -->
+  <!-- small header tweaks + NEW 2-column layout styles -->
   <style>
     header.site-header { text-align:center; margin: 34px 10px 18px; }
     header.site-header h1 { margin: 0 0 6px; font-size: 56px; line-height:1; letter-spacing:.2px; }
@@ -58,6 +58,41 @@
     header.site-header h1 a:hover { text-decoration: underline; }
     header.site-header .motto { margin: 2px 0 18px; color:#6F675D; font-style: italic; font-size: 18px; }
     h2.section { text-align:center; margin: 0 0 14px; }
+
+    /* === NEW: Layout that matches your sketch === */
+    .ptd-grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 26px;
+      align-items:start;
+      margin-top: 6px;
+    }
+    .ptd-col{ min-width: 0; }
+    .ptd-col--right{
+      border-left: 2px solid #111;
+      padding-left: 24px;
+    }
+
+    .ptd-section-title{
+      text-align:center;
+      margin: 0 0 14px;
+    }
+
+    /* "Once videos end, articles continue" visual separator */
+    .ptd-continue-title{
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px dashed rgba(0,0,0,.35);
+    }
+
+    /* Keep your existing .results styles in /assets/main.css working,
+       but allow them inside our columns. */
+    .results { width: 100%; }
+
+    @media (max-width: 980px){
+      .ptd-grid{ grid-template-columns: 1fr; }
+      .ptd-col--right{ border-left: none; padding-left: 0; }
+    }
   </style>
 
   <!-- Schema.org -->
@@ -82,8 +117,30 @@
     </header>
 
     <main id="main" role="main" aria-label="News list" class="main">
-      <section id="results" class="results" aria-live="polite" aria-busy="true"></section>
+      <!-- NEW two-column scaffold -->
+      <div class="ptd-grid" id="ptdGrid" aria-live="polite" aria-busy="true">
+        <!-- LEFT: Videos, then Articles continue -->
+        <section class="ptd-col ptd-col--left" aria-label="YouTube videos and continued articles">
+          <h2 class="ptd-section-title">YouTube Videos</h2>
+          <section id="videos" class="results"></section>
+
+          <h2 class="ptd-section-title ptd-continue-title">Articles</h2>
+          <section id="articlesLeft" class="results"></section>
+        </section>
+
+        <!-- RIGHT: Articles -->
+        <section class="ptd-col ptd-col--right" aria-label="Articles">
+          <h2 class="ptd-section-title">Articles</h2>
+          <section id="articlesRight" class="results"></section>
+        </section>
+      </div>
+
+      <!-- Keep your existing empty-state element -->
       <div id="empty" class="empty" style="display:none">No stories found.</div>
+
+      <!-- Backward compatibility: if /assets/app.js still tries to render into #results,
+           leave a hidden container so the page doesn't crash. -->
+      <section id="results" class="results" aria-live="polite" aria-busy="true" style="display:none"></section>
     </main>
 
     <footer class="footer">
@@ -94,8 +151,10 @@
 
   <script>
     (function(){
-      var yr=document.getElementById('yr'); 
+      var yr=document.getElementById('yr');
       if(yr) yr.textContent=new Date().getFullYear();
+
+      // Existing endpoint config (keep)
       window.__PTD__ = { endpoints: { recent:'/data/news.json' } };
     })();
   </script>
