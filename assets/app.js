@@ -1,7 +1,7 @@
 /* PTD Today — 2-column layout:
-   Left: Videos then Articles (continue immediately)
+   Left: Videos then Articles continue immediately
    Right: Articles
-   Masonry-balanced articles using scrollHeight (fixes empty right column / grid stretch).
+   Balanced by COUNT (not heights) to guarantee both columns are filled.
 */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
@@ -31,6 +31,7 @@
     catch { return ''; }
   }
 
+  // Only show thumbs for video on the homepage
   function bestImage(item){
     if (item.type === 'video' && item.image) return item.image;
     return '';
@@ -163,41 +164,25 @@
     VIDEOS_EL.appendChild(frag);
   }
 
-  // ✅ Key fix: use scrollHeight (content height) not offsetHeight (grid-stretched)
-  const contentHeight = (el) => (el ? el.scrollHeight : 0);
-
-  function renderArticlesMasonry(articles){
+  // ✅ Guaranteed fill: distribute by COUNT
+  // Start with RIGHT so it never ends up empty down the page.
+  function renderArticlesBalanced(articles){
     if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
 
     ARTS_LEFT_EL.innerHTML = '';
     ARTS_RIGHT_EL.innerHTML = '';
 
-    for (const a of articles){
-      const node = buildCard(a);
+    const leftFrag = document.createDocumentFragment();
+    const rightFrag = document.createDocumentFragment();
 
-      const leftH  = contentHeight(ARTS_LEFT_EL);
-      const rightH = contentHeight(ARTS_RIGHT_EL);
-
-      if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
-      else ARTS_RIGHT_EL.appendChild(node);
+    for (let i = 0; i < articles.length; i++){
+      const node = buildCard(articles[i]);
+      if (i % 2 === 0) rightFrag.appendChild(node); // 0,2,4... -> RIGHT
+      else leftFrag.appendChild(node);              // 1,3,5... -> LEFT (after videos)
     }
-  }
 
-  // Rebalance once after layout settles (fonts/images can change heights)
-  function rebalanceOnce(){
-    if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
-    const all = [...ARTS_LEFT_EL.children, ...ARTS_RIGHT_EL.children];
-    if (!all.length) return;
-
-    ARTS_LEFT_EL.innerHTML = '';
-    ARTS_RIGHT_EL.innerHTML = '';
-
-    for (const node of all){
-      const leftH  = contentHeight(ARTS_LEFT_EL);
-      const rightH = contentHeight(ARTS_RIGHT_EL);
-      if (leftH <= rightH) ARTS_LEFT_EL.appendChild(node);
-      else ARTS_RIGHT_EL.appendChild(node);
-    }
+    ARTS_RIGHT_EL.appendChild(rightFrag);
+    ARTS_LEFT_EL.appendChild(leftFrag);
   }
 
   (async function boot(){
@@ -214,7 +199,7 @@
     const arr = Array.isArray(raw) ? raw : (raw.items || []);
     let items = arr.map(normalize).filter(x => x.title && x.url);
 
-    // last 48–60 hours
+    // Keep roughly last 48–60 hours
     const now = Date.now();
     items = items.filter(x => !x.date || (now - x.date.getTime()) <= 60 * 3600 * 1000);
 
@@ -223,7 +208,7 @@
       return;
     }
 
-    // newest first, then by score
+    // Sort newest first, then by score
     items.sort((a,b)=>{
       const bd=(b.date?b.date.getTime():0), ad=(a.date?a.date.getTime():0);
       if(bd!==ad) return bd-ad;
@@ -241,15 +226,13 @@
     const hasNewLayout = VIDEOS_EL && ARTS_LEFT_EL && ARTS_RIGHT_EL;
     if (hasNewLayout){
       renderVideos(videos);
-      renderArticlesMasonry(articles);
+      renderArticlesBalanced(articles);
 
       if (GRID) GRID.setAttribute('aria-busy','false');
-
-      requestAnimationFrame(() => setTimeout(rebalanceOnce, 180));
       return;
     }
 
-    // fallback
+    // Fallback to single list if needed
     if (RESULTS_FALLBACK){
       const frag = document.createDocumentFragment();
       for (const x of items) frag.appendChild(buildCard(x));
