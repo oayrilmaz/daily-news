@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Analytics 4 (same as index, optional but consistent) -->
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVKD1RLFE5"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-TVKD1RLFE5');
+  </script>
+  <!-- End GA -->
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#E7DCC8" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="description" content="PTD AI Desk: AI-generated energy & power intelligence briefs with confidence levels.">
+  <link rel="canonical" href="https://ptdtoday.com/ai.html" />
+  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
+
+  <!-- Social -->
+  <meta property="og:site_name" content="PTD Today" />
+  <meta property="og:title" content="PTD Today — AI Desk" />
+  <meta property="og:description" content="AI-generated intelligence briefs with confidence levels." />
+  <meta property="og:image" content="/assets/og-default.png" />
+  <meta property="og:url" content="https://ptdtoday.com/ai.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <title>PTD Today — AI Desk</title>
+
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/assets/main.css" />
+
+  <style>
+    /* Match your index header vibe */
+    header.site-header {
+      text-align: center;
+      margin: 34px 10px 18px;
+    }
+    header.site-header h1 {
+      margin: 0 0 6px;
+      font-size: 56px;
+      line-height: 1;
+      letter-spacing: .2px;
+    }
+    header.site-header h1 a {
+      color: inherit;
+      text-decoration: none;
+    }
+    header.site-header .motto {
+      margin: 2px 0 10px;
+      color: #6F675D;
+      font-style: italic;
+      font-size: 18px;
+    }
+
+    /* Top nav */
+    .ptd-nav {
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+      margin: 6px 0 16px;
+      font-size: 14px;
+    }
+    .ptd-nav a {
+      text-decoration: none;
+      color: #222;
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+    .ptd-nav a:hover {
+      background: #f1ece3;
+    }
+    .ptd-nav a.active {
+      font-weight: 600;
+      background: #e7dcc8;
+    }
+
+    /* AI list layout */
+    .ai-wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 14px 18px;
+    }
+
+    .ai-intro {
+      margin: 8px auto 18px;
+      color: #6F675D;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .ai-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 14px 0 14px;
+    }
+
+    .ai-controls .updated {
+      margin: 0;
+      font-size: 13px;
+      color: #6F675D;
+    }
+
+    .ai-filter {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #444;
+    }
+
+    .ai-filter select {
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid #e6e6e6;
+      background: #fff;
+    }
+
+    .ai-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .ai-card {
+      border: 1px solid #e6e6e6;
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .ai-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid transparent;
+    }
+    .badge-high { background: #e8fff1; color: #0a7a3b; border-color: #b7f0cd; }
+    .badge-med  { background: #fff8e6; color: #8a5b00; border-color: #ffe1a6; }
+    .badge-low  { background: #ffecec; color: #9b1c1c; border-color: #ffbdbd; }
+
+    .ai-meta {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .ai-title {
+      margin: 0 0 8px 0;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .ai-title a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .ai-title a:hover {
+      text-decoration: underline;
+    }
+
+    .ai-tldr {
+      margin: 0 0 10px 0;
+      color: #222;
+      line-height: 1.5;
+    }
+
+    .ai-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tag {
+      font-size: 12px;
+      padding: 3px 8px;
+      border: 1px solid #eee;
+      border-radius: 999px;
+      color: #444;
+      background: #fafafa;
+    }
+
+    .empty {
+      text-align: center;
+      color: #6F675D;
+      margin: 24px 0;
+    }
+  </style>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "PTD Today — AI Desk",
+    "url": "https://ptdtoday.com/ai.html"
+  }
+  </script>
+</head>
+
+<body>
+  <div class="wrap" id="top">
+
+    <header class="site-header">
+      <h1 class="logo">
+        <a href="/" aria-label="Go to PTD Today home">PTD Today</a>
+      </h1>
+
+      <p class="motto">First to Know. First to Lead.</p>
+
+      <nav class="ptd-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/ai.html" class="active">AI</a>
+      </nav>
+
+      <h2 class="section">PTD AI Desk</h2>
+    </header>
+
+    <main class="main ai-wrap" role="main">
+      <p class="ai-intro">
+        AI-generated intelligence briefs for Energy &amp; Power. Each item includes a confidence level and tags.
+        (Informational only — may contain errors.)
+      </p>
+
+      <div class="ai-controls">
+        <div class="updated" id="aiUpdated" role="status" aria-live="polite">Loading…</div>
+
+        <div class="ai-filter">
+          <label for="confidenceFilter">Filter:</label>
+          <select id="confidenceFilter">
+            <option value="All">All confidence</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </div>
+      </div>
+
+      <section id="aiList" class="ai-list" aria-live="polite" aria-busy="true"></section>
+
+      <div id="aiEmpty" class="empty" style="display:none">
+        No AI briefs yet. Once <code>data/ai_news.json</code> is published, they will appear here.
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© <span id="yr"></span> PTD Today — AI Desk.</p>
+      <p>
+        AI content is generated for informational purposes and may contain errors.
+        Do not treat as investment, legal, or engineering advice.
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    const AI_ENDPOINT = "/data/ai_news.json";
+
+    const aiList = document.getElementById("aiList");
+    const aiEmpty = document.getElementById("aiEmpty");
+    const aiUpdated = document.getElementById("aiUpdated");
+    const confidenceFilter = document.getElementById("confidenceFilter");
+
+    function badgeClass(level) {
+      if (level === "High") return "badge badge-high";
+      if (level === "Medium") return "badge badge-med";
+      return "badge badge-low";
+    }
+
+    function render(items) {
+      aiList.innerHTML = "";
+
+      if (!items || items.length === 0) {
+        aiList.setAttribute("aria-busy", "false");
+        aiEmpty.style.display = "block";
+        return;
+      }
+
+      aiEmpty.style.display = "none";
+
+      for (const item of items) {
+        const el = document.createElement("article");
+        el.className = "ai-card";
+
+        const tagsHtml = (item.tags || []).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("");
+
+        el.innerHTML = `
+          <div class="ai-top">
+            <span class="${badgeClass(item.confidence || "Low")}">${escapeHtml(item.confidence || "Low")} confidence</span>
+            <span class="ai-meta">${escapeHtml(item.published_at || "")}</span>
+          </div>
+
+          <h3 class="ai-title">
+            <a href="${item.url ? item.url : '#'}">${escapeHtml(item.title || "Untitled")}</a>
+          </h3>
+
+          <p class="ai-tldr">${escapeHtml(item.tldr || "")}</p>
+
+          <div class="ai-tags">${tagsHtml}</div>
+        `;
+
+        aiList.appendChild(el);
+      }
+
+      aiList.setAttribute("aria-busy", "false");
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function applyFilter(allItems) {
+      const v = confidenceFilter.value;
+      if (v === "All") return allItems;
+      return allItems.filter(x => (x.confidence || "").toLowerCase() === v.toLowerCase());
+    }
+
+    async function loadAI() {
+      try {
+        aiList.setAttribute("aria-busy", "true");
+
+        const res = await fetch(AI_ENDPOINT, { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const data = await res.json();
+        const items = Array.isArray(data.items) ? data.items : [];
+
+        const updatedText = data.updated_at
+          ? `Updated: ${data.updated_at}`
+          : `Updated: ${new Date().toLocaleString()}`;
+
+        aiUpdated.textContent = updatedText;
+
+        const filtered = applyFilter(items);
+        render(filtered);
+
+        confidenceFilter.onchange = () => render(applyFilter(items));
+      } catch (e) {
+        aiUpdated.textContent = "Could not load AI briefs.";
+        render([]);
+      }
+    }
+
+    loadAI();
+  </script>
+</body>
+</html>
