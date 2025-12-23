@@ -10,7 +10,7 @@ const openai = new OpenAI({
 // ---- CONFIG ----
 const OUTPUT_JSON = "data/ai_news.json";
 const AI_DIR = "ai";
-const MAX_ITEMS = 3;
+const MAX_ITEMS = 10;
 const CONFIDENCE_LEVELS = ["High", "Medium", "Low"];
 
 const SYSTEM_PROMPT = `
