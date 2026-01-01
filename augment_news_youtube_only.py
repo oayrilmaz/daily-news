@@ -34,7 +34,7 @@ KEYWORDS = [
 ]
 
 # ------------------------ OpenAI -----------------------------------
-# You already have OpenAI; store key in env var (GitHub secret, local env, etc.)
+# Store key in env var (GitHub secret, local env, etc.)
 # export OPENAI_API_KEY="..."
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_MODEL = os.getenv("PTD_OPENAI_MODEL", "gpt-4.1-mini")  # override if you want
@@ -154,6 +154,7 @@ def compute_feed_fingerprint(items, max_items=80):
             "category": it.get("category", ""),
             "published": it.get("published", ""),
             "type": it.get("type", ""),
+            "score": it.get("score", None),
             "url": it.get("url", "")
         })
     raw = json.dumps(compact, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
@@ -173,7 +174,16 @@ def openai_call_responses(prompt_text: str) -> str:
     payload = {
         "model": OPENAI_MODEL,
         "input": [
-            {"role": "system", "content": "You are PTD Today’s editorial analyst. Use ONLY the provided feed items (headline+metadata). Do NOT invent facts. Do NOT quote article text. Be concise and professional."},
+            {
+                "role": "system",
+                "content": (
+                    "You are PTD Today’s editorial analyst (Energy / Grid / Data Centers / AI). "
+                    "Use ONLY the provided feed items (headline + metadata). "
+                    "Do NOT invent facts. Do NOT use external knowledge. Do NOT quote article text. "
+                    "Write in a crisp, neutral, newsroom tone (WSJ/FT style). "
+                    "If a headline is ambiguous, say 'Not enough information in the headline.'"
+                )
+            },
             {"role": "user", "content": prompt_text}
         ]
     }
@@ -189,18 +199,14 @@ def openai_call_responses(prompt_text: str) -> str:
         method="POST"
     )
 
-    with urlopen(req, timeout=30) as resp:
+    with urlopen(req, timeout=35) as resp:
         out = resp.read().decode("utf-8", errors="replace")
 
     j = json.loads(out)
 
-    # Responses API returns output text in multiple possible shapes;
-    # We'll robustly extract any "output_text" convenience field if present,
-    # else join text parts from output array.
     if isinstance(j, dict) and "output_text" in j and isinstance(j["output_text"], str):
         return j["output_text"].strip()
 
-    # fallback parse
     texts = []
     for block in j.get("output", []) if isinstance(j, dict) else []:
         for c in block.get("content", []) if isinstance(block, dict) else []:
@@ -212,8 +218,8 @@ def openai_call_responses(prompt_text: str) -> str:
 def build_daily_brief_prompt(feed_items):
     """
     feed_items: list of dicts with title/publisher/category/published/score/url
+    Produces a premium editorial brief.
     """
-    # Keep only what we already show (headline metadata)
     compact = []
     for it in feed_items[:80]:
         if not isinstance(it, dict):
@@ -224,22 +230,34 @@ def build_daily_brief_prompt(feed_items):
             "category": it.get("category", ""),
             "published": it.get("published", ""),
             "score": it.get("score", None),
+            "type": it.get("type", ""),
             "url": it.get("url", "")
         })
 
     return (
-        "Create a “Daily Intelligence Brief” summarizing the PTD Today homepage feed.\n\n"
-        "Input: A list of feed items (headline, publisher, category, published timestamp, score, url).\n\n"
-        "Output format (markdown):\n"
-        "1) Top themes (max 5 bullets)\n"
-        "2) Top stories (up to 8) — one sentence each, based only on headline/metadata; include (Source: Publisher)\n"
-        "3) Sector takeaways (Grid / Renewables / Data Centers & AI) — 1–2 bullets each if relevant\n"
-        "4) Notable companies/regions mentioned (only if visible from headlines)\n\n"
-        "Rules:\n"
-        "- Use ONLY provided items. No external knowledge. No guessing.\n"
-        "- If uncertain, say: “Not enough information in the headline.”\n"
-        "- Do NOT quote article text.\n\n"
-        "Here are the feed items as JSON:\n"
+        "Write a premium 'Daily Intelligence Brief' for PTD Today based ONLY on the feed items below.\n\n"
+        "STRICT RULES:\n"
+        "- Use ONLY the provided items. No external facts, no guessing.\n"
+        "- Do NOT quote article text. You only have headlines + metadata.\n"
+        "- If something isn't clear from the headline, say: 'Not enough information in the headline.'\n"
+        "- Be concise and professional. No hype.\n\n"
+        "OUTPUT (markdown) — EXACT STRUCTURE:\n"
+        "A) Lead (2–3 sentences): what the day signals across energy/grid/data centers/AI.\n"
+        "B) Top themes (3–6 bullets): short, punchy, actionable.\n"
+        "C) Why it matters (1–2 bullets): implications for operators, suppliers, investors.\n"
+        "D) Watchlist (2–4 bullets): what to monitor next (policy, supply chain, projects, earnings, etc.).\n"
+        "E) Top stories (up to 8): one line each, end with '(Source: Publisher)'.\n"
+        "F) Sector takeaways:\n"
+        "   - Grid: 1–2 bullets (if relevant)\n"
+        "   - Renewables & Storage: 1–2 bullets (if relevant)\n"
+        "   - Data Centers & AI: 1–2 bullets (if relevant)\n"
+        "G) Notable mentions (if visible from headlines only):\n"
+        "   - Companies: comma-separated\n"
+        "   - Regions/Countries: comma-separated\n\n"
+        "SELECTION GUIDANCE:\n"
+        "- Prioritize more recent items; use score as a tie-breaker.\n"
+        "- If the feed lacks variety, acknowledge it briefly in the Lead.\n\n"
+        "FEED ITEMS (JSON):\n"
         f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
     )
 
@@ -247,11 +265,21 @@ def build_daily_brief_prompt(feed_items):
 def generate_home_summary(all_items):
     """
     Generates /data/home_summary.json based on the same items shown on homepage.
-    We summarize articles + videos (or you can choose to exclude videos).
+    Summarizes articles + videos (headlines + metadata only).
     """
-    # Sort newest first (same as your homepage)
     items = list(all_items)
-    items.sort(key=published_dt, reverse=True)
+
+    # Sort: newest first; if timestamps equal/close, higher score first
+    def sort_key(it):
+        dt = published_dt(it)
+        score = it.get("score", 0) if isinstance(it, dict) else 0
+        try:
+            s = float(score) if score is not None else 0.0
+        except Exception:
+            s = 0.0
+        return (dt, s)
+
+    items.sort(key=sort_key, reverse=True)
 
     # keep roughly last 60 hours, matching your homepage
     now = datetime.now(timezone.utc)
@@ -268,7 +296,6 @@ def generate_home_summary(all_items):
     if not filtered:
         return
 
-    # fingerprint to avoid wasting calls if nothing changed
     fp = compute_feed_fingerprint(filtered)
 
     existing = load_existing(HOME_SUMMARY_PATH)
@@ -307,12 +334,14 @@ def main():
     print(f"Found {len(new_items)} new YouTube videos from CNN/Reuters/WSJ/FT matching your keywords.")
 
     all_items = existing + new_items
+
+    # Keep consistent ordering in news.json
     all_items.sort(key=published_dt, reverse=True)
 
     save_json(NEWS_JSON_PATH, all_items)
     print(f"Saved {len(all_items)} total items to {NEWS_JSON_PATH}")
 
-    # Generate homepage summary (optional if key present)
+    # Generate homepage summary (only if key present)
     try:
         if os.getenv(OPENAI_API_KEY_ENV, "").strip():
             generate_home_summary(all_items)
