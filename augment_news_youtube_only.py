@@ -2,21 +2,21 @@
 #
 # 1) Expands data/news.json with YouTube videos related to energy / grid / AI / data centers
 #    from CNN / Reuters / WSJ / FT (VIDEO items only)
-# 2) Generates a homepage "Daily Intelligence Brief" from the CURRENT data/news.json
-#    and writes it to data/home_summary.json (static JSON, like your ai.html pattern)
+# 2) Generates AI summaries (daily/weekly/monthly/quarterly/yearly + forecast)
+#    into static JSON files under /data so your site can fetch them.
 
 import json
 import os
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 import xml.etree.ElementTree as ET
 
-
 # ------------------------ Paths ------------------------------------
 NEWS_JSON_PATH = "data/news.json"
-HOME_SUMMARY_PATH = "data/home_summary.json"
+HOME_SUMMARY_PATH = "data/home_summary.json"          # homepage daily brief
+BRIEFS_DIR = "data/briefs"
 
 # ------------------------ YouTube feeds ----------------------------
 YOUTUBE_CHANNELS = [
@@ -40,14 +40,16 @@ OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_MODEL = os.getenv("PTD_OPENAI_MODEL", "gpt-4.1-mini")  # override if you want
 
 
-def now_utc_iso():
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+# ======================== helpers ==================================
+def now_utc():
+    return datetime.now(timezone.utc)
 
+def now_utc_iso():
+    return now_utc().isoformat().replace("+00:00", "Z")
 
 def has_keyword(text: str) -> bool:
     t = (text or "").lower()
     return any(k in t for k in KEYWORDS)
-
 
 def fetch(url: str):
     try:
@@ -56,16 +58,56 @@ def fetch(url: str):
     except URLError:
         return None
 
-
 def parse_iso(dt_str: str) -> str:
     """Normalize RFC3339-ish string into YYYY-MM-DDTHH:MM:SSZ."""
     try:
         dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
     except Exception:
-        dt = datetime.now(timezone.utc)
+        dt = now_utc()
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
+def published_dt(item):
+    try:
+        return datetime.fromisoformat(item["published"].replace("Z", "+00:00")).astimezone(timezone.utc)
+    except Exception:
+        return datetime.min.replace(tzinfo=timezone.utc)
 
+def load_existing(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return [] if path.endswith(".json") else None
+
+def save_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+def compute_fingerprint(items, meta_extra=None, max_items=120):
+    """Stable hash for avoiding unnecessary OpenAI calls."""
+    compact = []
+    for it in items[:max_items]:
+        if not isinstance(it, dict):
+            continue
+        compact.append({
+            "title": it.get("title", ""),
+            "publisher": it.get("publisher", ""),
+            "category": it.get("category", ""),
+            "published": it.get("published", ""),
+            "type": it.get("type", ""),
+            "url": it.get("url", ""),
+            "score": it.get("score", None),
+        })
+    base = {
+        "items": compact,
+        "meta": meta_extra or {}
+    }
+    raw = json.dumps(base, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+# ===================== youtube parsing =============================
 def parse_youtube_feed(xml_bytes, publisher):
     if not xml_bytes:
         return []
@@ -117,50 +159,7 @@ def parse_youtube_feed(xml_bytes, publisher):
     return videos
 
 
-def load_existing(path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
-    except Exception:
-        return []
-
-
-def save_json(path, obj):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-
-
-def published_dt(item):
-    try:
-        return datetime.fromisoformat(item["published"].replace("Z", "+00:00"))
-    except Exception:
-        return datetime.min.replace(tzinfo=timezone.utc)
-
-
-def compute_feed_fingerprint(items, max_items=80):
-    """
-    Create a stable hash for the current homepage feed input.
-    Uses only metadata we already have. Limits to max_items to keep stable.
-    """
-    compact = []
-    for it in items[:max_items]:
-        if not isinstance(it, dict):
-            continue
-        compact.append({
-            "title": it.get("title", ""),
-            "publisher": it.get("publisher", ""),
-            "category": it.get("category", ""),
-            "published": it.get("published", ""),
-            "type": it.get("type", ""),
-            "score": it.get("score", None),
-            "url": it.get("url", "")
-        })
-    raw = json.dumps(compact, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
+# ===================== OpenAI call ================================
 def openai_call_responses(prompt_text: str) -> str:
     """
     Calls OpenAI Responses API via HTTPS (no extra Python dependencies).
@@ -174,16 +173,12 @@ def openai_call_responses(prompt_text: str) -> str:
     payload = {
         "model": OPENAI_MODEL,
         "input": [
-            {
-                "role": "system",
-                "content": (
-                    "You are PTD Today’s editorial analyst (Energy / Grid / Data Centers / AI). "
-                    "Use ONLY the provided feed items (headline + metadata). "
-                    "Do NOT invent facts. Do NOT use external knowledge. Do NOT quote article text. "
-                    "Write in a crisp, neutral, newsroom tone (WSJ/FT style). "
-                    "If a headline is ambiguous, say 'Not enough information in the headline.'"
-                )
-            },
+            {"role": "system", "content": (
+                "You are PTD Today’s editorial analyst. "
+                "Use ONLY the provided feed items (headline+metadata). "
+                "Do NOT invent facts. Do NOT quote article text. "
+                "Be concise, structured, and professional."
+            )},
             {"role": "user", "content": prompt_text}
         ]
     }
@@ -199,7 +194,7 @@ def openai_call_responses(prompt_text: str) -> str:
         method="POST"
     )
 
-    with urlopen(req, timeout=35) as resp:
+    with urlopen(req, timeout=45) as resp:
         out = resp.read().decode("utf-8", errors="replace")
 
     j = json.loads(out)
@@ -215,15 +210,21 @@ def openai_call_responses(prompt_text: str) -> str:
     return "\n".join(texts).strip()
 
 
-def build_daily_brief_prompt(feed_items):
-    """
-    feed_items: list of dicts with title/publisher/category/published/score/url
-    Produces a premium editorial brief.
-    """
-    compact = []
-    for it in feed_items[:80]:
+# ===================== summarization ==============================
+def items_in_window(all_items, start_dt, end_dt):
+    out = []
+    for it in all_items:
         if not isinstance(it, dict):
             continue
+        dt = published_dt(it)
+        if start_dt <= dt < end_dt:
+            out.append(it)
+    out.sort(key=published_dt, reverse=True)
+    return out
+
+def compact_feed(items, limit=90):
+    compact = []
+    for it in items[:limit]:
         compact.append({
             "title": it.get("title", ""),
             "publisher": it.get("publisher", ""),
@@ -231,90 +232,162 @@ def build_daily_brief_prompt(feed_items):
             "published": it.get("published", ""),
             "score": it.get("score", None),
             "type": it.get("type", ""),
-            "url": it.get("url", "")
+            "url": it.get("url", ""),
         })
+    return compact
 
+def prompt_for_period(label, start_dt, end_dt, items):
     return (
-        "Write a premium 'Daily Intelligence Brief' for PTD Today based ONLY on the feed items below.\n\n"
-        "STRICT RULES:\n"
-        "- Use ONLY the provided items. No external facts, no guessing.\n"
-        "- Do NOT quote article text. You only have headlines + metadata.\n"
-        "- If something isn't clear from the headline, say: 'Not enough information in the headline.'\n"
-        "- Be concise and professional. No hype.\n\n"
-        "OUTPUT (markdown) — EXACT STRUCTURE:\n"
-        "A) Lead (2–3 sentences): what the day signals across energy/grid/data centers/AI.\n"
-        "B) Top themes (3–6 bullets): short, punchy, actionable.\n"
-        "C) Why it matters (1–2 bullets): implications for operators, suppliers, investors.\n"
-        "D) Watchlist (2–4 bullets): what to monitor next (policy, supply chain, projects, earnings, etc.).\n"
-        "E) Top stories (up to 8): one line each, end with '(Source: Publisher)'.\n"
-        "F) Sector takeaways:\n"
-        "   - Grid: 1–2 bullets (if relevant)\n"
-        "   - Renewables & Storage: 1–2 bullets (if relevant)\n"
-        "   - Data Centers & AI: 1–2 bullets (if relevant)\n"
-        "G) Notable mentions (if visible from headlines only):\n"
-        "   - Companies: comma-separated\n"
-        "   - Regions/Countries: comma-separated\n\n"
-        "SELECTION GUIDANCE:\n"
-        "- Prioritize more recent items; use score as a tie-breaker.\n"
-        "- If the feed lacks variety, acknowledge it briefly in the Lead.\n\n"
-        "FEED ITEMS (JSON):\n"
-        f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
+        f"Create a “{label} Intelligence Brief” for PTD Today.\n"
+        f"Time window: {start_dt.isoformat()} to {end_dt.isoformat()} (UTC)\n\n"
+        "You are given ONLY headline + metadata items (no article text).\n\n"
+        "Output format (markdown):\n"
+        "1) Top themes (max 6 bullets)\n"
+        "2) Top stories (up to 10) — one sentence each, based only on headlines/metadata; include (Source: Publisher)\n"
+        "3) Sector takeaways:\n"
+        "   - Grid\n"
+        "   - Renewables\n"
+        "   - Data Centers & AI\n"
+        "   (1–3 bullets each if relevant)\n"
+        "4) Notable companies/regions mentioned (only if visible from headlines)\n\n"
+        "Rules:\n"
+        "- Use ONLY provided items. No external knowledge. No guessing.\n"
+        "- If uncertain, say: “Not enough information in the headline.”\n"
+        "- Do NOT quote article text.\n\n"
+        "Feed items JSON:\n"
+        f"{json.dumps(compact_feed(items), ensure_ascii=False, indent=2)}\n"
     )
 
+def prompt_for_forecast(current_year, today_dt, items_recent):
+    end_of_year = datetime(current_year + 1, 1, 1, tzinfo=timezone.utc)
+    return (
+        f"Create a “Forecast: Watchlist for the rest of {current_year}” for PTD Today.\n"
+        f"Today (UTC): {today_dt.isoformat()}\n"
+        f"Scope: From today to {end_of_year.isoformat()}.\n\n"
+        "Important: This is NOT a prediction based on external knowledge.\n"
+        "It must be a structured 'what to watch' outlook derived ONLY from patterns in the provided headlines/metadata.\n\n"
+        "Output format (markdown):\n"
+        "1) What to watch (10 bullets max) — each bullet starts with a short label like “Grid: …” / “Data Centers: …” / “Policy: …”\n"
+        "2) Risks & unknowns (max 6 bullets)\n"
+        "3) Signals to monitor (max 8 bullets) — measurable signals or keywords that would confirm/deny the theme\n\n"
+        "Rules:\n"
+        "- Use ONLY provided items. No external knowledge. No guessing.\n"
+        "- Do NOT claim specific future events. Phrase as watchlist/signals.\n"
+        "- Do NOT quote article text.\n\n"
+        "Recent items JSON:\n"
+        f"{json.dumps(compact_feed(items_recent), ensure_ascii=False, indent=2)}\n"
+    )
 
-def generate_home_summary(all_items):
-    """
-    Generates /data/home_summary.json based on the same items shown on homepage.
-    Summarizes articles + videos (headlines + metadata only).
-    """
-    items = list(all_items)
-
-    # Sort: newest first; if timestamps equal/close, higher score first
-    def sort_key(it):
-        dt = published_dt(it)
-        score = it.get("score", 0) if isinstance(it, dict) else 0
-        try:
-            s = float(score) if score is not None else 0.0
-        except Exception:
-            s = 0.0
-        return (dt, s)
-
-    items.sort(key=sort_key, reverse=True)
-
-    # keep roughly last 60 hours, matching your homepage
-    now = datetime.now(timezone.utc)
-    cutoff = now.timestamp() - (60 * 3600)
-    filtered = []
-    for it in items:
-        try:
-            dt = published_dt(it)
-            if dt.timestamp() >= cutoff:
-                filtered.append(it)
-        except Exception:
-            filtered.append(it)
-
-    if not filtered:
+def write_summary_if_changed(path, label, start_dt, end_dt, items):
+    if not items:
         return
 
-    fp = compute_feed_fingerprint(filtered)
+    meta_extra = {
+        "label": label,
+        "start": start_dt.isoformat(),
+        "end": end_dt.isoformat()
+    }
+    fp = compute_fingerprint(items, meta_extra=meta_extra)
 
-    existing = load_existing(HOME_SUMMARY_PATH)
+    existing = load_existing(path)
     if isinstance(existing, dict) and existing.get("fingerprint") == fp:
-        print("Homepage summary unchanged (fingerprint match). Skipping OpenAI call.")
+        print(f"{label}: unchanged (fingerprint match). Skipping.")
         return
 
-    prompt = build_daily_brief_prompt(filtered)
-    summary_md = openai_call_responses(prompt)
-
+    summary_md = openai_call_responses(prompt_for_period(label, start_dt, end_dt, items))
     out = {
         "updated_at": now_utc_iso(),
         "fingerprint": fp,
+        "label": label,
+        "window_start": start_dt.isoformat().replace("+00:00", "Z"),
+        "window_end": end_dt.isoformat().replace("+00:00", "Z"),
         "summary_md": summary_md
     }
-    save_json(HOME_SUMMARY_PATH, out)
-    print(f"Saved homepage summary to {HOME_SUMMARY_PATH}")
+    save_json(path, out)
+    print(f"Saved {label} summary -> {path}")
+
+def write_forecast_if_changed(path, current_year, today_dt, items_recent):
+    if not items_recent:
+        return
+
+    meta_extra = {
+        "label": "Forecast",
+        "year": current_year,
+        "today": today_dt.isoformat()
+    }
+    fp = compute_fingerprint(items_recent, meta_extra=meta_extra)
+
+    existing = load_existing(path)
+    if isinstance(existing, dict) and existing.get("fingerprint") == fp:
+        print("Forecast: unchanged (fingerprint match). Skipping.")
+        return
+
+    summary_md = openai_call_responses(prompt_for_forecast(current_year, today_dt, items_recent))
+    out = {
+        "updated_at": now_utc_iso(),
+        "fingerprint": fp,
+        "label": f"Forecast: rest of {current_year}",
+        "summary_md": summary_md
+    }
+    save_json(path, out)
+    print(f"Saved forecast -> {path}")
+
+def generate_all_briefs(all_items):
+    os.makedirs(BRIEFS_DIR, exist_ok=True)
+
+    # Use both articles + videos (same as your homepage feed). If you prefer excluding videos:
+    # items_for_briefs = [x for x in all_items if x.get("type") != "video"]
+    items_for_briefs = list(all_items)
+    items_for_briefs.sort(key=published_dt, reverse=True)
+
+    now = now_utc()
+
+    # Daily (homepage): keep your existing ~60h window so it matches feed
+    daily_start = now - timedelta(hours=60)
+    daily_items = items_in_window(items_for_briefs, daily_start, now)
+
+    # Write homepage daily brief
+    write_summary_if_changed(
+        HOME_SUMMARY_PATH,
+        "Daily",
+        daily_start,
+        now,
+        daily_items
+    )
+
+    # Weekly / Monthly / Quarterly
+    weekly_start = now - timedelta(days=7)
+    monthly_start = now - timedelta(days=30)
+    quarterly_start = now - timedelta(days=90)
+
+    write_summary_if_changed(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly", weekly_start, now,
+                            items_in_window(items_for_briefs, weekly_start, now))
+    write_summary_if_changed(os.path.join(BRIEFS_DIR, "monthly.json"), "Monthly", monthly_start, now,
+                            items_in_window(items_for_briefs, monthly_start, now))
+    write_summary_if_changed(os.path.join(BRIEFS_DIR, "quarterly.json"), "Quarterly", quarterly_start, now,
+                            items_in_window(items_for_briefs, quarterly_start, now))
+
+    # Yearly YTD (current year)
+    y = now.year
+    ytd_start = datetime(y, 1, 1, tzinfo=timezone.utc)
+    ytd_items = items_in_window(items_for_briefs, ytd_start, now)
+    write_summary_if_changed(os.path.join(BRIEFS_DIR, "yearly_ytd.json"), f"Yearly YTD ({y})", ytd_start, now, ytd_items)
+
+    # Full 2025 summary (only if you have 2025 items in data/news.json)
+    y2025_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+    y2026_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    items_2025 = items_in_window(items_for_briefs, y2025_start, y2026_start)
+    if items_2025:
+        write_summary_if_changed(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025", y2025_start, y2026_start, items_2025)
+    else:
+        print("Year 2025: No 2025 items found in data/news.json (skipping year_2025.json).")
+
+    # Forecast rest of current year (watchlist based on recent 30 days)
+    recent_for_forecast = items_in_window(items_for_briefs, monthly_start, now)
+    write_forecast_if_changed(os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"), y, now, recent_for_forecast)
 
 
+# ===================== main =======================================
 def main():
     existing = load_existing(NEWS_JSON_PATH)
     if not isinstance(existing, list):
@@ -331,25 +404,22 @@ def main():
             if v["url"] not in by_url:
                 new_items.append(v)
 
-    print(f"Found {len(new_items)} new YouTube videos from CNN/Reuters/WSJ/FT matching your keywords.")
+    print(f"Found {len(new_items)} new YouTube videos (CNN/Reuters/WSJ/FT) matching keywords.")
 
     all_items = existing + new_items
-
-    # Keep consistent ordering in news.json
     all_items.sort(key=published_dt, reverse=True)
 
     save_json(NEWS_JSON_PATH, all_items)
-    print(f"Saved {len(all_items)} total items to {NEWS_JSON_PATH}")
+    print(f"Saved {len(all_items)} total items -> {NEWS_JSON_PATH}")
 
-    # Generate homepage summary (only if key present)
+    # Generate briefs only if OpenAI key is present
     try:
         if os.getenv(OPENAI_API_KEY_ENV, "").strip():
-            generate_home_summary(all_items)
+            generate_all_briefs(all_items)
         else:
-            print(f"Skipping homepage summary: env var {OPENAI_API_KEY_ENV} not set.")
+            print(f"Skipping briefs: env var {OPENAI_API_KEY_ENV} not set.")
     except Exception as e:
-        print(f"Homepage summary generation failed: {e}")
-
+        print(f"Brief generation failed: {e}")
 
 if __name__ == "__main__":
     main()
