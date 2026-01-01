@@ -128,11 +128,34 @@
       white-space: nowrap;
     }
 
+    /* New: nicer typography for rendered markdown */
     .brief-body{
       font-size: 14px;
       line-height: 1.55;
       color: #222;
-      white-space: pre-wrap; /* keep line breaks */
+    }
+
+    .brief-body .sec{
+      margin: 10px 0 6px;
+      font-weight: 700;
+      letter-spacing: .15px;
+    }
+
+    .brief-body p{
+      margin: 6px 0;
+    }
+
+    .brief-body ul{
+      margin: 6px 0 8px 18px;
+      padding: 0;
+    }
+
+    .brief-body li{
+      margin: 4px 0;
+    }
+
+    .brief-body .muted{
+      color: #6F675D;
     }
 
     .brief-note{
@@ -268,6 +291,63 @@
     document.getElementById('yr').textContent = new Date().getFullYear();
     window.__PTD__ = { endpoints: { recent: '/data/news.json' } };
 
+    // ---- Small safe renderer for our brief markdown (no external deps) ----
+    function escapeHtml(s){
+      return String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderBriefMarkdown(md){
+      const raw = (md || "").replace(/\r\n/g, "\n").trim();
+      if(!raw) return "<p class='muted'>No brief yet.</p>";
+
+      const lines = raw.split("\n");
+      let html = "";
+      let inList = false;
+
+      function closeList(){
+        if(inList){ html += "</ul>"; inList = false; }
+      }
+
+      for (let line of lines){
+        line = line.trim();
+
+        // blank line
+        if(!line){
+          closeList();
+          continue;
+        }
+
+        // bullets: "- " or "• "
+        const isBullet = line.startsWith("- ") || line.startsWith("• ");
+        if(isBullet){
+          if(!inList){ html += "<ul>"; inList = true; }
+          const item = line.replace(/^(- |• )/, "");
+          html += "<li>" + escapeHtml(item) + "</li>";
+          continue;
+        }
+
+        closeList();
+
+        // section headers like "A) Lead ..." or "B) Top themes ..."
+        const isSection = /^[A-G]\)\s+/.test(line);
+        if(isSection){
+          html += "<div class='sec'>" + escapeHtml(line) + "</div>";
+          continue;
+        }
+
+        // normal paragraph
+        html += "<p>" + escapeHtml(line) + "</p>";
+      }
+
+      closeList();
+      return html;
+    }
+
     // Load Daily Intelligence Brief from /data/home_summary.json
     (async function(){
       const updatedEl = document.getElementById("briefUpdated");
@@ -282,10 +362,11 @@
         updatedEl.textContent = "Updated: " + when;
 
         const md = (data.summary_md || "").trim();
-        bodyEl.textContent = md ? md : "No brief yet.";
+        bodyEl.innerHTML = renderBriefMarkdown(md);
       }catch(e){
         updatedEl.textContent = "Brief not available yet";
-        bodyEl.textContent = "Once /data/home_summary.json is published, the daily brief will appear here.";
+        bodyEl.innerHTML =
+          "<p class='muted'>Once <code>/data/home_summary.json</code> is published, the daily brief will appear here.</p>";
       }
     })();
   </script>
