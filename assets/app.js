@@ -1,10 +1,12 @@
-/* PTD Today — 2-column layout:
+/* PTD Today — 2-column layout (masonry by HEIGHT):
    Left: Videos then Articles continue immediately
    Right: Articles
-   Balanced by COUNT (not heights) to guarantee both columns are filled.
+   Articles are placed one-by-one into the currently shorter column,
+   so the right column never “runs out” (even when videos make the left taller).
 */
 (function(){
   const $  = (s, n=document)=>n.querySelector(s);
+  const $$ = (s, n=document)=>[...n.querySelectorAll(s)];
 
   const GRID          = $('#ptdGrid');
   const VIDEOS_EL     = $('#videos');
@@ -31,7 +33,7 @@
     catch { return ''; }
   }
 
-  // Only show thumbs for video on the homepage
+  // We only show thumbs for video on the homepage
   function bestImage(item){
     if (item.type === 'video' && item.image) return item.image;
     return '';
@@ -50,6 +52,7 @@
     const date      = (d && d.getTime() > now) ? new Date(now) : d;
     const score     = typeof raw.score==='number' ? raw.score : null;
 
+    // internal page
     const share = (raw.share && String(raw.share).trim())
       ? String(raw.share).trim()
       : `/article.html?u=${encodeURIComponent(url)}`;
@@ -164,25 +167,44 @@
     VIDEOS_EL.appendChild(frag);
   }
 
-  // ✅ Guaranteed fill: distribute by COUNT
-  // Start with RIGHT so it never ends up empty down the page.
-  function renderArticlesBalanced(articles){
+  // ✅ True fix: Masonry distribute by current rendered HEIGHT
+  function renderArticlesMasonry(articles){
     if (!ARTS_LEFT_EL || !ARTS_RIGHT_EL) return;
 
     ARTS_LEFT_EL.innerHTML = '';
     ARTS_RIGHT_EL.innerHTML = '';
 
-    const leftFrag = document.createDocumentFragment();
-    const rightFrag = document.createDocumentFragment();
+    // Important: LEFT column height includes VIDEOS section (above articlesLeft).
+    // We'll measure the column containers themselves, not just the article lists.
+    const leftCol  = ARTS_LEFT_EL.parentElement;   // .ptd-col (contains videos + articlesLeft)
+    const rightCol = ARTS_RIGHT_EL.parentElement;  // .ptd-col--right
 
-    for (let i = 0; i < articles.length; i++){
-      const node = buildCard(articles[i]);
-      if (i % 2 === 0) rightFrag.appendChild(node); // 0,2,4... -> RIGHT
-      else leftFrag.appendChild(node);              // 1,3,5... -> LEFT (after videos)
+    // If parent elements aren't found, fallback to alternating
+    const canMeasure = leftCol && rightCol && typeof leftCol.getBoundingClientRect === 'function';
+
+    const appendOne = (node) => {
+      if (!canMeasure){
+        // fallback
+        if (ARTS_RIGHT_EL.childElementCount <= ARTS_LEFT_EL.childElementCount) ARTS_RIGHT_EL.appendChild(node);
+        else ARTS_LEFT_EL.appendChild(node);
+        return;
+      }
+
+      // Force a reflow-friendly measurement:
+      // Put the next card into whichever column is currently shorter.
+      const leftH  = leftCol.getBoundingClientRect().height;
+      const rightH = rightCol.getBoundingClientRect().height;
+
+      if (rightH <= leftH) ARTS_RIGHT_EL.appendChild(node);
+      else ARTS_LEFT_EL.appendChild(node);
+    };
+
+    // Build + append progressively so height decisions are real.
+    // This is slightly more work but fixes your exact “right column empty” issue.
+    for (const a of articles){
+      const node = buildCard(a);
+      appendOne(node);
     }
-
-    ARTS_RIGHT_EL.appendChild(rightFrag);
-    ARTS_LEFT_EL.appendChild(leftFrag);
   }
 
   (async function boot(){
@@ -226,9 +248,12 @@
     const hasNewLayout = VIDEOS_EL && ARTS_LEFT_EL && ARTS_RIGHT_EL;
     if (hasNewLayout){
       renderVideos(videos);
-      renderArticlesBalanced(articles);
 
-      if (GRID) GRID.setAttribute('aria-busy','false');
+      // Wait one frame so video heights are in the DOM before masonry placement
+      requestAnimationFrame(() => {
+        renderArticlesMasonry(articles);
+        if (GRID) GRID.setAttribute('aria-busy','false');
+      });
       return;
     }
 
