@@ -18,32 +18,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      # --- Python for homepage + briefs generation ---
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Generate homepage + period briefs (Python)
+      # You can keep npm if you like, but it’s not required.
+      # We'll just call the python script directly (simpler + faster).
+      - name: Generate briefs (Python)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PTD_OPENAI_MODEL: gpt-4.1-mini
         run: |
           python3 augment_news_youtube_only.py
-
-      # --- Node (keep if you still want ai_news.json + ai/*.html generation) ---
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Install deps
-        run: npm install
-
-      - name: Generate AI Desk briefs (Node)
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npm run generate:ai
 
       - name: Commit & push changes
         run: |
@@ -53,9 +40,7 @@ jobs:
           git add \
             data/news.json \
             data/home_summary.json \
-            data/briefs/*.json \
-            data/ai_news.json \
-            ai/*.html || true
+            data/briefs/*.json || true
 
           git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
           git push
