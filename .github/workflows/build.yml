@@ -5,11 +5,6 @@ on:
   schedule:
     - cron: "0 */2 * * *" # every 2 hours UTC
 
-# 🔒 Prevent concurrent runs pushing at the same time
-concurrency:
-  group: ptd-build
-  cancel-in-progress: true
-
 permissions:
   contents: write
 
@@ -18,16 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # IMPORTANT: full history required for safe pushes
           fetch-depth: 0
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      # 🔒 Always reset to remote main to avoid conflicts
+      - name: Reset to origin/main
+        run: |
+          git fetch origin
+          git reset --hard origin/main
 
       - name: Build site data & short pages
         run: node scripts/build.mjs
@@ -37,11 +37,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage changes
           git add data s
 
-          # Commit only if there are changes
-          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
 
-          # Push safely
+          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+
           git push origin main
