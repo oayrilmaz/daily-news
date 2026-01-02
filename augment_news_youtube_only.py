@@ -4,6 +4,11 @@
 #    from CNN / Reuters / WSJ / FT (VIDEO items only)
 # 2) Generates multiple “brief” JSON files (daily/weekly/monthly/quarterly/YTD/2025/forecast)
 #    using ONLY headline + metadata from data/news.json (no invention, no external knowledge).
+#
+# IMPORTANT:
+# - This version ALWAYS writes the brief JSON files (even if there are no items yet),
+#   so your /briefs page never hits 404 or “not available”.
+# - If OpenAI fails or the key is missing, it writes placeholders instead of skipping.
 
 import json
 import os
@@ -23,6 +28,7 @@ HOME_SUMMARY_PATH = "data/home_summary.json"
 # All other briefs go here
 BRIEFS_DIR = "data/briefs"
 
+
 # ------------------------ YouTube feeds ----------------------------
 YOUTUBE_CHANNELS = [
     ("https://www.youtube.com/feeds/videos.xml?channel_id=UCupvZG-5ko_eiXAupbDfxWw", "CNN"),
@@ -37,6 +43,7 @@ KEYWORDS = [
     "data center", "datacenter", "cloud", "ai", "chips",
     "semiconductor", "nvidia", "rare earth"
 ]
+
 
 # ------------------------ OpenAI -----------------------------------
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
@@ -278,19 +285,55 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
 
 
 def generate_brief_file(path, label, items, mode="brief"):
-    if not items:
-        print(f"{label}: no items (skipping).")
-        return False
+    """
+    ALWAYS writes a JSON file so the website never shows 404 / missing.
+    - If there are no items => write a placeholder brief.
+    - If OpenAI errors => write a fallback placeholder (but still save the file).
+    """
 
-    fp = compute_fingerprint(items, label)
+    # Always compute fingerprint (even if empty)
+    fp = compute_fingerprint(items or [], label)
 
     existing = load_json(path, default=None)
     if isinstance(existing, dict) and existing.get("fingerprint") == fp:
         print(f"{label}: unchanged (fingerprint match).")
         return False
 
-    prompt = build_prompt(label, items, mode=mode)
-    summary_md = openai_call_responses(prompt)
+    # Placeholder if no items
+    if not items:
+        payload = {
+            "updated_at": now_utc_iso(),
+            "label": label,
+            "fingerprint": fp,
+            "summary_md": (
+                "• Not enough items in this time window yet.\n"
+                "• This brief will auto-populate as new headlines arrive."
+            )
+        }
+        save_json(path, payload)
+        print(f"Saved {label} placeholder -> {path}")
+        return True
+
+    # Try OpenAI; if it fails, save fallback placeholder
+    try:
+        prompt = build_prompt(label, items, mode=mode)
+        summary_md = openai_call_responses(prompt)
+        if not (summary_md or "").strip():
+            raise RuntimeError("Empty AI output")
+    except Exception as e:
+        payload = {
+            "updated_at": now_utc_iso(),
+            "label": label,
+            "fingerprint": fp,
+            "summary_md": (
+                "• Brief generation failed in this run.\n"
+                f"• Reason: {type(e).__name__}\n"
+                "• The next scheduled run will try again."
+            )
+        }
+        save_json(path, payload)
+        print(f"Saved {label} fallback (OpenAI error) -> {path} ({e})")
+        return True
 
     payload = {
         "updated_at": now_utc_iso(),
@@ -304,7 +347,7 @@ def generate_brief_file(path, label, items, mode="brief"):
 
 
 def generate_all_briefs(all_items):
-    items = list(all_items)
+    items = list(all_items or [])
     items.sort(key=published_dt, reverse=True)
 
     now = now_utc()
@@ -392,12 +435,13 @@ def main():
     save_json(NEWS_JSON_PATH, all_items)
     print(f"Saved {len(all_items)} total items to {NEWS_JSON_PATH}")
 
-    # Generate briefs (only if OPENAI_API_KEY is set)
+    # ALWAYS write the brief JSON files:
+    # - If OPENAI_API_KEY exists -> AI content
+    # - If missing -> placeholders (still produces the files so the website never 404s)
     try:
-        if os.getenv(OPENAI_API_KEY_ENV, "").strip():
-            generate_all_briefs(all_items)
-        else:
-            print(f"Skipping briefs: env var {OPENAI_API_KEY_ENV} not set.")
+        generate_all_briefs(all_items)
+        if not os.getenv(OPENAI_API_KEY_ENV, "").strip():
+            print(f"Note: {OPENAI_API_KEY_ENV} not set; briefs may be placeholders.")
     except Exception as e:
         print(f"Brief generation failed: {e}")
 
