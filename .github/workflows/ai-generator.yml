@@ -31,10 +31,14 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npm run generate:ai
 
-      - name: Commit & push changes
+            - name: Commit & push changes
         run: |
           git config user.name "ptd-ai-bot"
           git config user.email "bot@ptdtoday.com"
-          git add data/news.json data/ai_news.json data/home_summary.json data/briefs/*.json ai/*.html
-          git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
+
+          git add data/news.json data/ai_news.json data/home_summary.json data/briefs/*.json ai/*.html || true
+
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          git commit -m "AI: auto-generate briefs"
           git push
