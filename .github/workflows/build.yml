@@ -8,43 +8,46 @@ on:
 permissions:
   contents: write
 
+# Prevent two runs from pushing at the same time
 concurrency:
-  group: build-ptd-today
+  group: ptdtoday-build
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # IMPORTANT: fetch full history so rebase works reliably
           fetch-depth: 0
-          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: Build site data & short pages
-        run: node scripts/build.mjs
-
-      # Only commit/push when this workflow runs on main (schedule/manual).
-      # This avoids trying to push on PR runs.
-      - name: Commit updated data and short pages
-        if: github.ref == 'refs/heads/main'
+      # Pull FIRST so we build on top of latest main
+      - name: Sync with main
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase --autostash origin main
 
-          git pull --rebase origin main
+      - name: Build site data & short pages
+        run: node scripts/build.mjs
 
+      - name: Commit updated data and short pages
+        run: |
+          # Stage changes
           git add data s
-          git status
 
-          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes"
+          # Commit only if there are changes
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
 
+          # Rebase again in case another run pushed while we were building
+          git pull --rebase --autostash origin main
+
+          # Push
           git push origin main
