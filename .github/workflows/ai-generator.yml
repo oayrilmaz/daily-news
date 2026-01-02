@@ -2,15 +2,11 @@ name: PTD AI Generator
 
 on:
   schedule:
-    - cron: "0 */2 * * *"   # every 2 hours (UTC)
+    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
-
-concurrency:
-  group: ptd-ai-generator
-  cancel-in-progress: true
 
 jobs:
   generate:
@@ -27,25 +23,24 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Generate briefs (Python)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Generate news + briefs
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PTD_OPENAI_MODEL: gpt-4.1-mini
         run: |
-          python3 augment_news_youtube_only.py
-          echo "---- DEBUG: list data/briefs ----"
-          ls -la data/briefs || true
-          echo "---- DEBUG: git status ----"
-          git status --porcelain
+          python augment_news_youtube_only.py
 
-            - name: Commit & push changes
+      - name: Commit & push changes
         run: |
           git config user.name "ptd-ai-bot"
           git config user.email "bot@ptdtoday.com"
 
           git add \
             data/news.json \
-            data/news_archive.json \
             data/home_summary.json \
             data/briefs/*.json || true
 
