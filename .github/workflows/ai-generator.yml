@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: ptd-ai-generator
+  cancel-in-progress: true
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -23,24 +27,27 @@ jobs:
         with:
           python-version: "3.11"
 
-      # You can keep npm if you like, but it’s not required.
-      # We'll just call the python script directly (simpler + faster).
       - name: Generate briefs (Python)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PTD_OPENAI_MODEL: gpt-4.1-mini
         run: |
           python3 augment_news_youtube_only.py
+          echo "---- DEBUG: list data/briefs ----"
+          ls -la data/briefs || true
+          echo "---- DEBUG: git status ----"
+          git status --porcelain
 
       - name: Commit & push changes
         run: |
           git config user.name "ptd-ai-bot"
           git config user.email "bot@ptdtoday.com"
 
-          git add \
-            data/news.json \
-            data/home_summary.json \
-            data/briefs/*.json || true
+          # Always stage the directory (so changes are picked up)
+          git add data/news.json data/home_summary.json data/briefs || true
 
           git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
+
+          # Pull/rebase to avoid occasional non-fast-forward errors
+          git pull --rebase origin main || true
           git push
