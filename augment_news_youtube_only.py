@@ -16,8 +16,12 @@ import xml.etree.ElementTree as ET
 
 # ------------------------ Paths ------------------------------------
 NEWS_JSON_PATH = "data/news.json"
-HOME_SUMMARY_PATH = "data/home_summary.json"         # keep for daily (homepage default)
-BRIEFS_DIR = "data/briefs"                           # new folder for all other briefs
+
+# Homepage reads THIS (keep it)
+HOME_SUMMARY_PATH = "data/home_summary.json"
+
+# All other briefs go here
+BRIEFS_DIR = "data/briefs"
 
 # ------------------------ YouTube feeds ----------------------------
 YOUTUBE_CHANNELS = [
@@ -39,6 +43,7 @@ OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_MODEL = os.getenv("PTD_OPENAI_MODEL", "gpt-4.1-mini")
 
 
+# ------------------------ Helpers ----------------------------------
 def now_utc():
     return datetime.now(timezone.utc)
 
@@ -70,6 +75,58 @@ def fetch(url: str):
     except URLError:
         return None
 
+def load_json(path, default):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+def save_json(path, obj):
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
+
+def compute_fingerprint(items, label, max_items=120):
+    compact = []
+    for it in items[:max_items]:
+        if not isinstance(it, dict):
+            continue
+        compact.append({
+            "title": it.get("title",""),
+            "publisher": it.get("publisher",""),
+            "category": it.get("category",""),
+            "published": it.get("published",""),
+            "type": it.get("type",""),
+            "url": it.get("url","")
+        })
+    raw = json.dumps({"label": label, "items": compact}, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+def filter_range(items, start_dt, end_dt):
+    out = []
+    for it in items:
+        dt = published_dt(it)
+        if dt == datetime.min.replace(tzinfo=timezone.utc):
+            continue
+        if start_dt <= dt < end_dt:
+            out.append(it)
+    return out
+
+def quarter_start(dt):
+    q = ((dt.month - 1) // 3) * 3 + 1
+    return datetime(dt.year, q, 1, tzinfo=timezone.utc)
+
+def year_start(dt):
+    return datetime(dt.year, 1, 1, tzinfo=timezone.utc)
+
+def month_start(dt):
+    return datetime(dt.year, dt.month, 1, tzinfo=timezone.utc)
+
+
+# ------------------------ YouTube parsing ---------------------------
 def parse_youtube_feed(xml_bytes, publisher):
     if not xml_bytes:
         return []
@@ -120,34 +177,8 @@ def parse_youtube_feed(xml_bytes, publisher):
 
     return videos
 
-def load_existing(path):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return [] if path.endswith(".json") else None
 
-def save_json(path, obj):
-    os.makedirs(os.path.dirname(path), exist_ok=True) if os.path.dirname(path) else None
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-
-def compute_fingerprint(items, label, max_items=120):
-    compact = []
-    for it in items[:max_items]:
-        if not isinstance(it, dict):
-            continue
-        compact.append({
-            "title": it.get("title",""),
-            "publisher": it.get("publisher",""),
-            "category": it.get("category",""),
-            "published": it.get("published",""),
-            "type": it.get("type",""),
-            "url": it.get("url","")
-        })
-    raw = json.dumps({"label": label, "items": compact}, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
+# ------------------------ OpenAI call ------------------------------
 def openai_call_responses(prompt_text: str) -> str:
     key = os.getenv(OPENAI_API_KEY_ENV, "").strip()
     if not key:
@@ -158,8 +189,10 @@ def openai_call_responses(prompt_text: str) -> str:
         "model": OPENAI_MODEL,
         "input": [
             {"role": "system", "content":
-                "You are PTD Today’s editorial analyst. Use ONLY the provided feed items (headline + metadata). "
-                "Do NOT invent facts. Do NOT use external knowledge. Do NOT quote article text. "
+                "You are PTD Today’s editorial analyst.\n"
+                "Use ONLY the provided feed items (headline + metadata).\n"
+                "Do NOT invent facts. Do NOT use external knowledge.\n"
+                "Do NOT quote article text.\n"
                 "Be concise, professional, and structured."
             },
             {"role": "user", "content": prompt_text}
@@ -192,8 +225,8 @@ def openai_call_responses(prompt_text: str) -> str:
                 texts.append(c.get("text", ""))
     return "\n".join(texts).strip()
 
-def build_prompt(label: str, feed_items):
-    # Keep only what we show on cards (headline metadata)
+
+def build_prompt(label: str, feed_items, mode: str = "brief"):
     compact = []
     for it in feed_items[:120]:
         if not isinstance(it, dict):
@@ -208,6 +241,25 @@ def build_prompt(label: str, feed_items):
             "url": it.get("url", "")
         })
 
+    if mode == "forecast":
+        return (
+            f"Create a PTD Today “{label}” based ONLY on the feed items below.\n\n"
+            "This is NOT a prediction. It is a forward-looking WATCHLIST inferred from headline signals.\n"
+            "You only have headline + metadata. No external knowledge.\n\n"
+            "Output format (markdown):\n"
+            "1) Themes likely to stay active (max 6 bullets) — phrase as watch items, not facts\n"
+            "2) What to monitor next (Grid / Renewables / Data Centers & AI) — 2 bullets each if relevant\n"
+            "3) Regions / companies appearing repeatedly (only if visible from headlines)\n"
+            "4) Risks / constraints implied by headlines (max 5 bullets)\n\n"
+            "Rules:\n"
+            "- Use ONLY provided items. No guessing about outcomes.\n"
+            "- Do NOT state future events as facts.\n"
+            "- If uncertain, say: “Not enough information in the headline.”\n\n"
+            "Feed items (JSON):\n"
+            f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
+        )
+
+    # normal brief
     return (
         f"Create a PTD Today “{label} Intelligence Brief” from the feed items below.\n\n"
         "You only have: headline + publisher + category + timestamp + score + type + url.\n\n"
@@ -224,35 +276,20 @@ def build_prompt(label: str, feed_items):
         f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
     )
 
-def filter_range(items, start_dt, end_dt):
-    out = []
-    for it in items:
-        dt = published_dt(it)
-        if dt == datetime.min.replace(tzinfo=timezone.utc):
-            continue
-        if start_dt <= dt < end_dt:
-            out.append(it)
-    return out
 
-def quarter_start(dt):
-    q = ((dt.month - 1) // 3) * 3 + 1
-    return datetime(dt.year, q, 1, tzinfo=timezone.utc)
-
-def year_start(dt):
-    return datetime(dt.year, 1, 1, tzinfo=timezone.utc)
-
-def generate_brief_file(path, label, items):
+def generate_brief_file(path, label, items, mode="brief"):
     if not items:
+        print(f"{label}: no items (skipping).")
         return False
 
     fp = compute_fingerprint(items, label)
 
-    existing = load_existing(path)
+    existing = load_json(path, default=None)
     if isinstance(existing, dict) and existing.get("fingerprint") == fp:
         print(f"{label}: unchanged (fingerprint match).")
         return False
 
-    prompt = build_prompt(label, items)
+    prompt = build_prompt(label, items, mode=mode)
     summary_md = openai_call_responses(prompt)
 
     payload = {
@@ -262,59 +299,77 @@ def generate_brief_file(path, label, items):
         "summary_md": summary_md
     }
     save_json(path, payload)
-    print(f"Saved {label} brief -> {path}")
+    print(f"Saved {label} -> {path}")
     return True
 
+
 def generate_all_briefs(all_items):
-    # Sort newest first
     items = list(all_items)
     items.sort(key=published_dt, reverse=True)
 
     now = now_utc()
 
-    # Define time windows
-    daily_start = now - timedelta(days=1)
-    weekly_start = now - timedelta(days=7)
-    monthly_start = now - timedelta(days=30)
+    # Match homepage feed logic: last 60 hours
+    homepage_window_start = now - timedelta(hours=60)
 
+    # True daily: last 24 hours
+    daily_24h_start = now - timedelta(hours=24)
+
+    # Weekly rolling
+    weekly_start = now - timedelta(days=7)
+
+    # Rolling 30d
+    last30_start = now - timedelta(days=30)
+
+    # Calendar periods
+    m_start = month_start(now)
     q_start = quarter_start(now)
     y_start = year_start(now)
 
-    # 2025 full year window
+    # 2025 full year
     y2025_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
     y2026_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    # Forecast (headlines only): use last 30 days to create “forward watchlist”
-    forecast_window = filter_range(items, monthly_start, now)
-
-    daily_items = filter_range(items, daily_start, now)
+    # Filter windows
+    homepage_items = filter_range(items, homepage_window_start, now)
+    daily_items = filter_range(items, daily_24h_start, now)
     weekly_items = filter_range(items, weekly_start, now)
-    monthly_items = filter_range(items, monthly_start, now)
-    quarterly_items = filter_range(items, q_start, now)
+    last30_items = filter_range(items, last30_start, now)
+
+    mtd_items = filter_range(items, m_start, now)
+    qtd_items = filter_range(items, q_start, now)
     ytd_items = filter_range(items, y_start, now)
+
     y2025_items = filter_range(items, y2025_start, y2026_start)
 
-    # Ensure output folder exists
     os.makedirs(BRIEFS_DIR, exist_ok=True)
 
-    # Daily brief remains at home_summary.json (your homepage reads it already)
-    generate_brief_file(HOME_SUMMARY_PATH, "Daily", daily_items)
+    # Homepage (reads this already)
+    generate_brief_file(HOME_SUMMARY_PATH, "Daily (Homepage • last 60 hours)", homepage_items)
 
-    # Other periods
-    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly", weekly_items)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly.json"), "Monthly (last 30 days)", monthly_items)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly.json"), "Quarter-to-date", quarterly_items)
+    # Other briefs
+    generate_brief_file(os.path.join(BRIEFS_DIR, "daily.json"), "Daily (last 24 hours)", daily_items)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly (last 7 days)", weekly_items)
+
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_mtd.json"), "Monthly (Month-to-date)", mtd_items)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_30d.json"), "Monthly (last 30 days)", last30_items)
+
+    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly_qtd.json"), "Quarter-to-date", qtd_items)
     generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items)
+
     generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items)
 
-    # Forecast: prompt uses last 30 days but asks for “watchlist”
-    # (still allowed because it’s based on headline signals, not real predictions)
-    if forecast_window:
-        label = "Forecast / Watchlist (based on last 30 days headlines)"
-        generate_brief_file(os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"), label, forecast_window)
+    # Forecast/watchlist based on last 30 days headline signals
+    generate_brief_file(
+        os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"),
+        "Forward Watchlist (rest of year • headline signals from last 30 days)",
+        last30_items,
+        mode="forecast"
+    )
+
 
 def main():
-    existing = load_existing(NEWS_JSON_PATH)
+    existing = load_json(NEWS_JSON_PATH, default=[])
     if not isinstance(existing, list):
         existing = []
 
@@ -345,6 +400,7 @@ def main():
             print(f"Skipping briefs: env var {OPENAI_API_KEY_ENV} not set.")
     except Exception as e:
         print(f"Brief generation failed: {e}")
+
 
 if __name__ == "__main__":
     main()
