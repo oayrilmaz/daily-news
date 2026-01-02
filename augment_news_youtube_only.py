@@ -5,23 +5,23 @@
 # 2) Maintains a rolling archive at data/news_archive.json (so weekly/monthly/quarterly can exist)
 # 3) Generates multiple “brief” JSON files (daily/weekly/monthly/quarterly/YTD/2025/forecast)
 #    using ONLY headline + metadata from the archive (no invention, no external knowledge).
-# 4) ALWAYS writes brief files (creates stubs if not enough items / no API key).
+# 4) ALWAYS writes brief files (creates stubs if not enough items / no API key / API failure).
 
 import json
 import os
 import hashlib
 from datetime import datetime, timezone, timedelta
 from urllib.request import urlopen, Request
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 import xml.etree.ElementTree as ET
 
 
 # ------------------------ Paths ------------------------------------
 NEWS_JSON_PATH = "data/news.json"                    # your site uses this for cards
-ARCHIVE_JSON_PATH = "data/news_archive.json"         # permanent history for briefs
+ARCHIVE_JSON_PATH = "data/news_archive.json"         # rolling history for briefs
 
 HOME_SUMMARY_PATH = "data/home_summary.json"         # homepage brief reads this
-BRIEFS_DIR = "data/briefs"                           # weekly/monthly/quarterly/ytd/year/forecast
+BRIEFS_DIR = "data/briefs"                           # brief json files live here
 
 
 # ------------------------ YouTube feeds ----------------------------
@@ -61,7 +61,7 @@ def parse_iso(dt_str: str) -> str:
 
 def published_dt(item):
     try:
-        return datetime.fromisoformat(item.get("published", "").replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat((item.get("published", "") or "").replace("Z", "+00:00")).astimezone(timezone.utc)
     except Exception:
         return datetime.min.replace(tzinfo=timezone.utc)
 
@@ -70,11 +70,12 @@ def has_keyword(text: str) -> bool:
     return any(k in t for k in KEYWORDS)
 
 def fetch(url: str):
+    # YouTube sometimes blocks "default" clients; use a browser UA and handle non-XML safely.
     try:
-        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urlopen(req, timeout=12) as resp:
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (PTDTodayBot/1.0)"})
+        with urlopen(req, timeout=15) as resp:
             return resp.read()
-    except URLError:
+    except (URLError, HTTPError):
         return None
     except Exception:
         return None
@@ -99,12 +100,12 @@ def compute_fingerprint(items, label, max_items=120):
         if not isinstance(it, dict):
             continue
         compact.append({
-            "title": it.get("title",""),
-            "publisher": it.get("publisher",""),
-            "category": it.get("category",""),
-            "published": it.get("published",""),
-            "type": it.get("type",""),
-            "url": it.get("url","")
+            "title": it.get("title", ""),
+            "publisher": it.get("publisher", ""),
+            "category": it.get("category", ""),
+            "published": it.get("published", ""),
+            "type": it.get("type", ""),
+            "url": it.get("url", "")
         })
     raw = json.dumps({"label": label, "items": compact}, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -119,6 +120,9 @@ def filter_range(items, start_dt, end_dt):
             out.append(it)
     return out
 
+def month_start(dt):
+    return datetime(dt.year, dt.month, 1, tzinfo=timezone.utc)
+
 def quarter_start(dt):
     q = ((dt.month - 1) // 3) * 3 + 1
     return datetime(dt.year, q, 1, tzinfo=timezone.utc)
@@ -132,12 +136,18 @@ def parse_youtube_feed(xml_bytes, publisher):
     if not xml_bytes:
         return []
 
+    # IMPORTANT: protect against invalid XML so Actions doesn't fail
+    try:
+        root = ET.fromstring(xml_bytes)
+    except Exception:
+        return []
+
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
         "yt": "http://www.youtube.com/xml/schemas/2015",
         "media": "http://search.yahoo.com/mrss/"
     }
-    root = ET.fromstring(xml_bytes)
+
     videos = []
 
     for entry in root.findall("atom:entry", ns):
@@ -225,6 +235,7 @@ def openai_call_responses(prompt_text: str) -> str:
                 texts.append(c.get("text", ""))
     return "\n".join(texts).strip()
 
+
 def build_prompt(label: str, feed_items, mode: str = "brief"):
     compact = []
     for it in feed_items[:120]:
@@ -274,6 +285,7 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
         f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
     )
 
+
 def write_stub(path, label, reason):
     payload = {
         "updated_at": now_utc_iso(),
@@ -284,8 +296,15 @@ def write_stub(path, label, reason):
     save_json(path, payload)
     print(f"Wrote STUB -> {path}")
 
+
 def generate_brief_file(path, label, items, mode="brief"):
-    # ALWAYS create the file (real or stub)
+    """
+    ALWAYS creates the file:
+      - if no items -> stub
+      - if no API key -> stub
+      - if OpenAI fails -> stub
+      - else -> real brief
+    """
     key_present = bool(os.getenv(OPENAI_API_KEY_ENV, "").strip())
 
     if not items:
@@ -318,97 +337,114 @@ def generate_brief_file(path, label, items, mode="brief"):
         write_stub(path, label, f"Brief generation failed: {e}")
         return False
 
+
 def generate_all_briefs(archive_items):
     items = list(archive_items)
     items.sort(key=published_dt, reverse=True)
 
     now = now_utc()
 
+    # windows
+    homepage_start = now - timedelta(hours=60)   # homepage expectation (last 60h)
     daily_start = now - timedelta(hours=24)
     weekly_start = now - timedelta(days=7)
-    monthly_start = now - timedelta(days=30)
+    last30_start = now - timedelta(days=30)
 
+    # calendar periods
+    m_start = month_start(now)
     q_start = quarter_start(now)
     y_start = year_start(now)
 
+    # year slices
     y2025_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
     y2026_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
+    # filtered sets
+    homepage_items = filter_range(items, homepage_start, now)
     daily_items = filter_range(items, daily_start, now)
     weekly_items = filter_range(items, weekly_start, now)
-    monthly_items = filter_range(items, monthly_start, now)
-    quarterly_items = filter_range(items, q_start, now)
+    last30_items = filter_range(items, last30_start, now)
+
+    mtd_items = filter_range(items, m_start, now)
+    qtd_items = filter_range(items, q_start, now)
     ytd_items = filter_range(items, y_start, now)
     y2025_items = filter_range(items, y2025_start, y2026_start)
 
     os.makedirs(BRIEFS_DIR, exist_ok=True)
 
-    # Homepage brief
-    generate_brief_file(HOME_SUMMARY_PATH, "Daily", daily_items, mode="brief")
+    # Homepage brief file
+    generate_brief_file(HOME_SUMMARY_PATH, "Daily (Homepage • last 60 hours)", homepage_items, mode="brief")
 
-    # Briefs page expects these exact filenames:
-    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly", weekly_items, mode="brief")
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly.json"), "Monthly (last 30 days)", monthly_items, mode="brief")
-    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly.json"), "Quarter-to-date", quarterly_items, mode="brief")
+    # Briefs page expects these exact filenames (your requested list)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "daily.json"), "Daily (last 24 hours)", daily_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly (last 7 days)", weekly_items, mode="brief")
+
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_mtd.json"), "Monthly (Month-to-date)", mtd_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_30d.json"), "Monthly (last 30 days)", last30_items, mode="brief")
+
+    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly_qtd.json"), "Quarter-to-date", qtd_items, mode="brief")
     generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items, mode="brief")
+
     generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items, mode="brief")
 
     generate_brief_file(
         os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"),
-        "Forecast / Watchlist (headline signals from last 30 days)",
-        monthly_items,
+        "Forward Watchlist (rest of year • headline signals from last 30 days)",
+        last30_items,
         mode="forecast"
     )
 
+
 def main():
-    # Load current site feed (may be short / overwritten by other scripts)
+    # Load current site feed (cards)
     news_items = load_json(NEWS_JSON_PATH, default=[])
     if not isinstance(news_items, list):
         news_items = []
 
-    # Load archive (persistent)
+    # Load archive (persistent / rolling)
     archive_items = load_json(ARCHIVE_JSON_PATH, default=[])
     if not isinstance(archive_items, list):
         archive_items = []
 
-    # Build URL indexes for dedupe
-    archive_by_url = {it.get("url"): it for it in archive_items if isinstance(it, dict) and it.get("url")}
+    # URL dedupe maps
     news_by_url = {it.get("url"): it for it in news_items if isinstance(it, dict) and it.get("url")}
+    archive_by_url = {it.get("url"): it for it in archive_items if isinstance(it, dict) and it.get("url")}
 
-    # Fetch new YouTube videos and add to BOTH news.json and archive.json
+    # Fetch new YouTube videos
     new_items = []
     for feed_url, pub in YOUTUBE_CHANNELS:
         xml_bytes = fetch(feed_url)
         videos = parse_youtube_feed(xml_bytes, pub)
         for v in videos:
             u = v.get("url")
-            if u and (u not in archive_by_url) and (u not in news_by_url):
+            if not u:
+                continue
+            if (u not in news_by_url) and (u not in archive_by_url):
                 new_items.append(v)
 
     print(f"Found {len(new_items)} new YouTube videos matching keywords.")
 
-    # Update news.json (site feed)
+    # Update news.json (cards)
     updated_news = list(news_items) + new_items
     updated_news.sort(key=published_dt, reverse=True)
     save_json(NEWS_JSON_PATH, updated_news)
     print(f"Saved {len(updated_news)} items to {NEWS_JSON_PATH}")
 
-    # Update archive.json (persistent history)
-    updated_archive = list(archive_items)
-    for v in new_items:
-        updated_archive.append(v)
+    # Update archive.json (rolling history)
+    updated_archive = list(archive_items) + new_items
 
-    # Optional: keep archive from growing forever (e.g., last 365 days)
-    # Comment out if you want infinite history.
+    # Keep archive from growing forever: last 365 days
     cutoff = now_utc() - timedelta(days=365)
     updated_archive = [it for it in updated_archive if published_dt(it) >= cutoff]
 
+    # Sort + save
     updated_archive.sort(key=published_dt, reverse=True)
     save_json(ARCHIVE_JSON_PATH, updated_archive)
     print(f"Saved {len(updated_archive)} items to {ARCHIVE_JSON_PATH}")
 
-    # Generate briefs from ARCHIVE (not from news.json)
+    # Generate briefs from ARCHIVE (always writes files)
     generate_all_briefs(updated_archive)
+
 
 if __name__ == "__main__":
     main()
