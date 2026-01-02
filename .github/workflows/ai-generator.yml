@@ -3,7 +3,7 @@ name: PTD AI Generator
 on:
   schedule:
     - cron: "0 */2 * * *"   # every 2 hours (UTC)
-  workflow_dispatch:        # adds a "Run workflow" button
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,6 +18,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # --- Python for homepage + briefs generation ---
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate homepage + period briefs (Python)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PTD_OPENAI_MODEL: gpt-4.1-mini
+        run: |
+          python3 augment_news_youtube_only.py
+
+      # --- Node (keep if you still want ai_news.json + ai/*.html generation) ---
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -26,7 +40,7 @@ jobs:
       - name: Install deps
         run: npm install
 
-      - name: Generate AI briefs
+      - name: Generate AI Desk briefs (Node)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: npm run generate:ai
@@ -36,17 +50,12 @@ jobs:
           git config user.name "ptd-ai-bot"
           git config user.email "bot@ptdtoday.com"
 
-          # Stage everything your generators may touch
           git add \
             data/news.json \
-            data/ai_news.json \
             data/home_summary.json \
             data/briefs/*.json \
-            ai/*.html \
-            || true
+            data/ai_news.json \
+            ai/*.html || true
 
-          # If nothing changed, exit cleanly (prevents red failure)
-          git diff --cached --quiet && echo "No changes to commit" && exit 0
-
-          git commit -m "AI: auto-generate briefs"
+          git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
           git push
