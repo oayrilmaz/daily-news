@@ -2,13 +2,10 @@
 #
 # 1) Expands data/news.json with YouTube videos related to energy / grid / AI / data centers
 #    from CNN / Reuters / WSJ / FT (VIDEO items only)
-# 2) Generates multiple “brief” JSON files (daily/weekly/monthly/quarterly/YTD/2025/forecast)
-#    using ONLY headline + metadata from data/news.json (no invention, no external knowledge).
-#
-# IMPORTANT:
-# - This version ALWAYS writes the brief JSON files (even if there are no items yet),
-#   so your /briefs page never hits 404 or “not available”.
-# - If OpenAI fails or the key is missing, it writes placeholders instead of skipping.
+# 2) Maintains a rolling archive at data/news_archive.json (so weekly/monthly/quarterly can exist)
+# 3) Generates multiple “brief” JSON files (daily/weekly/monthly/quarterly/YTD/2025/forecast)
+#    using ONLY headline + metadata from the archive (no invention, no external knowledge).
+# 4) ALWAYS writes brief files (creates stubs if not enough items / no API key).
 
 import json
 import os
@@ -20,13 +17,11 @@ import xml.etree.ElementTree as ET
 
 
 # ------------------------ Paths ------------------------------------
-NEWS_JSON_PATH = "data/news.json"
+NEWS_JSON_PATH = "data/news.json"                    # your site uses this for cards
+ARCHIVE_JSON_PATH = "data/news_archive.json"         # permanent history for briefs
 
-# Homepage reads THIS (keep it)
-HOME_SUMMARY_PATH = "data/home_summary.json"
-
-# All other briefs go here
-BRIEFS_DIR = "data/briefs"
+HOME_SUMMARY_PATH = "data/home_summary.json"         # homepage brief reads this
+BRIEFS_DIR = "data/briefs"                           # weekly/monthly/quarterly/ytd/year/forecast
 
 
 # ------------------------ YouTube feeds ----------------------------
@@ -58,16 +53,15 @@ def now_utc_iso():
     return now_utc().isoformat().replace("+00:00", "Z")
 
 def parse_iso(dt_str: str) -> str:
-    """Normalize RFC3339-ish string into YYYY-MM-DDTHH:MM:SSZ."""
     try:
-        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat((dt_str or "").replace("Z", "+00:00"))
     except Exception:
         dt = now_utc()
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 def published_dt(item):
     try:
-        return datetime.fromisoformat(item["published"].replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(item.get("published", "").replace("Z", "+00:00")).astimezone(timezone.utc)
     except Exception:
         return datetime.min.replace(tzinfo=timezone.utc)
 
@@ -77,9 +71,12 @@ def has_keyword(text: str) -> bool:
 
 def fetch(url: str):
     try:
-        with urlopen(url, timeout=10) as resp:
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=12) as resp:
             return resp.read()
     except URLError:
+        return None
+    except Exception:
         return None
 
 def load_json(path, default):
@@ -129,9 +126,6 @@ def quarter_start(dt):
 def year_start(dt):
     return datetime(dt.year, 1, 1, tzinfo=timezone.utc)
 
-def month_start(dt):
-    return datetime(dt.year, dt.month, 1, tzinfo=timezone.utc)
-
 
 # ------------------------ YouTube parsing ---------------------------
 def parse_youtube_feed(xml_bytes, publisher):
@@ -169,7 +163,7 @@ def parse_youtube_feed(xml_bytes, publisher):
         if not has_keyword(title + " " + desc):
             continue
 
-        item = {
+        videos.append({
             "title": title,
             "url": url,
             "publisher": publisher,
@@ -179,8 +173,7 @@ def parse_youtube_feed(xml_bytes, publisher):
             "image": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
             "type": "video",
             "videoId": video_id
-        }
-        videos.append(item)
+        })
 
     return videos
 
@@ -217,12 +210,12 @@ def openai_call_responses(prompt_text: str) -> str:
         method="POST"
     )
 
-    with urlopen(req, timeout=45) as resp:
+    with urlopen(req, timeout=60) as resp:
         out = resp.read().decode("utf-8", errors="replace")
 
     j = json.loads(out)
 
-    if isinstance(j, dict) and "output_text" in j and isinstance(j["output_text"], str):
+    if isinstance(j, dict) and isinstance(j.get("output_text"), str):
         return j["output_text"].strip()
 
     texts = []
@@ -231,7 +224,6 @@ def openai_call_responses(prompt_text: str) -> str:
             if isinstance(c, dict) and c.get("type") == "output_text":
                 texts.append(c.get("text", ""))
     return "\n".join(texts).strip()
-
 
 def build_prompt(label: str, feed_items, mode: str = "brief"):
     compact = []
@@ -266,7 +258,6 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
             f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
         )
 
-    # normal brief
     return (
         f"Create a PTD Today “{label} Intelligence Brief” from the feed items below.\n\n"
         "You only have: headline + publisher + category + timestamp + score + type + url.\n\n"
@@ -283,168 +274,141 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
         f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
     )
 
+def write_stub(path, label, reason):
+    payload = {
+        "updated_at": now_utc_iso(),
+        "label": label,
+        "fingerprint": "stub",
+        "summary_md": f"• Not available yet.\n\nReason: {reason}"
+    }
+    save_json(path, payload)
+    print(f"Wrote STUB -> {path}")
 
 def generate_brief_file(path, label, items, mode="brief"):
-    """
-    ALWAYS writes a JSON file so the website never shows 404 / missing.
-    - If there are no items => write a placeholder brief.
-    - If OpenAI errors => write a fallback placeholder (but still save the file).
-    """
+    # ALWAYS create the file (real or stub)
+    key_present = bool(os.getenv(OPENAI_API_KEY_ENV, "").strip())
 
-    # Always compute fingerprint (even if empty)
-    fp = compute_fingerprint(items or [], label)
+    if not items:
+        write_stub(path, label, "Not enough items in this time window yet.")
+        return False
 
+    fp = compute_fingerprint(items, label)
     existing = load_json(path, default=None)
     if isinstance(existing, dict) and existing.get("fingerprint") == fp:
         print(f"{label}: unchanged (fingerprint match).")
         return False
 
-    # Placeholder if no items
-    if not items:
-        payload = {
-            "updated_at": now_utc_iso(),
-            "label": label,
-            "fingerprint": fp,
-            "summary_md": (
-                "• Not enough items in this time window yet.\n"
-                "• This brief will auto-populate as new headlines arrive."
-            )
-        }
-        save_json(path, payload)
-        print(f"Saved {label} placeholder -> {path}")
-        return True
+    if not key_present:
+        write_stub(path, label, f"{OPENAI_API_KEY_ENV} is not set in Actions secrets.")
+        return False
 
-    # Try OpenAI; if it fails, save fallback placeholder
     try:
         prompt = build_prompt(label, items, mode=mode)
         summary_md = openai_call_responses(prompt)
-        if not (summary_md or "").strip():
-            raise RuntimeError("Empty AI output")
-    except Exception as e:
         payload = {
             "updated_at": now_utc_iso(),
             "label": label,
             "fingerprint": fp,
-            "summary_md": (
-                "• Brief generation failed in this run.\n"
-                f"• Reason: {type(e).__name__}\n"
-                "• The next scheduled run will try again."
-            )
+            "summary_md": summary_md
         }
         save_json(path, payload)
-        print(f"Saved {label} fallback (OpenAI error) -> {path} ({e})")
+        print(f"Saved {label} -> {path}")
         return True
+    except Exception as e:
+        write_stub(path, label, f"Brief generation failed: {e}")
+        return False
 
-    payload = {
-        "updated_at": now_utc_iso(),
-        "label": label,
-        "fingerprint": fp,
-        "summary_md": summary_md
-    }
-    save_json(path, payload)
-    print(f"Saved {label} -> {path}")
-    return True
-
-
-def generate_all_briefs(all_items):
-    items = list(all_items or [])
+def generate_all_briefs(archive_items):
+    items = list(archive_items)
     items.sort(key=published_dt, reverse=True)
 
     now = now_utc()
 
-    # Match homepage feed logic: last 60 hours
-    homepage_window_start = now - timedelta(hours=60)
-
-    # True daily: last 24 hours
-    daily_24h_start = now - timedelta(hours=24)
-
-    # Weekly rolling
+    daily_start = now - timedelta(hours=24)
     weekly_start = now - timedelta(days=7)
+    monthly_start = now - timedelta(days=30)
 
-    # Rolling 30d
-    last30_start = now - timedelta(days=30)
-
-    # Calendar periods
-    m_start = month_start(now)
     q_start = quarter_start(now)
     y_start = year_start(now)
 
-    # 2025 full year
     y2025_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
     y2026_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    # Filter windows
-    homepage_items = filter_range(items, homepage_window_start, now)
-    daily_items = filter_range(items, daily_24h_start, now)
+    daily_items = filter_range(items, daily_start, now)
     weekly_items = filter_range(items, weekly_start, now)
-    last30_items = filter_range(items, last30_start, now)
-
-    mtd_items = filter_range(items, m_start, now)
-    qtd_items = filter_range(items, q_start, now)
+    monthly_items = filter_range(items, monthly_start, now)
+    quarterly_items = filter_range(items, q_start, now)
     ytd_items = filter_range(items, y_start, now)
-
     y2025_items = filter_range(items, y2025_start, y2026_start)
 
     os.makedirs(BRIEFS_DIR, exist_ok=True)
 
-    # Homepage (reads this already)
-    generate_brief_file(HOME_SUMMARY_PATH, "Daily (Homepage • last 60 hours)", homepage_items)
+    # Homepage brief
+    generate_brief_file(HOME_SUMMARY_PATH, "Daily", daily_items, mode="brief")
 
-    # Other briefs
-    generate_brief_file(os.path.join(BRIEFS_DIR, "daily.json"), "Daily (last 24 hours)", daily_items)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly (last 7 days)", weekly_items)
+    # Briefs page expects these exact filenames:
+    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly", weekly_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly.json"), "Monthly (last 30 days)", monthly_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly.json"), "Quarter-to-date", quarterly_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items, mode="brief")
 
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_mtd.json"), "Monthly (Month-to-date)", mtd_items)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_30d.json"), "Monthly (last 30 days)", last30_items)
-
-    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly_qtd.json"), "Quarter-to-date", qtd_items)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items)
-
-    generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items)
-
-    # Forecast/watchlist based on last 30 days headline signals
     generate_brief_file(
         os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"),
-        "Forward Watchlist (rest of year • headline signals from last 30 days)",
-        last30_items,
+        "Forecast / Watchlist (headline signals from last 30 days)",
+        monthly_items,
         mode="forecast"
     )
 
-
 def main():
-    existing = load_json(NEWS_JSON_PATH, default=[])
-    if not isinstance(existing, list):
-        existing = []
+    # Load current site feed (may be short / overwritten by other scripts)
+    news_items = load_json(NEWS_JSON_PATH, default=[])
+    if not isinstance(news_items, list):
+        news_items = []
 
-    # Dedupe by URL
-    by_url = {item.get("url"): item for item in existing if isinstance(item, dict) and item.get("url")}
+    # Load archive (persistent)
+    archive_items = load_json(ARCHIVE_JSON_PATH, default=[])
+    if not isinstance(archive_items, list):
+        archive_items = []
 
+    # Build URL indexes for dedupe
+    archive_by_url = {it.get("url"): it for it in archive_items if isinstance(it, dict) and it.get("url")}
+    news_by_url = {it.get("url"): it for it in news_items if isinstance(it, dict) and it.get("url")}
+
+    # Fetch new YouTube videos and add to BOTH news.json and archive.json
     new_items = []
     for feed_url, pub in YOUTUBE_CHANNELS:
         xml_bytes = fetch(feed_url)
         videos = parse_youtube_feed(xml_bytes, pub)
         for v in videos:
-            if v["url"] not in by_url:
+            u = v.get("url")
+            if u and (u not in archive_by_url) and (u not in news_by_url):
                 new_items.append(v)
 
-    print(f"Found {len(new_items)} new YouTube videos from CNN/Reuters/WSJ/FT matching your keywords.")
+    print(f"Found {len(new_items)} new YouTube videos matching keywords.")
 
-    all_items = existing + new_items
-    all_items.sort(key=published_dt, reverse=True)
+    # Update news.json (site feed)
+    updated_news = list(news_items) + new_items
+    updated_news.sort(key=published_dt, reverse=True)
+    save_json(NEWS_JSON_PATH, updated_news)
+    print(f"Saved {len(updated_news)} items to {NEWS_JSON_PATH}")
 
-    save_json(NEWS_JSON_PATH, all_items)
-    print(f"Saved {len(all_items)} total items to {NEWS_JSON_PATH}")
+    # Update archive.json (persistent history)
+    updated_archive = list(archive_items)
+    for v in new_items:
+        updated_archive.append(v)
 
-    # ALWAYS write the brief JSON files:
-    # - If OPENAI_API_KEY exists -> AI content
-    # - If missing -> placeholders (still produces the files so the website never 404s)
-    try:
-        generate_all_briefs(all_items)
-        if not os.getenv(OPENAI_API_KEY_ENV, "").strip():
-            print(f"Note: {OPENAI_API_KEY_ENV} not set; briefs may be placeholders.")
-    except Exception as e:
-        print(f"Brief generation failed: {e}")
+    # Optional: keep archive from growing forever (e.g., last 365 days)
+    # Comment out if you want infinite history.
+    cutoff = now_utc() - timedelta(days=365)
+    updated_archive = [it for it in updated_archive if published_dt(it) >= cutoff]
 
+    updated_archive.sort(key=published_dt, reverse=True)
+    save_json(ARCHIVE_JSON_PATH, updated_archive)
+    print(f"Saved {len(updated_archive)} items to {ARCHIVE_JSON_PATH}")
+
+    # Generate briefs from ARCHIVE (not from news.json)
+    generate_all_briefs(updated_archive)
 
 if __name__ == "__main__":
     main()
