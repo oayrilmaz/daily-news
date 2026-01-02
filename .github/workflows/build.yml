@@ -26,21 +26,14 @@ jobs:
       - name: Build site data & short pages
         run: node scripts/build.mjs
 
-      - name: Commit updated data and short pages
+            - name: Commit updated data and short pages
         run: |
-          set -e
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Stage only what you want your bot to update
-          git add data s
-
-          # Commit if there are changes
-          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
-
-          # Sync with remote to avoid "fetch first" push rejections
           git pull --rebase origin main
 
-          # Push back to main
+          git add data s
+          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes"
+
           git push origin main
