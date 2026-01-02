@@ -8,15 +8,21 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-ptd-today
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           # IMPORTANT: fetch full history so rebase works reliably
           fetch-depth: 0
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -26,7 +32,10 @@ jobs:
       - name: Build site data & short pages
         run: node scripts/build.mjs
 
-            - name: Commit updated data and short pages
+      # Only commit/push when this workflow runs on main (schedule/manual).
+      # This avoids trying to push on PR runs.
+      - name: Commit updated data and short pages
+        if: github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -34,6 +43,8 @@ jobs:
           git pull --rebase origin main
 
           git add data s
+          git status
+
           git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes"
 
           git push origin main
