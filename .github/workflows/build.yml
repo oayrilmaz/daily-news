@@ -5,21 +5,23 @@ on:
   schedule:
     - cron: "0 */2 * * *" # every 2 hours UTC
 
+# 🔒 Prevent concurrent runs pushing at the same time
+concurrency:
+  group: ptd-build
+  cancel-in-progress: true
+
 permissions:
   contents: write
-
-# Prevent two runs from pushing at the same time
-concurrency:
-  group: ptdtoday-build
-  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # IMPORTANT: full history required for safe pushes
           fetch-depth: 0
 
       - name: Setup Node
@@ -27,27 +29,19 @@ jobs:
         with:
           node-version: "20"
 
-      # Pull FIRST so we build on top of latest main
-      - name: Sync with main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase --autostash origin main
-
       - name: Build site data & short pages
         run: node scripts/build.mjs
 
       - name: Commit updated data and short pages
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           # Stage changes
           git add data s
 
           # Commit only if there are changes
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))"
+          git commit -m "chore: refresh news & shortlinks ($(date -u +'%Y-%m-%dT%H:%M:%SZ'))" || echo "No changes to commit"
 
-          # Rebase again in case another run pushed while we were building
-          git pull --rebase --autostash origin main
-
-          # Push
+          # Push safely
           git push origin main
