@@ -1,9 +1,11 @@
 name: PTD AI Generator
 
 on:
-  schedule:
-    - cron: "0 */2 * * *"
   workflow_dispatch:
+  schedule:
+    - cron: "15 */6 * * *"   # every 6 hours (example)
+  push:
+    branches: [ "main" ]
 
 permissions:
   contents: write
@@ -11,15 +13,10 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -36,13 +33,15 @@ jobs:
 
       - name: Commit & push changes
         run: |
-          git config user.name "ptd-ai-bot"
-          git config user.email "bot@ptdtoday.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           git add \
             data/news.json \
+            data/news_archive.json \
             data/home_summary.json \
-            data/briefs/*.json || true
+            data/briefs/*.json \
+            data/briefs/.gitkeep || true
 
-          git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
+          git commit -m "Update news + briefs" || exit 0
           git push
