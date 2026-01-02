@@ -38,16 +38,16 @@ jobs:
           echo "---- DEBUG: git status ----"
           git status --porcelain
 
-      - name: Commit & push changes
+            - name: Commit & push changes
         run: |
           git config user.name "ptd-ai-bot"
           git config user.email "bot@ptdtoday.com"
 
-          # Always stage the directory (so changes are picked up)
-          git add data/news.json data/home_summary.json data/briefs || true
+          git add \
+            data/news.json \
+            data/news_archive.json \
+            data/home_summary.json \
+            data/briefs/*.json || true
 
           git commit -m "AI: auto-generate briefs" || echo "No changes to commit"
-
-          # Pull/rebase to avoid occasional non-fast-forward errors
-          git pull --rebase origin main || true
           git push
