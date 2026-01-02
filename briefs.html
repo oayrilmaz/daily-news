@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#E7DCC8" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="description" content="PTD Today Briefs: Weekly, Monthly, Quarterly, YTD, 2025 Review, and Forecast Watchlist." />
+  <link rel="canonical" href="https://ptdtoday.com/briefs.html" />
+  <meta name="robots" content="index,follow" />
+
+  <title>PTD Today — Briefs</title>
+
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/assets/main.css" />
+
+  <style>
+    header.site-header { text-align:center; margin:34px 10px 18px; }
+    header.site-header h1 { margin:0 0 6px; font-size:56px; line-height:1; letter-spacing:.2px; }
+    header.site-header h1 a { color:inherit; text-decoration:none; }
+    header.site-header .motto { margin:2px 0 10px; color:#6F675D; font-style:italic; font-size:18px; }
+
+    .ptd-nav { display:flex; justify-content:center; gap:22px; margin:6px 0 16px; font-size:14px; }
+    .ptd-nav a { text-decoration:none; color:#222; padding:6px 10px; border-radius:999px; }
+    .ptd-nav a:hover { background:#f1ece3; }
+    .ptd-nav a.active { font-weight:600; background:#e7dcc8; }
+
+    .wrap-inner { max-width:980px; margin:0 auto; padding:0 14px 30px; }
+    .controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin:14px 0; }
+    .controls label { font-size:13px; color:#444; }
+    select { font-size:13px; padding:6px 10px; border-radius:10px; border:1px solid #e6e6e6; background:#fff; }
+
+    .brief-box { border:1px solid rgba(0,0,0,.12); border-radius:14px; background:rgba(255,255,255,.75); padding:14px; }
+    .brief-top { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:baseline; margin-bottom:10px; }
+    .brief-title { margin:0; font-size:18px; font-weight:800; color:#222; }
+    .brief-meta { font-size:12px; color:#6F675D; white-space:nowrap; }
+    .brief-body { font-size:14px; line-height:1.55; color:#222; white-space:pre-wrap; }
+    .brief-note { margin-top:10px; font-size:12px; color:#6F675D; }
+    .empty { text-align:center; color:#6F675D; margin:24px 0; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="top">
+    <header class="site-header">
+      <h1 class="logo"><a href="/" aria-label="Go to PTD Today home">PTD Today</a></h1>
+      <p class="motto">First to Know. First to Lead.</p>
+
+      <nav class="ptd-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/ai.html">AI</a>
+        <a href="/briefs.html" class="active">Briefs</a>
+      </nav>
+
+      <h2 class="section">Intelligence Briefs</h2>
+    </header>
+
+    <main class="wrap-inner" role="main">
+      <div class="controls">
+        <div style="font-size:13px;color:#6F675D" id="status">Loading…</div>
+
+        <div>
+          <label for="briefSelect">Select:</label>
+          <select id="briefSelect">
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarter-to-date</option>
+            <option value="ytd">Year-to-date</option>
+            <option value="year_2025">2025 Review</option>
+            <option value="forecast_rest_of_year">Forecast / Watchlist</option>
+          </select>
+        </div>
+      </div>
+
+      <section class="brief-box" aria-live="polite">
+        <div class="brief-top">
+          <p class="brief-title" id="briefTitle">Brief</p>
+          <span class="brief-meta" id="briefUpdated">—</span>
+        </div>
+
+        <div class="brief-body" id="briefBody"></div>
+        <div class="brief-note">Informational only — may contain errors.</div>
+      </section>
+
+      <div id="empty" class="empty" style="display:none">
+        Brief not available yet (file not generated/committed).
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>© <span id="yr"></span> PTD Today — Briefs.</p>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    const MAP = {
+      weekly:  { title: "Weekly Intelligence Brief", file: "/data/briefs/weekly.json" },
+      monthly: { title: "Monthly Intelligence Brief (Last 30 Days)", file: "/data/briefs/monthly.json" },
+      quarterly:{ title: "Quarter-to-date Intelligence Brief", file: "/data/briefs/quarterly.json" },
+      ytd:     { title: "Year-to-date Intelligence Brief", file: "/data/briefs/ytd.json" },
+      year_2025:{ title: "2025 Intelligence Review", file: "/data/briefs/year_2025.json" },
+      forecast_rest_of_year:{ title: "Forecast / Watchlist (Headline-based)", file: "/data/briefs/forecast_rest_of_year.json" }
+    };
+
+    const sel = document.getElementById("briefSelect");
+    const statusEl = document.getElementById("status");
+    const titleEl = document.getElementById("briefTitle");
+    const updatedEl = document.getElementById("briefUpdated");
+    const bodyEl = document.getElementById("briefBody");
+    const emptyEl = document.getElementById("empty");
+
+    async function load(which){
+      const meta = MAP[which] || MAP.weekly;
+      titleEl.textContent = meta.title;
+      statusEl.textContent = "Loading…";
+      emptyEl.style.display = "none";
+      bodyEl.textContent = "";
+
+      try{
+        const res = await fetch(meta.file, { cache: "no-store" });
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        updatedEl.textContent = data.updated_at ? ("Updated: " + data.updated_at) : "—";
+        bodyEl.textContent = (data.summary_md || "").trim() || "No content yet.";
+        statusEl.textContent = "Loaded";
+      } catch(e){
+        statusEl.textContent = "Not available yet";
+        updatedEl.textContent = "—";
+        emptyEl.style.display = "block";
+        bodyEl.textContent = "Once this file is generated and committed, it will appear here:\n" + meta.file;
+      }
+    }
+
+    sel.addEventListener("change", () => load(sel.value));
+    load(sel.value);
+  </script>
+</body>
+</html>
