@@ -1,12 +1,11 @@
 # file: augment_news_youtube_only.py
 #
-# 1) Expands data/news.json with YouTube videos related to energy / grid / AI / data centers
-#    from CNN / Reuters / WSJ / FT (VIDEO items only, keyword filtered)
-# 2) Maintains a rolling archive at data/news_archive.json (so weekly/monthly/quarterly can exist)
-# 3) Generates multiple “brief” JSON files (daily/weekly/monthly/quarterly/YTD/2025/forecast)
-#    using ONLY headline + metadata from the archive (no invention, no external knowledge).
-# 4) ALWAYS writes brief files (creates stubs if not enough items / no API key / errors).
-# 5) Filters briefs to PTD-relevant topics to avoid politics/general headlines.
+# FIXED VERSION:
+# 1) Uses existing data/news.json as the main feed (articles you already show on the site)
+# 2) Optionally augments with YouTube videos (CNN/Reuters/WSJ/FT) but ONLY if PTD-relevant
+# 3) Maintains rolling archive at data/news_archive.json from ALL items (articles + videos)
+# 4) Generates brief JSON files from PTD-relevant items (filters out politics/noise)
+# 5) ALWAYS writes brief files (creates stubs if not enough items / no API key)
 
 import json
 import os
@@ -18,14 +17,14 @@ import xml.etree.ElementTree as ET
 
 
 # ------------------------ Paths ------------------------------------
-NEWS_JSON_PATH = "data/news.json"             # site cards
-ARCHIVE_JSON_PATH = "data/news_archive.json"  # persistent history for briefs
+NEWS_JSON_PATH = "data/news.json"            # your site cards use this
+ARCHIVE_JSON_PATH = "data/news_archive.json" # rolling history for briefs
 
-HOME_SUMMARY_PATH = "data/home_summary.json"  # homepage brief reads this
-BRIEFS_DIR = "data/briefs"                    # briefs page reads these
+HOME_SUMMARY_PATH = "data/home_summary.json"
+BRIEFS_DIR = "data/briefs"
 
 
-# ------------------------ YouTube feeds ----------------------------
+# ------------------------ YouTube feeds (optional) ------------------
 YOUTUBE_CHANNELS = [
     ("https://www.youtube.com/feeds/videos.xml?channel_id=UCupvZG-5ko_eiXAupbDfxWw", "CNN"),
     ("https://www.youtube.com/feeds/videos.xml?channel_id=UChqUTb7kYRX8-EiaN3XFrSQ", "Reuters"),
@@ -33,32 +32,25 @@ YOUTUBE_CHANNELS = [
     ("https://www.youtube.com/feeds/videos.xml?channel_id=UCoUxsWakJucWg46KW5RsvPw", "Financial Times"),
 ]
 
-# PTD focus keywords (expand freely)
-KEYWORDS = [
-    # Grid / power
-    "grid", "power", "electricity", "substation", "transmission", "distribution",
-    "hvdc", "gis", "switchgear", "transformer", "interconnector",
-    "utility", "tso", "dso",
-
-    # Renewables / storage
-    "renewable", "solar", "wind", "offshore", "battery", "energy storage", "storage",
-    "hydrogen", "electrolyzer",
-
-    # Data centers / AI / chips
-    "data center", "datacenter", "cloud", "ai", "gpu", "chips", "semiconductor",
-    "nvidia", "amd", "intel",
-
-    # Rare earth / supply chain
-    "rare earth", "lithium", "copper", "nickel", "critical minerals",
-
-    # Market/system
-    "demand", "capacity", "blackout", "outage", "load", "peak",
+PTD_KEYWORDS = [
+    "grid", "power", "electric", "electricity", "transmission", "distribution",
+    "substation", "switchgear", "gis", "ais", "transformer", "reactor", "breaker",
+    "hvdc", "facts", "statcom", "synchronous condenser", "series capacitor",
+    "renewable", "solar", "wind", "offshore", "onshore", "hydrogen",
+    "battery", "storage", "bess", "energy storage",
+    "data center", "datacenter", "hyperscale", "cloud",
+    "ai", "artificial intelligence", "genai", "gpu", "chips",
+    "semiconductor", "nvidia", "amd", "intel",
+    "rare earth", "lithium", "nickel", "cobalt"
 ]
 
-# Optional: blocklist keywords to reduce politics-only items
-BLOCKLIST = [
-    "election", "president", "prime minister", "minister", "senator",
-    "campaign", "vote", "ballot", "congress", "parliament",
+# Optional “noise” filter for common non-PTD headline clusters (tune as you like)
+NOISE_KEYWORDS = [
+    "election", "campaign", "vote", "senate", "congress", "parliament",
+    "mayor", "governor", "president", "prime minister",
+    "war", "missile", "ceasefire",
+    "court", "trial", "lawsuit",
+    "celebration", "festival", "new year"
 ]
 
 
@@ -83,43 +75,34 @@ def parse_iso(dt_str: str) -> str:
 
 def published_dt(item):
     try:
-        return datetime.fromisoformat((item.get("published","") or "").replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(item.get("published", "").replace("Z", "+00:00")).astimezone(timezone.utc)
     except Exception:
         return datetime.min.replace(tzinfo=timezone.utc)
 
-def has_keyword(text: str) -> bool:
-    t = (text or "").lower()
-    return any(k in t for k in KEYWORDS)
+def text_of(item) -> str:
+    # Use title + category + publisher to decide relevance without article body
+    parts = [
+        item.get("title", ""),
+        item.get("category", ""),
+        item.get("publisher", "")
+    ]
+    return " ".join([p for p in parts if p]).lower()
 
-def has_blocked(text: str) -> bool:
-    t = (text or "").lower()
-    return any(b in t for b in BLOCKLIST)
+def is_ptd_relevant(item) -> bool:
+    t = text_of(item)
+    if any(k in t for k in PTD_KEYWORDS):
+        return True
+    return False
 
-def is_ptd_relevant(item: dict) -> bool:
-    """Hard filter to keep briefs on PTD topics."""
-    title = (item.get("title") or "")
-    category = (item.get("category") or "")
-    publisher = (item.get("publisher") or "")
-    blob = f"{title} {category} {publisher}".lower()
-
-    # Must match PTD focus keywords
-    if not has_keyword(blob):
-        return False
-
-    # If it's purely political per blocklist, drop it (still allows e.g., policy affecting grid)
-    # You can soften this rule later if needed.
-    if has_blocked(title) and not any(k in blob for k in ["grid", "power", "energy", "data center", "ai", "semiconductor"]):
-        return False
-
-    return True
+def is_noise(item) -> bool:
+    t = text_of(item)
+    return any(k in t for k in NOISE_KEYWORDS)
 
 def fetch(url: str):
     try:
         req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urlopen(req, timeout=12) as resp:
             return resp.read()
-    except URLError:
-        return None
     except Exception:
         return None
 
@@ -207,11 +190,7 @@ def parse_youtube_feed(xml_bytes, publisher):
         if not title or not video_id or not url:
             continue
 
-        # Filter video relevance
-        if not has_keyword((title + " " + desc).lower()):
-            continue
-
-        videos.append({
+        item = {
             "title": title,
             "url": url,
             "publisher": publisher,
@@ -221,7 +200,13 @@ def parse_youtube_feed(xml_bytes, publisher):
             "image": f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg",
             "type": "video",
             "videoId": video_id
-        })
+        }
+
+        # Only keep PTD-relevant videos
+        if not is_ptd_relevant(item):
+            continue
+
+        videos.append(item)
 
     return videos
 
@@ -238,10 +223,11 @@ def openai_call_responses(prompt_text: str) -> str:
         "input": [
             {"role": "system", "content":
                 "You are PTD Today’s editorial analyst.\n"
-                "Focus ONLY on PTD topics: grid, transmission, substations, renewables, storage, data centers, AI, semiconductors, rare earths.\n"
-                "Use ONLY the provided feed items (headline + metadata).\n"
+                "PTD Today scope: power transmission, grid, substations, HVDC, renewables, storage, data centers, AI/chips, rare earths.\n"
+                "Use ONLY the provided headlines + metadata.\n"
                 "Do NOT invent facts. Do NOT use external knowledge.\n"
                 "Do NOT quote article text.\n"
+                "If an item is off-scope, ignore it.\n"
                 "Be concise, professional, and structured."
             },
             {"role": "user", "content": prompt_text}
@@ -276,6 +262,7 @@ def openai_call_responses(prompt_text: str) -> str:
 
 
 def build_prompt(label: str, feed_items, mode: str = "brief"):
+    # feed_items are already filtered to PTD-relevant
     compact = []
     for it in feed_items[:120]:
         if not isinstance(it, dict):
@@ -294,11 +281,11 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
         return (
             f"Create a PTD Today “{label}” based ONLY on the feed items below.\n\n"
             "This is NOT a prediction. It is a forward-looking WATCHLIST inferred from headline signals.\n"
-            "Only PTD areas: grid, renewables, storage, data centers, AI, semiconductors, rare earth.\n\n"
+            "You only have headline + metadata. No external knowledge.\n\n"
             "Output format (markdown):\n"
             "1) Themes likely to stay active (max 6 bullets) — phrase as watch items, not facts\n"
             "2) What to monitor next (Grid / Renewables / Storage / Data Centers & AI / Chips & Supply Chain) — 1–2 bullets each if relevant\n"
-            "3) Companies/regions appearing repeatedly (only if visible from headlines)\n"
+            "3) Regions / companies appearing repeatedly (only if visible from headlines)\n"
             "4) Risks / constraints implied by headlines (max 5 bullets)\n\n"
             "Rules:\n"
             "- Use ONLY provided items. No guessing about outcomes.\n"
@@ -310,16 +297,14 @@ def build_prompt(label: str, feed_items, mode: str = "brief"):
 
     return (
         f"Create a PTD Today “{label} Intelligence Brief” from the feed items below.\n\n"
-        "You only have: headline + publisher + category + timestamp + score + type + url.\n"
-        "ONLY cover PTD topics (grid, renewables, storage, data centers, AI, semiconductors, rare earth).\n\n"
+        "You only have: headline + publisher + category + timestamp + score + type + url.\n\n"
         "Output format (markdown):\n"
-        "1) Top themes (max 5 bullets)\n"
-        "2) Top stories (up to 8) — one sentence each, based ONLY on headline/metadata; include (Source: Publisher)\n"
-        "3) Sector takeaways (Grid / Renewables / Storage / Data Centers & AI / Chips & Supply Chain) — 1–2 bullets each IF relevant\n"
+        "1) Top themes (max 6 bullets)\n"
+        "2) Top stories (up to 10) — one sentence each, based ONLY on headline/metadata; include (Source: Publisher)\n"
+        "3) Sector takeaways (Grid / Renewables / Storage / Data Centers & AI / Chips & Supply Chain / Rare Earths) — 1–2 bullets each IF relevant\n"
         "4) Notable companies/regions mentioned (ONLY if visible from headlines)\n\n"
         "Rules:\n"
         "- Use ONLY provided items. No external knowledge. No guessing.\n"
-        "- If uncertain, say: “Not enough information in the headline.”\n"
         "- Do NOT quote article text.\n\n"
         "Feed items (JSON):\n"
         f"{json.dumps(compact, ensure_ascii=False, indent=2)}\n"
@@ -338,11 +323,11 @@ def write_stub(path, label, reason):
 
 
 def generate_brief_file(path, label, items, mode="brief"):
-    # ALWAYS write the file (real or stub)
+    # ALWAYS create the file (real or stub)
     key_present = bool(os.getenv(OPENAI_API_KEY_ENV, "").strip())
 
     if not items:
-        write_stub(path, label, "Not enough PTD-relevant items in this time window yet.")
+        write_stub(path, label, "No PTD-relevant items found in this time window.")
         return False
 
     fp = compute_fingerprint(items, label)
@@ -373,15 +358,14 @@ def generate_brief_file(path, label, items, mode="brief"):
 
 
 def generate_all_briefs(archive_items):
-    # Filter to PTD topics BEFORE building time windows
-    items = [it for it in (archive_items or []) if isinstance(it, dict) and is_ptd_relevant(it)]
-    items.sort(key=published_dt, reverse=True)
+    # Keep only PTD-relevant items; drop obvious noise
+    scoped = [it for it in archive_items if is_ptd_relevant(it) and not is_noise(it)]
+    scoped.sort(key=published_dt, reverse=True)
 
     now = now_utc()
 
-    # Time windows
-    homepage_start = now - timedelta(hours=60)
-    daily_start = now - timedelta(hours=24)
+    homepage_window_start = now - timedelta(hours=60)
+    daily_24h_start = now - timedelta(hours=24)
     weekly_start = now - timedelta(days=7)
     last30_start = now - timedelta(days=30)
 
@@ -392,86 +376,101 @@ def generate_all_briefs(archive_items):
     y2025_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
     y2026_start = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
-    # Filter windows
-    homepage_items = filter_range(items, homepage_start, now)
-    daily_items = filter_range(items, daily_start, now)
-    weekly_items = filter_range(items, weekly_start, now)
-    last30_items = filter_range(items, last30_start, now)
+    homepage_items = filter_range(scoped, homepage_window_start, now)
+    daily_items = filter_range(scoped, daily_24h_start, now)
+    weekly_items = filter_range(scoped, weekly_start, now)
+    last30_items = filter_range(scoped, last30_start, now)
 
-    mtd_items = filter_range(items, m_start, now)
-    qtd_items = filter_range(items, q_start, now)
-    ytd_items = filter_range(items, y_start, now)
+    mtd_items = filter_range(scoped, m_start, now)
+    qtd_items = filter_range(scoped, q_start, now)
+    ytd_items = filter_range(scoped, y_start, now)
 
-    y2025_items = filter_range(items, y2025_start, y2026_start)
+    y2025_items = filter_range(scoped, y2025_start, y2026_start)
 
     os.makedirs(BRIEFS_DIR, exist_ok=True)
 
-    # Homepage summary file (used on index page)
-    generate_brief_file(HOME_SUMMARY_PATH, "Daily (Homepage • last 60 hours)", homepage_items, mode="brief")
+    # Homepage
+    generate_brief_file(HOME_SUMMARY_PATH, "Daily (Homepage • last 60 hours)", homepage_items)
 
-    # Briefs page files (your exact filenames)
-    generate_brief_file(os.path.join(BRIEFS_DIR, "daily.json"), "Daily (last 24 hours)", daily_items, mode="brief")
-    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly (last 7 days)", weekly_items, mode="brief")
+    # Briefs page files (these match what you now have in /data/briefs/)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "daily.json"), "Daily (last 24 hours)", daily_items)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "weekly.json"), "Weekly (last 7 days)", weekly_items)
 
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_mtd.json"), "Monthly (Month-to-date)", mtd_items, mode="brief")
-    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_30d.json"), "Monthly (last 30 days)", last30_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_mtd.json"), "Monthly (Month-to-date)", mtd_items)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "monthly_30d.json"), "Monthly (last 30 days)", last30_items)
 
-    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly_qtd.json"), "Quarter-to-date", qtd_items, mode="brief")
-    generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "quarterly_qtd.json"), "Quarter-to-date", qtd_items)
+    generate_brief_file(os.path.join(BRIEFS_DIR, "ytd.json"), "Year-to-date", ytd_items)
 
-    generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items, mode="brief")
+    generate_brief_file(os.path.join(BRIEFS_DIR, "year_2025.json"), "Year 2025 review", y2025_items)
 
     generate_brief_file(
         os.path.join(BRIEFS_DIR, "forecast_rest_of_year.json"),
-        "Forward Watchlist (rest of year • headline signals from last 30 days)",
+        "Forward Watchlist (headline signals from last 30 days)",
         last30_items,
         mode="forecast"
     )
 
 
 def main():
-    # Load site feed
+    # Load current site feed (ARTICLES you already display)
     news_items = load_json(NEWS_JSON_PATH, default=[])
     if not isinstance(news_items, list):
         news_items = []
 
-    # Load archive
+    # Load archive (persistent)
     archive_items = load_json(ARCHIVE_JSON_PATH, default=[])
     if not isinstance(archive_items, list):
         archive_items = []
 
-    # URL dedupe maps
-    news_by_url = {it.get("url"): it for it in news_items if isinstance(it, dict) and it.get("url")}
+    # Dedupe index
     archive_by_url = {it.get("url"): it for it in archive_items if isinstance(it, dict) and it.get("url")}
+    news_by_url = {it.get("url"): it for it in news_items if isinstance(it, dict) and it.get("url")}
 
-    # Fetch new YouTube videos and add to both news + archive
-    new_items = []
+    # 1) FIRST: add ALL news.json items into archive (THIS is the big fix)
+    merged_archive = list(archive_items)
+    added_from_news = 0
+    for it in news_items:
+        if not isinstance(it, dict):
+            continue
+        u = it.get("url")
+        if u and u not in archive_by_url:
+            merged_archive.append(it)
+            archive_by_url[u] = it
+            added_from_news += 1
+
+    print(f"Archived {added_from_news} new items from data/news.json")
+
+    # 2) OPTIONAL: add PTD-relevant YouTube videos too
+    new_videos = []
     for feed_url, pub in YOUTUBE_CHANNELS:
         xml_bytes = fetch(feed_url)
         videos = parse_youtube_feed(xml_bytes, pub)
         for v in videos:
             u = v.get("url")
-            if u and (u not in news_by_url) and (u not in archive_by_url):
-                new_items.append(v)
+            if u and (u not in archive_by_url) and (u not in news_by_url):
+                new_videos.append(v)
 
-    print(f"Found {len(new_items)} new YouTube videos matching keywords.")
+    print(f"Found {len(new_videos)} new PTD-relevant YouTube videos.")
 
-    # Update news.json
-    updated_news = list(news_items) + new_items
+    # Add videos to news.json (so cards can show them too, if you want)
+    updated_news = list(news_items) + new_videos
     updated_news.sort(key=published_dt, reverse=True)
     save_json(NEWS_JSON_PATH, updated_news)
     print(f"Saved {len(updated_news)} items to {NEWS_JSON_PATH}")
 
-    # Update archive.json (keep 365 days)
-    updated_archive = list(archive_items) + new_items
-    cutoff = now_utc() - timedelta(days=365)
-    updated_archive = [it for it in updated_archive if published_dt(it) >= cutoff]
-    updated_archive.sort(key=published_dt, reverse=True)
-    save_json(ARCHIVE_JSON_PATH, updated_archive)
-    print(f"Saved {len(updated_archive)} items to {ARCHIVE_JSON_PATH}")
+    # Add videos to archive
+    merged_archive.extend(new_videos)
 
-    # Generate briefs from archive (PTD-filtered inside)
-    generate_all_briefs(updated_archive)
+    # Keep archive bounded (last 365 days)
+    cutoff = now_utc() - timedelta(days=365)
+    merged_archive = [it for it in merged_archive if published_dt(it) >= cutoff]
+    merged_archive.sort(key=published_dt, reverse=True)
+    save_json(ARCHIVE_JSON_PATH, merged_archive)
+    print(f"Saved {len(merged_archive)} items to {ARCHIVE_JSON_PATH}")
+
+    # Generate briefs from archive (PTD-scoped)
+    generate_all_briefs(merged_archive)
 
 
 if __name__ == "__main__":
