@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Analytics 4 -->
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVKD1RLFE5"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-TVKD1RLFE5');
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#E7DCC8" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="description" content="PTD Intelligence Room: a focused community space for Grid, AI, Data Centers, Renewables, and Energy infrastructure." />
+  <link rel="canonical" href="https://ptdtoday.com/room.html" />
+  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
+
+  <!-- Social -->
+  <meta property="og:site_name" content="PTD Today" />
+  <meta property="og:title" content="PTD Today — Intelligence Room" />
+  <meta property="og:description" content="A focused space for Grid, AI, Data Centers, Renewables, and Energy infrastructure." />
+  <meta property="og:image" content="/assets/og-default.png" />
+  <meta property="og:url" content="https://ptdtoday.com/room.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <title>PTD Today — Intelligence Room</title>
+
+  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/assets/main.css" />
+
+  <style>
+    /* Match PTD header vibe */
+    header.site-header {
+      text-align: center;
+      margin: 34px 10px 18px;
+    }
+    header.site-header h1 {
+      margin: 0 0 6px;
+      font-size: 56px;
+      line-height: 1;
+      letter-spacing: .2px;
+    }
+    header.site-header h1 a {
+      color: inherit;
+      text-decoration: none;
+    }
+    header.site-header .motto {
+      margin: 2px 0 10px;
+      color: #6F675D;
+      font-style: italic;
+      font-size: 18px;
+    }
+
+    /* Top nav */
+    .ptd-nav {
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+      margin: 6px 0 16px;
+      font-size: 14px;
+      flex-wrap: wrap;
+    }
+    .ptd-nav a {
+      text-decoration: none;
+      color: #222;
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+    .ptd-nav a:hover { background: #f1ece3; }
+    .ptd-nav a.active {
+      font-weight: 600;
+      background: #e7dcc8;
+    }
+
+    /* Page wrap */
+    .room-wrap{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 14px 24px;
+    }
+
+    /* Brief box (same style family as homepage) */
+    .brief-box{
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 14px;
+      background: rgba(255,255,255,.75);
+      padding: 14px 14px 12px;
+      margin: 10px 0 14px;
+      text-align: left;
+    }
+    .brief-top{
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .brief-title{
+      margin: 0;
+      font-size: 14px;
+      letter-spacing: .2px;
+      color: #222;
+      font-weight: 700;
+    }
+    .brief-meta{
+      font-size: 12px;
+      color: #6F675D;
+      white-space: nowrap;
+    }
+    .brief-body{
+      font-size: 14px;
+      line-height: 1.55;
+      color: #222;
+    }
+    .brief-body ul{ margin: 6px 0 8px 18px; padding: 0; }
+    .brief-body li{ margin: 4px 0; }
+    .muted{ color:#6F675D; }
+    .brief-note{
+      margin-top: 10px;
+      font-size: 12px;
+      color: #6F675D;
+    }
+
+    /* Room layout */
+    .room-grid{
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 980px){
+      .room-grid{ grid-template-columns: 1fr; }
+    }
+
+    /* Cards */
+    .panel{
+      border: 1px solid rgba(0,0,0,.10);
+      border-radius: 14px;
+      background: #fff;
+      padding: 14px;
+    }
+    .panel h3{
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      letter-spacing: .2px;
+    }
+
+    .rules{
+      border: 1px solid rgba(0,0,0,.08);
+      background: rgba(231,220,200,.35);
+      border-radius: 12px;
+      padding: 10px 10px 9px;
+      font-size: 13px;
+      color:#222;
+      margin-bottom: 12px;
+    }
+    .rules b{ font-weight: 700; }
+    .rules .bad{ color:#9b1c1c; font-weight:600; }
+    .rules .good{ color:#0a7a3b; font-weight:600; }
+
+    /* Feed placeholder */
+    .feed-empty{
+      padding: 12px;
+      border-radius: 12px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      color:#444;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    /* Right sticky panel */
+    .sticky{
+      position: sticky;
+      top: 12px;
+    }
+
+    /* Buttons */
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,.12);
+      background:#fff;
+      color:#222;
+      text-decoration:none;
+      font-size: 13px;
+      cursor:pointer;
+    }
+    .btn:hover{ background:#f7f5f1; }
+    .btn.secondary{
+      background: rgba(231,220,200,.35);
+      border-color: rgba(0,0,0,.10);
+    }
+
+    .suggestions{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top: 10px;
+    }
+
+    .chip{
+      width:100%;
+      text-align:left;
+      padding: 9px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.10);
+      background: #fafafa;
+      cursor:pointer;
+      font-size: 13px;
+      color:#222;
+      line-height: 1.35;
+    }
+    .chip:hover{ background:#f3efe7; }
+
+    .divider{
+      height:1px;
+      background: rgba(0,0,0,.08);
+      margin: 12px 0;
+    }
+
+    .composer{
+      margin-top: 12px;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      flex-wrap: wrap;
+    }
+    .composer textarea{
+      width:100%;
+      min-height: 84px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.12);
+      font: inherit;
+      resize: vertical;
+      background:#fff;
+    }
+    .composer .row{
+      display:flex;
+      gap:10px;
+      width:100%;
+      justify-content: space-between;
+      align-items:center;
+      flex-wrap: wrap;
+    }
+    .note{
+      font-size: 12px;
+      color:#6F675D;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap" id="top">
+
+    <header class="site-header">
+      <h1 class="logo">
+        <a href="/" aria-label="Go to PTD Today home">PTD Today</a>
+      </h1>
+      <p class="motto">First to Know. First to Lead.</p>
+
+      <nav class="ptd-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/ai.html">AI</a>
+        <a href="/briefs.html">Briefs</a>
+        <a href="/room.html" class="active">Room</a>
+      </nav>
+
+      <h2 class="section">PTD Intelligence Room</h2>
+      <div class="updated" id="updated" role="status" aria-live="polite">Loading…</div>
+    </header>
+
+    <main class="main room-wrap" role="main">
+
+      <!-- Today’s Focus (reads the same daily brief JSON you already generate) -->
+      <section class="brief-box" aria-label="Today’s Focus">
+        <div class="brief-top">
+          <p class="brief-title">Today’s Focus (from PTD Daily Brief)</p>
+          <span class="brief-meta" id="briefUpdated">Loading…</span>
+        </div>
+        <div class="brief-body" id="briefBody"><p class="muted">Preparing…</p></div>
+        <div class="brief-note">Informational only — may contain errors.</div>
+      </section>
+
+      <section class="room-grid" aria-label="Room content">
+        <!-- Left: Room feed + composer (UI only) -->
+        <div class="panel" aria-label="Room feed">
+          <h3>Room feed</h3>
+
+          <div class="rules" role="note" aria-label="Room rules">
+            <div><b>Allowed:</b> <span class="good">Grid • AI • Data Centers • Renewables • Oil &amp; Gas (infrastructure)</span></div>
+            <div><b>Not allowed:</b> <span class="bad">Politics / elections / general geopolitics</span></div>
+          </div>
+
+          <div class="feed-empty">
+            <b>Coming soon:</b> interactive discussion inside PTD Today.<br/>
+            For now, use the AI panel on the right to craft a tight, on-topic LinkedIn post — then share it in your groups to drive traffic here.
+          </div>
+
+          <div class="divider"></div>
+
+          <h3>Draft a message (UI-only)</h3>
+          <div class="composer">
+            <textarea id="draft" placeholder="Write your message here… (UI only for now)"></textarea>
+
+            <div class="row">
+              <button class="btn secondary" id="copyDraft">Copy draft</button>
+              <a class="btn" href="/briefs.html" target="_blank" rel="noopener">Open Briefs</a>
+              <span class="note">Posting inside PTD Room is disabled in v1 (no backend yet).</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: AI Moderator panel (UI only) -->
+        <aside class="panel sticky" aria-label="AI moderator panel">
+          <h3>AI Moderator Panel (UI)</h3>
+          <div class="note">
+            Use these prompts to keep everything aligned with PTD Today’s focus areas.
+          </div>
+
+          <div class="divider"></div>
+
+          <h3>Suggested prompts</h3>
+          <div class="suggestions">
+            <button class="chip" data-prompt="From today’s PTD brief, what are the 3 biggest themes impacting Grid & Transmission planning?">
+              Grid & Transmission — top 3 themes
+            </button>
+            <button class="chip" data-prompt="Summarize what today’s headlines imply for AI/Data Centers power demand and infrastructure constraints (no politics).">
+              AI & Data Centers — demand + constraints
+            </button>
+            <button class="chip" data-prompt="Pick 5 headlines and convert them into an executive LinkedIn post (short, factual, on-topic).">
+              LinkedIn post — executive style
+            </button>
+            <button class="chip" data-prompt="What OEM/EPC implications can be inferred from the headlines only? If unclear, say not enough info.">
+              OEM/EPC implications — headline-only
+            </button>
+          </div>
+
+          <div class="divider"></div>
+
+          <h3>Copy-ready LinkedIn hook</h3>
+          <div class="note" id="hookText">
+            “Day-by-day, the Grid + AI/Data Center story is tightening planning timelines. Here are today’s signals from PTD Today…”
+          </div>
+          <div style="margin-top:10px;">
+            <button class="btn secondary" id="copyHook">Copy hook</button>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>© <span id="yr"></span> PTD Today — Intelligence Room.</p>
+      <p class="muted">This page is a UI-only prototype. Interactive posting will be added in a later version.</p>
+    </footer>
+
+  </div>
+
+  <script>
+    document.getElementById('yr').textContent = new Date().getFullYear();
+
+    // Use the same "Updated" label style as other pages
+    const updatedEl = document.getElementById('updated');
+    if(updatedEl) updatedEl.textContent = "Updated — " + new Date().toISOString().replace('T',' ').replace(/:\d\d\.\d{3}Z$/,'Z');
+
+    // ---- Small safe markdown-ish renderer (bullets + paragraphs) ----
+    function escapeHtml(s){
+      return String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function renderBriefMarkdown(md){
+      const raw = (md || "").replace(/\r\n/g, "\n").trim();
+      if(!raw) return "<p class='muted'>No brief yet.</p>";
+
+      const lines = raw.split("\n");
+      let html = "";
+      let inList = false;
+
+      function closeList(){
+        if(inList){ html += "</ul>"; inList = false; }
+      }
+
+      for (let line of lines){
+        line = line.trim();
+        if(!line){ closeList(); continue; }
+
+        const isBullet = line.startsWith("- ") || line.startsWith("• ");
+        if(isBullet){
+          if(!inList){ html += "<ul>"; inList = true; }
+          html += "<li>" + escapeHtml(line.replace(/^(- |• )/, "")) + "</li>";
+          continue;
+        }
+
+        closeList();
+        html += "<p>" + escapeHtml(line) + "</p>";
+      }
+
+      closeList();
+      return html;
+    }
+
+    // Load Today’s Focus from /data/home_summary.json
+    (async function(){
+      const bUpd = document.getElementById("briefUpdated");
+      const bBody = document.getElementById("briefBody");
+
+      try{
+        const res = await fetch("/data/home_summary.json", { cache: "no-store" });
+        if(!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        bUpd.textContent = "Updated: " + (data.updated_at || new Date().toISOString());
+        bBody.innerHTML = renderBriefMarkdown((data.summary_md || "").trim());
+      }catch(e){
+        bUpd.textContent = "Not available yet";
+        bBody.innerHTML = "<p class='muted'>Once <code>/data/home_summary.json</code> is published, Today’s Focus will appear here.</p>";
+      }
+    })();
+
+    // Prompt chips -> paste into draft (UI-only)
+    const draft = document.getElementById("draft");
+    document.querySelectorAll(".chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const p = btn.getAttribute("data-prompt") || "";
+        if(!draft) return;
+        draft.value = (draft.value ? (draft.value + "\n\n") : "") + p;
+        draft.focus();
+      });
+    });
+
+    // Copy draft
+    document.getElementById("copyDraft")?.addEventListener("click", async () => {
+      try{
+        await navigator.clipboard.writeText(draft?.value || "");
+      }catch(e){}
+    });
+
+    // Copy hook
+    document.getElementById("copyHook")?.addEventListener("click", async () => {
+      try{
+        await navigator.clipboard.writeText(document.getElementById("hookText")?.textContent || "");
+      }catch(e){}
+    });
+  </script>
+</body>
+</html>
