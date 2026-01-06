@@ -1,64 +1,287 @@
+<!-- room.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Intelligence Room</title>
-  <meta name="description" content="PTD Today — Intelligence Room." />
+  <meta name="description" content="PTD Today — Intelligence Room (community posts)." />
+
   <style>
     :root{
-      --bg:#fbfaf7;
-      --paper:#ffffff;
+      --bg:#f4efe6;
+      --paper:#fffdf8;
       --ink:#111;
-      --muted:#6b6b6b;
+      --muted:#666;
       --rule:rgba(0,0,0,.12);
-      --chipbg:#f4f2ed;
-      --chipbd:rgba(0,0,0,.12);
+      --chip:#f2efe8;
+      --shadow:0 18px 40px rgba(0,0,0,.06);
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:Georgia,"Times New Roman",Times,serif;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:860px;margin:0 auto;padding:26px 16px 60px}
-    .mast{text-align:center;padding:14px 0 10px}
-    .brand{font-size:46px;margin:0;font-weight:700}
-    .tagline{margin:6px 0 18px;color:var(--muted);font-style:italic;font-size:17px}
-    .nav{display:flex;justify-content:center;gap:18px;margin:2px 0 6px;flex-wrap:wrap}
-    .nav a{text-decoration:none;padding:6px 10px;border-radius:999px;border:1px solid transparent;color:rgba(0,0,0,.8);font-size:16px}
-    .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.03)}
-    .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.04);font-weight:700}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family: Georgia,"Times New Roman",Times,serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    a{color:inherit}
+    .wrap{max-width:860px;margin:0 auto;padding:26px 16px 56px}
 
-    .pageTitle{text-align:center;margin:14px 0 6px;font-size:44px;font-weight:800}
-    .updated{text-align:center;color:var(--muted);font-size:16px;margin-bottom:18px}
+    /* Mast (same as Home) */
+    .mast{text-align:center;padding:18px 0 6px}
+    .brand{margin:0;font-weight:800;letter-spacing:.4px;font-size:54px}
+    .tagline{margin:6px 0 14px;color:var(--muted);font-style:italic;font-size:18px}
+    .nav{display:flex;justify-content:center;gap:18px;margin:6px 0 6px}
+    .nav a{
+      text-decoration:none;
+      padding:8px 12px;
+      border-radius:999px;
+      border:1px solid transparent;
+      color:rgba(0,0,0,.78);
+      font-size:16px;
+    }
+    .nav a:hover{border-color:var(--rule);background:rgba(255,255,255,.35)}
+    .nav a.active{border-color:var(--rule);background:rgba(255,255,255,.55);font-weight:700;color:rgba(0,0,0,.92)}
+    .rule{height:1px;background:var(--rule);margin:14px auto 0;max-width:740px}
 
-    .panel{background:var(--paper);border:1px solid var(--rule);border-radius:14px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.05)}
-    .notice{padding:14px 16px;border-bottom:1px solid var(--rule);background:rgba(0,0,0,.015);font-size:15px;color:rgba(0,0,0,.78)}
+    .pageTitle{text-align:center;margin:18px 0 4px;font-size:44px;font-weight:900}
+    .updated{text-align:center;color:var(--muted);font-size:16px;margin:0 0 16px}
+
+    .panel{
+      background:var(--paper);
+      border:1px solid var(--rule);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .notice{
+      padding:12px 14px;
+      border-bottom:1px solid var(--rule);
+      color:rgba(0,0,0,.84);
+      font-size:15px;
+      background:rgba(0,0,0,.015);
+    }
+    .notice b{font-weight:800}
+    .notice .muted{color:var(--muted)}
+
+    .formWrap{
+      padding:14px 14px 12px;
+      border-bottom:1px solid var(--rule);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr 1.2fr 1.1fr .7fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .field label{
+      display:block;
+      font-size:13px;
+      color:var(--muted);
+      margin:0 0 6px 2px;
+    }
+    input, select, textarea{
+      width:100%;
+      border:1px solid var(--rule);
+      border-radius:10px;
+      padding:10px 12px;
+      font-family:inherit;
+      background:rgba(0,0,0,.02);
+      font-size:15px;
+      outline:none;
+    }
+    textarea{
+      margin-top:8px;
+      border-radius:12px;
+      min-height:98px;
+      resize:vertical;
+      line-height:1.5;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
+    .btn{
+      appearance:none;
+      border:1px solid var(--rule);
+      padding:9px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:15px;
+    }
+    .btn.primary{background:#111;color:#fff}
+    .btn.secondary{background:transparent;color:rgba(0,0,0,.82)}
+    .btn.secondary:hover{background:rgba(0,0,0,.04)}
+    .rightMeta{margin-left:auto;color:var(--muted);font-size:14px}
+
+    .feedHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:12px 14px;
+      border-bottom:1px solid var(--rule);
+      background:rgba(0,0,0,.01);
+    }
+    .feedHead h3{
+      margin:0;
+      font-size:18px;
+      font-weight:900;
+    }
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--chip);
+      color:rgba(0,0,0,.75);
+      font-size:14px;
+      white-space:nowrap;
+    }
+
+    .feed{padding:0}
+    .post{
+      padding:14px;
+      border-bottom:1px solid var(--rule);
+    }
+    .post:last-child{border-bottom:none}
+    .postTop{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+    .who{
+      font-weight:900;
+      font-size:16px;
+    }
+    .who span{
+      font-weight:600;
+      color:var(--muted);
+    }
+    .when{
+      color:var(--muted);
+      font-size:13px;
+      white-space:nowrap;
+      margin-top:2px;
+    }
+    .chips{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:10px 0 0;
+    }
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--chip);
+      font-size:13px;color:rgba(0,0,0,.72);
+    }
+    .msg{
+      margin:10px 0 0;
+      font-size:16px;
+      line-height:1.7;
+      color:rgba(0,0,0,.9);
+      white-space:pre-line;
+    }
+
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:14px}
+
+    @media (max-width:820px){
+      .grid{grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width:520px){
+      .brand{font-size:44px}
+      .pageTitle{font-size:34px}
+      .grid{grid-template-columns:1fr;}
+      .rightMeta{margin-left:0}
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <header class="mast">
       <h1 class="brand">PTD Today</h1>
       <div class="tagline">First to Know. First to Lead.</div>
 
-      <!-- ONLY Home + Room -->
+      <!-- Only Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a href="/index.html">Home</a>
         <a class="active" href="/room.html">Room</a>
       </nav>
+
+      <div class="rule"></div>
     </header>
 
     <div class="pageTitle">PTD Intelligence Room</div>
-    <div class="updated" id="updatedLine">Updated —</div>
+    <div class="updated" id="updatedLine">Updated — …</div>
 
     <section class="panel">
       <div class="notice">
-        This is your community space. (Your existing Room post/feed logic can stay below.)
+        <b>Allowed:</b> Grid • AI • Data Centers • Renewables • Oil &amp; Gas (infrastructure)
+        <br/>
+        <b>Not allowed:</b> Politics / elections / general geopolitics • hate • abuse • spam
       </div>
 
-      <!-- KEEP your existing Room form + feed code below this line.
-           The key fix was removing AI/Briefs from the nav here too. -->
-      <div style="padding:16px;">
-        <em>Paste your existing Room HTML/JS here (unchanged), if it was removed.</em>
+      <div class="formWrap">
+        <div class="grid">
+          <div class="field">
+            <label for="name">Your name</label>
+            <input id="name" placeholder="Thomas Edison" />
+          </div>
+
+          <div class="field">
+            <label for="company">Company (optional)</label>
+            <input id="company" placeholder="e.g., PTD Today / GE Vernova" />
+          </div>
+
+          <div class="field">
+            <label for="location">Location (optional)</label>
+            <input id="location" placeholder="e.g., US / NC / EU / Dubai" />
+          </div>
+
+          <div class="field">
+            <label for="category">Category</label>
+            <select id="category">
+              <option>Job</option>
+              <option>Need</option>
+              <option>Offer</option>
+              <option>Vendor</option>
+              <option>Partner</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" placeholder="Post your need or offer (professional + clean). Example: Need GIS commissioning support in Q2; looking for recommended contractors in the US."></textarea>
+        </div>
+
+        <div class="actions">
+          <button class="btn primary" id="btnPost" type="button">Post</button>
+          <button class="btn secondary" id="btnRefresh" type="button">Refresh feed</button>
+          <span class="rightMeta"><span class="muted">Posts:</span> <span id="postsCount">0</span></span>
+        </div>
+      </div>
+
+      <div class="feedHead">
+        <h3>Room feed</h3>
+        <span class="pill" id="pillScope">Public (local demo)</span>
+      </div>
+
+      <div class="feed" id="feed">
+        <div class="empty">Loading…</div>
       </div>
     </section>
 
@@ -66,9 +289,124 @@
   </div>
 
   <script>
-    document.getElementById("year").textContent = new Date().getFullYear();
-    document.getElementById("updatedLine").textContent =
-      "Updated — " + new Date().toLocaleString();
+    // ============================
+    // Storage (static-site friendly)
+    // If you have a real backend, replace ONLY this section.
+    // ============================
+    const STORAGE_KEY = "ptdtoday_room_posts_v1";
+
+    const $ = (id) => document.getElementById(id);
+
+    function escapeHtml(str){
+      return (str ?? "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+
+    function fmtLocal(iso){
+      try{
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, { year:"numeric", month:"numeric", day:"numeric", hour:"numeric", minute:"2-digit" });
+      }catch(e){ return iso || ""; }
+    }
+
+    function loadPosts(){
+      try{
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      }catch(e){
+        return [];
+      }
+    }
+
+    function savePosts(posts){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posts, null, 2));
+    }
+
+    function render(){
+      const posts = loadPosts().sort((a,b)=> (b.created_at||"").localeCompare(a.created_at||""));
+      $("postsCount").textContent = String(posts.length);
+
+      if(!posts.length){
+        $("feed").innerHTML = `
+          <div class="post">
+            <div class="postTop">
+              <div class="who">PTD Today <span>• PTD Today • US</span></div>
+              <div class="when">${escapeHtml(fmtLocal(new Date().toISOString()))}</div>
+            </div>
+            <div class="chips">
+              <span class="chip">other</span>
+            </div>
+            <div class="msg">Welcome to the PTD Intelligence Room.\n\nThis is a new space built for professionals across power transmission, grid infrastructure, renewables, data centers, and energy to share freely — based on real needs, real offers, and real experience.\n\nWhether you are:\n• Looking for expertise or support\n• Offering services, equipment, or solutions\n• Hiring / open to work\n\nPost a clear, professional note and include location + category for faster matching.</div>
+          </div>
+        `;
+        return;
+      }
+
+      $("feed").innerHTML = posts.map(p=>{
+        const who = `${escapeHtml(p.name || "Anonymous")}`;
+        const line2 = [p.company, p.location].filter(Boolean).map(escapeHtml).join(" • ");
+        const when = escapeHtml(fmtLocal(p.created_at));
+        const cat = escapeHtml((p.category || "other").toLowerCase());
+
+        return `
+          <div class="post">
+            <div class="postTop">
+              <div class="who">${who}${line2 ? ` <span>• ${line2}</span>` : ""}</div>
+              <div class="when">${when}</div>
+            </div>
+            <div class="chips">
+              <span class="chip">${cat}</span>
+            </div>
+            <div class="msg">${escapeHtml(p.message || "")}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function updateUpdatedLine(){
+      $("updatedLine").textContent = `Updated — ${new Date().toLocaleString()}`;
+    }
+
+    function post(){
+      const name = $("name").value.trim();
+      const company = $("company").value.trim();
+      const location = $("location").value.trim();
+      const category = $("category").value.trim();
+      const message = $("message").value.trim();
+
+      if(!message || message.length < 10){
+        alert("Please write a more detailed message (at least 10 characters).");
+        return;
+      }
+
+      const posts = loadPosts();
+      posts.push({
+        id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        created_at: new Date().toISOString(),
+        name: name || "Anonymous",
+        company: company || "",
+        location: location || "",
+        category: category || "Other",
+        message
+      });
+
+      savePosts(posts);
+
+      $("message").value = "";
+      updateUpdatedLine();
+      render();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    // Init
+    $("year").textContent = new Date().getFullYear();
+    updateUpdatedLine();
+    render();
+
+    $("btnPost").addEventListener("click", post);
+    $("btnRefresh").addEventListener("click", () => { updateUpdatedLine(); render(); });
   </script>
 </body>
 </html>
