@@ -2,46 +2,40 @@ name: Daily AI News (PTD Today)
 
 on:
   workflow_dispatch:
+  pull_request:
   schedule:
-    - cron: "0 * * * *"   # runs every hour (UTC)
+    - cron: "0 * * * *"
 
 jobs:
   generate:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (v20)
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      # 3️⃣ Install dependencies (FIXED)
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Generate AI News JSON
       - name: Generate AI News JSON
+        run: node scripts/generate-ai-news.js
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: npm run generate:ai
 
-      # 5️⃣ Generate YouTube JSON
       - name: Generate YouTube JSON
+        run: node scripts/generate_youtube.js
         env:
           YOUTUBE_RSS_URLS: ${{ secrets.YOUTUBE_RSS_URLS }}
-        run: npm run generate:youtube
 
-      # 6️⃣ Commit & push if changed
-      - name: Commit and push changes
+      - name: Commit & push if changed
         run: |
-          git config user.name "ptd-today-bot"
+          git config user.name "ptd-bot"
           git config user.email "bot@ptdtoday.com"
-          git add data/*.json
-          git diff --quiet && echo "No changes" || git commit -m "Update AI & YouTube news"
+          git add .
+          git diff --cached --quiet || git commit -m "Update AI + YouTube news"
           git push
