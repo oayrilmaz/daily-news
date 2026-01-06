@@ -1,37 +1,45 @@
-name: Daily AI News Generator
+name: Daily AI News (PTD Today)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * *"   # Runs every day at 06:00 UTC
+    - cron: "15 23 * * *"   # runs daily at 23:15 UTC
+
+permissions:
+  contents: write
 
 jobs:
-  generate-news:
+  generate:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
       - name: Install dependencies
-        run: |
-          npm install openai fs-extra
+        run: npm ci
 
-      - name: Generate daily AI news
+      - name: Generate AI News JSON
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          node scripts/generate-daily-news.js
+        run: node scripts/generate_ai_news.js
 
-      - name: Commit and push changes
+      - name: Commit & push if changed
         run: |
-          git config --global user.name "PTD Today Bot"
-          git config --global user.email "bot@ptdtoday.com"
-          git add .
-          git commit -m "Daily AI news update" || echo "No changes"
+          git config user.name "ptdtoday-bot"
+          git config user.email "ptdtoday-bot@users.noreply.github.com"
+
+          git add public/data/ai_news.json
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update daily AI news"
           git push
