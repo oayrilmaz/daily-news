@@ -6,13 +6,6 @@
   <title>PTD Today — Daily Briefing</title>
   <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence briefing)." />
 
-  <!-- Fallback OG for homepage shares -->
-  <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content="PTD Today — Daily Briefing" />
-  <meta property="og:description" content="Daily AI-generated intelligence briefing for power grid, substations, data centers, renewables, critical minerals." />
-  <meta property="og:url" content="https://ptdtoday.com/index.html" />
-
   <style>
     :root{
       --bg:#ffffff;
@@ -83,7 +76,6 @@
       font-family:inherit;
       font-size:14px;
     }
-    .btn.secondary{background:#fff;color:#111}
     .btn:hover{filter:brightness(.98)}
 
     .search{flex:1 1 320px;display:flex;align-items:center;margin-left:auto}
@@ -219,7 +211,6 @@
       padding-top:12px;
     }
     details.readMore summary{display:none}
-
     .body{
       font-size:16px;
       line-height:1.65;
@@ -270,6 +261,7 @@
       <h1 class="brand">PTD Today</h1>
       <div class="tagline">First to Know. First to Lead.</div>
 
+      <!-- ONLY Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a class="active" href="/index.html">Home</a>
         <a href="/room.html">Room</a>
@@ -284,7 +276,6 @@
     <section class="panel">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
-
         <div class="search">
           <input id="q" type="search" placeholder="Search headlines, tags, regions…" autocomplete="off" />
         </div>
@@ -324,9 +315,8 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    // ✅ Share a REAL page for LinkedIn preview: /p/<id>.html
-    function articleUrl(id){
-      return `${window.location.origin}/p/${encodeURIComponent(id)}.html`;
+    function articlePageUrl(id){
+      return `${window.location.origin}/articles/${encodeURIComponent(id)}.html`;
     }
 
     async function shareLink(title, text, url){
@@ -336,9 +326,9 @@
       }
       try{
         await navigator.clipboard.writeText(url);
-        alert("Article share link copied.");
+        alert("Article link copied.");
       }catch(e){
-        prompt("Copy this article share link:", url);
+        prompt("Copy this article link:", url);
       }
     }
 
@@ -391,7 +381,7 @@
 
               ${watch.length ? `
                 <div class="subhead">What to watch</div>
-                <ul>${watch.slice(0,8).map(w=>`<li>${escapeHtml(w)}</li>`).join("")}</ul>
+                <ul>${watch.slice(0,10).map(w=>`<li>${escapeHtml(w)}</li>`).join("")}</ul>
               ` : ""}
 
               ${action ? `
@@ -469,9 +459,7 @@
           const open = !det.open;
           det.open = open;
           btn.textContent = open ? "Hide" : "Read";
-          if(open){
-            history.replaceState(null, "", "#" + encodeURIComponent(id));
-          }
+          if(open){ history.replaceState(null, "", "#" + encodeURIComponent(id)); }
         });
       });
 
@@ -479,9 +467,9 @@
         btn.addEventListener("click", async ()=>{
           const id = btn.getAttribute("data-id");
           const it = map.get(id) || {};
-          const url = articleUrl(id);
+          const url = articlePageUrl(id);   // ✅ THIS is the share fix
           const title = it.title || "PTD Today";
-          const text = (it.lede || it.summary || "").toString().slice(0, 220);
+          const text = (it.lede || it.summary || "").toString().slice(0, 200);
           await shareLink(title, text, url);
         });
       });
@@ -491,7 +479,6 @@
       const raw = window.location.hash || "";
       const id = decodeURIComponent(raw.replace("#","")).trim();
       if(!id) return;
-
       const el = document.getElementById(id);
       if(!el) return;
 
