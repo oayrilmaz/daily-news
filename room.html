@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Intelligence Room</title>
-  <meta name="description" content="PTD Today — Intelligence Room." />
+  <meta name="description" content="PTD Today — Intelligence Room (community space)." />
 
   <style>
     :root{
@@ -18,81 +18,88 @@
       --btn:#111;
       --btnInk:#fff;
     }
+
     *{box-sizing:border-box}
     body{
       margin:0;background:var(--bg);color:var(--ink);
       font-family: Georgia, "Times New Roman", Times, serif;
-      -webkit-font-smoothing:antialiased;
+      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
     }
+    a{color:inherit}
     .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
     .mast{text-align:center;padding:16px 0 6px}
     .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
     .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
+
     .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
     .nav a{
-      text-decoration:none;padding:7px 12px;border-radius:999px;
-      border:1px solid transparent;color:rgba(0,0,0,.75);font-size:15px
+      text-decoration:none;padding:7px 12px;border-radius:999px;border:1px solid transparent;
+      color:rgba(0,0,0,.75);font-size:15px
     }
     .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
     .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
     .rule{height:1px;background:var(--rule);margin:14px 0 0}
 
-    .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800}
+    .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800;letter-spacing:.2px}
     .updated{text-align:center;color:var(--muted);font-size:15px;margin:6px 0 18px}
 
     .panel{background:var(--paper);border:1px solid var(--rule);border-radius:14px;overflow:hidden}
-    .notice{padding:12px 14px;border-bottom:1px solid var(--rule);background:rgba(0,0,0,.02);font-size:14px;color:rgba(0,0,0,.80)}
-    .formWrap{padding:14px;border-bottom:1px solid var(--rule)}
-    .grid{display:grid;grid-template-columns:1fr 1fr 1fr 160px;gap:10px}
-    @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr; } }
-    @media (max-width:520px){ .grid{grid-template-columns:1fr; } }
+    .notice{
+      padding:12px 14px;border-bottom:1px solid var(--rule);
+      color:rgba(0,0,0,.80);font-size:14px;background:rgba(0,0,0,.02)
+    }
 
-    input, select, textarea{
+    .formWrap{padding:14px;border-bottom:1px solid var(--rule)}
+    .row{display:grid;grid-template-columns:1.1fr 1.2fr .9fr .7fr;gap:10px}
+    .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px}
+    .field input,.field select,.field textarea{
       width:100%;
       border:1px solid var(--rule);
       border-radius:10px;
       padding:10px 12px;
       font-family:inherit;
       font-size:14px;
-      background:#fff;
       outline:none;
+      background:#fff;
     }
-    textarea{min-height:120px;resize:vertical}
+    .field textarea{min-height:96px;resize:vertical}
 
     .btnRow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
     .btn{
-      appearance:none;border:1px solid var(--rule);border-radius:999px;
-      padding:9px 14px;cursor:pointer;font-family:inherit;font-size:14px;
+      appearance:none;border:1px solid var(--rule);
       background:var(--btn);color:var(--btnInk);
+      padding:9px 14px;border-radius:999px;cursor:pointer;
+      font-family:inherit;font-size:14px
     }
     .btn.secondary{background:#fff;color:#111}
+    .btn:hover{filter:brightness(.98)}
+
     .feedHead{
-      display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
-      padding:10px 14px;border-bottom:1px solid var(--rule);background:#fff;
+      display:flex;justify-content:space-between;align-items:center;gap:10px;
+      padding:12px 14px;border-bottom:1px solid var(--rule);background:#fff;flex-wrap:wrap
     }
     .pill{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:7px 10px;border-radius:999px;border:1px solid var(--rule);
-      background:var(--pill);font-size:13px;color:rgba(0,0,0,.78)
+      display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;
+      border:1px solid var(--rule);background:var(--pill);font-size:13px;color:rgba(0,0,0,.78)
     }
-
     .feed{padding:0}
     .post{
-      padding:16px 14px;border-bottom:1px solid var(--soft);
+      padding:16px 14px;border-bottom:1px solid var(--soft)
     }
     .post:last-child{border-bottom:none}
-    .meta{
-      color:var(--muted);font-size:12px;letter-spacing:.14px;text-transform:uppercase;margin-bottom:6px
-    }
-    .pTitle{margin:0 0 8px;font-size:20px;font-weight:900;line-height:1.12}
-    .pBody{margin:0;font-size:15px;line-height:1.6;color:rgba(0,0,0,.86)}
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .chip{
-      display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;
-      border:1px solid var(--rule);background:rgba(0,0,0,.02);font-size:12px;color:rgba(0,0,0,.72)
-    }
-
+    .meta{color:var(--muted);font-size:12px;letter-spacing:.14px;text-transform:uppercase;margin-bottom:6px}
+    .pTitle{margin:0 0 6px;font-size:20px;font-weight:800}
+    .pBody{margin:0;color:rgba(0,0,0,.86);line-height:1.6;font-size:15px}
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
+
+    @media (max-width:900px){
+      .row{grid-template-columns:1fr 1fr}
+    }
+    @media (max-width:760px){
+      .brand{font-size:44px}
+      .pageTitle{font-size:36px}
+      .row{grid-template-columns:1fr}
+    }
   </style>
 </head>
 
@@ -115,53 +122,50 @@
 
     <section class="panel">
       <div class="notice">
-        <strong>Allowed:</strong> Grid • Data Centers • Renewables • Oil &amp; Gas (infrastructure) • OEM/EPC • Careers<br/>
+        <strong>Allowed:</strong> Grid • AI • Data Centers • Renewables • Oil &amp; Gas (infrastructure)<br/>
         <strong>Not allowed:</strong> Politics / elections / general geopolitics • hate • abuse • spam
       </div>
 
       <div class="formWrap">
-        <div class="grid">
-          <div>
-            <label for="name" style="display:block;margin:0 0 6px;color:var(--muted);font-size:13px">Your name</label>
-            <input id="name" placeholder="e.g., Thomas Edison" />
+        <div class="row">
+          <div class="field">
+            <label>Your name</label>
+            <input id="name" placeholder="Your name" />
           </div>
-          <div>
-            <label for="company" style="display:block;margin:0 0 6px;color:var(--muted);font-size:13px">Company (optional)</label>
+          <div class="field">
+            <label>Company (optional)</label>
             <input id="company" placeholder="e.g., PTD Today / GE Vernova" />
           </div>
-          <div>
-            <label for="location" style="display:block;margin:0 0 6px;color:var(--muted);font-size:13px">Location (optional)</label>
+          <div class="field">
+            <label>Location (optional)</label>
             <input id="location" placeholder="e.g., US / NC / EU / Dubai" />
           </div>
-          <div>
-            <label for="category" style="display:block;margin:0 0 6px;color:var(--muted);font-size:13px">Category</label>
+          <div class="field">
+            <label>Category</label>
             <select id="category">
               <option>Job</option>
-              <option>Need</option>
-              <option>Offer</option>
               <option>Service</option>
               <option>Equipment</option>
-              <option>RFP</option>
+              <option>Support</option>
               <option>Other</option>
             </select>
           </div>
         </div>
 
-        <div style="margin-top:10px">
-          <label for="message" style="display:block;margin:0 0 6px;color:var(--muted);font-size:13px">Message</label>
+        <div class="field" style="margin-top:10px">
+          <label>Message</label>
           <textarea id="message" placeholder="Post your need or offer (professional + clean). Example: Need GIS commissioning support in Q2; looking for recommended contractors in the U.S."></textarea>
         </div>
 
         <div class="btnRow">
           <button class="btn" id="btnPost" type="button">Post</button>
-          <button class="btn secondary" id="btnRefresh" type="button">Refresh feed</button>
-          <button class="btn secondary" id="btnClear" type="button">Clear my local feed</button>
+          <button class="btn secondary" id="btnRefreshFeed" type="button">Refresh feed</button>
         </div>
       </div>
 
       <div class="feedHead">
-        <span class="pill" id="countPill">Posts: 0</span>
-        <span class="pill">Local prototype (browser storage)</span>
+        <span class="pill">Room feed</span>
+        <span class="pill" id="countPill">Posts: —</span>
       </div>
 
       <div class="feed" id="feed"></div>
@@ -171,109 +175,51 @@
   </div>
 
   <script>
-    const $ = (id) => document.getElementById(id);
-    const STORE_KEY = "ptd_room_posts_v1";
+    // If you already had your own Room logic, paste it here and keep the same IDs:
+    // name, company, location, category, message, btnPost, btnRefreshFeed, feed.
 
-    function nowIso(){ return new Date().toISOString(); }
-    function fmtLocal(iso){
-      try{ return new Date(iso).toLocaleString(); }catch(e){ return iso; }
-    }
+    const $ = (id) => document.getElementById(id);
+
     function escapeHtml(str){
       return (str ?? "").toString()
         .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    function loadPosts(){
-      try{
-        const raw = localStorage.getItem(STORE_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        return Array.isArray(arr) ? arr : [];
-      }catch(e){
-        return [];
+    // Demo-only feed (so the page doesn't look empty).
+    // Replace this with your existing stored feed (file/db) if you have one.
+    const demo = [
+      {
+        name: "PTD Today",
+        location: "US",
+        category: "Other",
+        company: "PTD Today",
+        message: "Welcome to the PTD Intelligence Room.\n\nThis space is built for professionals across power transmission, grid infrastructure, renewables, and data centers to share real needs and real offers.",
+        created_at: new Date().toISOString()
       }
-    }
-    function savePosts(posts){
-      localStorage.setItem(STORE_KEY, JSON.stringify(posts, null, 2));
-    }
+    ];
 
-    function render(){
-      const posts = loadPosts().sort((a,b)=> (b.created_at||"").localeCompare(a.created_at||""));
-      $("countPill").textContent = `Posts: ${posts.length}`;
-      $("updatedLine").textContent = `Updated — ${new Date().toLocaleString()}`;
-
-      $("feed").innerHTML = posts.length ? posts.map(p => `
+    function render(posts){
+      $("updatedLine").textContent = "Updated — " + new Date().toLocaleString();
+      $("countPill").textContent = "Posts: " + posts.length;
+      $("feed").innerHTML = posts.map(p => `
         <div class="post">
-          <div class="meta">
-            ${escapeHtml(p.category || "Other")} • ${escapeHtml(p.location || "—")} • ${escapeHtml(fmtLocal(p.created_at))}
-          </div>
-          <h3 class="pTitle">${escapeHtml(p.title || "Post")}</h3>
-          <p class="pBody">${escapeHtml(p.message || "")}</p>
-          <div class="chips">
-            ${p.company ? `<span class="chip">${escapeHtml(p.company)}</span>` : ""}
-            ${p.name ? `<span class="chip">${escapeHtml(p.name)}</span>` : ""}
-          </div>
+          <div class="meta">${escapeHtml(p.company || "")} • ${escapeHtml(p.name || "")} • ${escapeHtml(p.location || "")}</div>
+          <div class="pTitle">${escapeHtml(p.category || "Post")}</div>
+          <div class="pBody">${escapeHtml(p.message || "").replace(/\n/g,"<br/>")}</div>
         </div>
-      `).join("") : `
-        <div class="post">
-          <div class="meta">PTD Today • PTD Today • Global</div>
-          <h3 class="pTitle">Welcome to the PTD Intelligence Room</h3>
-          <p class="pBody">
-            This is a community space for professionals across power transmission, grid infrastructure, renewables,
-            data centers, and energy to share real needs and real offers.
-          </p>
-          <p class="pBody" style="margin-top:10px">
-            Whether you are: (1) looking for expertise/support, (2) offering services/equipment/solutions,
-            (3) hiring or open to roles — post here.
-          </p>
-        </div>
-      `;
+      `).join("");
     }
-
-    function makeTitleFrom(category, company, location){
-      const parts = [];
-      if(category) parts.push(category);
-      if(company) parts.push(company);
-      if(location) parts.push(location);
-      return parts.join(" • ").slice(0, 90) || "Post";
-    }
-
-    $("btnPost").addEventListener("click", ()=>{
-      const name = $("name").value.trim();
-      const company = $("company").value.trim();
-      const location = $("location").value.trim();
-      const category = $("category").value;
-      const message = $("message").value.trim();
-
-      if(!message){
-        alert("Please enter a message.");
-        return;
-      }
-
-      const posts = loadPosts();
-      posts.push({
-        id: "room-" + Math.random().toString(36).slice(2),
-        created_at: nowIso(),
-        name, company, location, category,
-        title: makeTitleFrom(category, company, location),
-        message
-      });
-      savePosts(posts);
-
-      $("message").value = "";
-      render();
-    });
-
-    $("btnRefresh").addEventListener("click", render);
-    $("btnClear").addEventListener("click", ()=>{
-      if(confirm("Clear your local Room feed on this browser?")){
-        localStorage.removeItem(STORE_KEY);
-        render();
-      }
-    });
 
     $("year").textContent = new Date().getFullYear();
-    render();
+    render(demo);
+
+    $("btnRefreshFeed").addEventListener("click", ()=>render(demo));
+
+    $("btnPost").addEventListener("click", ()=>{
+      // Placeholder: connect to your existing submit logic if you have one.
+      alert("Posting is not wired in this static version yet. If you already had posting logic, paste it into this file where indicated.");
+    });
   </script>
 </body>
 </html>
