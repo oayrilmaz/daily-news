@@ -26,15 +26,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Avoid push rejection if another run pushed while this run was executing
       - name: Rebase on latest main
         run: |
           git fetch origin main
           git rebase origin/main
 
-      - name: Generate AI JSON
+      - name: Generate AI JSON + Article Pages
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SITE_ORIGIN: https://ptdtoday.com
         run: npm run generate:ai
 
       - name: Commit & push if changed
