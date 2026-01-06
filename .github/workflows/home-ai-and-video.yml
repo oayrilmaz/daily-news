@@ -2,6 +2,8 @@ name: Home AI + YouTube (PTD Today)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ "main" ]
 
 permissions:
   contents: write
@@ -19,24 +21,29 @@ jobs:
         with:
           node-version: "20"
 
+      # ✅ Critical: works even if you DO NOT have package-lock.json
       - name: Install dependencies
         run: npm install
 
       - name: Generate AI News JSON
+        run: npm run generate:ai
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: node scripts/generate_ai_news.js
 
       - name: Generate YouTube JSON
-        env:
-          YOUTUBE_RSS_URLS: ${{ secrets.YOUTUBE_RSS_URLS }}
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-        run: node scripts/generate_youtube.js
+        run: npm run generate:youtube
 
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
           git add -A
-          git diff --cached --quiet || git commit -m "Update AI + YouTube briefs"
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Update AI + YouTube feeds"
           git push
