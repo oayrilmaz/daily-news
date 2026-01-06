@@ -2,11 +2,22 @@ name: Home AI + YouTube (PTD Today)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "15 */6 * * *"   # every 6 hours
   push:
-    branches: [ "main" ]
+    paths:
+      - "scripts/**"
+      - "data/**"
+      - "*.html"
+      - "package.json"
+      - ".github/workflows/home-ai-and-video.yml"
 
 permissions:
   contents: write
+
+concurrency:
+  group: "ptdtoday-home-ai-youtube"
+  cancel-in-progress: true
 
 jobs:
   generate:
@@ -15,17 +26,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # REQUIRED so pull --rebase works
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
-      # ✅ Critical: works even if you DO NOT have package-lock.json
-      - name: Install dependencies
-        run: npm install
+      - name: Install deps
+        run: npm ci
 
-      - name: Generate AI News JSON
+      - name: Generate AI JSON
         run: npm run generate:ai
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -35,15 +48,11 @@ jobs:
 
       - name: Commit & push if changed
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
 
-          git add -A
+          git add data/*.json
+          git commit -m "Update AI + YouTube feeds" || echo "No changes"
 
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          git commit -m "Update AI + YouTube feeds"
-          git push
+          git pull --rebase origin main
+          git push origin main
