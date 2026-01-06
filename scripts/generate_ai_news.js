@@ -1,6 +1,8 @@
 // scripts/generate_ai_news.js
-// Generates a DAILY AI INTELLIGENCE BRIEF (not “verified news”) for PTD Today.
-// Output: data/ai_news.json (for Home) + briefs/daily-ai.json (for Briefs page)
+// Generates DAILY AI WRITTEN BRIEFING for PTD Today (no external links required).
+// Outputs:
+//   - data/ai_news.json                (Home reads this)
+//   - data/briefs/daily-ai.json        (optional copy if you ever use briefs page again)
 
 import fs from "fs";
 import path from "path";
@@ -33,59 +35,65 @@ function writeJson(filePath, obj) {
   fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
 }
 
+// Keep model configurable from repo secrets/env
+function getModel() {
+  return process.env.PTD_OPENAI_MODEL || "gpt-4o-mini";
+}
+
 async function main() {
-  // IMPORTANT: keep API key ONLY in secrets/env (never in HTML/JS front-end).
-  // OpenAI recommends using env vars for keys.  [oai_citation:0‡OpenAI Platform](https://platform.openai.com/docs/api-reference/introduction?utm_source=chatgpt.com)
   const apiKey = mustEnv("OPENAI_API_KEY");
   const client = new OpenAI({ apiKey });
 
   const today = utcDateOnly();
   const now = isoNow();
+  const model = getModel();
 
-  // We will generate “AI brief” (signals, expectations, scenarios),
-  // NOT factual “news” unless you feed verified sources.
+  // IMPORTANT:
+  // This is an "intelligence-style briefing", not verified reporting.
+  // We avoid claiming specific real-world events as facts when not provided sources.
+
   const system = `
-You are PTD Today’s Daily AI Intelligence Brief generator.
+You are PTD Today’s daily editorial writer.
 
-CRITICAL RULES:
-- Do NOT present unverified real-world events as facts.
-- If you are not given sources, write as: "signals", "expectations", "scenario watch", "what to monitor".
-- Avoid naming/quoting specific articles, magazines, or publishers.
-- Keep it useful for: power grid, transmission, substations, HV equipment, EPC/OEM, data centers power, renewables, critical minerals, AI-in-energy.
-- Output MUST be valid JSON that matches the schema exactly.
-- No markdown, no extra text.
+CRITICAL:
+- Do NOT claim specific real-world events happened unless they are framed as "signals" or "watch items".
+- No publisher names. No citations. No links.
+- Avoid politics/elections/geopolitics. Keep it strictly professional infrastructure/energy/AI sectors.
+- Audience: executives in Grid, EPC/OEM, Renewables, Data Centers & AI, critical minerals.
+- Tone: crisp, human, WSJ-like clarity (but not copying WSJ), neutral, professional.
 
-STYLE:
-- Short, punchy, executive tone.
-- Actionable watch items for next 24–72h.
-`;
+OUTPUT:
+- Return valid JSON only (no markdown).
+- Match the schema exactly.
+  `.trim();
 
-  // JSON schema-ish instruction (keeps the output stable)
   const user = `
-Generate today's brief for date_utc = "${today}".
-Return JSON with this exact structure:
+Create today's PTD Today Daily AI Briefing for date_utc="${today}".
+
+Return JSON with EXACT structure:
 
 {
-  "title": "PTD Today — Daily AI Intelligence Brief",
+  "title": "PTD Today — Daily AI Briefing",
   "disclaimer": "Informational only — AI-generated; may contain errors. Not investment or engineering advice.",
   "updated_at": "${now}",
   "date_utc": "${today}",
   "sections": [
-    { "heading": "Top Themes", "bullets": ["...","..."] },
-    { "heading": "What to Watch (24–72h)", "bullets": ["...","..."] }
+    { "heading": "Top Themes", "bullets": ["...","...","...","...","..."] },
+    { "heading": "What to Watch (24–72h)", "bullets": ["...","...","...","...","..."] }
   ],
   "items": [
     {
-      "id": "ai-YYYYMMDD-001",
+      "id": "ai-${today.replaceAll("-","")}-001",
       "created_at": "${now}",
-      "category": "Power Grid" | "Substations" | "Data Centers" | "Renewables" | "Markets" | "Critical Minerals" | "Policy" | "OEM/EPC",
+      "category": "Power Grid" | "Substations" | "Data Centers" | "Renewables" | "Oil & Gas" | "Markets" | "Critical Minerals" | "OEM/EPC",
       "region": "Global" | "North America" | "Europe" | "Middle East" | "Asia" | "LATAM" | "Africa",
-      "title": "Short headline",
-      "summary": "2–3 sentences. MUST be framed as intelligence/scenario, not claimed facts.",
+      "title": "Short headline (8–14 words)",
+      "summary_short": "2–3 sentences. Executive preview. No claimed facts.",
+      "body_long": "A longer human-style brief (120–220 words). Use careful language: signals, pressure points, timelines, constraints, procurement, capacity, interconnection, supply chain. No claimed facts.",
       "confidence_label": "Low" | "Medium" | "High",
       "confidence_score": 0.0,
-      "tags": ["tag1","tag2"],
-      "watchlist": ["bullet", "bullet"],
+      "tags": ["tag1","tag2","tag3"],
+      "watchlist": ["bullet","bullet","bullet"],
       "action_for_readers": "1 sentence action"
     }
   ]
@@ -93,25 +101,24 @@ Return JSON with this exact structure:
 
 REQUIREMENTS:
 - Exactly 10 items.
-- confidence_score between 0.55 and 0.90 (float).
-- ids must be unique.
-- No publisher names, no 'Source:' lines, no links.
-`;
+- confidence_score must be a float between 0.55 and 0.90.
+- No links anywhere.
+- No politics. No elections. No partisan or government drama.
+- Make it feel like a sharp human editor wrote it.
+  `.trim();
 
-  // Use Structured Outputs guide approach (JSON-only).  [oai_citation:1‡OpenAI Platform](https://platform.openai.com/docs/guides/structured-outputs?utm_source=chatgpt.com)
   const resp = await client.responses.create({
-    model: "gpt-5-mini",
+    model,
     input: [
-      { role: "system", content: system.trim() },
-      { role: "user", content: user.trim() }
+      { role: "system", content: system },
+      { role: "user", content: user },
     ],
-    // Strongly encourage JSON-only
-    text: { format: { type: "json_object" } }
+    // Force JSON object output
+    text: { format: { type: "json_object" } },
   });
 
-  // The SDK returns text in output_text for many responses
   const text = resp.output_text;
-  if (!text) throw new Error("No output_text returned from OpenAI");
+  if (!text) throw new Error("No output_text returned from model.");
 
   let payload;
   try {
@@ -120,11 +127,12 @@ REQUIREMENTS:
     throw new Error(`Model returned non-JSON. First 200 chars: ${text.slice(0, 200)}`);
   }
 
-  // Write TWO files so Home + Briefs can read different endpoints if you want
+  // Write outputs
   writeJson(path.join("data", "ai_news.json"), payload);
-  writeJson(path.join("briefs", "daily-ai.json"), payload);
+  writeJson(path.join("data", "briefs", "daily-ai.json"), payload);
 
-  console.log("Wrote: data/ai_news.json and briefs/daily-ai.json");
+  console.log("Wrote: data/ai_news.json");
+  console.log("Wrote: data/briefs/daily-ai.json");
 }
 
 main().catch((err) => {
