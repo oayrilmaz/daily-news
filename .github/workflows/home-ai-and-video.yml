@@ -3,12 +3,11 @@ name: Home AI + YouTube (PTD Today)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 */6 * * *"   # every 6 hours
+    - cron: "15 */6 * * *"
   push:
     paths:
       - "scripts/**"
       - "data/**"
-      - "*.html"
       - "package.json"
       - ".github/workflows/home-ai-and-video.yml"
 
@@ -27,7 +26,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # REQUIRED so pull --rebase works
+          fetch-depth: 0
+
+      - name: Pull latest main
+        run: |
+          git pull origin main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -35,7 +38,7 @@ jobs:
           node-version: "20"
           cache: "npm"
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
 
       - name: Generate AI JSON
@@ -52,7 +55,7 @@ jobs:
           git config user.email "github-actions@github.com"
 
           git add data/*.json
-          git commit -m "Update AI + YouTube feeds" || echo "No changes"
+          git status
 
-          git pull --rebase origin main
+          git commit -m "Update AI + YouTube feeds" || echo "No changes to commit"
           git push origin main
