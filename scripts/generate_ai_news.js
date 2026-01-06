@@ -1,6 +1,6 @@
 // scripts/generate_ai_news.js
 // Generates a DAILY AI INTELLIGENCE BRIEF for PTD Today.
-// Output: data/ai_news.json (Home)
+// Output: data/ai_news.json + briefs/daily-ai.json
 
 import fs from "fs";
 import path from "path";
@@ -41,43 +41,52 @@ async function main() {
   const now = isoNow();
 
   const system = `
-You are PTD Today’s Daily AI Briefing writer.
+You are PTD Today’s Daily Intelligence Brief writer.
 
 CRITICAL RULES:
-- Do NOT present real-world events as verified facts.
-- Write as: "signals", "scenario watch", "what to monitor", "operators may consider".
-- Do NOT cite publishers or include links.
-- Audience: power grid, transmission, substations, HV equipment, EPC/OEM, data center power, renewables, critical minerals, AI-in-energy.
-- Output MUST be valid JSON only. No markdown. No extra text.
+- Do NOT present unverified real-world events as facts.
+- If you are not given sources, write as "signals", "scenario watch", "what to monitor", "expectation", "contingency".
+- Do NOT name or quote publishers, websites, or specific articles.
+- Keep it useful for: power grid, transmission, substations, HV equipment, EPC/OEM, data centers power, renewables, critical minerals, AI-in-energy.
+- Output MUST be valid JSON matching the schema exactly.
+- No markdown, no extra text.
 
-STYLE (WSJ-like briefing tone):
-- Strong headlines, clean lede, then a short “story” paragraph.
-- Practical and readable, like a human editor wrote it.
-- Avoid hype, avoid fluff.
-`;
+WRITING STYLE (important):
+- Human, professional, WSJ-like clarity (tight, concrete, credible tone).
+- Each item must have:
+  (1) a strong headline,
+  (2) a short lede (1–2 sentences),
+  (3) a long body (multi-paragraph, ~500–900 words) that keeps readers engaged.
+- The long body must stay within "intelligence/scenario" framing (no false certainty).
+- Avoid fluff. Use specifics like operational implications, constraints, trade-offs, decision paths.
+`.trim();
 
   const user = `
-Generate today's briefing for date_utc = "${today}".
+Generate today's brief for date_utc = "${today}".
 
 Return JSON with this exact structure:
 
 {
-  "title": "PTD Today — Daily AI Briefing",
+  "title": "PTD Today — Daily AI Intelligence Brief",
   "disclaimer": "Informational only — AI-generated; may contain errors. Not investment or engineering advice.",
   "updated_at": "${now}",
   "date_utc": "${today}",
+  "sections": [
+    { "heading": "Top Themes", "bullets": ["...","...","..."] },
+    { "heading": "What to Watch (24–72h)", "bullets": ["...","...","..."] }
+  ],
   "items": [
     {
       "id": "ai-YYYYMMDD-001",
       "created_at": "${now}",
       "category": "Power Grid" | "Substations" | "Data Centers" | "Renewables" | "Markets" | "Critical Minerals" | "Policy" | "OEM/EPC",
       "region": "Global" | "North America" | "Europe" | "Middle East" | "Asia" | "LATAM" | "Africa",
-      "title": "Headline (6–12 words)",
-      "lede": "1–2 sentences. Executive summary, intelligence framing (not fact claims).",
-      "story": "A longer paragraph (120–220 words) written like a human analyst. Must remain scenario-based, no specific factual claims of breaking events.",
+      "title": "Short headline",
+      "lede": "1–2 sentences hook. Intelligence framing, not asserted facts.",
+      "body": "Multi-paragraph long-form article (~500–900 words). Use blank lines between paragraphs.",
       "confidence_label": "Low" | "Medium" | "High",
       "confidence_score": 0.0,
-      "tags": ["tag1","tag2"],
+      "tags": ["tag1","tag2","tag3"],
       "watchlist": ["bullet", "bullet", "bullet"],
       "action_for_readers": "1 sentence action"
     }
@@ -86,18 +95,17 @@ Return JSON with this exact structure:
 
 REQUIREMENTS:
 - Exactly 10 items.
-- confidence_score between 0.55 and 0.90 (float).
-- ids must be unique and match the date.
-- tags: 2–5 tags each.
-- watchlist: 3–5 bullets each.
+- confidence_score must be a float between 0.55 and 0.90.
+- ids must be unique and sequential (001..010).
 - No links, no sources, no publisher names.
-`;
+- Use blank lines in "body" to separate paragraphs.
+`.trim();
 
   const resp = await client.responses.create({
     model: "gpt-5-mini",
     input: [
-      { role: "system", content: system.trim() },
-      { role: "user", content: user.trim() }
+      { role: "system", content: system },
+      { role: "user", content: user }
     ],
     text: { format: { type: "json_object" } }
   });
@@ -113,7 +121,9 @@ REQUIREMENTS:
   }
 
   writeJson(path.join("data", "ai_news.json"), payload);
-  console.log("Wrote: data/ai_news.json");
+  writeJson(path.join("briefs", "daily-ai.json"), payload);
+
+  console.log("Wrote: data/ai_news.json and briefs/daily-ai.json");
 }
 
 main().catch((err) => {
