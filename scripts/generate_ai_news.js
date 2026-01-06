@@ -1,8 +1,6 @@
 // scripts/generate_ai_news.js
-// Generates DAILY AI WRITTEN BRIEFING for PTD Today (no external links required).
-// Outputs:
-//   - data/ai_news.json                (Home reads this)
-//   - data/briefs/daily-ai.json        (optional copy if you ever use briefs page again)
+// Generates a DAILY AI INTELLIGENCE BRIEF for PTD Today.
+// Output: data/ai_news.json (Home)
 
 import fs from "fs";
 import path from "path";
@@ -35,65 +33,52 @@ function writeJson(filePath, obj) {
   fs.writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
 }
 
-// Keep model configurable from repo secrets/env
-function getModel() {
-  return process.env.PTD_OPENAI_MODEL || "gpt-4o-mini";
-}
-
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const client = new OpenAI({ apiKey });
 
   const today = utcDateOnly();
   const now = isoNow();
-  const model = getModel();
-
-  // IMPORTANT:
-  // This is an "intelligence-style briefing", not verified reporting.
-  // We avoid claiming specific real-world events as facts when not provided sources.
 
   const system = `
-You are PTD Today’s daily editorial writer.
+You are PTD Today’s Daily AI Briefing writer.
 
-CRITICAL:
-- Do NOT claim specific real-world events happened unless they are framed as "signals" or "watch items".
-- No publisher names. No citations. No links.
-- Avoid politics/elections/geopolitics. Keep it strictly professional infrastructure/energy/AI sectors.
-- Audience: executives in Grid, EPC/OEM, Renewables, Data Centers & AI, critical minerals.
-- Tone: crisp, human, WSJ-like clarity (but not copying WSJ), neutral, professional.
+CRITICAL RULES:
+- Do NOT present real-world events as verified facts.
+- Write as: "signals", "scenario watch", "what to monitor", "operators may consider".
+- Do NOT cite publishers or include links.
+- Audience: power grid, transmission, substations, HV equipment, EPC/OEM, data center power, renewables, critical minerals, AI-in-energy.
+- Output MUST be valid JSON only. No markdown. No extra text.
 
-OUTPUT:
-- Return valid JSON only (no markdown).
-- Match the schema exactly.
-  `.trim();
+STYLE (WSJ-like briefing tone):
+- Strong headlines, clean lede, then a short “story” paragraph.
+- Practical and readable, like a human editor wrote it.
+- Avoid hype, avoid fluff.
+`;
 
   const user = `
-Create today's PTD Today Daily AI Briefing for date_utc="${today}".
+Generate today's briefing for date_utc = "${today}".
 
-Return JSON with EXACT structure:
+Return JSON with this exact structure:
 
 {
   "title": "PTD Today — Daily AI Briefing",
   "disclaimer": "Informational only — AI-generated; may contain errors. Not investment or engineering advice.",
   "updated_at": "${now}",
   "date_utc": "${today}",
-  "sections": [
-    { "heading": "Top Themes", "bullets": ["...","...","...","...","..."] },
-    { "heading": "What to Watch (24–72h)", "bullets": ["...","...","...","...","..."] }
-  ],
   "items": [
     {
-      "id": "ai-${today.replaceAll("-","")}-001",
+      "id": "ai-YYYYMMDD-001",
       "created_at": "${now}",
-      "category": "Power Grid" | "Substations" | "Data Centers" | "Renewables" | "Oil & Gas" | "Markets" | "Critical Minerals" | "OEM/EPC",
+      "category": "Power Grid" | "Substations" | "Data Centers" | "Renewables" | "Markets" | "Critical Minerals" | "Policy" | "OEM/EPC",
       "region": "Global" | "North America" | "Europe" | "Middle East" | "Asia" | "LATAM" | "Africa",
-      "title": "Short headline (8–14 words)",
-      "summary_short": "2–3 sentences. Executive preview. No claimed facts.",
-      "body_long": "A longer human-style brief (120–220 words). Use careful language: signals, pressure points, timelines, constraints, procurement, capacity, interconnection, supply chain. No claimed facts.",
+      "title": "Headline (6–12 words)",
+      "lede": "1–2 sentences. Executive summary, intelligence framing (not fact claims).",
+      "story": "A longer paragraph (120–220 words) written like a human analyst. Must remain scenario-based, no specific factual claims of breaking events.",
       "confidence_label": "Low" | "Medium" | "High",
       "confidence_score": 0.0,
-      "tags": ["tag1","tag2","tag3"],
-      "watchlist": ["bullet","bullet","bullet"],
+      "tags": ["tag1","tag2"],
+      "watchlist": ["bullet", "bullet", "bullet"],
       "action_for_readers": "1 sentence action"
     }
   ]
@@ -101,24 +86,24 @@ Return JSON with EXACT structure:
 
 REQUIREMENTS:
 - Exactly 10 items.
-- confidence_score must be a float between 0.55 and 0.90.
-- No links anywhere.
-- No politics. No elections. No partisan or government drama.
-- Make it feel like a sharp human editor wrote it.
-  `.trim();
+- confidence_score between 0.55 and 0.90 (float).
+- ids must be unique and match the date.
+- tags: 2–5 tags each.
+- watchlist: 3–5 bullets each.
+- No links, no sources, no publisher names.
+`;
 
   const resp = await client.responses.create({
-    model,
+    model: "gpt-5-mini",
     input: [
-      { role: "system", content: system },
-      { role: "user", content: user },
+      { role: "system", content: system.trim() },
+      { role: "user", content: user.trim() }
     ],
-    // Force JSON object output
-    text: { format: { type: "json_object" } },
+    text: { format: { type: "json_object" } }
   });
 
   const text = resp.output_text;
-  if (!text) throw new Error("No output_text returned from model.");
+  if (!text) throw new Error("No output_text returned from OpenAI");
 
   let payload;
   try {
@@ -127,12 +112,8 @@ REQUIREMENTS:
     throw new Error(`Model returned non-JSON. First 200 chars: ${text.slice(0, 200)}`);
   }
 
-  // Write outputs
   writeJson(path.join("data", "ai_news.json"), payload);
-  writeJson(path.join("data", "briefs", "daily-ai.json"), payload);
-
   console.log("Wrote: data/ai_news.json");
-  console.log("Wrote: data/briefs/daily-ai.json");
 }
 
 main().catch((err) => {
