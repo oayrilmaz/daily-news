@@ -17,14 +17,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
 
+      # 🔴 CRITICAL FIX — DO NOT USE npm ci OR cache
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
@@ -38,7 +39,7 @@ jobs:
           YOUTUBE_RSS_URLS: ${{ secrets.YOUTUBE_RSS_URLS }}
         run: node scripts/generate_youtube.js
 
-      - name: Commit & push if changed
+      - name: Commit and push if changed
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: update AI + YouTube feeds"
