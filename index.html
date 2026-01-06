@@ -1,132 +1,119 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Briefing</title>
-  <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence briefing)." />
+  <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence brief)." />
 
   <style>
     :root{
-      --bg:#fbfaf7;
-      --paper:#ffffff;
-      --ink:#111111;
-      --muted:#6b6b6b;
+      --bg:#f4efe6;
+      --paper:#fffdf8;
+      --ink:#111;
+      --muted:#666;
       --rule:rgba(0,0,0,.12);
-      --chipbg:#f4f2ed;
-      --chipbd:rgba(0,0,0,.12);
-      --btnbg:#111;
-      --btnink:#fff;
-      --btnbd:rgba(0,0,0,.2);
+      --chip:#f2efe8;
+      --shadow:0 18px 40px rgba(0,0,0,.06);
     }
     *{box-sizing:border-box}
     body{
       margin:0;
-      font-family: Georgia,"Times New Roman",Times,serif;
       background:var(--bg);
       color:var(--ink);
+      font-family: Georgia,"Times New Roman",Times,serif;
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
     a{color:inherit}
-    .wrap{max-width:860px;margin:0 auto;padding:26px 16px 60px}
-    .mast{text-align:center;padding:14px 0 10px}
-    .brand{font-size:46px;letter-spacing:.2px;margin:0;font-weight:700}
-    .tagline{margin:6px 0 18px;color:var(--muted);font-style:italic;font-size:17px}
+    .wrap{max-width:860px;margin:0 auto;padding:26px 16px 56px}
 
-    .nav{display:flex;justify-content:center;gap:18px;margin:2px 0 6px;flex-wrap:wrap}
+    /* Mast (WSJ-ish: strong masthead, thin rules) */
+    .mast{text-align:center;padding:18px 0 6px}
+    .brand{margin:0;font-weight:800;letter-spacing:.4px;font-size:54px}
+    .tagline{margin:6px 0 14px;color:var(--muted);font-style:italic;font-size:18px}
+    .nav{display:flex;justify-content:center;gap:18px;margin:6px 0 6px}
     .nav a{
       text-decoration:none;
-      padding:6px 10px;
+      padding:8px 12px;
       border-radius:999px;
       border:1px solid transparent;
-      color:rgba(0,0,0,.8);
+      color:rgba(0,0,0,.78);
       font-size:16px;
     }
-    .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.03)}
-    .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.04);font-weight:700}
+    .nav a:hover{border-color:var(--rule);background:rgba(255,255,255,.35)}
+    .nav a.active{border-color:var(--rule);background:rgba(255,255,255,.55);font-weight:700;color:rgba(0,0,0,.92)}
+    .rule{height:1px;background:var(--rule);margin:14px auto 0;max-width:740px}
 
-    .pageTitle{text-align:center;margin:14px 0 6px;font-size:44px;font-weight:800;letter-spacing:.1px}
-    .updated{text-align:center;color:var(--muted);font-size:16px;margin-bottom:18px}
+    .pageTitle{text-align:center;margin:18px 0 4px;font-size:44px;font-weight:900}
+    .updated{text-align:center;color:var(--muted);font-size:16px;margin:0 0 16px}
 
     .panel{
       background:var(--paper);
       border:1px solid var(--rule);
-      border-radius:14px;
+      border-radius:16px;
+      box-shadow:var(--shadow);
       overflow:hidden;
-      box-shadow:0 10px 26px rgba(0,0,0,.05);
     }
-
     .toolbar{
-      display:flex;
-      gap:10px;
-      padding:14px;
+      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+      padding:14px 14px;
       border-bottom:1px solid var(--rule);
-      align-items:center;
-      flex-wrap:wrap;
+      background:rgba(0,0,0,.02);
     }
     .btn{
       appearance:none;
-      border:1px solid var(--btnbd);
-      background:var(--btnbg);
-      color:var(--btnink);
-      padding:10px 14px;
+      border:1px solid var(--rule);
+      background:#111;
+      color:#fff;
+      padding:9px 14px;
       border-radius:999px;
       cursor:pointer;
       font-family:inherit;
       font-size:15px;
     }
     .btn.secondary{
-      background:#fff;
-      color:#111;
+      background:transparent;
+      color:rgba(0,0,0,.82);
     }
-    .btn.secondary:hover{background:rgba(0,0,0,.03)}
-    .search{flex:1 1 280px;display:flex;gap:10px;align-items:center;min-width:220px;margin-left:auto}
+    .btn.secondary:hover{background:rgba(0,0,0,.04)}
+    .search{flex:1 1 280px;margin-left:auto}
     .search input{
       width:100%;
-      padding:10px 14px;
-      border-radius:999px;
       border:1px solid var(--rule);
-      background:#fff;
+      border-radius:999px;
+      padding:10px 14px;
+      background:rgba(0,0,0,.02);
       font-family:inherit;
       font-size:15px;
       outline:none;
     }
 
     .notice{
-      padding:14px 16px;
+      padding:12px 14px;
       border-bottom:1px solid var(--rule);
       color:rgba(0,0,0,.78);
       font-size:15px;
+    }
+    .headRow{
+      display:flex;justify-content:space-between;gap:10px;align-items:center;
+      padding:10px 14px;border-bottom:1px solid var(--rule);
       background:rgba(0,0,0,.015);
     }
-
-    .itemsHead{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:12px 16px;
-      border-bottom:1px solid var(--rule);
-      background:rgba(0,0,0,.01);
-      flex-wrap:wrap;
-    }
     .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid var(--chipbd);
-      background:var(--chipbg);
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--chip);
+      color:rgba(0,0,0,.75);
       font-size:14px;
-      color:rgba(0,0,0,.78)
     }
     .tiny{color:var(--muted);font-size:14px}
 
-    .feed{padding:6px 0}
+    .feed{padding:0}
     .card{
-      padding:18px 16px 16px;
+      padding:16px 14px 14px;
       border-bottom:1px solid var(--rule);
     }
     .card:last-child{border-bottom:none}
@@ -138,103 +125,97 @@
       text-transform:uppercase;
       margin-bottom:8px;
     }
-    .headline{
+    .title{
       margin:0 0 10px;
-      font-size:32px;
-      font-weight:800;
-      line-height:1.05;
-      letter-spacing:.1px;
+      font-size:34px;
+      line-height:1.08;
+      font-weight:900;
     }
-    .lede{
+    .deck{
       margin:0 0 12px;
+      color:rgba(0,0,0,.82);
       font-size:18px;
       line-height:1.55;
-      color:rgba(0,0,0,.9);
-    }
-    .story{
-      margin:0 0 12px;
-      font-size:17px;
-      line-height:1.65;
-      color:rgba(0,0,0,.88);
-      white-space:pre-wrap;
     }
 
-    .row{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-top:10px;
+    .metaRow{
+      display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+      margin:10px 0 0;
     }
     .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid var(--chipbd);
-      background:var(--chipbg);
-      font-size:13px;
-      color:rgba(0,0,0,.8);
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--chip);
+      font-size:13px;color:rgba(0,0,0,.72);
     }
 
-    .actions{
+    details.story{
+      margin-top:12px;
+      border-top:1px solid var(--rule);
+      padding-top:12px;
+    }
+    details.story summary{
+      list-style:none;
       display:flex;
       gap:10px;
-      flex-wrap:wrap;
-      margin-top:12px;
       align-items:center;
-    }
-    .linkBtn{
-      appearance:none;
-      border:1px solid var(--chipbd);
-      background:#fff;
-      color:#111;
-      padding:9px 12px;
-      border-radius:999px;
       cursor:pointer;
-      font-family:inherit;
-      font-size:14px;
+      user-select:none;
     }
-    .linkBtn:hover{background:rgba(0,0,0,.03)}
+    details.story summary::-webkit-details-marker{display:none}
     .readBtn{
-      appearance:none;
-      border:1px solid var(--btnbd);
-      background:#111;
-      color:#fff;
-      padding:9px 12px;
-      border-radius:999px;
-      cursor:pointer;
-      font-family:inherit;
-      font-size:14px;
+      border:1px solid var(--rule);
+      background:#111;color:#fff;
+      padding:8px 12px;border-radius:999px;
+      font-family:inherit;font-size:14px;
     }
-
-    .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .tag{
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--chipbd);
-      background:var(--chipbg);
+    .shareBtn{
+      border:1px solid var(--rule);
+      background:transparent;
+      color:rgba(0,0,0,.82);
+      padding:8px 12px;border-radius:999px;
+      font-family:inherit;font-size:14px;
+    }
+    .shareBtn:hover{background:rgba(0,0,0,.04)}
+    .storyBody{
+      margin-top:12px;
+      font-size:18px;
+      line-height:1.75;
+      color:rgba(0,0,0,.88);
+      white-space:pre-line; /* keeps paragraphs if provided */
+    }
+    .subhead{
+      margin:14px 0 6px;
       font-size:13px;
-      color:rgba(0,0,0,.78)
+      letter-spacing:.12px;
+      text-transform:uppercase;
+      color:var(--muted);
     }
-
-    .divider{height:1px;background:var(--rule);margin:10px 0}
+    ul.clean{
+      margin:6px 0 0 18px;
+      padding:0;
+      color:rgba(0,0,0,.85);
+      font-size:17px;
+      line-height:1.6;
+    }
 
     .errorBox{
       padding:18px;
       color:#7a1f1f;
-      background:rgba(255,230,230,.65);
-      border:1px solid rgba(122,31,31,.20);
+      background:rgba(255,230,230,.70);
+      border:1px solid rgba(122,31,31,.18);
       border-radius:12px;
-      margin:16px;
+      margin:14px;
     }
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:14px}
 
     @media (max-width:760px){
-      .brand{font-size:40px}
+      .brand{font-size:44px}
       .pageTitle{font-size:36px}
-      .headline{font-size:28px}
+      .title{font-size:28px}
+      .deck{font-size:17px}
+      .storyBody{font-size:17px}
     }
   </style>
 </head>
@@ -245,20 +226,21 @@
       <h1 class="brand">PTD Today</h1>
       <div class="tagline">First to Know. First to Lead.</div>
 
-      <!-- ONLY Home + Room -->
+      <!-- Only Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a class="active" href="/index.html">Home</a>
         <a href="/room.html">Room</a>
       </nav>
+
+      <div class="rule"></div>
     </header>
 
-    <div class="pageTitle">Daily AI Briefing</div>
+    <div class="pageTitle">Daily Briefing</div>
     <div class="updated" id="updatedLine">Loading…</div>
 
     <section class="panel">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
-
         <div class="search">
           <input id="q" type="search" placeholder="Search headlines, tags, regions…" autocomplete="off" />
         </div>
@@ -268,7 +250,7 @@
         <em>Loading disclaimer…</em>
       </div>
 
-      <div class="itemsHead">
+      <div class="headRow">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="pill" id="countPill">Items: —</span>
           <span class="pill" id="datePill">Date (UTC): —</span>
@@ -283,7 +265,9 @@
   </div>
 
   <script>
-    // Read ONLY from data/ai_news.json (single source of truth)
+    // Use your generated file:
+    // Your script currently writes: data/ai_news.json and briefs/daily-ai.json
+    // Since we removed Briefs page, Home should read from /data/ai_news.json.
     const DATA_URL = "/data/ai_news.json";
     const $ = (id) => document.getElementById(id);
 
@@ -298,77 +282,89 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    function buildShareUrl(item){
-      // share a stable URL (home page) + simple text payload
-      const base = location.origin + "/index.html";
-      const text = `${item.title || "PTD Today"} — ${item.lede || item.summary || ""}`.trim();
-      return { url: base, text };
+    function metaLine(item){
+      const bits = [
+        item.category ? item.category.toUpperCase() : null,
+        item.region ? item.region.toUpperCase() : null,
+        item.created_at ? fmtUtc(item.created_at) : null
+      ].filter(Boolean);
+      return bits.join(" • ");
+    }
+
+    function sharePayload(item){
+      const title = item.title || "PTD Today";
+      const text = (item.teaser || item.summary || "").toString().slice(0, 240);
+      const url = location.href.split("#")[0];
+      return { title, text, url };
     }
 
     async function doShare(item){
-      const payload = buildShareUrl(item);
+      const p = sharePayload(item);
       try{
         if (navigator.share){
-          await navigator.share({ title: "PTD Today", text: payload.text, url: payload.url });
+          await navigator.share(p);
           return;
         }
-      }catch(e){ /* user cancelled or share failed */ }
-
+      }catch(e){}
       // fallback: copy
       try{
-        await navigator.clipboard.writeText(payload.url);
-        alert("Link copied.");
+        await navigator.clipboard.writeText(`${p.title}\n\n${p.text}\n\n${p.url}`);
+        alert("Copied to clipboard.");
       }catch(e){
-        prompt("Copy link:", payload.url);
+        prompt("Copy this:", `${p.title}\n\n${p.text}\n\n${p.url}`);
       }
     }
 
     function cardHtml(item, idx){
       const tags = Array.isArray(item.tags) ? item.tags : [];
-      const kicker = [
-        item.category ? item.category.toUpperCase() : "BRIEFING",
-        item.region ? item.region.toUpperCase() : "GLOBAL",
-        item.created_at ? fmtUtc(item.created_at) : ""
-      ].filter(Boolean).join(" • ");
-
-      const lede = item.lede || item.summary || "";
-      const story = item.story || item.body || ""; // allow either key
       const confLabel = item.confidence_label || "Medium";
       const confScore = (typeof item.confidence_score === "number") ? item.confidence_score : "";
 
-      // expand/collapse using a hidden div we toggle in JS after render
-      const storyId = `story_${idx}`;
-      const btnId = `read_${idx}`;
+      // Long-form fields (new):
+      const teaser = item.teaser || item.summary || "";
+      const story = item.story || ""; // full article text (paragraphs)
+      const watch = Array.isArray(item.watchlist) ? item.watchlist : [];
+      const action = item.action_for_readers || "";
+
+      const id = item.id || `ai-${idx+1}`;
+      const anchor = `#${encodeURIComponent(id)}`;
+
+      const storyBlock = `
+        <details class="story">
+          <summary>
+            <button class="readBtn" type="button">Read</button>
+            <button class="shareBtn" type="button" data-share="${escapeHtml(id)}">Share</button>
+            ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
+            ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
+            <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore!==""?` (${confScore})`:""}</span>
+          </summary>
+
+          <div class="storyBody">${escapeHtml(story || teaser)}</div>
+
+          ${watch.length ? `
+            <div class="subhead">What to watch</div>
+            <ul class="clean">${watch.slice(0,10).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>
+          ` : ""}
+
+          ${action ? `
+            <div class="subhead">Action</div>
+            <div class="storyBody" style="padding-top:0">${escapeHtml(action)}</div>
+          ` : ""}
+
+          ${tags.length ? `
+            <div class="metaRow" style="margin-top:14px">
+              ${tags.slice(0,16).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}
+            </div>
+          ` : ""}
+        </details>
+      `;
 
       return `
-        <article class="card">
-          <div class="kicker">${escapeHtml(kicker)}</div>
-          <h2 class="headline">${escapeHtml(item.title || "Untitled")}</h2>
-          ${lede ? `<p class="lede">${escapeHtml(lede)}</p>` : ""}
-
-          <div id="${storyId}" style="display:none;">
-            <div class="divider"></div>
-            ${story ? `<p class="story">${escapeHtml(story)}</p>` : ""}
-            ${Array.isArray(item.watchlist) && item.watchlist.length
-              ? `<div class="divider"></div>
-                 <div class="kicker">What to watch</div>
-                 <ul style="margin:0; padding-left:18px; color:rgba(0,0,0,.88); line-height:1.6;">
-                   ${item.watchlist.slice(0,6).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}
-                 </ul>`
-              : ""
-            }
-            ${item.action_for_readers ? `<div class="divider"></div><div class="kicker">Action</div><p class="story" style="margin-top:6px;">${escapeHtml(item.action_for_readers)}</p>` : ""}
-          </div>
-
-          <div class="actions">
-            <button class="readBtn" id="${btnId}" type="button">Read</button>
-            <button class="linkBtn" data-share="${idx}" type="button">Share</button>
-            <span class="chip">${escapeHtml(item.category || "—")}</span>
-            <span class="chip">${escapeHtml(item.region || "—")}</span>
-            <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore!==""?` (${confScore})`:""}</span>
-          </div>
-
-          ${tags.length ? `<div class="tags">${tags.slice(0,14).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+        <article class="card" id="${escapeHtml(id)}">
+          <div class="kicker">${escapeHtml(metaLine(item) || "PTD BRIEFING")}</div>
+          <h2 class="title">${escapeHtml(item.title || "Untitled")}</h2>
+          <p class="deck">${escapeHtml(teaser)}</p>
+          ${storyBlock}
         </article>
       `;
     }
@@ -378,33 +374,11 @@
       if(!q) return items;
       return items.filter(it=>{
         const hay = [
-          it.title,it.lede,it.summary,it.story,it.body,it.category,it.region,
+          it.title, it.teaser, it.summary, it.story,
+          it.category, it.region,
           ...(Array.isArray(it.tags)?it.tags:[])
         ].map(normalize).join(" ");
         return hay.includes(q);
-      });
-    }
-
-    function attachHandlers(items){
-      // Read toggles
-      items.forEach((_, idx)=>{
-        const btn = document.getElementById(`read_${idx}`);
-        const story = document.getElementById(`story_${idx}`);
-        if(!btn || !story) return;
-        btn.addEventListener("click", ()=>{
-          const open = story.style.display !== "none";
-          story.style.display = open ? "none" : "block";
-          btn.textContent = open ? "Read" : "Hide";
-        });
-      });
-
-      // Share buttons
-      document.querySelectorAll("[data-share]").forEach(el=>{
-        el.addEventListener("click", ()=>{
-          const idx = Number(el.getAttribute("data-share"));
-          const item = items[idx];
-          if(item) doShare(item);
-        });
       });
     }
 
@@ -421,14 +395,33 @@
 
       const allItems = Array.isArray(payload.items) ? payload.items : [];
       const items = applySearch(allItems, query);
-
       $("countPill").textContent = `Items: ${items.length}`;
 
       $("feed").innerHTML = items.length
-        ? items.map((it, idx)=>cardHtml(it, idx)).join("")
+        ? items.map(cardHtml).join("")
         : `<div class="errorBox">No items matched your search.</div>`;
 
-      attachHandlers(items);
+      // Wire share buttons after render
+      document.querySelectorAll("[data-share]").forEach(btn=>{
+        btn.addEventListener("click", (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.getAttribute("data-share");
+          const item = allItems.find(x => (x.id || "") === id) || null;
+          doShare(item || {});
+        });
+      });
+
+      // Make the "Read" button behave like a toggle label (without jumping)
+      document.querySelectorAll("details.story summary .readBtn").forEach(b=>{
+        b.addEventListener("click", (e)=>{
+          e.preventDefault();
+          e.stopPropagation();
+          const details = b.closest("details");
+          details.open = !details.open;
+          b.textContent = details.open ? "Hide" : "Read";
+        });
+      });
     }
 
     async function load(){
@@ -437,8 +430,11 @@
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
+
+        // initial render + search live
         render(payload, $("q").value);
         $("q").addEventListener("input", ()=>render(payload, $("q").value));
+
       }catch(err){
         $("updatedLine").textContent = "Could not load briefing.";
         $("disclaimerLine").textContent = "";
@@ -446,7 +442,7 @@
           <div class="errorBox">
             <strong>Briefing not available yet.</strong><br/>
             Expected file: <code>${DATA_URL}</code><br/>
-            <div style="margin-top:10px;color:#6b6b6b;">${escapeHtml(err.message || String(err))}</div>
+            <div style="margin-top:10px;color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
           </div>`;
       }
     }
