@@ -197,6 +197,76 @@
       border-radius: 14px;
       margin: 16px;
     }
+
+    /* ✅ YouTube section styles */
+    .subTitle{
+      text-align:center;
+      margin: 18px 0 10px;
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .ytWrap{
+      padding: 12px 12px 16px;
+    }
+
+    .ytGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    @media (min-width: 720px){
+      .ytGrid{ grid-template-columns: 1fr 1fr; }
+    }
+
+    .ytCard{
+      display:grid;
+      grid-template-columns: 150px 1fr;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.28);
+      text-decoration:none;
+      overflow:hidden;
+    }
+
+    .ytThumb{
+      width: 150px;
+      height: 84px;
+      border-radius: 10px;
+      overflow:hidden;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.35);
+    }
+    .ytThumb img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      display:block;
+    }
+
+    .ytTitle{
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--accent);
+    }
+
+    .ytMeta{
+      color: var(--muted);
+      font-size: 13px;
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items:center;
+    }
+
+    .dot{opacity:.7}
+
     .footer{
       text-align:center;
       margin-top: 18px;
@@ -209,6 +279,9 @@
       .card{grid-template-columns: 1fr}
       .side{text-align:left; min-width:auto}
       .rightBox{align-items:flex-start}
+
+      .ytCard{ grid-template-columns: 1fr; }
+      .ytThumb{ width: 100%; height: 180px; }
     }
   </style>
 </head>
@@ -227,6 +300,31 @@
       </nav>
     </header>
 
+    <!-- ✅ New YouTube section on Home -->
+    <div class="subTitle">YouTube Briefs</div>
+
+    <section class="panel" aria-label="YouTube Briefs">
+      <div class="toolbar">
+        <button class="btn" id="ytBtnRefresh" type="button">Refresh</button>
+
+        <div style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="pill" id="ytCountPill">Items: —</span>
+          <span class="pill" id="ytStatusPill">Loading…</span>
+        </div>
+      </div>
+
+      <div class="notice">
+        <span><strong>What this is:</strong> latest videos from selected channels (YouTube RSS), curated for PTD sectors.</span>
+        <span style="display:block; margin-top:6px;"><em>If this is empty, check that <code>/data/youtube.json</code> exists and is committed by your Action.</em></span>
+      </div>
+
+      <div class="ytWrap">
+        <div class="ytGrid" id="ytGrid"></div>
+        <div class="errorBox" id="ytError" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- Your existing AI section -->
     <div class="pageTitle">Daily AI News</div>
     <div class="updated" id="updatedLine">Loading…</div>
 
@@ -259,8 +357,12 @@
   </div>
 
   <script>
-    // ✅ This is the ONLY source Home uses now:
+    // ✅ AI file:
     const DATA_URL = "/briefs/daily-ai.json"; // must exist in your repo after the Action runs
+
+    // ✅ YouTube file:
+    const YT_URL = "/data/youtube.json"; // must exist in your repo after the Action runs
+
     const $ = (id) => document.getElementById(id);
 
     function fmtUtc(iso){
@@ -268,6 +370,13 @@
         const d = new Date(iso);
         return d.toUTCString().replace("GMT","UTC");
       }catch(e){ return iso || ""; }
+    }
+
+    function fmtLocalShort(iso){
+      if(!iso) return "";
+      const d = new Date(iso);
+      if(Number.isNaN(d.getTime())) return "";
+      return d.toLocaleString(undefined, { year:"numeric", month:"short", day:"2-digit" });
     }
 
     function normalize(s){ return (s || "").toString().toLowerCase(); }
@@ -278,6 +387,83 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
+    // ---------------------------
+    // ✅ YouTube render
+    // Expected items:
+    // [{ title, videoId, url, channel, published }, ...]
+    // ---------------------------
+    function ytCardHtml(v){
+      const url = v.url || (v.videoId ? `https://www.youtube.com/watch?v=${v.videoId}` : "#");
+      const thumb = v.videoId ? `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg` : "";
+      const title = escapeHtml(v.title || "Untitled");
+      const channel = escapeHtml(v.channel || "");
+      const published = escapeHtml(fmtLocalShort(v.published || v.published_at || v.publishedAt || ""));
+
+      return `
+        <a class="ytCard" href="${url}" target="_blank" rel="noopener">
+          <div class="ytThumb">
+            ${thumb ? `<img src="${thumb}" alt="${title}">` : ""}
+          </div>
+          <div>
+            <div class="ytTitle">${title}</div>
+            <div class="ytMeta">
+              ${channel ? `<span>${channel}</span>` : ""}
+              ${channel && published ? `<span class="dot">•</span>` : ""}
+              ${published ? `<span>${published}</span>` : ""}
+            </div>
+          </div>
+        </a>
+      `;
+    }
+
+    async function loadYouTube(){
+      $("ytError").style.display = "none";
+      $("ytError").textContent = "";
+      $("ytStatusPill").textContent = "Loading…";
+      $("ytCountPill").textContent = "Items: —";
+      $("ytGrid").innerHTML = "";
+
+      try{
+        const res = await fetch(YT_URL, { cache: "no-store" });
+        if(!res.ok) throw new Error(`Failed to load ${YT_URL} (${res.status})`);
+
+        const items = await res.json();
+        if(!Array.isArray(items) || items.length === 0){
+          $("ytStatusPill").textContent = "Empty";
+          $("ytCountPill").textContent = "Items: 0";
+          $("ytError").style.display = "block";
+          $("ytError").innerHTML = `No YouTube items found in <code>${escapeHtml(YT_URL)}</code>.`;
+          return;
+        }
+
+        // keep only usable entries
+        const usable = items.filter(v => v && v.title && (v.videoId || v.url));
+        $("ytCountPill").textContent = `Items: ${usable.length}`;
+        $("ytStatusPill").textContent = "OK";
+
+        if(usable.length === 0){
+          $("ytError").style.display = "block";
+          $("ytError").innerHTML = `Your <code>${escapeHtml(YT_URL)}</code> exists, but items are missing <code>title</code> or <code>videoId/url</code>.`;
+          return;
+        }
+
+        $("ytGrid").innerHTML = usable.slice(0, 12).map(ytCardHtml).join("");
+
+      }catch(err){
+        $("ytStatusPill").textContent = "Error";
+        $("ytCountPill").textContent = "Items: —";
+        $("ytError").style.display = "block";
+        $("ytError").innerHTML = `
+          <strong>YouTube section not available yet.</strong><br/>
+          Expected file: <code>${escapeHtml(YT_URL)}</code><br/>
+          <div style="margin-top:10px; color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
+        `;
+      }
+    }
+
+    // ---------------------------
+    // ✅ AI render (your existing logic)
+    // ---------------------------
     function cardHtml(item){
       const tags = Array.isArray(item.tags) ? item.tags : [];
       const meta = [
@@ -349,7 +535,7 @@
         : `<div class="errorBox">No AI items matched your search.</div>`;
     }
 
-    async function load(){
+    async function loadAI(){
       $("year").textContent = new Date().getFullYear();
 
       try{
@@ -357,7 +543,6 @@
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
 
-        // Optional: set title if JSON includes it
         if(payload.title) document.title = payload.title;
 
         render(payload, $("q").value);
@@ -369,7 +554,7 @@
         $("feed").innerHTML = `
           <div class="errorBox">
             <strong>AI news not available yet.</strong><br/>
-            Expected file: <code>${DATA_URL}</code><br/>
+            Expected file: <code>${escapeHtml(DATA_URL)}</code><br/>
             Run your GitHub Action that generates it (and commits it).<br/>
             <div style="margin-top:10px; color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
           </div>
@@ -377,10 +562,14 @@
       }
     }
 
+    // Buttons
     $("btnRefresh").addEventListener("click", () => location.reload());
     $("btnTop").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+    $("ytBtnRefresh").addEventListener("click", () => loadYouTube());
 
-    load();
+    // Initial loads
+    loadYouTube();
+    loadAI();
   </script>
 </body>
 </html>
