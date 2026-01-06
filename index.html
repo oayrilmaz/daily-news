@@ -3,10 +3,191 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PTD Today — Daily Briefing</title>
-  <meta name="description" content="PTD Today — Daily briefing (AI-assisted). Informational only." />
+  <title>PTD Today — Daily AI Briefing</title>
+  <meta name="description" content="PTD Today — Daily AI Briefing (AI-generated)." />
 
-  <link rel="stylesheet" href="/assets/main.css?v=1" />
+  <style>
+    :root{
+      --bg:#f3ecdf;
+      --paper:#fffdf8;
+      --ink:#111;
+      --muted:#6b665c;
+      --line:rgba(0,0,0,.12);
+      --accent:#0f172a;
+      --shadow:0 10px 30px rgba(0,0,0,.06);
+      --pill:#efe3cf;
+      --pill2:#e7d6bb;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Georgia, "Times New Roman", Times, serif;
+      background:var(--bg);
+      color:var(--ink);
+    }
+    a{color:inherit}
+    .wrap{max-width:980px;margin:0 auto;padding:28px 16px 60px}
+    .mast{text-align:center;padding:22px 0 10px}
+    .brand{font-size:52px;letter-spacing:.4px;margin:0;font-weight:700}
+    .tagline{margin:6px 0 18px;color:var(--muted);font-style:italic;font-size:18px}
+
+    .nav{display:flex;justify-content:center;gap:18px;margin:4px 0 14px;flex-wrap:wrap}
+    .nav a{
+      text-decoration:none;padding:8px 12px;border-radius:999px;
+      border:1px solid transparent;color:rgba(0,0,0,.75);font-size:16px
+    }
+    .nav a:hover{border-color:var(--line);background:rgba(255,255,255,.35)}
+    .nav a.active{border-color:var(--line);background:rgba(255,255,255,.55);font-weight:700;color:rgba(0,0,0,.92)}
+
+    .pageTitle{text-align:center;margin:12px 0 6px;font-size:40px;font-weight:800;letter-spacing:.2px}
+    .updated{text-align:center;color:var(--muted);font-size:15px;margin-bottom:18px}
+
+    .panel{
+      background:var(--paper);
+      border:1px solid var(--line);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .toolbar{
+      display:flex;gap:10px;padding:14px;
+      border-bottom:1px solid var(--line);
+      align-items:center;flex-wrap:wrap;
+      background:rgba(255,255,255,.55);
+    }
+    .btn{
+      appearance:none;border:1px solid var(--line);background:var(--pill);
+      padding:10px 14px;border-radius:999px;cursor:pointer;
+      font-family:inherit;font-size:15px;color:rgba(0,0,0,.82)
+    }
+    .btn:hover{background:var(--pill2)}
+    .search{flex:1 1 280px;display:flex;gap:10px;align-items:center;min-width:240px;margin-left:auto}
+    .search input{
+      width:100%;padding:10px 14px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.85);font-family:inherit;font-size:15px;outline:none
+    }
+
+    .notice{
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      color:rgba(0,0,0,.78);
+      font-size:15px;
+      background:rgba(255,255,255,.35);
+    }
+
+    .sections{padding:14px 16px 0}
+    .sec{
+      margin:0 0 12px;
+      padding:12px 12px 10px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:rgba(255,255,255,.55);
+    }
+    .sec h3{margin:0 0 8px;font-size:17px;letter-spacing:.2px}
+    .sec ul{margin:0 0 0 18px;padding:0}
+    .sec li{margin:6px 0;color:rgba(0,0,0,.84);line-height:1.35}
+
+    .itemsHead{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      padding:12px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+      background:rgba(255,255,255,.28);
+    }
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;
+      border:1px solid var(--line);background:rgba(255,255,255,.55);font-size:14px;color:rgba(0,0,0,.78)
+    }
+    .tiny{color:var(--muted);font-size:14px}
+
+    .feed{padding:6px 10px 16px}
+
+    .card{
+      padding:16px 14px;
+      border-bottom:1px solid var(--line);
+    }
+    .card:last-child{border-bottom:none}
+
+    .meta{
+      color:var(--muted);
+      font-size:13px;
+      letter-spacing:.15px;
+      text-transform:uppercase;
+      margin-bottom:8px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .metaLeft{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+    .title{
+      margin:0 0 8px;
+      font-size:24px;
+      font-weight:800;
+      line-height:1.12;
+      color:var(--accent);
+    }
+    .preview{
+      margin:0 0 10px;
+      color:rgba(0,0,0,.84);
+      font-size:16px;
+      line-height:1.5;
+    }
+
+    details.readmore{
+      border:1px dashed rgba(0,0,0,.14);
+      border-radius:12px;
+      padding:10px 12px;
+      background:rgba(255,255,255,.55);
+    }
+    details.readmore summary{
+      cursor:pointer;
+      font-weight:700;
+      color:rgba(0,0,0,.82);
+      outline:none;
+    }
+    .long{
+      margin:10px 0 0;
+      color:rgba(0,0,0,.84);
+      font-size:16px;
+      line-height:1.55;
+      white-space:pre-wrap;
+    }
+
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .chip{
+      display:inline-block;padding:6px 10px;border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.55);
+      font-size:13px;color:rgba(0,0,0,.72)
+    }
+
+    .rowActions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .tags{display:flex;gap:8px;flex-wrap:wrap}
+    .tag{
+      padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+      background:rgba(255,255,255,.45);font-size:13px;color:rgba(0,0,0,.76)
+    }
+
+    .errorBox{
+      padding:18px;color:#7a1f1f;background:rgba(255,230,230,.65);
+      border:1px solid rgba(122,31,31,.20);border-radius:14px;margin:16px
+    }
+    .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:14px}
+
+    @media (max-width:760px){
+      .brand{font-size:44px}
+      .pageTitle{font-size:34px}
+    }
+  </style>
 </head>
 
 <body>
@@ -15,14 +196,13 @@
       <h1 class="brand">PTD Today</h1>
       <div class="tagline">First to Know. First to Lead.</div>
 
-      <!-- NAV: only Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a class="active" href="/index.html">Home</a>
         <a href="/room.html">Room</a>
       </nav>
     </header>
 
-    <div class="pageTitle">Daily Briefing</div>
+    <div class="pageTitle">Daily AI Briefing</div>
     <div class="updated" id="updatedLine">Loading…</div>
 
     <section class="panel">
@@ -31,20 +211,20 @@
         <button class="btn" id="btnTop" type="button">Back to top</button>
 
         <div class="search">
-          <input id="q" type="search" placeholder="Search titles, regions, tags…" autocomplete="off" />
+          <input id="q" type="search" placeholder="Search titles, categories, tags…" autocomplete="off" />
         </div>
       </div>
 
-      <div class="notice" id="disclaimerLine">
-        <em>Loading disclaimer…</em>
-      </div>
+      <div class="notice" id="disclaimerLine"><em>Loading disclaimer…</em></div>
+
+      <div class="sections" id="sections"></div>
 
       <div class="itemsHead">
-        <div class="pills">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="pill" id="countPill">Items: —</span>
           <span class="pill" id="datePill">Date (UTC): —</span>
         </div>
-        <div class="tiny" id="modelHint">AI-assisted</div>
+        <div class="tiny" id="modelHint">AI-generated briefing</div>
       </div>
 
       <div class="feed" id="feed"></div>
@@ -53,6 +233,190 @@
     <div class="footer">© <span id="year"></span> PTD Today</div>
   </div>
 
-  <script src="/assets/app.js?v=1"></script>
+  <script>
+    // Home reads this file:
+    const DATA_URL = "/data/ai_news.json";
+    const $ = (id) => document.getElementById(id);
+
+    function fmtUtc(iso){
+      try{ return new Date(iso).toUTCString().replace("GMT","UTC"); }
+      catch(e){ return iso || ""; }
+    }
+    function normalize(s){ return (s || "").toString().toLowerCase(); }
+    function escapeHtml(str){
+      return (str ?? "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+
+    function renderSections(payload){
+      const host = $("sections");
+      host.innerHTML = "";
+      const secs = Array.isArray(payload.sections) ? payload.sections : [];
+      if(!secs.length) return;
+
+      for(const sec of secs){
+        const box = document.createElement("div");
+        box.className = "sec";
+
+        const h = document.createElement("h3");
+        h.textContent = sec.heading || "Section";
+        box.appendChild(h);
+
+        if(Array.isArray(sec.bullets) && sec.bullets.length){
+          const ul = document.createElement("ul");
+          for(const b of sec.bullets){
+            const li = document.createElement("li");
+            li.textContent = b;
+            ul.appendChild(li);
+          }
+          box.appendChild(ul);
+        }
+        host.appendChild(box);
+      }
+    }
+
+    async function shareItem(item){
+      const title = item.title || "PTD Today";
+      const text = (item.summary_short || item.summary || "").trim();
+      const url = window.location.href;
+
+      // Web Share on mobile
+      if (navigator.share){
+        try{
+          await navigator.share({ title, text, url });
+          return;
+        }catch(e){}
+      }
+
+      // Fallback: copy to clipboard
+      const clip = `${title}\n\n${text}\n\n${url}`;
+      try{
+        await navigator.clipboard.writeText(clip);
+        alert("Copied to clipboard.");
+      }catch(e){
+        alert("Copy failed. You can manually copy:\n\n" + clip);
+      }
+    }
+
+    function cardHtml(item){
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+      const meta = [
+        item.category ? item.category.toUpperCase() : "AI BRIEF",
+        item.region ? item.region.toUpperCase() : "GLOBAL",
+        item.created_at ? fmtUtc(item.created_at) : ""
+      ].filter(Boolean).join(" • ");
+
+      const preview = (item.summary_short || item.summary || "").trim();
+      const longBody = (item.body_long || "").trim();
+
+      const confLabel = item.confidence_label || "Medium";
+      const confScore = (typeof item.confidence_score === "number") ? item.confidence_score : "";
+
+      // data-id used to attach share handler
+      return `
+        <article class="card" data-id="${escapeHtml(item.id || "")}">
+          <div class="meta">
+            <div class="metaLeft">
+              <span>${escapeHtml(meta)}</span>
+              <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore!==""?` (${confScore})`:""}</span>
+            </div>
+            <button class="btn" type="button" data-share="1">Share</button>
+          </div>
+
+          <h3 class="title">${escapeHtml(item.title || "Untitled")}</h3>
+          <p class="preview">${escapeHtml(preview)}</p>
+
+          ${longBody ? `
+            <details class="readmore">
+              <summary>Read more</summary>
+              <div class="long">${escapeHtml(longBody)}</div>
+            </details>
+          ` : ""}
+
+          <div class="rowActions">
+            <div class="chips">
+              ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
+              ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
+            </div>
+            ${tags.length ? `<div class="tags">${tags.slice(0,12).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+          </div>
+        </article>
+      `;
+    }
+
+    function applySearch(items, q){
+      q = normalize(q).trim();
+      if(!q) return items;
+      return items.filter(it=>{
+        const hay = [
+          it.title, it.summary_short, it.body_long, it.category, it.region,
+          ...(Array.isArray(it.tags)?it.tags:[])
+        ].map(normalize).join(" ");
+        return hay.includes(q);
+      });
+    }
+
+    function render(payload, query=""){
+      const updatedAt = payload.updated_at || payload.updatedAt || "";
+      const dateUtc = payload.date_utc || payload.date || "";
+
+      $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
+      $("disclaimerLine").textContent =
+        payload.disclaimer ||
+        "Informational only — AI-generated; may contain errors. Not investment or engineering advice.";
+      $("datePill").textContent = `Date (UTC): ${dateUtc || "—"}`;
+
+      renderSections(payload);
+
+      const allItems = Array.isArray(payload.items) ? payload.items : [];
+      const items = applySearch(allItems, query);
+      $("countPill").textContent = `Items: ${items.length}`;
+
+      const feed = $("feed");
+      feed.innerHTML = items.length
+        ? items.map(cardHtml).join("")
+        : `<div class="errorBox">No items matched your search.</div>`;
+
+      // attach share handlers
+      feed.querySelectorAll("button[data-share='1']").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const card = btn.closest(".card");
+          const id = card?.getAttribute("data-id") || "";
+          const item = items.find(x => (x.id || "") === id) || null;
+          if(item) shareItem(item);
+        });
+      });
+    }
+
+    async function load(){
+      $("year").textContent = new Date().getFullYear();
+
+      try{
+        const res = await fetch(DATA_URL, { cache: "no-store" });
+        if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
+        const payload = await res.json();
+
+        render(payload, $("q").value);
+        $("q").addEventListener("input", ()=>render(payload, $("q").value));
+
+      }catch(err){
+        $("updatedLine").textContent = "Could not load AI briefing.";
+        $("disclaimerLine").textContent = "";
+        $("sections").innerHTML = "";
+        $("feed").innerHTML = `
+          <div class="errorBox">
+            <strong>AI briefing not available yet.</strong><br/>
+            Expected file: <code>${DATA_URL}</code><br/>
+            Run your GitHub Action that generates it (and commits it).<br/>
+            <div style="margin-top:10px;color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
+          </div>`;
+      }
+    }
+
+    $("btnRefresh").addEventListener("click", ()=>location.reload());
+    $("btnTop").addEventListener("click", ()=>window.scrollTo({top:0,behavior:"smooth"}));
+    load();
+  </script>
 </body>
 </html>
