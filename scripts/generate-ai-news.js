@@ -1,165 +1,85 @@
-import fs from "fs-extra";
-import path from "path";
-import slugify from "slugify";
-import OpenAI from "openai";
+# scripts/generate_ai_news.py
+import os, json, datetime
+from openai import OpenAI
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+# Output path inside your repo (make sure this folder exists)
+OUT_PATH = "public/data/ai_news.json"
 
-// ---- CONFIG ----
-const OUTPUT_JSON = "data/ai_news.json";
-const AI_DIR = "ai";
-const MAX_ITEMS = 10;
-const CONFIDENCE_LEVELS = ["High", "Medium", "Low"];
+PTD_SECTORS = [
+    "Power transmission & substations (AIS/GIS, transformers, switchgear)",
+    "HVDC / FACTS / synchronous condensers",
+    "Grid modernization, interconnection queues, TSO/ISO updates",
+    "Renewables (wind/solar) and grid integration",
+    "Data centers, AI load growth, utility power contracts",
+    "Critical minerals / rare earth supply chains (for grid & energy tech)",
+]
 
-const SYSTEM_PROMPT = `
-You are PTD AI Desk, an energy & power intelligence editor.
-Write concise, professional, non-hyped briefs.
-No references to external websites.
-No speculation stated as fact.
-Tone: Bloomberg / FT / utility-grade.
-`;
+def iso_now():
+    return datetime.datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
 
-const USER_PROMPT = `
-Generate ${MAX_ITEMS} AI intelligence briefs for Energy & Power.
+def main():
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise SystemExit("Missing OPENAI_API_KEY env var")
 
-Each brief MUST include:
-- title
-- tldr (1–2 sentences)
-- confidence (High / Medium / Low)
-- confidence_reason (1 sentence)
-- why_it_matters (3 bullets)
-- key_points (5–7 bullets)
-- watchlist (3 bullets)
-- known_unknowns (3 bullets)
-- tags (3–4 short tags)
+    client = OpenAI()
 
-Topics may include:
-Data centers, grid stability, HV equipment, interconnection, HVDC, synchronous condensers, GIS, transformers, rare earths.
+    # IMPORTANT:
+    # If you do NOT provide sources, the result is not “news”, it’s speculative.
+    # So we keep a “Sources” section and you can feed your own approved source list later.
+    prompt = f"""
+You are PTD Today’s daily energy & power newsroom editor.
 
-Return STRICT JSON ONLY:
-{
+Write a DAILY INTELLIGENCE BRIEF for the current UTC date.
+Focus only on these sectors:
+{chr(10).join([f"- {s}" for s in PTD_SECTORS])}
+
+Rules:
+- Output MUST be valid JSON only (no markdown).
+- Include 8–12 items max.
+- Each item must have:
+  - title (short)
+  - summary (2–4 sentences, professional, neutral tone)
+  - category (one of: Grid, Substations, HVDC_FACTS, Renewables, DataCenters_AI, CriticalMinerals, Markets, Policy)
+  - region (Global / US / Europe / MiddleEast / Asia / Africa / LatAm)
+  - confidence (0.0–1.0)
+  - sources: array of objects with {{"name","url"}} (publicly available sources)
+- If you are not confident about a claim, lower confidence and state uncertainty in the summary.
+
+Return JSON with:
+{{
+  "updated_at": "...ISO8601Z...",
   "items": [ ... ]
-}
-`;
+}}
+"""
 
-// ---- HELPERS ----
-function nowET() {
-  return new Date().toLocaleString("en-US", { timeZone: "America/New_York" }) + " ET";
-}
+    # Responses API example is in OpenAI docs.  [oai_citation:0‡OpenAI Platform](https://platform.openai.com/docs/guides/reasoning)
+    response = client.responses.create(
+        model="gpt-5-mini",
+        input=prompt,
+        reasoning={"effort": "low"},
+    )
 
-function articleHTML(item, id, slug) {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>PTD Today — AI Desk — ${item.title}</title>
-<meta name="description" content="${item.tldr}" />
-<link rel="canonical" href="https://ptdtoday.com/ai/${slug}.html" />
-<link rel="stylesheet" href="/assets/main.css" />
-</head>
+    # The python SDK provides output_text for convenience in many setups,
+    # but to be safe, we reconstruct from response.output if needed.
+    text = getattr(response, "output_text", None)
+    if not text:
+        # Fallback: find first output_text chunk
+        text = ""
+        for item in response.output:
+            if item.get("type") == "message":
+                for c in item.get("content", []):
+                    if c.get("type") == "output_text":
+                        text += c.get("text", "")
 
-<body>
-<div class="wrap">
-<header class="site-header">
-<h1><a href="/">PTD Today</a></h1>
-<p class="motto">First to Know. First to Lead.</p>
-<nav class="ptd-nav">
-<a href="/">Home</a>
-<a href="/ai.html" class="active">AI</a>
-</nav>
-</header>
+    data = json.loads(text)
+    data["updated_at"] = iso_now()
 
-<main class="article-wrap">
-<p class="kicker">AI Brief</p>
-<h1>${item.title}</h1>
+    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
+    with open(OUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-<p><strong>${item.confidence} confidence</strong> — ${item.confidence_reason}</p>
+    print(f"Wrote {OUT_PATH} with {len(data.get('items', []))} items")
 
-<section>
-<h2>TL;DR</h2>
-<p>${item.tldr}</p>
-</section>
-
-<section>
-<h2>Why it matters</h2>
-<ul>${item.why_it_matters.map(b => `<li>${b}</li>`).join("")}</ul>
-</section>
-
-<section>
-<h2>Key points</h2>
-<ul>${item.key_points.map(b => `<li>${b}</li>`).join("")}</ul>
-</section>
-
-<section>
-<h2>Watchlist (next 24–48 hours)</h2>
-<ul>${item.watchlist.map(b => `<li>${b}</li>`).join("")}</ul>
-</section>
-
-<section>
-<h2>Known unknowns</h2>
-<ul>${item.known_unknowns.map(b => `<li>${b}</li>`).join("")}</ul>
-</section>
-
-<p><em>AI-generated. Informational only.</em></p>
-
-<p><a href="/ai.html">← Back to AI Desk</a></p>
-</main>
-</div>
-</body>
-</html>
-`;
-}
-
-// ---- MAIN ----
-async function run() {
-  console.log("Generating AI briefs...");
-
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4.1-mini",
-    temperature: 0.4,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: USER_PROMPT }
-    ]
-  });
-
-  const data = JSON.parse(completion.choices[0].message.content);
-  const items = [];
-
-  await fs.ensureDir("data");
-  await fs.ensureDir(AI_DIR);
-
-  for (let i = 0; i < data.items.length; i++) {
-    const item = data.items[i];
-    const id = `ai-${new Date().toISOString().slice(0,10)}-${String(i+1).padStart(3,"0")}`;
-    const slug = slugify(item.title, { lower: true, strict: true });
-
-    const html = articleHTML(item, id, slug);
-    await fs.writeFile(path.join(AI_DIR, `${slug}.html`), html);
-
-    items.push({
-      id,
-      title: item.title,
-      tldr: item.tldr,
-      confidence: item.confidence,
-      tags: item.tags,
-      published_at: nowET(),
-      url: `/ai/${slug}.html`
-    });
-  }
-
-  await fs.writeJSON(OUTPUT_JSON, {
-    updated_at: nowET(),
-    items
-  }, { spaces: 2 });
-
-  console.log("✅ AI briefs generated successfully.");
-}
-
-run().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+if __name__ == "__main__":
+    main()
