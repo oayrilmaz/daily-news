@@ -2,83 +2,181 @@ import fs from "fs";
 import path from "path";
 import { XMLParser } from "fast-xml-parser";
 
+const CHANNELS_PATH = "data/youtube_channels.json";
 const OUT_PATH = "data/youtube.json";
 
-const RSS_URLS = (process.env.YOUTUBE_RSS_URLS || "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
-
-if (!RSS_URLS.length) {
-  console.error("No YOUTUBE_RSS_URLS defined");
-  process.exit(1);
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
-const parser = new XMLParser({
-  ignoreAttributes: false,
-});
+function ensureDirFor(filePath) {
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+}
 
 async function fetchText(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Failed RSS ${url} (${res.status})`);
-  return res.text();
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "ptdtoday-bot/1.0"
+    }
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status} for ${url}${body ? ` | ${body.slice(0, 120)}` : ""}`);
+  }
+  return await res.text();
 }
 
-function extractVideoId(link) {
-  try {
-    const u = new URL(link);
-    return u.searchParams.get("v");
-  } catch {
-    return null;
+function extractVideoId(entry) {
+  // Common locations:
+  // - entry["yt:videoId"]
+  // - entry.link["@_href"] => https://www.youtube.com/watch?v=...
+  const vid =
+    entry?.["yt:videoId"] ||
+    entry?.["videoId"] ||
+    entry?.["yt:videoid"];
+
+  if (typeof vid === "string" && vid.trim()) return vid.trim();
+
+  const href = entry?.link?.["@_href"];
+  if (typeof href === "string") {
+    const m = href.match(/[?&]v=([^&]+)/);
+    if (m?.[1]) return m[1];
   }
+
+  return "";
+}
+
+function normalizeEntries(feed) {
+  const entries = feed?.entry;
+  if (!entries) return [];
+  return Array.isArray(entries) ? entries : [entries];
+}
+
+async function loadChannelFeed(channelId) {
+  const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`;
+  const xml = await fetchText(url);
+
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_"
+  });
+
+  const parsed = parser.parse(xml);
+  const feed = parsed?.feed;
+  if (!feed) return [];
+
+  const entries = normalizeEntries(feed);
+
+  return entries.map((e) => {
+    const title = (e?.title ?? "").toString().trim();
+    const videoId = extractVideoId(e);
+    const url =
+      e?.link?.["@_href"] ||
+      (videoId ? `https://www.youtube.com/watch?v=${videoId}` : "");
+
+    const published =
+      (e?.published ?? e?.updated ?? "").toString().trim();
+
+    return {
+      title,
+      videoId,
+      url,
+      publishedAt: published,
+      channelId
+    };
+  });
+}
+
+function dedupeByVideoId(items) {
+  const seen = new Set();
+  const out = [];
+  for (const it of items) {
+    if (!it.videoId) continue;
+    if (seen.has(it.videoId)) continue;
+    seen.add(it.videoId);
+    out.push(it);
+  }
+  return out;
+}
+
+function isValidItem(it) {
+  return (
+    typeof it.title === "string" && it.title.trim().length > 0 &&
+    typeof it.videoId === "string" && it.videoId.trim().length > 0 &&
+    typeof it.url === "string" && it.url.startsWith("http")
+  );
 }
 
 async function main() {
-  const items = [];
+  if (!fs.existsSync(CHANNELS_PATH)) {
+    throw new Error(`Missing ${CHANNELS_PATH}. Create it with your channelIds.`);
+  }
 
-  for (const url of RSS_URLS) {
-    const xml = await fetchText(url);
-    const json = parser.parse(xml);
+  const cfg = readJson(CHANNELS_PATH);
+  const channels = Array.isArray(cfg.channels) ? cfg.channels : [];
 
-    const entries = json?.feed?.entry;
-    if (!entries) continue;
+  if (!channels.length) {
+    throw new Error(`No channels found in ${CHANNELS_PATH}. Add at least one channelId.`);
+  }
 
-    const list = Array.isArray(entries) ? entries : [entries];
+  let all = [];
+  const errors = [];
 
-    for (const e of list) {
-      const link =
-        typeof e.link === "string"
-          ? e.link
-          : e.link?.["@_href"];
+  for (const ch of channels) {
+    const channelId = (ch.channelId ?? "").toString().trim();
+    const name = (ch.name ?? channelId).toString().trim();
 
-      const videoId =
-        e["yt:videoId"] ||
-        extractVideoId(link);
+    if (!channelId) {
+      errors.push(`Skipped channel with missing channelId (name: ${name})`);
+      continue;
+    }
 
-      if (!e.title || !videoId) continue;
-
-      items.push({
-        title: e.title,
-        videoId,
-        url: `https://www.youtube.com/watch?v=${videoId}`,
-        channel: e.author?.name || "YouTube",
-        published: e.published || e.updated || null,
-      });
+    try {
+      const items = await loadChannelFeed(channelId);
+      // keep only well-formed items
+      const cleaned = items.filter(isValidItem).map(it => ({
+        ...it,
+        channelName: name
+      }));
+      all.push(...cleaned);
+    } catch (e) {
+      errors.push(`Channel ${name} (${channelId}) failed: ${e.message}`);
+      // IMPORTANT: continue; don't kill whole workflow for one bad channel
     }
   }
 
+  all = dedupeByVideoId(all);
+
+  // newest first (publishedAt is ISO-ish; fallback keeps original order)
+  all.sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""));
+
+  // keep it reasonable
+  const MAX_ITEMS = 40;
+  all = all.slice(0, MAX_ITEMS);
+
   const payload = {
     updated_at: new Date().toISOString(),
-    items,
+    items: all,
+    errors
   };
 
-  fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-  fs.writeFileSync(OUT_PATH, JSON.stringify(payload, null, 2));
+  ensureDirFor(OUT_PATH);
+  fs.writeFileSync(OUT_PATH, JSON.stringify(payload, null, 2), "utf8");
 
-  console.log(`YouTube JSON written: ${items.length} items`);
+  if (all.length === 0) {
+    // Fail ONLY if you produced nothing (so you notice)
+    throw new Error(
+      `YouTube output has 0 valid items. Check channelIds. First error: ${errors[0] || "none"}`
+    );
+  }
+
+  console.log(`Wrote ${OUT_PATH} with ${all.length} items.`);
+  if (errors.length) console.log(`Warnings: ${errors.length} channel errors.`);
 }
 
-main().catch(err => {
-  console.error(err);
+main().catch((err) => {
+  console.error(err?.stack || err?.message || String(err));
   process.exit(1);
 });
