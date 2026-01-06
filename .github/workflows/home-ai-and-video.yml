@@ -1,61 +1,52 @@
-name: Home AI + YouTube (PTD Today)
+name: Home AI (PTD Today)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 */6 * * *"
-  push:
-    paths:
-      - "scripts/**"
-      - "data/**"
-      - "package.json"
-      - ".github/workflows/home-ai-and-video.yml"
+    - cron: "15 * * * *"   # every hour at :15 UTC
 
 permissions:
   contents: write
 
-concurrency:
-  group: "ptdtoday-home-ai-youtube"
-  cancel-in-progress: true
-
 jobs:
   generate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Pull latest main
-        run: |
-          git pull origin main
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
+      # Avoid push rejection if another run pushed while this run was executing
+      - name: Rebase on latest main
+        run: |
+          git fetch origin main
+          git rebase origin/main
+
       - name: Generate AI JSON
-        run: npm run generate:ai
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
-      - name: Generate YouTube JSON
-        run: npm run generate:youtube
+        run: npm run generate:ai
 
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config user.email "github-actions@users.noreply.github.com"
 
-          git add data/*.json
-          git status
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
 
-          git commit -m "Update AI + YouTube feeds" || echo "No changes to commit"
+          git commit -m "Update AI feed"
           git push origin main
