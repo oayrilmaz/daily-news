@@ -1,384 +1,386 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google Analytics 4 -->
-  <link rel="dns-prefetch" href="https://www.googletagmanager.com">
-  <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVKD1RLFE5"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){ dataLayer.push(arguments); }
-    gtag('js', new Date());
-    gtag('config', 'G-TVKD1RLFE5');
-  </script>
-
-  <!-- Performance -->
-  <link rel="dns-prefetch" href="https://i.ytimg.com">
-  <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
-
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#E7DCC8" />
-  <meta name="color-scheme" content="light only" />
-  <meta name="description" content="PTD Today: daily curated Energy & Power headlines. First to Know. First to Lead.">
-  <link rel="canonical" href="https://ptdtoday.com/" />
-  <meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1" />
+  <title>PTD Today — Daily AI News</title>
+  <meta name="description" content="PTD Today — Daily AI News (AI-generated)." />
 
-  <!-- Social -->
-  <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:title" content="PTD Today — Daily Energy & Power News" />
-  <meta property="og:description" content="First to Know. First to Lead." />
-  <meta property="og:image" content="/assets/og-default.png" />
-  <meta property="og:url" content="https://ptdtoday.com/" />
-  <meta name="twitter:card" content="summary_large_image" />
-
-  <title>PTD Today — Daily Energy & Power News</title>
-
-  <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/assets/main.css" />
-
-  <!-- === FINAL LAYOUT OVERRIDES + AI BRIEF BOX === -->
   <style>
-    /* Header */
-    header.site-header {
-      text-align: center;
-      margin: 34px 10px 18px;
+    :root{
+      --bg: #f3ecdf;
+      --panel: #f8f1e5;
+      --ink: #1a1a1a;
+      --muted: #6b665c;
+      --line: rgba(0,0,0,.10);
+      --shadow: 0 10px 30px rgba(0,0,0,.06);
+      --pill: #efe3cf;
+      --pill2: #e7d6bb;
+      --accent: #0f172a;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Georgia, "Times New Roman", Times, serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    a{color:inherit}
+    .wrap{max-width: 980px; margin: 0 auto; padding: 28px 16px 60px;}
+    .mast{text-align:center; padding: 22px 0 10px;}
+    .brand{font-size: 46px; letter-spacing: .4px; margin: 0; font-weight: 700;}
+    .tagline{margin: 6px 0 18px; color: var(--muted); font-style: italic; font-size: 18px;}
+    .nav{
+      display:flex; justify-content:center; gap: 18px;
+      margin: 4px 0 14px; flex-wrap: wrap;
+    }
+    .nav a{
+      text-decoration:none; padding: 8px 12px; border-radius: 999px;
+      background: transparent; border: 1px solid transparent;
+      color: rgba(0,0,0,.75); font-size: 16px;
+    }
+    .nav a:hover{border-color: var(--line); background: rgba(255,255,255,.35)}
+    .nav a.active{
+      border-color: var(--line);
+      background: rgba(255,255,255,.5);
+      color: rgba(0,0,0,.92);
+      font-weight: 700;
     }
 
-    header.site-header h1 {
-      margin: 0 0 6px;
-      font-size: 56px;
-      line-height: 1;
-      letter-spacing: .2px;
+    .pageTitle{ text-align:center; margin: 10px 0 6px; font-size: 40px; font-weight: 800; }
+    .updated{ text-align:center; color: var(--muted); font-size: 16px; margin-bottom: 18px; }
+
+    .panel{
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
     }
 
-    header.site-header h1 a {
-      color: inherit;
-      text-decoration: none;
+    .toolbar{
+      display:flex; gap:10px; padding: 14px;
+      border-bottom: 1px solid var(--line);
+      align-items:center; flex-wrap: wrap;
+    }
+    .btn{
+      appearance:none;
+      border: 1px solid var(--line);
+      background: #efe3cf;
+      padding: 10px 14px;
+      border-radius: 999px;
+      cursor:pointer;
+      font-family: inherit;
+      font-size: 15px;
+      color: rgba(0,0,0,.82);
+    }
+    .btn:hover{background: var(--pill2)}
+    .search{
+      flex: 1 1 280px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width: 240px;
+      margin-left:auto;
+    }
+    .search input{
+      width:100%;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.55);
+      font-family: inherit;
+      font-size: 15px;
+      outline:none;
     }
 
-    header.site-header .motto {
-      margin: 2px 0 10px;
-      color: #6F675D;
-      font-style: italic;
-      font-size: 18px;
+    .notice{
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      color: rgba(0,0,0,.78);
+      font-size: 15px;
+      background: rgba(255,255,255,.28);
     }
+    .notice em{color: var(--muted)}
 
-    /* TOP NAV */
-    .ptd-nav {
-      display: flex;
-      justify-content: center;
-      gap: 22px;
-      margin: 6px 0 16px;
+    .itemsHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.18);
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.40);
       font-size: 14px;
+      color: rgba(0,0,0,.78);
     }
+    .tiny{ color: var(--muted); font-size: 14px; }
 
-    .ptd-nav a {
-      text-decoration: none;
-      color: #222;
+    .feed{ padding: 10px 10px 16px; }
+
+    .card{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 16px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .card:last-child{border-bottom:none}
+    .meta{
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: .15px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .title{
+      margin: 0 0 10px;
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1.12;
+      color: var(--accent);
+    }
+    .summary{
+      margin: 0 0 10px;
+      color: rgba(0,0,0,.82);
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .tags{
+      display:flex;
+      gap:8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .tag{
       padding: 6px 10px;
       border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.40);
+      font-size: 13px;
+      color: rgba(0,0,0,.76);
     }
 
-    .ptd-nav a:hover {
-      background: #f1ece3;
+    .side{ min-width: 240px; text-align:right; }
+    .chip{
+      display:inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.40);
+      font-size: 13px;
+      color: rgba(0,0,0,.72);
+      margin-left: 6px;
+      margin-bottom: 6px;
+    }
+    .rightBox{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:8px;
     }
 
-    .ptd-nav a.active {
-      font-weight: 600;
-      background: #e7dcc8;
-    }
-
-    /* AI brief box */
-    .brief-wrap{
-      max-width: 980px;
-      margin: 10px auto 8px;
-      padding: 0 14px;
-      text-align: left;
-    }
-
-    .brief-box{
-      border: 1px solid rgba(0,0,0,.12);
+    .errorBox{
+      padding: 18px;
+      color: #7a1f1f;
+      background: rgba(255,230,230,.65);
+      border: 1px solid rgba(122,31,31,.20);
       border-radius: 14px;
-      background: rgba(255,255,255,.75);
-      padding: 14px 14px 12px;
+      margin: 16px;
     }
-
-    .brief-top{
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 8px;
-    }
-
-    .brief-title{
-      margin: 0;
+    .footer{
+      text-align:center;
+      margin-top: 18px;
+      color: var(--muted);
       font-size: 14px;
-      letter-spacing: .2px;
-      color: #222;
-      font-weight: 700;
     }
-
-    .brief-meta{
-      font-size: 12px;
-      color: #6F675D;
-      white-space: nowrap;
-    }
-
-    /* New: nicer typography for rendered markdown */
-    .brief-body{
-      font-size: 14px;
-      line-height: 1.55;
-      color: #222;
-    }
-
-    .brief-body .sec{
-      margin: 10px 0 6px;
-      font-weight: 700;
-      letter-spacing: .15px;
-    }
-
-    .brief-body p{
-      margin: 6px 0;
-    }
-
-    .brief-body ul{
-      margin: 6px 0 8px 18px;
-      padding: 0;
-    }
-
-    .brief-body li{
-      margin: 4px 0;
-    }
-
-    .brief-body .muted{
-      color: #6F675D;
-    }
-
-    .brief-note{
-      margin-top: 10px;
-      font-size: 12px;
-      color: #6F675D;
-    }
-
-    /* Two-column layout */
-    .ptd-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-      align-items: start;
-      margin-top: 6px;
-    }
-
-    .ptd-col {
-      min-width: 0;
-      align-self: start;
-    }
-
-    .ptd-col--right {
-      border: none;
-      padding: 0;
-    }
-
-    #videos.results,
-    #articlesLeft.results,
-    #articlesRight.results {
-      display: flex;
-      flex-direction: column;
-      gap: 18px;
-      margin: 0;
-      padding: 0;
-    }
-
-    #videos.results:empty {
-      display: none;
-    }
-
-    @media (max-width: 980px) {
-      .ptd-grid {
-        grid-template-columns: 1fr;
-        gap: 18px;
-      }
+    @media (max-width: 760px){
+      .brand{font-size: 40px}
+      .pageTitle{font-size: 34px}
+      .card{grid-template-columns: 1fr}
+      .side{text-align:left; min-width:auto}
+      .rightBox{align-items:flex-start}
     }
   </style>
-
-  <!-- Schema -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "PTD Today",
-    "url": "https://ptdtoday.com/"
-  }
-  </script>
 </head>
 
 <body>
-  <div class="wrap" id="top">
+  <div class="wrap">
+    <header class="mast">
+      <h1 class="brand">PTD Today</h1>
+      <div class="tagline">First to Know. First to Lead.</div>
 
-    <header class="site-header">
-      <h1 class="logo">
-        <a href="/" aria-label="Go to PTD Today home">PTD Today</a>
-      </h1>
-
-      <p class="motto">First to Know. First to Lead.</p>
-
-      <!-- NAV -->
-<nav class="ptd-nav" aria-label="Primary">
-  <a href="/">Home</a>
-  <a href="/ai.html">AI</a>
-  <a href="/briefs.html" class="active">Briefs</a>
-  <a href="/room.html">Room</a>
-</nav>
-
-      <h2 class="section">Daily Energy &amp; Power News</h2>
-
-      <div class="updated" id="updated" role="status" aria-live="polite">
-        Loading…
-      </div>
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="active" href="/index.html">Home</a>
+        <a href="/ai.html">AI</a>
+        <a href="/briefs.html">Briefs</a>
+        <a href="/room.html">Room</a>
+      </nav>
     </header>
 
-    <!-- AI DAILY BRIEF (static JSON, generated by script) -->
-    <section class="brief-wrap" aria-label="Daily intelligence brief">
-      <div class="brief-box">
-        <div class="brief-top">
-          <p class="brief-title">Daily Intelligence Brief</p>
-          <span class="brief-meta" id="briefUpdated">Loading…</span>
+    <div class="pageTitle">Daily AI News</div>
+    <div class="updated" id="updatedLine">Loading…</div>
+
+    <section class="panel">
+      <div class="toolbar">
+        <button class="btn" id="btnRefresh" type="button">Refresh</button>
+        <button class="btn" id="btnTop" type="button">Back to top</button>
+
+        <div class="search">
+          <input id="q" type="search" placeholder="Search titles, categories, tags…" autocomplete="off" />
         </div>
-        <div class="brief-body" id="briefBody">Preparing summary…</div>
-        <div class="brief-note">Informational only — may contain errors.</div>
       </div>
+
+      <div class="notice" id="disclaimerLine">
+        <em>Loading disclaimer…</em>
+      </div>
+
+      <div class="itemsHead">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="pill" id="countPill">Items: —</span>
+          <span class="pill" id="datePill">Date (UTC): —</span>
+        </div>
+        <div class="tiny" id="modelHint">AI-generated (no external links)</div>
+      </div>
+
+      <div class="feed" id="feed"></div>
     </section>
 
-    <main id="main" role="main" class="main">
-
-      <div class="ptd-grid" id="ptdGrid" aria-live="polite" aria-busy="true">
-
-        <section class="ptd-col">
-          <section id="videos" class="results"></section>
-          <section id="articlesLeft" class="results"></section>
-        </section>
-
-        <section class="ptd-col ptd-col--right">
-          <section id="articlesRight" class="results"></section>
-        </section>
-
-      </div>
-
-      <div id="empty" class="empty" style="display:none">
-        No stories found.
-      </div>
-
-      <!-- legacy hidden container (kept) -->
-      <section id="results" class="results" style="display:none"></section>
-
-    </main>
-
-    <footer class="footer">
-      <p>© <span id="yr"></span> PTD Today — Curated Energy &amp; Power Headlines.</p>
-      <p>
-        PTD Today displays publicly available content using authorized YouTube embeds,
-        RSS-provided metadata, or PTD-generated visuals.
-        All articles link to their original publishers; all copyrights
-        belong to their respective owners.
-      </p>
-    </footer>
-
+    <div class="footer">© <span id="year"></span> PTD Today — Daily AI News</div>
   </div>
 
   <script>
-    document.getElementById('yr').textContent = new Date().getFullYear();
-    window.__PTD__ = { endpoints: { recent: '/data/news.json' } };
+    // ✅ This is the ONLY source Home uses now:
+    const DATA_URL = "/briefs/daily-ai.json"; // must exist in your repo after the Action runs
+    const $ = (id) => document.getElementById(id);
 
-    // ---- Small safe renderer for our brief markdown (no external deps) ----
-    function escapeHtml(s){
-      return String(s || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    function fmtUtc(iso){
+      try{
+        const d = new Date(iso);
+        return d.toUTCString().replace("GMT","UTC");
+      }catch(e){ return iso || ""; }
     }
 
-    function renderBriefMarkdown(md){
-      const raw = (md || "").replace(/\r\n/g, "\n").trim();
-      if(!raw) return "<p class='muted'>No brief yet.</p>";
+    function normalize(s){ return (s || "").toString().toLowerCase(); }
 
-      const lines = raw.split("\n");
-      let html = "";
-      let inList = false;
-
-      function closeList(){
-        if(inList){ html += "</ul>"; inList = false; }
-      }
-
-      for (let line of lines){
-        line = line.trim();
-
-        // blank line
-        if(!line){
-          closeList();
-          continue;
-        }
-
-        // bullets: "- " or "• "
-        const isBullet = line.startsWith("- ") || line.startsWith("• ");
-        if(isBullet){
-          if(!inList){ html += "<ul>"; inList = true; }
-          const item = line.replace(/^(- |• )/, "");
-          html += "<li>" + escapeHtml(item) + "</li>";
-          continue;
-        }
-
-        closeList();
-
-        // section headers like "A) Lead ..." or "B) Top themes ..."
-        const isSection = /^[A-G]\)\s+/.test(line);
-        if(isSection){
-          html += "<div class='sec'>" + escapeHtml(line) + "</div>";
-          continue;
-        }
-
-        // normal paragraph
-        html += "<p>" + escapeHtml(line) + "</p>";
-      }
-
-      closeList();
-      return html;
+    function escapeHtml(str){
+      return (str ?? "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    // Load Daily Intelligence Brief from /data/home_summary.json
-    (async function(){
-      const updatedEl = document.getElementById("briefUpdated");
-      const bodyEl = document.getElementById("briefBody");
+    function cardHtml(item){
+      const tags = Array.isArray(item.tags) ? item.tags : [];
+      const meta = [
+        item.category ? item.category.toUpperCase() : "AI NEWS",
+        item.region ? item.region.toUpperCase() : "GLOBAL",
+        item.created_at ? fmtUtc(item.created_at) : ""
+      ].filter(Boolean).join(" • ");
+
+      const confLabel = item.confidence_label || "Medium";
+      const confScore = (typeof item.confidence_score === "number") ? item.confidence_score : "";
+
+      return `
+        <div class="card">
+          <div>
+            <div class="meta">${escapeHtml(meta)}</div>
+            <h3 class="title">${escapeHtml(item.title || "Untitled")}</h3>
+            <p class="summary">${escapeHtml(item.summary || "")}</p>
+
+            ${tags.length ? `
+              <div class="tags">
+                ${tags.slice(0, 14).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join("")}
+              </div>
+            ` : ""}
+          </div>
+
+          <div class="side">
+            <div class="rightBox">
+              ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
+              ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
+              <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore !== "" ? ` (${confScore})` : ""}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function applySearch(items, q){
+      q = normalize(q).trim();
+      if(!q) return items;
+
+      return items.filter(it => {
+        const hay = [
+          it.title, it.summary, it.category, it.region,
+          ...(Array.isArray(it.tags) ? it.tags : [])
+        ].map(normalize).join(" ");
+        return hay.includes(q);
+      });
+    }
+
+    function render(payload, query=""){
+      const updatedAt = payload.updated_at || payload.updatedAt || "";
+      const dateUtc = payload.date_utc || payload.date || "";
+
+      $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
+      $("disclaimerLine").textContent =
+        payload.disclaimer ||
+        "AI-generated news for PTD sectors. Informational only — may contain errors.";
+
+      $("datePill").textContent = `Date (UTC): ${dateUtc || "—"}`;
+
+      const allItems = Array.isArray(payload.items) ? payload.items : [];
+      const items = applySearch(allItems, query);
+
+      $("countPill").textContent = `Items: ${items.length}`;
+
+      const feed = $("feed");
+      feed.innerHTML = items.length
+        ? items.map(cardHtml).join("")
+        : `<div class="errorBox">No AI items matched your search.</div>`;
+    }
+
+    async function load(){
+      $("year").textContent = new Date().getFullYear();
 
       try{
-        const res = await fetch("/data/home_summary.json", { cache: "no-store" });
-        if(!res.ok) throw new Error("HTTP " + res.status);
-        const data = await res.json();
+        const res = await fetch(DATA_URL, { cache: "no-store" });
+        if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
+        const payload = await res.json();
 
-        const when = data.updated_at ? data.updated_at : new Date().toISOString();
-        updatedEl.textContent = "Updated: " + when;
+        // Optional: set title if JSON includes it
+        if(payload.title) document.title = payload.title;
 
-        const md = (data.summary_md || "").trim();
-        bodyEl.innerHTML = renderBriefMarkdown(md);
-      }catch(e){
-        updatedEl.textContent = "Brief not available yet";
-        bodyEl.innerHTML =
-          "<p class='muted'>Once <code>/data/home_summary.json</code> is published, the daily brief will appear here.</p>";
+        render(payload, $("q").value);
+        $("q").addEventListener("input", () => render(payload, $("q").value));
+
+      }catch(err){
+        $("updatedLine").textContent = "Could not load AI news.";
+        $("disclaimerLine").textContent = "";
+        $("feed").innerHTML = `
+          <div class="errorBox">
+            <strong>AI news not available yet.</strong><br/>
+            Expected file: <code>${DATA_URL}</code><br/>
+            Run your GitHub Action that generates it (and commits it).<br/>
+            <div style="margin-top:10px; color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
+          </div>
+        `;
       }
-    })();
-  </script>
+    }
 
-  <script src="/assets/app.js" defer></script>
+    $("btnRefresh").addEventListener("click", () => location.reload());
+    $("btnTop").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+
+    load();
+  </script>
 </body>
 </html>
-<nav class="nav" aria-label="Primary navigation">
-  <a href="/index.html">Home</a>
-  <a href="/ai.html">AI</a>
-  <a href="/briefs.html">Briefs</a>
-  <a href="/room.html">Room</a>
-</nav>
