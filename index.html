@@ -1,221 +1,265 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PTD Today — Daily Briefing</title>
-  <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence brief)." />
+  <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence briefing)." />
 
   <style>
     :root{
-      --bg:#f4efe6;
-      --paper:#fffdf8;
-      --ink:#111;
-      --muted:#666;
-      --rule:rgba(0,0,0,.12);
-      --chip:#f2efe8;
-      --shadow:0 18px 40px rgba(0,0,0,.06);
+      --bg:#ffffff;
+      --paper:#ffffff;
+      --ink:#111111;
+      --muted:#5c5c5c;
+      --rule:rgba(0,0,0,.15);
+      --soft:rgba(0,0,0,.06);
+      --pill:rgba(0,0,0,.04);
+      --btn:#111;
+      --btnInk:#fff;
     }
+
     *{box-sizing:border-box}
     body{
       margin:0;
       background:var(--bg);
       color:var(--ink);
-      font-family: Georgia,"Times New Roman",Times,serif;
+      font-family: Georgia, "Times New Roman", Times, serif;
       -webkit-font-smoothing:antialiased;
       text-rendering:optimizeLegibility;
     }
     a{color:inherit}
-    .wrap{max-width:860px;margin:0 auto;padding:26px 16px 56px}
+    .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
+    .mast{text-align:center;padding:16px 0 6px}
+    .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
+    .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
 
-    /* Mast (WSJ-ish: strong masthead, thin rules) */
-    .mast{text-align:center;padding:18px 0 6px}
-    .brand{margin:0;font-weight:800;letter-spacing:.4px;font-size:54px}
-    .tagline{margin:6px 0 14px;color:var(--muted);font-style:italic;font-size:18px}
-    .nav{display:flex;justify-content:center;gap:18px;margin:6px 0 6px}
+    .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
     .nav a{
       text-decoration:none;
-      padding:8px 12px;
+      padding:7px 12px;
       border-radius:999px;
       border:1px solid transparent;
-      color:rgba(0,0,0,.78);
-      font-size:16px;
+      color:rgba(0,0,0,.75);
+      font-size:15px;
     }
-    .nav a:hover{border-color:var(--rule);background:rgba(255,255,255,.35)}
-    .nav a.active{border-color:var(--rule);background:rgba(255,255,255,.55);font-weight:700;color:rgba(0,0,0,.92)}
-    .rule{height:1px;background:var(--rule);margin:14px auto 0;max-width:740px}
+    .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
+    .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
 
-    .pageTitle{text-align:center;margin:18px 0 4px;font-size:44px;font-weight:900}
-    .updated{text-align:center;color:var(--muted);font-size:16px;margin:0 0 16px}
+    .rule{height:1px;background:var(--rule);margin:14px 0 0}
+    .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800;letter-spacing:.2px}
+    .updated{text-align:center;color:var(--muted);font-size:15px;margin:6px 0 18px}
 
     .panel{
       background:var(--paper);
       border:1px solid var(--rule);
-      border-radius:16px;
-      box-shadow:var(--shadow);
+      border-radius:14px;
       overflow:hidden;
     }
+
     .toolbar{
-      display:flex;gap:10px;align-items:center;flex-wrap:wrap;
-      padding:14px 14px;
+      display:flex;
+      gap:10px;
+      padding:12px 14px;
       border-bottom:1px solid var(--rule);
-      background:rgba(0,0,0,.02);
+      align-items:center;
+      flex-wrap:wrap;
     }
     .btn{
       appearance:none;
       border:1px solid var(--rule);
-      background:#111;
-      color:#fff;
+      background:var(--btn);
+      color:var(--btnInk);
       padding:9px 14px;
       border-radius:999px;
       cursor:pointer;
       font-family:inherit;
-      font-size:15px;
+      font-size:14px;
     }
     .btn.secondary{
-      background:transparent;
-      color:rgba(0,0,0,.82);
+      background:#fff;
+      color:#111;
     }
-    .btn.secondary:hover{background:rgba(0,0,0,.04)}
-    .search{flex:1 1 280px;margin-left:auto}
+    .btn:hover{filter:brightness(.98)}
+
+    .search{flex:1 1 320px;display:flex;align-items:center;margin-left:auto}
     .search input{
       width:100%;
-      border:1px solid var(--rule);
-      border-radius:999px;
       padding:10px 14px;
-      background:rgba(0,0,0,.02);
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:#fff;
       font-family:inherit;
-      font-size:15px;
+      font-size:14px;
       outline:none;
     }
 
     .notice{
       padding:12px 14px;
       border-bottom:1px solid var(--rule);
-      color:rgba(0,0,0,.78);
-      font-size:15px;
+      color:rgba(0,0,0,.80);
+      font-size:14px;
+      background:rgba(0,0,0,.02);
     }
+
     .headRow{
-      display:flex;justify-content:space-between;gap:10px;align-items:center;
-      padding:10px 14px;border-bottom:1px solid var(--rule);
-      background:rgba(0,0,0,.015);
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 14px;
+      border-bottom:1px solid var(--rule);
+      background:#fff;
+      align-items:center;
+      flex-wrap:wrap;
     }
     .pill{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:6px 10px;border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
       border:1px solid var(--rule);
-      background:var(--chip);
-      color:rgba(0,0,0,.75);
-      font-size:14px;
+      background:var(--pill);
+      font-size:13px;
+      color:rgba(0,0,0,.78);
     }
-    .tiny{color:var(--muted);font-size:14px}
+    .tiny{color:var(--muted);font-size:13px}
+
+    .sections{
+      padding:14px;
+      border-bottom:1px solid var(--rule);
+      background:#fff;
+    }
+    .secBlock{
+      border:1px solid var(--rule);
+      border-radius:12px;
+      padding:12px 12px;
+      background:rgba(0,0,0,.015);
+      margin-bottom:10px;
+    }
+    .secBlock:last-child{margin-bottom:0}
+    .secH{
+      margin:0 0 8px;
+      font-size:18px;
+      font-weight:800;
+      letter-spacing:.1px;
+    }
+    .secBlock ul{margin:0;padding-left:20px;color:rgba(0,0,0,.84)}
+    .secBlock li{margin:6px 0;line-height:1.35}
 
     .feed{padding:0}
+
     .card{
-      padding:16px 14px 14px;
-      border-bottom:1px solid var(--rule);
+      padding:18px 16px;
+      border-bottom:1px solid var(--soft);
+      scroll-margin-top:16px;
     }
     .card:last-child{border-bottom:none}
-
-    .kicker{
+    .meta{
       color:var(--muted);
-      font-size:13px;
-      letter-spacing:.12px;
+      font-size:12px;
+      letter-spacing:.14px;
       text-transform:uppercase;
-      margin-bottom:8px;
+      margin-bottom:6px;
     }
     .title{
       margin:0 0 10px;
       font-size:34px;
-      line-height:1.08;
       font-weight:900;
+      line-height:1.02;
     }
-    .deck{
+    .lede{
       margin:0 0 12px;
-      color:rgba(0,0,0,.82);
-      font-size:18px;
+      font-size:17px;
       line-height:1.55;
+      color:rgba(0,0,0,.86);
     }
 
-    .metaRow{
-      display:flex;gap:8px;flex-wrap:wrap;align-items:center;
-      margin:10px 0 0;
-    }
-    .chip{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:6px 10px;border-radius:999px;
-      border:1px solid var(--rule);
-      background:var(--chip);
-      font-size:13px;color:rgba(0,0,0,.72);
-    }
-
-    details.story{
-      margin-top:12px;
-      border-top:1px solid var(--rule);
-      padding-top:12px;
-    }
-    details.story summary{
-      list-style:none;
+    .actions{
       display:flex;
       gap:10px;
+      flex-wrap:wrap;
       align-items:center;
+      margin:12px 0 6px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:rgba(0,0,0,.02);
+      font-size:13px;
+      color:rgba(0,0,0,.76);
+    }
+    .btnMini{
+      appearance:none;
+      border:1px solid var(--rule);
+      background:#fff;
+      padding:7px 12px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:13px;
+      color:#111;
+    }
+    .btnMini.primary{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
+
+    details.readMore{
+      margin-top:10px;
+      border-top:1px solid var(--soft);
+      padding-top:12px;
+    }
+    details.readMore summary{
+      list-style:none;
       cursor:pointer;
       user-select:none;
+      display:none; /* we control via buttons */
     }
-    details.story summary::-webkit-details-marker{display:none}
-    .readBtn{
-      border:1px solid var(--rule);
-      background:#111;color:#fff;
-      padding:8px 12px;border-radius:999px;
-      font-family:inherit;font-size:14px;
+    .body{
+      font-size:16px;
+      line-height:1.65;
+      color:rgba(0,0,0,.86);
     }
-    .shareBtn{
-      border:1px solid var(--rule);
-      background:transparent;
-      color:rgba(0,0,0,.82);
-      padding:8px 12px;border-radius:999px;
-      font-family:inherit;font-size:14px;
-    }
-    .shareBtn:hover{background:rgba(0,0,0,.04)}
-    .storyBody{
-      margin-top:12px;
-      font-size:18px;
-      line-height:1.75;
-      color:rgba(0,0,0,.88);
-      white-space:pre-line; /* keeps paragraphs if provided */
-    }
+    .body p{margin:0 0 12px}
     .subhead{
-      margin:14px 0 6px;
-      font-size:13px;
-      letter-spacing:.12px;
+      margin:16px 0 8px;
+      font-size:12px;
       text-transform:uppercase;
+      letter-spacing:.12px;
       color:var(--muted);
     }
-    ul.clean{
-      margin:6px 0 0 18px;
-      padding:0;
-      color:rgba(0,0,0,.85);
-      font-size:17px;
-      line-height:1.6;
+    .body ul{margin:0 0 12px;padding-left:18px}
+    .body li{margin:6px 0}
+
+    .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .tag{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:rgba(0,0,0,.02);
+      font-size:12px;
+      color:rgba(0,0,0,.72);
     }
 
     .errorBox{
       padding:18px;
-      color:#7a1f1f;
-      background:rgba(255,230,230,.70);
-      border:1px solid rgba(122,31,31,.18);
-      border-radius:12px;
       margin:14px;
+      border:1px solid rgba(150,0,0,.18);
+      border-radius:12px;
+      background:rgba(255,230,230,.55);
+      color:#7a1f1f;
     }
-    .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:14px}
+    .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
 
     @media (max-width:760px){
       .brand{font-size:44px}
       .pageTitle{font-size:36px}
-      .title{font-size:28px}
-      .deck{font-size:17px}
-      .storyBody{font-size:17px}
+      .title{font-size:30px}
     }
   </style>
 </head>
@@ -226,7 +270,7 @@
       <h1 class="brand">PTD Today</h1>
       <div class="tagline">First to Know. First to Lead.</div>
 
-      <!-- Only Home + Room -->
+      <!-- ONLY Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a class="active" href="/index.html">Home</a>
         <a href="/room.html">Room</a>
@@ -235,19 +279,20 @@
       <div class="rule"></div>
     </header>
 
-    <div class="pageTitle">Daily Briefing</div>
+    <div class="pageTitle">Daily AI Briefing</div>
     <div class="updated" id="updatedLine">Loading…</div>
 
     <section class="panel">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
+
         <div class="search">
           <input id="q" type="search" placeholder="Search headlines, tags, regions…" autocomplete="off" />
         </div>
       </div>
 
       <div class="notice" id="disclaimerLine">
-        <em>Loading disclaimer…</em>
+        Informational only — AI-generated; may contain errors. Not investment or engineering advice.
       </div>
 
       <div class="headRow">
@@ -258,6 +303,7 @@
         <div class="tiny" id="modelHint">AI-generated briefing</div>
       </div>
 
+      <div class="sections" id="sections"></div>
       <div class="feed" id="feed"></div>
     </section>
 
@@ -265,10 +311,8 @@
   </div>
 
   <script>
-    // Use your generated file:
-    // Your script currently writes: data/ai_news.json and briefs/daily-ai.json
-    // Since we removed Briefs page, Home should read from /data/ai_news.json.
-    const DATA_URL = "/data/ai_news.json";
+    // Data produced by your GitHub Action
+    const DATA_URL = "/briefs/daily-ai.json";
     const $ = (id) => document.getElementById(id);
 
     function fmtUtc(iso){
@@ -282,89 +326,84 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    function metaLine(item){
-      const bits = [
-        item.category ? item.category.toUpperCase() : null,
-        item.region ? item.region.toUpperCase() : null,
-        item.created_at ? fmtUtc(item.created_at) : null
-      ].filter(Boolean);
-      return bits.join(" • ");
+    function articleUrl(id){
+      const base = window.location.origin + window.location.pathname;
+      return `${base}#${encodeURIComponent(id)}`;
     }
 
-    function sharePayload(item){
-      const title = item.title || "PTD Today";
-      const text = (item.teaser || item.summary || "").toString().slice(0, 240);
-      const url = location.href.split("#")[0];
-      return { title, text, url };
-    }
-
-    async function doShare(item){
-      const p = sharePayload(item);
+    async function shareLink(title, text, url){
+      if (navigator.share) {
+        try { await navigator.share({ title, text, url }); return; }
+        catch(e){ return; } // user cancelled
+      }
       try{
-        if (navigator.share){
-          await navigator.share(p);
-          return;
-        }
-      }catch(e){}
-      // fallback: copy
-      try{
-        await navigator.clipboard.writeText(`${p.title}\n\n${p.text}\n\n${p.url}`);
-        alert("Copied to clipboard.");
+        await navigator.clipboard.writeText(url);
+        alert("Article link copied.");
       }catch(e){
-        prompt("Copy this:", `${p.title}\n\n${p.text}\n\n${p.url}`);
+        prompt("Copy this article link:", url);
       }
     }
 
-    function cardHtml(item, idx){
-      const tags = Array.isArray(item.tags) ? item.tags : [];
+    function paragraphsToHtml(text){
+      const t = (text || "").trim();
+      if(!t) return "";
+      // split on blank lines
+      const parts = t.split(/\n\s*\n/g).map(s => s.trim()).filter(Boolean);
+      return parts.map(p => `<p>${escapeHtml(p)}</p>`).join("");
+    }
+
+    function cardHtml(item){
+      const id = (item.id || "").toString().trim() || ("ai-" + Math.random().toString(36).slice(2));
+      const meta = [
+        item.category ? item.category.toUpperCase() : "BRIEF",
+        item.region ? item.region.toUpperCase() : "GLOBAL",
+        item.created_at ? fmtUtc(item.created_at) : ""
+      ].filter(Boolean).join(" • ");
+
       const confLabel = item.confidence_label || "Medium";
       const confScore = (typeof item.confidence_score === "number") ? item.confidence_score : "";
 
-      // Long-form fields (new):
-      const teaser = item.teaser || item.summary || "";
-      const story = item.story || ""; // full article text (paragraphs)
+      const tags = Array.isArray(item.tags) ? item.tags : [];
       const watch = Array.isArray(item.watchlist) ? item.watchlist : [];
-      const action = item.action_for_readers || "";
+      const action = (item.action_for_readers || "").toString().trim();
 
-      const id = item.id || `ai-${idx+1}`;
-      const anchor = `#${encodeURIComponent(id)}`;
-
-      const storyBlock = `
-        <details class="story">
-          <summary>
-            <button class="readBtn" type="button">Read</button>
-            <button class="shareBtn" type="button" data-share="${escapeHtml(id)}">Share</button>
-            ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
-            ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
-            <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore!==""?` (${confScore})`:""}</span>
-          </summary>
-
-          <div class="storyBody">${escapeHtml(story || teaser)}</div>
-
-          ${watch.length ? `
-            <div class="subhead">What to watch</div>
-            <ul class="clean">${watch.slice(0,10).map(x=>`<li>${escapeHtml(x)}</li>`).join("")}</ul>
-          ` : ""}
-
-          ${action ? `
-            <div class="subhead">Action</div>
-            <div class="storyBody" style="padding-top:0">${escapeHtml(action)}</div>
-          ` : ""}
-
-          ${tags.length ? `
-            <div class="metaRow" style="margin-top:14px">
-              ${tags.slice(0,16).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}
-            </div>
-          ` : ""}
-        </details>
-      `;
+      // NEW preferred fields (from updated generator)
+      const lede = (item.lede || item.summary || "").toString();
+      const body = (item.body || "").toString();
 
       return `
-        <article class="card" id="${escapeHtml(id)}">
-          <div class="kicker">${escapeHtml(metaLine(item) || "PTD BRIEFING")}</div>
-          <h2 class="title">${escapeHtml(item.title || "Untitled")}</h2>
-          <p class="deck">${escapeHtml(teaser)}</p>
-          ${storyBlock}
+        <article class="card" id="${escapeHtml(id)}" data-id="${escapeHtml(id)}">
+          <div class="meta">${escapeHtml(meta)}</div>
+          <h3 class="title">${escapeHtml(item.title || "Untitled")}</h3>
+          <p class="lede">${escapeHtml(lede)}</p>
+
+          <div class="actions">
+            <button class="btnMini primary" type="button" data-action="toggle" data-id="${escapeHtml(id)}">Read</button>
+            <button class="btnMini" type="button" data-action="share" data-id="${escapeHtml(id)}">Share</button>
+
+            ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
+            ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
+            <span class="chip">Confidence: ${escapeHtml(confLabel)}${confScore!==""?` (${escapeHtml(confScore)})`:""}</span>
+          </div>
+
+          ${tags.length ? `<div class="tags">${tags.slice(0,12).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+
+          <details class="readMore" id="details-${escapeHtml(id)}">
+            <summary>Read</summary>
+            <div class="body">
+              ${body ? paragraphsToHtml(body) : (item.summary ? paragraphsToHtml(item.summary) : "")}
+
+              ${watch.length ? `
+                <div class="subhead">What to watch</div>
+                <ul>${watch.slice(0,8).map(w=>`<li>${escapeHtml(w)}</li>`).join("")}</ul>
+              ` : ""}
+
+              ${action ? `
+                <div class="subhead">Action</div>
+                <p>${escapeHtml(action)}</p>
+              ` : ""}
+            </div>
+          </details>
         </article>
       `;
     }
@@ -374,12 +413,29 @@
       if(!q) return items;
       return items.filter(it=>{
         const hay = [
-          it.title, it.teaser, it.summary, it.story,
-          it.category, it.region,
-          ...(Array.isArray(it.tags)?it.tags:[])
+          it.title, it.lede, it.summary, it.body, it.category, it.region,
+          ...(Array.isArray(it.tags)?it.tags:[]),
+          ...(Array.isArray(it.watchlist)?it.watchlist:[])
         ].map(normalize).join(" ");
         return hay.includes(q);
       });
+    }
+
+    function renderSections(payload){
+      const secs = Array.isArray(payload.sections) ? payload.sections : [];
+      if(!secs.length){
+        $("sections").innerHTML = "";
+        return;
+      }
+      $("sections").innerHTML = secs.map(s=>{
+        const bullets = Array.isArray(s.bullets) ? s.bullets : [];
+        return `
+          <div class="secBlock">
+            <h4 class="secH">${escapeHtml(s.heading || "Section")}</h4>
+            ${bullets.length ? `<ul>${bullets.slice(0,10).map(b=>`<li>${escapeHtml(b)}</li>`).join("")}</ul>` : ""}
+          </div>
+        `;
+      }).join("");
     }
 
     function render(payload, query=""){
@@ -393,61 +449,94 @@
 
       $("datePill").textContent = `Date (UTC): ${dateUtc || "—"}`;
 
+      renderSections(payload);
+
       const allItems = Array.isArray(payload.items) ? payload.items : [];
       const items = applySearch(allItems, query);
+
       $("countPill").textContent = `Items: ${items.length}`;
 
       $("feed").innerHTML = items.length
         ? items.map(cardHtml).join("")
-        : `<div class="errorBox">No items matched your search.</div>`;
+        : `<div class="errorBox"><strong>No items matched your search.</strong></div>`;
 
-      // Wire share buttons after render
-      document.querySelectorAll("[data-share]").forEach(btn=>{
-        btn.addEventListener("click", (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          const id = btn.getAttribute("data-share");
-          const item = allItems.find(x => (x.id || "") === id) || null;
-          doShare(item || {});
+      bindCardActions(payload);
+      focusFromHash();
+    }
+
+    function bindCardActions(payload){
+      const allItems = Array.isArray(payload.items) ? payload.items : [];
+      const map = new Map(allItems.map(it => [(it.id || "").toString(), it]));
+
+      document.querySelectorAll("[data-action='toggle']").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = btn.getAttribute("data-id");
+          const det = document.getElementById("details-" + id);
+          if(!det) return;
+          const open = !det.open;
+          det.open = open;
+          btn.textContent = open ? "Hide" : "Read";
+          // Update URL hash for deep linking
+          if(open){
+            history.replaceState(null, "", "#" + encodeURIComponent(id));
+          }
         });
       });
 
-      // Make the "Read" button behave like a toggle label (without jumping)
-      document.querySelectorAll("details.story summary .readBtn").forEach(b=>{
-        b.addEventListener("click", (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          const details = b.closest("details");
-          details.open = !details.open;
-          b.textContent = details.open ? "Hide" : "Read";
+      document.querySelectorAll("[data-action='share']").forEach(btn=>{
+        btn.addEventListener("click", async ()=>{
+          const id = btn.getAttribute("data-id");
+          const it = map.get(id) || {};
+          const url = articleUrl(id);
+          const title = it.title || "PTD Today";
+          const text = (it.lede || it.summary || "").toString().slice(0, 200);
+          await shareLink(title, text, url);
         });
       });
     }
 
+    function focusFromHash(){
+      const raw = window.location.hash || "";
+      const id = decodeURIComponent(raw.replace("#","")).trim();
+      if(!id) return;
+      const el = document.getElementById(id);
+      if(!el) return;
+
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+
+      // auto-open the article
+      const det = document.getElementById("details-" + id);
+      const btn = document.querySelector(`[data-action='toggle'][data-id='${CSS.escape(id)}']`);
+      if(det && !det.open){
+        det.open = true;
+        if(btn) btn.textContent = "Hide";
+      }
+    }
+
     async function load(){
       $("year").textContent = new Date().getFullYear();
+
       try{
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
 
-        // initial render + search live
         render(payload, $("q").value);
         $("q").addEventListener("input", ()=>render(payload, $("q").value));
-
       }catch(err){
         $("updatedLine").textContent = "Could not load briefing.";
-        $("disclaimerLine").textContent = "";
+        $("sections").innerHTML = "";
         $("feed").innerHTML = `
           <div class="errorBox">
             <strong>Briefing not available yet.</strong><br/>
-            Expected file: <code>${DATA_URL}</code><br/>
+            Expected file: <code>${escapeHtml(DATA_URL)}</code><br/>
             <div style="margin-top:10px;color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
           </div>`;
       }
     }
 
     $("btnRefresh").addEventListener("click", ()=>location.reload());
+    window.addEventListener("hashchange", focusFromHash);
     load();
   </script>
 </body>
