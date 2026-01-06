@@ -1,175 +1,149 @@
-import fs from "fs/promises";
-import path from "path";
+// scripts/generate_youtube.js
+// Generates a simple JSON feed from one or more YouTube channel RSS URLs.
+// Output: /briefs/youtube.json
+// Env: YOUTUBE_RSS_URLS = comma/newline separated list of RSS URLs
+// Example RSS URL:
+// https://www.youtube.com/feeds/videos.xml?channel_id=UCxxxxxxxxxxxxxxxxxxxxxx
+
+import fs from "node:fs/promises";
+import path from "node:path";
 import { XMLParser } from "fast-xml-parser";
 
 const OUT_FILE = "briefs/youtube.json";
-const MAX_ITEMS_TOTAL = 18;     // total videos saved
-const MAX_PER_FEED = 6;         // max pulled from each RSS feed
-const FETCH_TIMEOUT_MS = 15000;
 
-function parseEnvList(value) {
-  return (value || "")
+function splitUrls(raw) {
+  return (raw || "")
     .split(/[\n,]+/g)
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
 async function fetchText(url) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const res = await fetch(url, {
+    headers: {
+      "user-agent": "ptdtoday-bot/1.0 (+https://ptdtoday.com)",
+      "accept": "application/xml,text/xml;q=0.9,*/*;q=0.8",
+    },
+  });
 
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "PTD-Today-Bot/1.0 (+https://ptdtoday.com)",
-        "Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.8"
-      }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.text();
-  } finally {
-    clearTimeout(t);
+  if (!res.ok) {
+    // Don’t hard-fail the whole workflow because of one bad channel.
+    throw new Error(`Failed to fetch RSS: ${url} (${res.status})`);
   }
+  return await res.text();
 }
 
-// Extract YouTube videoId from common URL patterns
-function extractVideoId(link) {
-  if (!link) return null;
-  try {
-    const u = new URL(link);
-    if (u.hostname.includes("youtube.com")) {
-      return u.searchParams.get("v") || null;
-    }
-    if (u.hostname === "youtu.be") {
-      return u.pathname.replace("/", "") || null;
-    }
-  } catch {}
-  // fallback: try to find v=xxxxx
-  const m = String(link).match(/[?&]v=([a-zA-Z0-9_-]{6,})/);
-  return m ? m[1] : null;
-}
+function parseRss(xmlText) {
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    // YouTube feeds use namespaces like yt:videoId, media:group, etc.
+    removeNSPrefix: false,
+  });
 
-function normalizeItem(entry, feedTitle = "") {
-  // RSS entry fields vary; YouTube usually has:
-  // entry.title, entry.link, entry["yt:videoId"], entry.author.name, entry.published
-  const title = entry.title?.["#text"] ?? entry.title ?? "";
-  const link = entry.link?.["@_href"] ?? entry.link ?? "";
-  const videoId =
-    entry["yt:videoId"] ||
-    entry["videoId"] ||
-    extractVideoId(link);
+  const parsed = parser.parse(xmlText);
+  const feed = parsed?.feed || {};
+  const entries = feed?.entry ? (Array.isArray(feed.entry) ? feed.entry : [feed.entry]) : [];
 
-  const channel =
-    entry.author?.name ??
-    entry.author ??
-    feedTitle ??
-    "";
+  const channelTitle = feed?.title ?? "";
+  const channelLink = feed?.link?.["@_href"] ?? "";
 
-  const published =
-    entry.published ??
-    entry.updated ??
-    "";
+  const items = entries.map((e) => {
+    const title = e?.title ?? "";
+    const published = e?.published ?? "";
+    const updated = e?.updated ?? "";
+    const videoId = e?.["yt:videoId"] ?? "";
+    const videoUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : (e?.link?.["@_href"] ?? "");
+    const authorName = e?.author?.name ?? "";
 
-  const thumb =
-    videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
+    // Thumbnail is usually in media:group > media:thumbnail
+    let thumb = "";
+    const mediaGroup = e?.["media:group"];
+    const mediaThumb = mediaGroup?.["media:thumbnail"];
+    if (Array.isArray(mediaThumb) && mediaThumb[0]?.["@_url"]) thumb = mediaThumb[0]["@_url"];
+    else if (mediaThumb?.["@_url"]) thumb = mediaThumb["@_url"];
+
+    return {
+      title,
+      published_at: published || updated,
+      video_id: videoId,
+      url: videoUrl,
+      thumbnail: thumb,
+      author: authorName,
+    };
+  });
 
   return {
-    source: "YouTube",
-    channel: String(channel || "").trim(),
-    title: String(title || "").trim(),
-    url: link || (videoId ? `https://www.youtube.com/watch?v=${videoId}` : ""),
-    videoId: videoId || "",
-    published_at: published || "",
-    thumbnail: thumb
+    channel_title: channelTitle,
+    channel_url: channelLink,
+    items,
   };
 }
 
-// OPTIONAL: fetch view counts using YouTube Data API (requires YOUTUBE_API_KEY)
-async function enrichWithViews(items, apiKey) {
-  const ids = [...new Set(items.map(v => v.videoId).filter(Boolean))];
-  if (!apiKey || ids.length === 0) return items;
-
-  // YouTube API allows up to 50 ids per call
-  const chunks = [];
-  for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50));
-
-  const stats = new Map();
-
-  for (const chunk of chunks) {
-    const url = new URL("https://www.googleapis.com/youtube/v3/videos");
-    url.searchParams.set("part", "statistics");
-    url.searchParams.set("id", chunk.join(","));
-    url.searchParams.set("key", apiKey);
-
-    const res = await fetch(url.toString());
-    if (!res.ok) continue;
-
-    const json = await res.json();
-    for (const it of (json.items || [])) {
-      const vid = it.id;
-      const views = Number(it.statistics?.viewCount || 0);
-      stats.set(vid, views);
-    }
-
-    // be gentle
-    await sleep(200);
-  }
-
-  return items.map(v => ({
-    ...v,
-    views: stats.get(v.videoId) ?? null
-  }));
-}
-
-async function ensureDir(p) {
-  await fs.mkdir(p, { recursive: true });
+async function ensureDir(filePath) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
 
 async function main() {
-  const rssUrls = parseEnvList(process.env.YOUTUBE_RSS_URLS);
-  const ytApiKey = (process.env.YOUTUBE_API_KEY || "").trim();
+  const urls = splitUrls(process.env.YOUTUBE_RSS_URLS);
 
-  const payload = {
-    title: "PTD Today — YouTube Briefs",
-    updated_at: new Date().toISOString(),
-    disclaimer:
-      "Video list is aggregated from public YouTube feeds. Informational only. Availability may change.",
-    items: []
-  };
-
-  if (rssUrls.length === 0) {
-    // Don’t fail the job—just write an empty file so the site still loads.
-    await ensureDir(path.dirname(OUT_FILE));
-    await fs.writeFile(OUT_FILE, JSON.stringify(payload, null, 2), "utf8");
-    console.log("No YOUTUBE_RSS_URLS provided. Wrote empty youtube.json.");
+  if (!urls.length) {
+    // Still write a valid JSON so the site can render “no videos yet”
+    await ensureDir(OUT_FILE);
+    await fs.writeFile(
+      OUT_FILE,
+      JSON.stringify(
+        {
+          updated_at: new Date().toISOString(),
+          items: [],
+          warnings: ["YOUTUBE_RSS_URLS is empty."],
+        },
+        null,
+        2
+      )
+    );
+    console.log(`Wrote empty ${OUT_FILE} (no YOUTUBE_RSS_URLS provided).`);
     return;
   }
 
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "@_"
-  });
-
+  const warnings = [];
   const all = [];
 
-  for (const url of rssUrls) {
+  for (const url of urls) {
     try {
       const xml = await fetchText(url);
-      const obj = parser.parse(xml);
+      const parsed = parseRss(xml);
 
-      const feedTitle =
-        obj?.feed?.title?.["#text"] ??
-        obj?.feed?.title ??
-        "";
+      const channelItems = (parsed.items || []).map((it) => ({
+        ...it,
+        source: "YouTube",
+        channel_title: parsed.channel_title || "",
+        channel_url: parsed.channel_url || "",
+      }));
 
-      const entries = obj?.feed?.entry
-        ? (Array.isArray(obj.feed.entry) ? obj.feed.entry : [obj.feed.entry])
-        : [];
+      all.push(...channelItems);
+      console.log(`OK: ${parsed.channel_title || "YouTube channel"} (${channelItems.length} items)`);
+    } catch (err) {
+      warnings.push(String(err?.message || err));
+      console.log(`WARN: ${String(err?.message || err)}`);
+    }
+  }
 
-      const mapped = entries
-        .slice(0, MAX_PER_FEED)
-        .map(e => normalizeItem(e, feedTitle))
-        .
+  // Sort newest first
+  all.sort((a, b) => new Date(b.published_at || 0) - new Date(a.published_at || 0));
+
+  const payload = {
+    updated_at: new Date().toISOString(),
+    items: all.slice(0, 50), // keep it light
+    warnings,
+  };
+
+  await ensureDir(OUT_FILE);
+  await fs.writeFile(OUT_FILE, JSON.stringify(payload, null, 2));
+  console.log(`Wrote ${OUT_FILE} (${payload.items.length} videos).`);
+}
+
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
