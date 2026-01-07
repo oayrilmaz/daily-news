@@ -198,6 +198,11 @@
       font-family:inherit;
       font-size:13px;
       color:#111;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      line-height:1;
     }
     .btnMini.primary{
       background:#111;
@@ -301,6 +306,7 @@
   </div>
 
   <script>
+    // Data produced by your GitHub Action
     const DATA_URL = "/briefs/daily-ai.json";
     const $ = (id) => document.getElementById(id);
 
@@ -315,20 +321,24 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
+    // ✅ Share should share the *article page* (so LinkedIn shows a preview)
     function articlePageUrl(id){
       return `${window.location.origin}/articles/${encodeURIComponent(id)}.html`;
     }
 
     async function shareLink(title, text, url){
+      // Native share (mobile) - includes URL
       if (navigator.share) {
         try { await navigator.share({ title, text, url }); return; }
-        catch(e){ return; }
+        catch(e){ return; } // user cancelled
       }
+      // Clipboard fallback (desktop) - LinkedIn-ready draft
+      const draft = `${title}\n\n${text}\n\n${url}`;
       try{
-        await navigator.clipboard.writeText(url);
-        alert("Article link copied.");
+        await navigator.clipboard.writeText(draft);
+        alert("Copied draft for LinkedIn:\n\n" + draft);
       }catch(e){
-        prompt("Copy this article link:", url);
+        prompt("Copy this draft for LinkedIn:", draft);
       }
     }
 
@@ -366,6 +376,7 @@
           <div class="actions">
             <button class="btnMini primary" type="button" data-action="toggle" data-id="${escapeHtml(id)}">Read</button>
             <button class="btnMini" type="button" data-action="share" data-id="${escapeHtml(id)}">Share</button>
+            <a class="btnMini" href="${escapeHtml(articlePageUrl(id))}" target="_blank" rel="noopener">Open</a>
 
             ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
             ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
@@ -467,9 +478,9 @@
         btn.addEventListener("click", async ()=>{
           const id = btn.getAttribute("data-id");
           const it = map.get(id) || {};
-          const url = articlePageUrl(id);   // ✅ THIS is the share fix
+          const url = articlePageUrl(id);
           const title = it.title || "PTD Today";
-          const text = (it.lede || it.summary || "").toString().slice(0, 200);
+          const text = (it.lede || it.summary || "").toString().slice(0, 220);
           await shareLink(title, text, url);
         });
       });
