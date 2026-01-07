@@ -3,14 +3,19 @@ name: Home AI (PTD Today)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "15 * * * *"   # every hour at :15 UTC
+    - cron: "15 * * * *" # every hour at :15 UTC
 
 permissions:
   contents: write
 
+concurrency:
+  group: home-ai-ptdtoday
+  cancel-in-progress: true
+
 jobs:
   generate:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,10 +31,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Rebase on latest main
+      # Keep local branch aligned with remote to avoid push rejection
+      - name: Sync with latest main
         run: |
           git fetch origin main
-          git rebase origin/main
+          git checkout main
+          git reset --hard origin/main
 
       - name: Generate AI JSON + Article Pages
         env:
