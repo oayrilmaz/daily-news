@@ -1,7 +1,11 @@
 // ====================================================================
 // PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
-// + Short share pages
-// + AUTO robots.txt + sitemap index + sitemap-main.xml + sitemap-articles.xml
+// + Short share pages (/s/<id>/) for LinkedIn previews
+// + SINGLE OWNER for robots + sitemaps:
+//    - robots.txt
+//    - sitemap.xml (index)
+//    - sitemap-main.xml
+//    - sitemap-articles.xml (auto from /articles/*.html)
 // Node 20+
 // ====================================================================
 
@@ -17,21 +21,20 @@ const ROOT       = path.resolve(__dirname, "..");
 
 const OUT_DATA   = path.join(ROOT, "data");
 const OUT_SHORT  = path.join(ROOT, "s");
-const OUT_ART    = path.join(ROOT, "articles");      // AI article pages live here
+const OUT_ART    = path.join(ROOT, "articles");
 
 const NEWS_PATH  = path.join(OUT_DATA, "news.json");
 const WEEK_PATH  = path.join(OUT_DATA, "7d.json");
 const SHORT_MAP  = path.join(OUT_DATA, "shortlinks.json");
 const YT_DEBUG   = path.join(OUT_DATA, "youtube_raw.json");
 
-// SEO outputs
-const ROBOTS_PATH          = path.join(ROOT, "robots.txt");
-const SITEMAP_INDEX_PATH   = path.join(ROOT, "sitemap.xml");          // sitemap index
-const SITEMAP_MAIN_PATH    = path.join(ROOT, "sitemap-main.xml");     // core pages
-const SITEMAP_ARTICLES_PATH= path.join(ROOT, "sitemap-articles.xml"); // /articles/*.html
+const ROBOTS_PATH           = path.join(ROOT, "robots.txt");
+const SITEMAP_INDEX_PATH    = path.join(ROOT, "sitemap.xml");
+const SITEMAP_MAIN_PATH     = path.join(ROOT, "sitemap-main.xml");
+const SITEMAP_ARTICLES_PATH = path.join(ROOT, "sitemap-articles.xml");
 
 // ---------- Site ----------
-const SITE_ORIGIN = "https://ptdtoday.com";
+const SITE_ORIGIN = (process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = "G-TVKD1RLFE5";
 
 // ====================================================================
@@ -152,12 +155,35 @@ const RX_EXCLUDE = [
 
 const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 const clean = (s="") => s.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
-function safeISO(x){ const d=new Date(x||Date.now()); return Number.isNaN(d.getTime())?new Date().toISOString():d.toISOString(); }
-function domainOf(url=""){ try{return new URL(url).hostname.replace(/^www\./,"").toLowerCase();}catch{return"";} }
-function hoursAgo(iso){ const t=new Date(iso).getTime(); return (Date.now()-t)/36e5; }
-function scoreItem(url,published){ const ageH=Math.max(1,hoursAgo(published)); return 10/ageH; }
-function dedupeByUrl(items){ const seen=new Set(); return items.filter(x=>{const k=(x.url||"").trim(); if(!k||seen.has(k))return false; seen.add(k); return true;}); }
-function sortByDateDesc(a,b){ return new Date(b.published)-new Date(a.published); }
+
+function safeISO(x){
+  const d=new Date(x||Date.now());
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+function domainOf(url=""){
+  try{return new URL(url).hostname.replace(/^www\./,"").toLowerCase();}
+  catch{return"";}
+}
+function hoursAgo(iso){
+  const t=new Date(iso).getTime();
+  return (Date.now()-t)/36e5;
+}
+function scoreItem(_url,published){
+  const ageH=Math.max(1,hoursAgo(published));
+  return 10/ageH;
+}
+function dedupeByUrl(items){
+  const seen=new Set();
+  return items.filter(x=>{
+    const k=(x.url||"").trim();
+    if(!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+function sortByDateDesc(a,b){
+  return new Date(b.published)-new Date(a.published);
+}
 const isLogoPath = u => /logo|sprite|favicon|brand|og-image-default/i.test(u||"");
 
 function xmlEscape(s=""){
@@ -292,7 +318,10 @@ function extractImageFromHtml(html){
     /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
     /<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i
   ];
-  for (const re of cands){ const u=pick(re); if(u && !isLogoPath(u)) return u; }
+  for (const re of cands){
+    const u=pick(re);
+    if(u && !isLogoPath(u)) return u;
+  }
   const imgs=[...html.matchAll(/<img\b[^>]*src=["']([^"']+)["']/gi)].map(m=>m[1]);
   const good=imgs.find(u=>u && !isLogoPath(u));
   return good||"";
@@ -301,6 +330,7 @@ function extractImageFromHtml(html){
 async function enrichArticleImages(items){
   const targets = items.filter(x=>x.type==="article" && !x.image).slice(0, ENRICH_MAX);
   const q=[...targets];
+
   async function worker(){
     while(q.length){
       const it=q.shift();
@@ -312,12 +342,13 @@ async function enrichArticleImages(items){
       await sleep(120);
     }
   }
+
   await Promise.all(Array.from({length:CONCURRENCY}, worker));
   return items;
 }
 
 // ====================================================================
-// SHORT PAGES (LinkedIn preview) — keep for sharing, but NOINDEX for SEO
+// SHORT PAGES (for LinkedIn share OG/GA) — NOINDEX
 // ====================================================================
 
 const shortIdFor = (url) => crypto.createHash("sha1").update(url).digest("base64url").slice(0,10);
@@ -327,14 +358,13 @@ const gaHead = () => `
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>`;
 
 function staticSharePage(item){
-  const id    = item.sid;
-  const url   = `${SITE_ORIGIN}/s/${id}/`;
-  const title = item.title;
-  const img   = item.image || `${SITE_ORIGIN}/assets/og-default.png`;
+  const id   = item.sid;
+  const url  = `${SITE_ORIGIN}/s/${id}/`;
+  const title= item.title;
+  const img  = item.image || `${SITE_ORIGIN}/assets/og-default.png`;
 
   const meta = `
 <meta name="robots" content="noindex,follow">
-<link rel="canonical" href="${escapeHtml(url)}">
 <meta property="og:type" content="${item.type==='video' ? 'video.other' : 'article'}">
 <meta property="og:site_name" content="PTD Today">
 <meta property="og:title" content="${escapeHtml(title)}">
@@ -414,12 +444,15 @@ function passesYouTubePolicy(blob, policy){
 }
 
 // ====================================================================
-// SEO: robots.txt + sitemap index + sitemap-main + sitemap-articles
+// SEO: robots + sitemaps (index + split)
 // ====================================================================
 
 async function writeRobotsTxt(){
   const body = `User-agent: *
 Allow: /
+
+# Avoid indexing short share pages (they are for social previews only)
+Disallow: /s/
 
 Sitemap: ${SITE_ORIGIN}/sitemap.xml
 `;
@@ -427,25 +460,32 @@ Sitemap: ${SITE_ORIGIN}/sitemap.xml
 }
 
 async function writeSitemapIndex(){
+  const now = new Date().toISOString();
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap><loc>${xmlEscape(SITE_ORIGIN + "/sitemap-main.xml")}</loc></sitemap>
-  <sitemap><loc>${xmlEscape(SITE_ORIGIN + "/sitemap-articles.xml")}</loc></sitemap>
+  <sitemap>
+    <loc>${xmlEscape(`${SITE_ORIGIN}/sitemap-main.xml`)}</loc>
+    <lastmod>${xmlEscape(now)}</lastmod>
+  </sitemap>
+  <sitemap>
+    <loc>${xmlEscape(`${SITE_ORIGIN}/sitemap-articles.xml`)}</loc>
+    <lastmod>${xmlEscape(now)}</lastmod>
+  </sitemap>
 </sitemapindex>
 `;
   await fs.writeFile(SITEMAP_INDEX_PATH, xml, "utf8");
 }
 
-async function writeSitemapMainXml(){
+async function writeSitemapMain(){
   const urls = [
     { loc: `${SITE_ORIGIN}/`,         changefreq: "hourly", priority: "1.0" },
-    { loc: `${SITE_ORIGIN}/index.html`,changefreq:"hourly", priority: "0.9" },
-    { loc: `${SITE_ORIGIN}/room.html`, changefreq: "weekly", priority: "0.6" }
+    { loc: `${SITE_ORIGIN}/index.html`, changefreq: "hourly", priority: "0.9" },
+    { loc: `${SITE_ORIGIN}/room.html`,  changefreq: "weekly", priority: "0.6" }
   ];
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map(u => {
+${urls.map(u=>{
   const parts = [];
   parts.push(`<loc>${xmlEscape(u.loc)}</loc>`);
   if (u.changefreq) parts.push(`<changefreq>${xmlEscape(u.changefreq)}</changefreq>`);
@@ -457,27 +497,33 @@ ${urls.map(u => {
   await fs.writeFile(SITEMAP_MAIN_PATH, xml, "utf8");
 }
 
-async function writeSitemapArticlesXml(){
+async function writeSitemapArticles(){
+  const articleHtml = await listHtmlFiles(OUT_ART); // /articles/*.html (generated by AI job)
   const urls = [];
 
-  const articleHtml = await listHtmlFiles(OUT_ART);
   for (const abs of articleHtml){
     const relPath = toSitePath(abs); // /articles/xyz.html
+    const stat = await fs.stat(abs);
     urls.push({
       loc: `${SITE_ORIGIN}${relPath}`,
+      lastmod: stat.mtime.toISOString(),
       changefreq: "daily",
-      priority: "0.7",
-      lastmod: (await fs.stat(abs)).mtime.toISOString()
+      priority: "0.7"
     });
   }
 
-  // De-dupe
+  // de-dupe
   const seen = new Set();
-  const final = urls.filter(u => u?.loc && !seen.has(u.loc) && seen.add(u.loc));
+  const final = urls.filter(u => {
+    if (!u.loc) return false;
+    if (seen.has(u.loc)) return false;
+    seen.add(u.loc);
+    return true;
+  });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${final.map(u => {
+${final.map(u=>{
   const parts = [];
   parts.push(`<loc>${xmlEscape(u.loc)}</loc>`);
   if (u.lastmod) parts.push(`<lastmod>${xmlEscape(u.lastmod)}</lastmod>`);
@@ -516,6 +562,7 @@ async function build(){
     const feeds = youTubeFeedUrlsForChannelId(ch);
     const policy = CHANNEL_POLICIES[ch] || { soft:false, requireCore:false };
     let all = [];
+
     for (const feedUrl of feeds){
       try{
         const { txt } = await fetchTextWithProxies(feedUrl, { "accept-language":"en-US,en;q=0.8" }, 3);
@@ -527,11 +574,14 @@ async function build(){
       }
     }
 
+    // de-dupe by videoId
     const seen = new Set();
     all = all.filter(v => (v.videoId && !seen.has(v.videoId) && seen.add(v.videoId)));
 
-    all = all.filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
-             .sort((a,b)=> new Date(b.published) - new Date(a.published));
+    // time filter + newest first
+    all = all
+      .filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
+      .sort((a,b)=> new Date(b.published) - new Date(a.published));
 
     ytDebug.push({ channel: ch, feeds, count: all.length, sample: all.slice(0,5) });
 
@@ -588,7 +638,7 @@ async function build(){
   const recent = items.filter(isRecent);
   const week   = items.filter(x => now - new Date(x.published).getTime() <= 7 * 24 * 3600 * 1000);
 
-  // Shortlinks for recent (keep for LinkedIn share previews)
+  // Shortlinks for recent
   await fs.mkdir(OUT_DATA, { recursive: true });
   await fs.mkdir(OUT_SHORT, { recursive: true });
   const shortMap = {};
@@ -612,10 +662,10 @@ async function build(){
   await fs.writeFile(SHORT_MAP, JSON.stringify(shortMap, null, 2));
   await fs.writeFile(YT_DEBUG, JSON.stringify(ytDebug, null, 2));
 
-  // SEO outputs
+  // ✅ SEO outputs (single owner)
   await writeRobotsTxt();
-  await writeSitemapMainXml();
-  await writeSitemapArticlesXml();
+  await writeSitemapMain();
+  await writeSitemapArticles();
   await writeSitemapIndex();
 
   console.log(`Wrote:
