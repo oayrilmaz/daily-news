@@ -1,6 +1,7 @@
 // ====================================================================
 // PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
-// Channel policies + playlist fallback + smart-allow + shorts filter + debug
+// + Short share pages
+// + AUTO robots.txt + sitemap.xml (includes /articles + /s + key pages)
 // Node 20+
 // ====================================================================
 
@@ -13,12 +14,18 @@ import crypto from "node:crypto";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 const ROOT       = path.resolve(__dirname, "..");
+
 const OUT_DATA   = path.join(ROOT, "data");
 const OUT_SHORT  = path.join(ROOT, "s");
+const OUT_ART    = path.join(ROOT, "articles");      // ✅ AI article pages live here
+
 const NEWS_PATH  = path.join(OUT_DATA, "news.json");
 const WEEK_PATH  = path.join(OUT_DATA, "7d.json");
 const SHORT_MAP  = path.join(OUT_DATA, "shortlinks.json");
 const YT_DEBUG   = path.join(OUT_DATA, "youtube_raw.json");
+
+const ROBOTS_PATH  = path.join(ROOT, "robots.txt");  // ✅
+const SITEMAP_PATH = path.join(ROOT, "sitemap.xml"); // ✅
 
 // ---------- Site ----------
 const SITE_ORIGIN = "https://ptdtoday.com";
@@ -59,16 +66,14 @@ const FEEDS = (process.env.FEEDS?.split(",").map(s=>s.trim()).filter(Boolean)) |
 
 // ---------- YouTube channels ----------
 const YT = {
-  // OEMs / Utilities / Vendors (already focused)
   SIEMENS:   "UC0jLzOK3mWr4YcUuG3KzZmw",
   HITACHI:   "UC4l7cLFsPzQYdMwvZRVqNag",
   ABB:       "UCJ2Kx0pPZzJyaRlwviCJPdA",
   SCHNEIDER: "UCvB8R7oZJxge5tR3MUpxYfw",
 
-  // Business / Market desks
   BLOOMBERG: "UCUMZ7gohGI9HcU9VNsr2FJQ",
-  CNBC:      "UCvJJ_dzjViJCoLf5uKUTwoA", // CNBC Television (common)
-  CNBC_ALT:  "UCrp_UI8XtuYfpiqluWLD7Lw", // CNBC (alt/general)
+  CNBC:      "UCvJJ_dzjViJCoLf5uKUTwoA",
+  CNBC_ALT:  "UCrp_UI8XtuYfpiqluWLD7Lw",
   WSJ:       "UCW6-BQWFA70DyycZ57JKias",
   REUTERS:   "UChqUTb7kYRX8-EiaN3XFrSQ",
   BBC:       "UC16niRr50-MSBwiO3YDb3RA"
@@ -96,43 +101,22 @@ const CHANNEL_POLICIES = {
 // TOPIC FILTERS
 // ====================================================================
 
-// Strict domain language
 const RX_INCLUDE_STRICT = [
-  // Transmission & Grid
   /\b(grid|transmission|distribution|substation|overhead\s+line|interconnector|intertie)\b/i,
   /\b(transformer|autotransformer|switchgear|breaker|protection\s+relay)\b/i,
   /\b(statcom|synchronous\s+condenser|reactive\s+power|facts|tcsr|tcsc|upfc|pmu|synchrophasor)\b/i,
-
-  // HVDC/HVAC
   /\b(hvdc|hvac\s+transmission|converter\s+station|vsc|csc)\b/i,
-
-  // Renewables & Generation
   /\b(renewable|solar|pv|wind|offshore\s+wind|hydro(?:power)?|geothermal|biomass|nuclear|smr|small\s+modular\s+reactor)\b/i,
-
-  // Storage / Grid Edge
   /\b(battery|batteries|bess|energy\s+storage|lithium|grid[-\s]?forming)\b/i,
   /\b(virtual\s+power\s+plant|vpp|vehicle[-\s]?to[-\s]?grid|v2g|microgrid)\b/i,
-
-  // Industrial loads
   /\b(semiconductor|foundry|fab|refinery|mining|smelter|steel|cement|rail|metro|traction|port|airport)\b/i,
-
-  // Policy & Markets
   /\b(ferc|rto|iso|pjm|miso|ercot|caiso|iso[-\s]?ne|nyiso|ofgem|grid\s+code|capacity\s+market|ancillary\s+services)\b/i,
-
-  // Automation & Monitoring
   /\b(scada|ems|dms|adms|derms|wams|digital\s+twin|condition\s+monitoring|predictive\s+maintenance|iec\s*61850)\b/i,
-
-  // Equipment & Cables
   /\b(subsea\s+cable|hv\s+cable|xlpe|hvac\s+cable|conductor)\b/i,
-
-  // Supply chain / lead times
   /\bsupply\s+chain.*\b(lead\s*time|capacity|backlog|shortage|procurement)\b/i,
-
-  // Data centers / AI power / Semiconductors (broad but relevant)
   /\b(ai|artificial\s+intelligence|machine\s+learning|gpu|nvidia|semiconductor|chip|server|rack|data\s*cent(?:er|re)s?|hyperscale|colocation|supercomputer|hpc|cloud|ai\s+infrastructure|pue|liquid\s+cooling|immersion\s+cooling)\b/i
 ];
 
-// Softer net (only if strict fails AND policy.soft = true)
 const RX_INCLUDE_SOFT = [
   /\b(power|electric(ity|al)?|energy|utility|utilities)\b/i,
   /\b(grid|transmission|substation|hvdc|converter|bess|battery|storage)\b/i,
@@ -142,10 +126,8 @@ const RX_INCLUDE_SOFT = [
   /\b(nvidia|chip(s)?|semiconductor|foundry|fab)\b/i
 ];
 
-// Core “must-have” for general news channels (avoid geopolitics)
 const RX_CORE = /\b(power|electric(ity|al)?|grid|utility|data\s*cent(?:er|re)|datacentre|hyperscale|colocation|gpu|nvidia|ai|hvdc|battery|bess|hydrogen|solar|wind|nuclear|substation|transformer|transmission|converter|cooling|pue)\b/i;
 
-// Manual smart-allow: very specific combos we care about
 const RX_SMART_ALLOW = [
   /nvidia.*data\s*cent/i,
   /data\s*cent.*nvidia/i,
@@ -153,7 +135,6 @@ const RX_SMART_ALLOW = [
   /gpu.*(power|electric|grid)/i
 ];
 
-// Excludes
 const RX_EXCLUDE = [
   /\b(trump|biden|harris|election|congress|parliament|president|democrat|republican|politics|campaign)\b/i,
   /\b(israel|gaza|ukraine|russia|war|conflict|attack|terror|police|crime|shooting|murder|trial|court)\b/i,
@@ -175,6 +156,42 @@ function scoreItem(url,published){ const ageH=Math.max(1,hoursAgo(published)); r
 function dedupeByUrl(items){ const seen=new Set(); return items.filter(x=>{const k=(x.url||"").trim(); if(!k||seen.has(k))return false; seen.add(k); return true;}); }
 function sortByDateDesc(a,b){ return new Date(b.published)-new Date(a.published); }
 const isLogoPath = u => /logo|sprite|favicon|brand|og-image-default/i.test(u||"");
+
+function xmlEscape(s=""){
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&apos;");
+}
+
+async function fileExists(p){
+  try { await fs.stat(p); return true; } catch { return false; }
+}
+
+async function listHtmlFiles(dir){
+  const out = [];
+  if (!(await fileExists(dir))) return out;
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  for (const e of entries){
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()){
+      out.push(...(await listHtmlFiles(p)));
+    } else if (e.isFile() && e.name.toLowerCase().endsWith(".html")){
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function toSitePath(absPath){
+  // absPath within ROOT
+  const rel = path.relative(ROOT, absPath).split(path.sep).join("/");
+  // Map "index.html" at root to "/"
+  if (rel === "index.html") return "/";
+  return "/" + rel;
+}
 
 // ====================================================================
 // NETWORK + PARSERS (with proxy fallback)
@@ -254,7 +271,6 @@ function parseYouTubeRSS(xml){
   }).filter(x=>x.title && x.url);
 }
 
-// Build both URLs for a channel: channel feed + uploads playlist feed
 function youTubeFeedUrlsForChannelId(channelId){
   const feeds = [`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`];
   if (channelId.startsWith("UC")) {
@@ -371,7 +387,6 @@ const testCore    = (t) => RX_CORE.test(t);
 const testSmart   = (t) => RX_SMART_ALLOW.some(rx=>rx.test(t));
 const testExclude = (t) => RX_EXCLUDE.some(rx=>rx.test(t));
 
-// Decide if a YT item passes for a given channel policy
 function passesYouTubePolicy(blob, policy){
   if (testExclude(blob)) return false;
 
@@ -391,6 +406,82 @@ function passesYouTubePolicy(blob, policy){
   }
 
   return false;
+}
+
+// ====================================================================
+// SEO: robots.txt + sitemap.xml
+// ====================================================================
+
+async function writeRobotsTxt(){
+  const body = `User-agent: *
+Allow: /
+
+Sitemap: ${SITE_ORIGIN}/sitemap.xml
+`;
+  await fs.writeFile(ROBOTS_PATH, body, "utf8");
+}
+
+async function writeSitemapXml({ shortIds = [] }){
+  const urls = [];
+
+  // Core pages
+  const corePages = [
+    { loc: `${SITE_ORIGIN}/`, changefreq: "hourly", priority: "1.0" },
+    { loc: `${SITE_ORIGIN}/index.html`, changefreq: "hourly", priority: "0.9" },
+    { loc: `${SITE_ORIGIN}/room.html`, changefreq: "weekly", priority: "0.6" }
+  ];
+  urls.push(...corePages);
+
+  // Data endpoints (optional but fine)
+  const dataPages = [
+    { loc: `${SITE_ORIGIN}/data/news.json`, changefreq: "hourly", priority: "0.2" },
+    { loc: `${SITE_ORIGIN}/data/7d.json`,   changefreq: "hourly", priority: "0.2" }
+  ];
+  urls.push(...dataPages);
+
+  // ✅ AI article pages: /articles/*.html
+  const articleHtml = await listHtmlFiles(OUT_ART);
+  for (const abs of articleHtml){
+    const relPath = toSitePath(abs); // /articles/xyz.html
+    urls.push({
+      loc: `${SITE_ORIGIN}${relPath}`,
+      changefreq: "daily",
+      priority: "0.7",
+      lastmod: (await fs.stat(abs)).mtime.toISOString()
+    });
+  }
+
+  // ✅ Short share pages: /s/<id>/
+  for (const id of shortIds){
+    urls.push({
+      loc: `${SITE_ORIGIN}/s/${encodeURIComponent(id)}/`,
+      changefreq: "hourly",
+      priority: "0.5"
+    });
+  }
+
+  // De-dupe by loc
+  const seen = new Set();
+  const final = urls.filter(u => {
+    if (!u?.loc) return false;
+    if (seen.has(u.loc)) return false;
+    seen.add(u.loc);
+    return true;
+  });
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${final.map(u => {
+  const parts = [];
+  parts.push(`<loc>${xmlEscape(u.loc)}</loc>`);
+  if (u.lastmod) parts.push(`<lastmod>${xmlEscape(u.lastmod)}</lastmod>`);
+  if (u.changefreq) parts.push(`<changefreq>${xmlEscape(u.changefreq)}</changefreq>`);
+  if (u.priority) parts.push(`<priority>${xmlEscape(u.priority)}</priority>`);
+  return `  <url>${parts.join("")}</url>`;
+}).join("\n")}
+</urlset>
+`;
+  await fs.writeFile(SITEMAP_PATH, xml, "utf8");
 }
 
 // ====================================================================
@@ -430,11 +521,9 @@ async function build(){
       }
     }
 
-    // de-dupe by videoId
     const seen = new Set();
     all = all.filter(v => (v.videoId && !seen.has(v.videoId) && seen.add(v.videoId)));
 
-    // time filter + newest first
     all = all.filter(v => (Date.now() - new Date(v.published).getTime()) <= YT_HOURS*3600*1000)
              .sort((a,b)=> new Date(b.published) - new Date(a.published));
 
@@ -497,6 +586,7 @@ async function build(){
   await fs.mkdir(OUT_DATA, { recursive: true });
   await fs.mkdir(OUT_SHORT, { recursive: true });
   const shortMap = {};
+  const shortIds = [];
 
   for(const it of recent){
     const id = shortIdFor(it.url);
@@ -509,6 +599,7 @@ async function build(){
       url: it.url, title: it.title, image: it.image, publisher: it.publisher,
       category: it.category, published: it.published, type: it.type, videoId: it.videoId || ""
     };
+    shortIds.push(id);
   }
 
   // Write data + debug
@@ -517,12 +608,18 @@ async function build(){
   await fs.writeFile(SHORT_MAP, JSON.stringify(shortMap, null, 2));
   await fs.writeFile(YT_DEBUG, JSON.stringify(ytDebug, null, 2));
 
+  // ✅ SEO outputs
+  await writeRobotsTxt();
+  await writeSitemapXml({ shortIds });
+
   console.log(`Wrote:
   - data/news.json (${recent.length})
   - data/7d.json
   - data/shortlinks.json
   - data/youtube_raw.json (debug)
   - s/<id>/index.html (${Object.keys(shortMap).length})
+  - robots.txt
+  - sitemap.xml
 Done.`);
 }
 
