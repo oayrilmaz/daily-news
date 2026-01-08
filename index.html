@@ -3,8 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PTD Today — Daily Briefing</title>
-  <meta name="description" content="PTD Today — Daily Briefing (AI-generated intelligence briefing)." />
+
+  <title>PTD Today — Daily AI Briefing</title>
+  <meta name="description" content="PTD Today — Daily AI Briefing (AI-generated intelligence briefing)." />
+  <link rel="canonical" href="https://ptdtoday.com/" />
+
+  <!-- Open Graph (Home) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="PTD Today" />
+  <meta property="og:title" content="PTD Today — Daily AI Briefing" />
+  <meta property="og:description" content="AI-generated intelligence briefing for power grids, substations, data centers, renewables, and critical minerals." />
+  <meta property="og:url" content="https://ptdtoday.com/" />
+  <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PTD Today — Daily AI Briefing" />
+  <meta name="twitter:description" content="AI-generated intelligence briefing for power grids, substations, data centers, renewables, and critical minerals." />
+  <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png" />
+
+  <!-- Minimal structured data (safe + generic) -->
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"WebSite",
+    "name":"PTD Today",
+    "url":"https://ptdtoday.com/",
+    "description":"AI-generated intelligence briefing for power grids, substations, data centers, renewables, and critical minerals."
+  }
+  </script>
 
   <style>
     :root{
@@ -31,7 +58,14 @@
     a{color:inherit}
     .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
     .mast{text-align:center;padding:16px 0 6px}
-    .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
+    .brand{
+      margin:0;
+      font-size:52px;
+      letter-spacing:.2px;
+      font-weight:700;
+      text-decoration:none;
+      display:inline-block;
+    }
     .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
 
     .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
@@ -47,7 +81,15 @@
     .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
 
     .rule{height:1px;background:var(--rule);margin:14px 0 0}
-    .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800;letter-spacing:.2px}
+
+    /* Headings: proper order (fixes Lighthouse warning) */
+    .pageTitle{
+      text-align:center;
+      margin:18px 0 2px;
+      font-size:44px;
+      font-weight:800;
+      letter-spacing:.2px;
+    }
     .updated{text-align:center;color:var(--muted);font-size:15px;margin:6px 0 18px}
 
     .panel{
@@ -252,6 +294,15 @@
     }
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
 
+    /* Hidden crawl links container (for search engines) */
+    #crawlLinks{
+      position:absolute;
+      left:-9999px;
+      top:auto;
+      width:1px;height:1px;
+      overflow:hidden;
+    }
+
     @media (max-width:760px){
       .brand{font-size:44px}
       .pageTitle{font-size:36px}
@@ -263,7 +314,7 @@
 <body>
   <div class="wrap">
     <header class="mast">
-      <h1 class="brand">PTD Today</h1>
+      <a class="brand" href="/" aria-label="PTD Today home">PTD Today</a>
       <div class="tagline">First to Know. First to Lead.</div>
 
       <!-- ONLY Home + Room -->
@@ -275,10 +326,10 @@
       <div class="rule"></div>
     </header>
 
-    <div class="pageTitle">Daily AI Briefing</div>
+    <h1 class="pageTitle">Daily AI Briefing</h1>
     <div class="updated" id="updatedLine">Loading…</div>
 
-    <section class="panel">
+    <section class="panel" aria-label="Daily briefing">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
         <div class="search">
@@ -303,6 +354,9 @@
     </section>
 
     <div class="footer">© <span id="year"></span> PTD Today</div>
+
+    <!-- Populated after JSON load so crawlers can discover /articles/*.html -->
+    <div id="crawlLinks" aria-hidden="true"></div>
   </div>
 
   <script>
@@ -327,12 +381,10 @@
     }
 
     async function shareLink(title, text, url){
-      // Native share (mobile) - includes URL
       if (navigator.share) {
         try { await navigator.share({ title, text, url }); return; }
         catch(e){ return; } // user cancelled
       }
-      // Clipboard fallback (desktop) - LinkedIn-ready draft
       const draft = `${title}\n\n${text}\n\n${url}`;
       try{
         await navigator.clipboard.writeText(draft);
@@ -370,7 +422,7 @@
       return `
         <article class="card" id="${escapeHtml(id)}" data-id="${escapeHtml(id)}">
           <div class="meta">${escapeHtml(meta)}</div>
-          <h3 class="title">${escapeHtml(item.title || "Untitled")}</h3>
+          <h2 class="title">${escapeHtml(item.title || "Untitled")}</h2>
           <p class="lede">${escapeHtml(lede)}</p>
 
           <div class="actions">
@@ -425,11 +477,24 @@
         const bullets = Array.isArray(s.bullets) ? s.bullets : [];
         return `
           <div class="secBlock">
-            <h4 class="secH">${escapeHtml(s.heading || "Section")}</h4>
+            <h3 class="secH">${escapeHtml(s.heading || "Section")}</h3>
             ${bullets.length ? `<ul>${bullets.slice(0,10).map(b=>`<li>${escapeHtml(b)}</li>`).join("")}</ul>` : ""}
           </div>
         `;
       }).join("");
+    }
+
+    function renderCrawlLinks(items){
+      // Create plain <a> links (no JS handlers) to help discovery of /articles/*.html
+      const links = (items || []).map(it => {
+        const id = (it.id || "").toString().trim();
+        if(!id) return "";
+        const url = articlePageUrl(id);
+        const title = (it.title || id).toString();
+        return `<a href="${escapeHtml(url)}">${escapeHtml(title)}</a>`;
+      }).filter(Boolean);
+
+      $("crawlLinks").innerHTML = links.join("\n");
     }
 
     function render(payload, query=""){
@@ -453,6 +518,9 @@
       $("feed").innerHTML = items.length
         ? items.map(cardHtml).join("")
         : `<div class="errorBox"><strong>No items matched your search.</strong></div>`;
+
+      // Populate crawlable links with the full set (not filtered)
+      renderCrawlLinks(allItems);
 
       bindCardActions(payload);
       focusFromHash();
