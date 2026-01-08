@@ -3,6 +3,7 @@
 // Output:
 //   - briefs/daily-ai.json (Home reads this)
 //   - articles/<id>.html  (for social share previews + direct reading)
+//   - sitemap.xml         (includes /articles/* so Google can discover them)
 
 import fs from "fs";
 import path from "path";
@@ -78,8 +79,19 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
   const watch = Array.isArray(item.watchlist) ? item.watchlist : [];
   const tags = Array.isArray(item.tags) ? item.tags : [];
 
-  // Optional: set a default OG image (create later if you want)
   const ogImage = `${siteOrigin.replace(/\/$/, "")}/assets/og-default.png`;
+
+  // JSON-LD (helps Google understand "Article" even if it doesn't show rich results)
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": title,
+    "description": description,
+    "datePublished": createdAt || payload.updated_at || new Date().toISOString(),
+    "dateModified": payload.updated_at || createdAt || new Date().toISOString(),
+    "mainEntityOfPage": url,
+    "publisher": { "@type": "Organization", "name": "PTD Today" }
+  };
 
   return `<!doctype html>
 <html lang="en">
@@ -88,10 +100,9 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)} — PTD Today</title>
   <meta name="description" content="${escapeHtml(description)}" />
-
   <link rel="canonical" href="${escapeHtml(url)}" />
 
-  <!-- Open Graph for LinkedIn/Facebook -->
+  <!-- Open Graph -->
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="${escapeHtml(title)}" />
@@ -104,6 +115,8 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
   <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
+
+  <script type="application/ld+json">${escapeHtml(JSON.stringify(jsonLd))}</script>
 
   <style>
     :root{
@@ -235,6 +248,37 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
 </html>`;
 }
 
+function buildSitemapXml({ siteOrigin, articleIds }) {
+  const base = siteOrigin.replace(/\/$/, "");
+  const now = new Date().toISOString();
+
+  const urls = [
+    { loc: `${base}/`, changefreq: "hourly", priority: "1.0" },
+    { loc: `${base}/index.html`, changefreq: "hourly" },
+    { loc: `${base}/room.html`, changefreq: "weekly" },
+    { loc: `${base}/briefs/daily-ai.json`, changefreq: "hourly" },
+    { loc: `${base}/data/news.json`, changefreq: "hourly" },
+    { loc: `${base}/data/7d.json`, changefreq: "hourly" },
+    ...articleIds.map(id => ({
+      loc: `${base}/articles/${encodeURIComponent(id)}.html`,
+      changefreq: "daily",
+      lastmod: now
+    }))
+  ];
+
+  const esc = (s) => escapeHtml(s);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => {
+  return `  <url>
+    <loc>${esc(u.loc)}</loc>${u.lastmod ? `\n    <lastmod>${esc(u.lastmod)}</lastmod>` : ""}${u.changefreq ? `\n    <changefreq>${esc(u.changefreq)}</changefreq>` : ""}${u.priority ? `\n    <priority>${esc(u.priority)}</priority>` : ""}
+  </url>`;
+}).join("\n")}
+</urlset>
+`;
+}
+
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const siteOrigin = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
@@ -324,16 +368,24 @@ REQUIREMENTS:
   // Write JSON used by Home
   writeJson(path.join("briefs", "daily-ai.json"), payload);
 
-  // Build per-article HTML pages for social preview
+  // Build per-article HTML pages + collect IDs
   const items = Array.isArray(payload.items) ? payload.items : [];
+  const articleIds = [];
+
   for (const item of items) {
     const id = (item.id || "").toString().trim();
     if (!id) continue;
+    articleIds.push(id);
+
     const html = renderArticleHtml({ siteOrigin, item, payload });
     writeFile(path.join("articles", `${id}.html`), html);
   }
 
-  console.log("Wrote: briefs/daily-ai.json and articles/*.html");
+  // ✅ Generate sitemap.xml including /articles/*
+  const sitemap = buildSitemapXml({ siteOrigin, articleIds });
+  writeFile("sitemap.xml", sitemap);
+
+  console.log("Wrote: briefs/daily-ai.json, articles/*.html, sitemap.xml");
 }
 
 main().catch((err) => {
