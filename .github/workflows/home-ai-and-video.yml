@@ -1,4 +1,4 @@
-name: Home AI (PTD Today)
+name: Home AI + Video (PTD Today)
 
 on:
   workflow_dispatch:
@@ -38,7 +38,19 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
-      - name: Generate AI JSON + Article Pages
+      # 1) Build Home feeds + YouTube + /s/ share pages
+      - name: Build Home feed + YouTube + short share pages
+        env:
+          RECENT_HOURS: "60"
+          YT_HOURS: "168"
+          CONCURRENCY: "6"
+          YT_MAX_PER_CHANNEL: "8"
+          MAX_ENRICH: "50"
+          # Optional: override FEEDS/YT_CHANNELS/PROXIES via repo secrets/vars later if you want
+        run: node scripts/build.mjs
+
+      # 2) Generate Daily AI Brief JSON + /articles/ pages
+      - name: Generate Daily AI JSON + Article Pages
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
@@ -55,5 +67,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update AI feed"
+          git commit -m "Update PTD Today feeds"
           git push origin main
