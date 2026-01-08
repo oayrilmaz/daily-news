@@ -1,7 +1,7 @@
 // ====================================================================
 // PTD Today Builder — Articles (~60h) + YouTube (past 7 days, topic filtered)
 // + Short share pages
-// + AUTO robots.txt + sitemap.xml (includes /articles + /s + key pages)
+// + AUTO robots.txt + sitemap index + sitemap-main.xml + sitemap-articles.xml
 // Node 20+
 // ====================================================================
 
@@ -17,15 +17,18 @@ const ROOT       = path.resolve(__dirname, "..");
 
 const OUT_DATA   = path.join(ROOT, "data");
 const OUT_SHORT  = path.join(ROOT, "s");
-const OUT_ART    = path.join(ROOT, "articles");      // ✅ AI article pages live here
+const OUT_ART    = path.join(ROOT, "articles");      // AI article pages live here
 
 const NEWS_PATH  = path.join(OUT_DATA, "news.json");
 const WEEK_PATH  = path.join(OUT_DATA, "7d.json");
 const SHORT_MAP  = path.join(OUT_DATA, "shortlinks.json");
 const YT_DEBUG   = path.join(OUT_DATA, "youtube_raw.json");
 
-const ROBOTS_PATH  = path.join(ROOT, "robots.txt");  // ✅
-const SITEMAP_PATH = path.join(ROOT, "sitemap.xml"); // ✅
+// SEO outputs
+const ROBOTS_PATH          = path.join(ROOT, "robots.txt");
+const SITEMAP_INDEX_PATH   = path.join(ROOT, "sitemap.xml");          // sitemap index
+const SITEMAP_MAIN_PATH    = path.join(ROOT, "sitemap-main.xml");     // core pages
+const SITEMAP_ARTICLES_PATH= path.join(ROOT, "sitemap-articles.xml"); // /articles/*.html
 
 // ---------- Site ----------
 const SITE_ORIGIN = "https://ptdtoday.com";
@@ -186,9 +189,7 @@ async function listHtmlFiles(dir){
 }
 
 function toSitePath(absPath){
-  // absPath within ROOT
   const rel = path.relative(ROOT, absPath).split(path.sep).join("/");
-  // Map "index.html" at root to "/"
   if (rel === "index.html") return "/";
   return "/" + rel;
 }
@@ -296,6 +297,7 @@ function extractImageFromHtml(html){
   const good=imgs.find(u=>u && !isLogoPath(u));
   return good||"";
 }
+
 async function enrichArticleImages(items){
   const targets = items.filter(x=>x.type==="article" && !x.image).slice(0, ENRICH_MAX);
   const q=[...targets];
@@ -315,7 +317,7 @@ async function enrichArticleImages(items){
 }
 
 // ====================================================================
-// SHORT PAGES (for LinkedIn share OG/GA)
+// SHORT PAGES (LinkedIn preview) — keep for sharing, but NOINDEX for SEO
 // ====================================================================
 
 const shortIdFor = (url) => crypto.createHash("sha1").update(url).digest("base64url").slice(0,10);
@@ -325,11 +327,14 @@ const gaHead = () => `
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>`;
 
 function staticSharePage(item){
-  const id   = item.sid;
-  const url  = `${SITE_ORIGIN}/s/${id}/`;
-  const title= item.title;
-  const img  = item.image || `${SITE_ORIGIN}/assets/og-default.png`;
+  const id    = item.sid;
+  const url   = `${SITE_ORIGIN}/s/${id}/`;
+  const title = item.title;
+  const img   = item.image || `${SITE_ORIGIN}/assets/og-default.png`;
+
   const meta = `
+<meta name="robots" content="noindex,follow">
+<link rel="canonical" href="${escapeHtml(url)}">
 <meta property="og:type" content="${item.type==='video' ? 'video.other' : 'article'}">
 <meta property="og:site_name" content="PTD Today">
 <meta property="og:title" content="${escapeHtml(title)}">
@@ -409,7 +414,7 @@ function passesYouTubePolicy(blob, policy){
 }
 
 // ====================================================================
-// SEO: robots.txt + sitemap.xml
+// SEO: robots.txt + sitemap index + sitemap-main + sitemap-articles
 // ====================================================================
 
 async function writeRobotsTxt(){
@@ -421,25 +426,40 @@ Sitemap: ${SITE_ORIGIN}/sitemap.xml
   await fs.writeFile(ROBOTS_PATH, body, "utf8");
 }
 
-async function writeSitemapXml({ shortIds = [] }){
-  const urls = [];
+async function writeSitemapIndex(){
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>${xmlEscape(SITE_ORIGIN + "/sitemap-main.xml")}</loc></sitemap>
+  <sitemap><loc>${xmlEscape(SITE_ORIGIN + "/sitemap-articles.xml")}</loc></sitemap>
+</sitemapindex>
+`;
+  await fs.writeFile(SITEMAP_INDEX_PATH, xml, "utf8");
+}
 
-  // Core pages
-  const corePages = [
-    { loc: `${SITE_ORIGIN}/`, changefreq: "hourly", priority: "1.0" },
-    { loc: `${SITE_ORIGIN}/index.html`, changefreq: "hourly", priority: "0.9" },
+async function writeSitemapMainXml(){
+  const urls = [
+    { loc: `${SITE_ORIGIN}/`,         changefreq: "hourly", priority: "1.0" },
+    { loc: `${SITE_ORIGIN}/index.html`,changefreq:"hourly", priority: "0.9" },
     { loc: `${SITE_ORIGIN}/room.html`, changefreq: "weekly", priority: "0.6" }
   ];
-  urls.push(...corePages);
 
-  // Data endpoints (optional but fine)
-  const dataPages = [
-    { loc: `${SITE_ORIGIN}/data/news.json`, changefreq: "hourly", priority: "0.2" },
-    { loc: `${SITE_ORIGIN}/data/7d.json`,   changefreq: "hourly", priority: "0.2" }
-  ];
-  urls.push(...dataPages);
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => {
+  const parts = [];
+  parts.push(`<loc>${xmlEscape(u.loc)}</loc>`);
+  if (u.changefreq) parts.push(`<changefreq>${xmlEscape(u.changefreq)}</changefreq>`);
+  if (u.priority) parts.push(`<priority>${xmlEscape(u.priority)}</priority>`);
+  return `  <url>${parts.join("")}</url>`;
+}).join("\n")}
+</urlset>
+`;
+  await fs.writeFile(SITEMAP_MAIN_PATH, xml, "utf8");
+}
 
-  // ✅ AI article pages: /articles/*.html
+async function writeSitemapArticlesXml(){
+  const urls = [];
+
   const articleHtml = await listHtmlFiles(OUT_ART);
   for (const abs of articleHtml){
     const relPath = toSitePath(abs); // /articles/xyz.html
@@ -451,23 +471,9 @@ async function writeSitemapXml({ shortIds = [] }){
     });
   }
 
-  // ✅ Short share pages: /s/<id>/
-  for (const id of shortIds){
-    urls.push({
-      loc: `${SITE_ORIGIN}/s/${encodeURIComponent(id)}/`,
-      changefreq: "hourly",
-      priority: "0.5"
-    });
-  }
-
-  // De-dupe by loc
+  // De-dupe
   const seen = new Set();
-  const final = urls.filter(u => {
-    if (!u?.loc) return false;
-    if (seen.has(u.loc)) return false;
-    seen.add(u.loc);
-    return true;
-  });
+  const final = urls.filter(u => u?.loc && !seen.has(u.loc) && seen.add(u.loc));
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -481,7 +487,7 @@ ${final.map(u => {
 }).join("\n")}
 </urlset>
 `;
-  await fs.writeFile(SITEMAP_PATH, xml, "utf8");
+  await fs.writeFile(SITEMAP_ARTICLES_PATH, xml, "utf8");
 }
 
 // ====================================================================
@@ -582,11 +588,10 @@ async function build(){
   const recent = items.filter(isRecent);
   const week   = items.filter(x => now - new Date(x.published).getTime() <= 7 * 24 * 3600 * 1000);
 
-  // Shortlinks for recent
+  // Shortlinks for recent (keep for LinkedIn share previews)
   await fs.mkdir(OUT_DATA, { recursive: true });
   await fs.mkdir(OUT_SHORT, { recursive: true });
   const shortMap = {};
-  const shortIds = [];
 
   for(const it of recent){
     const id = shortIdFor(it.url);
@@ -599,7 +604,6 @@ async function build(){
       url: it.url, title: it.title, image: it.image, publisher: it.publisher,
       category: it.category, published: it.published, type: it.type, videoId: it.videoId || ""
     };
-    shortIds.push(id);
   }
 
   // Write data + debug
@@ -608,9 +612,11 @@ async function build(){
   await fs.writeFile(SHORT_MAP, JSON.stringify(shortMap, null, 2));
   await fs.writeFile(YT_DEBUG, JSON.stringify(ytDebug, null, 2));
 
-  // ✅ SEO outputs
+  // SEO outputs
   await writeRobotsTxt();
-  await writeSitemapXml({ shortIds });
+  await writeSitemapMainXml();
+  await writeSitemapArticlesXml();
+  await writeSitemapIndex();
 
   console.log(`Wrote:
   - data/news.json (${recent.length})
@@ -619,7 +625,9 @@ async function build(){
   - data/youtube_raw.json (debug)
   - s/<id>/index.html (${Object.keys(shortMap).length})
   - robots.txt
-  - sitemap.xml
+  - sitemap.xml (index)
+  - sitemap-main.xml
+  - sitemap-articles.xml
 Done.`);
 }
 
