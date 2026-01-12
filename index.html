@@ -44,6 +44,10 @@
       --pill:rgba(0,0,0,.04);
       --btn:#111;
       --btnInk:#fff;
+
+      /* Highlight colors */
+      --hl-blue: rgba(173, 216, 230, 0.75); /* light blue */
+      --hl-red:  rgba(255, 182, 193, 0.75); /* light red */
     }
 
     *{box-sizing:border-box}
@@ -276,6 +280,7 @@
       font-family:inherit;
       font-size:13px;
       outline:none;
+      max-width: 320px;
     }
     .ttsHint{
       font-size:12px;
@@ -320,7 +325,11 @@
       border-radius:4px;
     }
     .w.active{
-      background:rgba(0,0,0,.14);
+      background: var(--hl-blue);
+      box-shadow:0 0 0 1px rgba(0,0,0,.06) inset;
+    }
+    .w.active-imp{
+      background: var(--hl-red);
       box-shadow:0 0 0 1px rgba(0,0,0,.06) inset;
     }
 
@@ -347,6 +356,7 @@
       .brand{font-size:44px}
       .pageTitle{font-size:36px}
       .title{font-size:30px}
+      .ttsSelect{max-width: 100%;}
     }
   </style>
 </head>
@@ -357,7 +367,6 @@
       <a class="brand" href="/" aria-label="PTD Today home">PTD Today</a>
       <div class="tagline">First to Know. First to Lead.</div>
 
-      <!-- ONLY Home + Room -->
       <nav class="nav" aria-label="Primary navigation">
         <a class="active" href="/index.html">Home</a>
         <a href="/room.html">Room</a>
@@ -394,13 +403,10 @@
     </section>
 
     <div class="footer">© <span id="year"></span> PTD Today</div>
-
-    <!-- Populated after JSON load so crawlers can discover /articles/*.html -->
     <div id="crawlLinks" aria-hidden="true"></div>
   </div>
 
   <script>
-    // Data produced by your GitHub Action
     const DATA_URL = "/briefs/daily-ai.json";
     const $ = (id) => document.getElementById(id);
 
@@ -414,8 +420,6 @@
         .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
-
-    // ✅ Share should share the *article page* (so LinkedIn shows a preview)
     function articlePageUrl(id){
       return `${window.location.origin}/articles/${encodeURIComponent(id)}.html`;
     }
@@ -423,7 +427,7 @@
     async function shareLink(title, text, url){
       if (navigator.share) {
         try { await navigator.share({ title, text, url }); return; }
-        catch(e){ return; } // user cancelled
+        catch(e){ return; }
       }
       const draft = `${title}\n\n${text}\n\n${url}`;
       try{
@@ -442,7 +446,10 @@
     }
 
     // -----------------------------
-    // TTS (AI reader + word highlight)
+    // BEST-POSSIBLE Human-like Reader (Web Speech API)
+    // Note: quality depends on voices installed on the user's device/browser.
+    // We: (1) auto-pick the best English voice, (2) let user choose voice/speed,
+    // (3) word-highlight with blue, and "important sections" in light red.
     // -----------------------------
     const TTS = {
       supported: ("speechSynthesis" in window) && ("SpeechSynthesisUtterance" in window),
@@ -453,7 +460,9 @@
       offsets: [],
       plain: "",
       originalHtml: "",
-      lastWordIndex: -1
+      lastWordIndex: -1,
+      voices: [],
+      voicesReady: false
     };
 
     function stopTts(){
@@ -462,7 +471,6 @@
         if (TTS.supported) { window.speechSynthesis.cancel(); }
       }catch(e){}
 
-      // restore UI/HTML for previous card
       if (TTS.activeId){
         const card = document.querySelector(`article.card[data-id="${CSS.escape(TTS.activeId)}"]`);
         if (card){
@@ -473,6 +481,8 @@
           card.querySelectorAll("[data-action='tts']").forEach(b=>b.setAttribute("aria-pressed","false"));
           const ctrls = card.querySelector(".ttsControls");
           if (ctrls) ctrls.classList.remove("show");
+          const pauseBtn = card.querySelector("[data-tts-pause]");
+          if (pauseBtn) pauseBtn.textContent = "Pause";
         }
       }
 
@@ -489,47 +499,24 @@
       if (!TTS.spans.length) return;
       if (idx === TTS.lastWordIndex) return;
 
-      if (TTS.lastWordIndex >= 0 && TTS.spans[TTS.lastWordIndex]){
-        TTS.spans[TTS.lastWordIndex].classList.remove("active");
+      const prev = TTS.spans[TTS.lastWordIndex];
+      if (prev){
+        prev.classList.remove("active");
+        prev.classList.remove("active-imp");
       }
+
       TTS.lastWordIndex = idx;
 
       const el = TTS.spans[idx];
       if (el){
-        el.classList.add("active");
-        // gentle keep-in-view
+        const isImp = el.getAttribute("data-imp") === "1";
+        el.classList.add(isImp ? "active-imp" : "active");
         el.scrollIntoView({ block: "nearest" });
       }
     }
 
-    function tokenizeToSpans(plainText){
-      // Split into word + whitespace tokens; only words get span.w
-      const tokens = [];
-      const offsets = [];
-      let cursor = 0;
-
-      // Use regex to keep whitespace
-      const re = /(\s+|[^\s]+)/g;
-      const parts = plainText.match(re) || [];
-
-      for (const part of parts){
-        const isSpace = /^\s+$/.test(part);
-        if (!isSpace){
-          tokens.push(part);
-          offsets.push(cursor); // start offset of this word in the plain string
-        }
-        cursor += part.length;
-      }
-      return { tokens, offsets };
-    }
-
-    function renderSpeakableBody(card, item){
-      // Save original (so we can restore)
-      const body = card.querySelector(".body");
-      if (!body) return null;
-      TTS.originalHtml = body.innerHTML;
-
-      // Build a reading string (title + lede + body + watch/action)
+    // Build speakable chunks with importance flags
+    function buildSpeakChunks(item){
       const title = (item.title || "").toString().trim();
       const lede  = (item.lede || item.summary || "").toString().trim();
       const main  = (item.body || item.summary || "").toString().trim();
@@ -537,28 +524,66 @@
       const action= (item.action_for_readers || "").toString().trim();
 
       const chunks = [];
-      if (title) chunks.push(title);
-      if (lede) chunks.push(lede);
-      if (main) chunks.push(main);
-      if (watch.length) chunks.push("What to watch. " + watch.join(". "));
-      if (action) chunks.push("Action. " + action);
+      if (title) chunks.push({ text: title, imp: false });
+      if (lede)  chunks.push({ text: lede,  imp: false });
+      if (main)  chunks.push({ text: main,  imp: false });
 
-      const plain = chunks.join("\n\n").replace(/\s+\n/g,"\n").trim();
-      if (!plain) return null;
+      // IMPORTANT sections (red highlight)
+      if (watch.length){
+        chunks.push({ text: "What to watch.", imp: true });
+        chunks.push({ text: watch.join(". "), imp: true });
+      }
+      if (action){
+        chunks.push({ text: "Action.", imp: true });
+        chunks.push({ text: action, imp: true });
+      }
 
-      // Turn into highlighted spans for reading view
-      const { tokens, offsets } = tokenizeToSpans(plain);
+      // Split into paragraphs (keep imp flag per paragraph)
+      const paras = [];
+      for (const c of chunks){
+        const parts = c.text.split(/\n\s*\n/g).map(s=>s.trim()).filter(Boolean);
+        for (const p of parts){
+          paras.push({ text: p, imp: c.imp });
+        }
+      }
+      return paras;
+    }
 
-      // Build HTML that preserves paragraph breaks (from \n\n)
-      const paras = plain.split(/\n\s*\n/g).map(s=>s.trim()).filter(Boolean);
+    function renderSpeakableBody(card, item){
+      const body = card.querySelector(".body");
+      if (!body) return null;
+
+      TTS.originalHtml = body.innerHTML;
+
+      const paras = buildSpeakChunks(item);
+      if (!paras.length) return null;
+
+      // Plain text for speech + offsets for mapping
+      const plain = paras.map(p => p.text).join("\n\n").trim();
+
+      // Token offsets in the FULL plain string
+      const offsets = [];
+      let cursor = 0;
+      {
+        const re = /(\s+|[^\s]+)/g;
+        const parts = plain.match(re) || [];
+        for (const part of parts){
+          const isSpace = /^\s+$/.test(part);
+          if (!isSpace){
+            offsets.push(cursor);
+          }
+          cursor += part.length;
+        }
+      }
+
+      // Build HTML with per-word spans and per-paragraph importance
       let wordIndex = 0;
-
       const html = paras.map(p=>{
-        // For each paragraph, split again to words+spaces and wrap words with spans
-        const parts = p.match(/(\s+|[^\s]+)/g) || [];
+        const parts = p.text.match(/(\s+|[^\s]+)/g) || [];
         const inner = parts.map(part=>{
           if (/^\s+$/.test(part)) return escapeHtml(part);
-          const span = `<span class="w" data-w="${wordIndex}">${escapeHtml(part)}</span>`;
+          const impAttr = p.imp ? ` data-imp="1"` : ` data-imp="0"`;
+          const span = `<span class="w" data-w="${wordIndex}"${impAttr}>${escapeHtml(part)}</span>`;
           wordIndex++;
           return span;
         }).join("");
@@ -567,10 +592,89 @@
 
       body.innerHTML = html;
 
-      // Collect spans
       const spans = [...body.querySelectorAll("span.w")];
-
       return { plain, spans, offsets };
+    }
+
+    // Voice ranking: try to auto-pick the most natural English voice available.
+    function scoreVoice(v){
+      const name = (v.name || "").toLowerCase();
+      const lang = (v.lang || "").toLowerCase();
+
+      let s = 0;
+
+      // Prefer English US (you can switch to en-GB if you want)
+      if (lang === "en-us") s += 30;
+      else if (lang.startsWith("en-")) s += 18;
+
+      // Prefer "premium/neural/natural/enhanced"
+      if (name.includes("neural")) s += 25;
+      if (name.includes("natural")) s += 22;
+      if (name.includes("premium")) s += 18;
+      if (name.includes("enhanced")) s += 15;
+
+      // Common high-quality engines
+      if (name.includes("google")) s += 16;
+      if (name.includes("microsoft")) s += 14;
+      if (name.includes("samantha")) s += 10;  // iOS
+      if (name.includes("ava")) s += 8;
+      if (name.includes("aria")) s += 8;
+      if (name.includes("jenny")) s += 8;
+
+      // Prefer non-localService when available (often higher quality)
+      if (v.localService === false) s += 6;
+
+      return s;
+    }
+
+    function loadVoices(){
+      if (!TTS.supported) return [];
+      const vs = window.speechSynthesis.getVoices() || [];
+      TTS.voices = vs;
+      TTS.voicesReady = vs.length > 0;
+      return vs;
+    }
+
+    function bestEnglishVoice(){
+      const vs = TTS.voices || loadVoices();
+      const en = vs.filter(v => ((v.lang || "").toLowerCase().startsWith("en")));
+      if (!en.length) return null;
+      en.sort((a,b)=> scoreVoice(b) - scoreVoice(a));
+      return en[0] || null;
+    }
+
+    function fillVoiceSelect(selectEl){
+      if (!selectEl) return;
+      const vs = TTS.voices || loadVoices();
+      const en = vs.filter(v => ((v.lang || "").toLowerCase().startsWith("en")));
+      selectEl.innerHTML = "";
+
+      const best = bestEnglishVoice();
+
+      if (!en.length){
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Default voice";
+        selectEl.appendChild(opt);
+        return;
+      }
+
+      // Keep top voices first (still show all)
+      const sorted = [...en].sort((a,b)=> scoreVoice(b) - scoreVoice(a));
+
+      for (const v of sorted){
+        const opt = document.createElement("option");
+        opt.value = v.name;
+        opt.textContent = `${v.name} (${v.lang})${v.localService ? "" : " • cloud"}`;
+        if (best && v.name === best.name) opt.selected = true;
+        selectEl.appendChild(opt);
+      }
+    }
+
+    function resolveVoiceByName(name){
+      if (!name) return null;
+      const vs = TTS.voices || loadVoices();
+      return vs.find(v => v.name === name) || null;
     }
 
     function startTtsForCard(card, item){
@@ -581,45 +685,53 @@
 
       const id = card.getAttribute("data-id") || "";
 
-      // Toggle off if same card is active
       if (TTS.activeId === id){
         stopTts();
         return;
       }
 
-      // Stop any current reader first
       stopTts();
 
-      // Ensure details open so user sees highlighting
       const det = card.querySelector(".readMore");
       if (det && !det.open) det.open = true;
 
-      // Build speakable HTML and span map
       const built = renderSpeakableBody(card, item);
       if (!built){
         alert("Nothing to read for this item.");
         return;
       }
 
-      // UI: show controls
       const ctrls = card.querySelector(".ttsControls");
       if (ctrls) ctrls.classList.add("show");
       card.querySelectorAll("[data-action='tts']").forEach(b=>b.setAttribute("aria-pressed","true"));
 
-      // Create utterance
+      // Ensure voices are loaded and selector is populated
+      const voiceSel = card.querySelector("[data-tts-voice]");
+      fillVoiceSelect(voiceSel);
+
+      // Build utterance
       const utter = new SpeechSynthesisUtterance(built.plain);
 
-      // Rate control
+      // Rate / Pitch (small pitch tweak makes many voices sound more natural)
       const rateSel = card.querySelector("[data-tts-rate]");
       const rateVal = rateSel ? Number(rateSel.value || "1") : 1;
-      utter.rate = (Number.isFinite(rateVal) && rateVal>0) ? rateVal : 1;
 
-      // Try to pick English voice if available
-      try{
-        const voices = window.speechSynthesis.getVoices() || [];
-        const en = voices.find(v => (v.lang||"").toLowerCase().startsWith("en"));
-        if (en) utter.voice = en;
-      }catch(e){}
+      const pitchSel = card.querySelector("[data-tts-pitch]");
+      const pitchVal = pitchSel ? Number(pitchSel.value || "1") : 1;
+
+      utter.rate = (Number.isFinite(rateVal) && rateVal>0) ? rateVal : 1;
+      utter.pitch = (Number.isFinite(pitchVal) && pitchVal>0) ? pitchVal : 1;
+      utter.volume = 1;
+
+      // Voice: use selected, else auto-best
+      let chosen = null;
+      if (voiceSel && voiceSel.value){
+        chosen = resolveVoiceByName(voiceSel.value);
+      }
+      if (!chosen){
+        chosen = bestEnglishVoice();
+      }
+      if (chosen) utter.voice = chosen;
 
       // Save state
       TTS.activeId = id;
@@ -629,19 +741,17 @@
       TTS.plain = built.plain;
       TTS.lastWordIndex = -1;
 
-      // Highlighting: preferred = onboundary (word)
+      // Highlighting (best effort): onboundary word mapping
       let boundaryWorks = false;
+
       utter.onboundary = (ev)=>{
-        // Some browsers support "word" boundaries; if not, this never fires.
         if (typeof ev.charIndex !== "number") return;
         boundaryWorks = true;
 
-        // Map charIndex -> word index by offsets
         const ci = ev.charIndex;
         const offs = TTS.offsets;
         if (!offs || !offs.length) return;
 
-        // Find last offset <= charIndex (binary search)
         let lo=0, hi=offs.length-1, ans=0;
         while(lo<=hi){
           const mid = (lo+hi)>>1;
@@ -654,24 +764,21 @@
       utter.onend = ()=> stopTts();
       utter.onerror = ()=> stopTts();
 
-      // Fallback highlighter (if boundary never fires): timed per-word
-      // (approximate, but keeps UX working across browsers)
+      // Fallback timed highlighter (approx)
       const startFallbackTimer = ()=>{
         if (TTS.timer) { clearInterval(TTS.timer); TTS.timer = null; }
         const words = TTS.spans.length || 0;
         if (!words) return;
 
-        // Approx words per minute, scaled by rate
         const wpmBase = 175;
         const rate = utter.rate || 1;
-        const wpm = Math.max(90, Math.min(320, wpmBase * rate));
+        const wpm = Math.max(95, Math.min(320, wpmBase * rate));
         const msPerWord = Math.max(140, Math.min(520, (60_000 / wpm)));
 
         let i = 0;
         setActiveSpan(0);
 
         TTS.timer = setInterval(()=>{
-          // If speech stopped, stop timer
           try{
             if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending){
               clearInterval(TTS.timer); TTS.timer=null; return;
@@ -685,20 +792,19 @@
 
       // Start speaking
       try{
-        window.speechSynthesis.cancel(); // clear any queue
+        window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
       }catch(e){
         stopTts();
         return;
       }
 
-      // If boundary doesn't show up shortly, start fallback
       setTimeout(()=>{
         if (TTS.activeId !== id) return;
         if (!boundaryWorks) startFallbackTimer();
       }, 700);
 
-      // Wire pause/resume/stop per card
+      // Controls
       const btnPause = card.querySelector("[data-tts-pause]");
       const btnStop  = card.querySelector("[data-tts-stop]");
 
@@ -718,15 +824,23 @@
       if (btnStop){
         btnStop.onclick = ()=> stopTts();
       }
-      if (rateSel){
-        rateSel.onchange = ()=>{
-          // restart with new rate (simple + reliable)
-          startTtsForCard(card, item);
-        };
-      }
+
+      // Any settings change => restart for best consistency
+      const restart = ()=> startTtsForCard(card, item);
+
+      if (rateSel) rateSel.onchange = restart;
+      if (pitchSel) pitchSel.onchange = restart;
+      if (voiceSel) voiceSel.onchange = restart;
     }
 
-    // Stop speech if user navigates away/refreshes
+    // Load voices early (some browsers require an event)
+    function initVoices(){
+      if (!TTS.supported) return;
+      loadVoices();
+      // Some browsers update voices asynchronously
+      window.speechSynthesis.onvoiceschanged = ()=> loadVoices();
+    }
+    initVoices();
     window.addEventListener("beforeunload", ()=> stopTts());
 
     // -----------------------------
@@ -768,16 +882,25 @@
           </div>
 
           <div class="ttsControls" aria-label="Audio reader controls">
-            <select class="ttsSelect" data-tts-rate aria-label="Reader speed">
-              <option value="0.9">0.9×</option>
+            <select class="ttsSelect" data-tts-voice aria-label="Voice"></select>
+
+            <select class="ttsSelect" data-tts-rate aria-label="Speed">
+              <option value="0.95">0.95×</option>
               <option value="1" selected>1.0×</option>
+              <option value="1.05">1.05×</option>
               <option value="1.1">1.1×</option>
-              <option value="1.2">1.2×</option>
-              <option value="1.3">1.3×</option>
+              <option value="1.15">1.15×</option>
             </select>
+
+            <select class="ttsSelect" data-tts-pitch aria-label="Pitch">
+              <option value="0.95">Pitch 0.95</option>
+              <option value="1" selected>Pitch 1.0</option>
+              <option value="1.05">Pitch 1.05</option>
+            </select>
+
             <button class="btnMini" type="button" data-tts-pause>Pause</button>
             <button class="btnMini" type="button" data-tts-stop>Stop</button>
-            <span class="ttsHint">Highlights words while reading (browser support varies).</span>
+            <span class="ttsHint">Blue highlight = reading. Red highlight = “important” sections (Watch/Action).</span>
           </div>
 
           ${tags.length ? `<div class="tags">${tags.slice(0,12).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
@@ -830,7 +953,6 @@
     }
 
     function renderCrawlLinks(items){
-      // Create plain <a> links (no JS handlers) to help discovery of /articles/*.html
       const links = (items || []).map(it => {
         const id = (it.id || "").toString().trim();
         if(!id) return "";
@@ -864,7 +986,6 @@
         ? items.map(cardHtml).join("")
         : `<div class="errorBox"><strong>No items matched your search.</strong></div>`;
 
-      // Populate crawlable links with the full set (not filtered)
       renderCrawlLinks(allItems);
 
       bindCardActions(payload);
@@ -877,9 +998,7 @@
 
       document.querySelectorAll("[data-action='toggle']").forEach(btn=>{
         btn.addEventListener("click", ()=>{
-          // If user opens/closes other items, stop TTS to avoid confusion
           stopTts();
-
           const id = btn.getAttribute("data-id");
           const det = document.getElementById("details-" + id);
           if(!det) return;
@@ -910,6 +1029,9 @@
           startTtsForCard(card, it);
         });
       });
+
+      // Populate voice selectors now (after cards exist)
+      document.querySelectorAll("[data-tts-voice]").forEach(sel => fillVoiceSelect(sel));
     }
 
     function focusFromHash(){
