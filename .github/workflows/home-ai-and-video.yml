@@ -46,7 +46,6 @@ jobs:
           CONCURRENCY: "6"
           YT_MAX_PER_CHANNEL: "8"
           MAX_ENRICH: "50"
-          # Optional: override FEEDS/YT_CHANNELS/PROXIES via repo secrets/vars later if you want
         run: node scripts/build.mjs
 
       # 2) Generate Daily AI Brief JSON + /articles/ pages
@@ -55,6 +54,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
         run: npm run generate:ai
+
+      # 3) Generate Media (YouTube → AI summaries + Media pages)
+      - name: Generate Media (YouTube → AI summaries)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SITE_ORIGIN: https://ptdtoday.com
+          MEDIA_MAX_VIDEOS: "12"
+          MEDIA_LOOKBACK_HOURS: "48"
+        run: node scripts/generate_media.js
 
       - name: Commit & push if changed
         run: |
