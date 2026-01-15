@@ -1,7 +1,7 @@
 // scripts/generate_media.js
 // PTD Today — Media Builder
-// - Fetches YouTube RSS from selected channels (daily ok)
-// - Tries to pull captions via timedtext (if available), fallback to description
+// - Fetches YouTube RSS from selected channels
+// - Tries captions via timedtext (if available), fallback to description
 // - Uses OpenAI to summarize and produce PTD-style "article pages" per video
 // Output:
 //   - data/media.json
@@ -22,17 +22,19 @@ function optEnv(name, fallback = "") {
 
 const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = optEnv("GA_ID", ""); // optional
-const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "18")); // total to publish
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
-const DAYS = Number(optEnv("MEDIA_DAYS", "7"));
 
+const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24")); // total to publish
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
+const DAYS = Number(optEnv("MEDIA_DAYS", "7")); // ✅ past week default
+
+// IMPORTANT: Set your 20 channels via env in Actions:
+// YT_CHANNELS="UCxxx,UCyyy,..."
 const DEFAULT_CHANNELS = [
-  // Put your PTD Today / relevant channels here.
-  // You can override with env: YT_CHANNELS="UCxxxx,UCyyyy"
-  "UC0jLzOK3mWr4YcUuG3KzZmw", // Siemens (example)
-  "UC4l7cLFsPzQYdMwvZRVqNag", // Hitachi Energy (example)
-  "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB (example)
-  "UCvB8R7oZJxge5tR3MUpxYfw"  // Schneider (example)
+  // fallback only (if env not set)
+  "UC0jLzOK3mWr4YcUuG3KzZmw",
+  "UC4l7cLFsPzQYdMwvZRVqNag",
+  "UCJ2Kx0pPZzJyaRlwviCJPdA",
+  "UCvB8R7oZJxge5tR3MUpxYfw"
 ];
 
 const YT_CHANNELS = (optEnv("YT_CHANNELS", "")
@@ -83,11 +85,13 @@ function parseYouTubeRSS(xml) {
       (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i)||[])[1] || ""
     );
 
+    const publishedIso = pub ? new Date(pub).toISOString() : new Date().toISOString();
+
     return {
       id,
       title,
       channel: ch,
-      published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+      published_at: publishedIso,
       url: id ? `https://www.youtube.com/watch?v=${id}` : "",
       thumbnail: id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "",
       description: desc
@@ -96,14 +100,11 @@ function parseYouTubeRSS(xml) {
 }
 
 async function fetchCaptions(videoId) {
-  // Captions endpoint (works if captions are public/available)
-  // Note: Some videos won’t expose captions; fallback to description.
   const url = `https://www.youtube.com/api/timedtext?lang=en&v=${encodeURIComponent(videoId)}`;
   try{
     const xml = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
     if (!xml || !xml.includes("<text")) return "";
     const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map(m => m[1]);
-    // basic decode
     const decoded = texts.join(" ")
       .replace(/&#39;/g,"'")
       .replace(/&quot;/g,'"')
@@ -162,7 +163,6 @@ function renderMediaArticleHtml(item) {
   <meta name="description" content="${escapeHtml(description)}" />
   <link rel="canonical" href="${escapeHtml(canonical)}" />
 
-  <!-- Open Graph -->
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="${escapeHtml(title)}" />
@@ -170,7 +170,6 @@ function renderMediaArticleHtml(item) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:image" content="${escapeHtml(thumb)}" />
 
-  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
@@ -227,7 +226,7 @@ function renderMediaArticleHtml(item) {
       <div class="rule"></div>
     </header>
 
-    <div class="meta">VIDEO • ${escapeHtml(channel)} • ${escapeHtml(published)}</div>
+    <div class="meta">VIDEO • ${escapeHtml(channel)} • ${escapeHtml(published ? new Date(published).toUTCString().replace("GMT","UTC") : "")}</div>
     <h1>${escapeHtml(title)}</h1>
     ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
 
@@ -291,7 +290,6 @@ async function summarizeVideo(openai, v) {
   const transcript = v.transcript || "";
   const desc = v.description || "";
 
-  // Keep the prompt grounded: summarize what’s in transcript/description only.
   const system = `
 You are PTD Today’s Media summarizer.
 
@@ -299,7 +297,7 @@ Rules:
 - Summarize ONLY what is present in the provided transcript/description.
 - If transcript is missing or thin, be explicit: "Based on the available description…"
 - Keep it useful for power transmission, substations, data centers power, renewables, critical minerals, and AI infrastructure.
-- No publisher praise, no speculation beyond the text.
+- No speculation beyond the text.
 Return VALID JSON only.
 `.trim();
 
@@ -338,14 +336,12 @@ Return JSON with EXACT keys:
   let obj = {};
   try { obj = JSON.parse(text); } catch { obj = {}; }
 
-  // sanitize
-  const out = {
+  return {
     summary: (obj.summary || "").toString().slice(0, 600),
     bullets: Array.isArray(obj.bullets) ? obj.bullets.map(x=>String(x)).slice(0, 5) : [],
     takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(x=>String(x)).slice(0, 6) : [],
     tags: Array.isArray(obj.tags) ? obj.tags.map(x=>String(x)).slice(0, 12) : []
   };
-  return out;
 }
 
 async function main() {
@@ -355,7 +351,6 @@ async function main() {
   const cutoffMs = Date.now() - DAYS * 24 * 3600 * 1000;
   const all = [];
 
-  // 1) Fetch RSS from channels
   for (const ch of CHANNELS) {
     const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ch)}`;
     try{
@@ -371,22 +366,18 @@ async function main() {
     }
   }
 
-  // 2) Dedupe + sort
   const seen = new Set();
   let videos = all.filter(v => (v.id && !seen.has(v.id) && seen.add(v.id)));
   videos.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
   videos = videos.slice(0, MAX_VIDEOS);
 
-  // 3) Captions + AI summaries
   for (const v of videos) {
     v.transcript = await fetchCaptions(v.id);
-    // If transcript missing, keep a note for prompt
     if (!v.transcript) v.transcript = "";
     v.ai = await summarizeVideo(openai, v);
     await sleep(150);
   }
 
-  // 4) Write media pages
   const outItems = videos.map(v => ({
     id: v.id,
     title: v.title,
@@ -397,13 +388,11 @@ async function main() {
     ai: v.ai
   }));
 
-  // Create /media/<id>.html pages
   for (const it of outItems) {
     const html = renderMediaArticleHtml(it);
     writeFile(path.join("media", `${it.id}.html`), html);
   }
 
-  // Write data/media.json
   const payload = {
     title: "PTD Today — Media",
     disclaimer: "Informational only — AI-generated summaries; may contain errors. Verify with the original video.",
