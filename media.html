@@ -35,7 +35,6 @@
       --btnInk:#fff;
       --card:#fff;
     }
-
     *{box-sizing:border-box}
     body{
       margin:0;
@@ -46,9 +45,7 @@
       text-rendering:optimizeLegibility;
     }
     a{color:inherit}
-
     .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
-
     .mast{text-align:center;padding:16px 0 6px}
     .brand{
       margin:0;
@@ -59,7 +56,6 @@
       display:inline-block;
     }
     .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
-
     .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
     .nav a{
       text-decoration:none;
@@ -71,7 +67,6 @@
     }
     .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
     .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
-
     .rule{height:1px;background:var(--rule);margin:14px 0 0}
 
     .pageTitle{
@@ -110,17 +105,7 @@
       font-size:14px;
     }
     .btn:hover{filter:brightness(.98)}
-
-    .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .sel{
-      border:1px solid var(--rule);
-      border-radius:999px;
-      padding:8px 12px;
-      background:#fff;
-      font-family:inherit;
-      font-size:14px;
-      outline:none;
-    }
+    .btn.secondary{background:#fff;color:#111}
 
     .search{flex:1 1 320px;display:flex;align-items:center;margin-left:auto}
     .search input{
@@ -161,10 +146,11 @@
 
     .row{
       display:grid;
-      grid-template-columns: 260px 1fr;
+      grid-template-columns: 280px 1fr;
       gap:14px;
       align-items:start;
     }
+
     .thumb{
       width:100%;
       border-radius:12px;
@@ -172,8 +158,7 @@
       border:1px solid var(--rule);
       background:#f4f4f4;
       position:relative;
-      display:block;
-      text-decoration:none;
+      min-height:158px;
     }
     .thumb img{
       width:100%;
@@ -192,14 +177,36 @@
       letter-spacing:.1px;
     }
 
-    h2{margin:0 0 10px;font-size:28px;line-height:1.1;font-weight:900}
-    .summary{margin:0 0 12px;font-size:16px;line-height:1.6;color:rgba(0,0,0,.86)}
+    h2{
+      margin:0 0 10px;
+      font-size:28px;
+      line-height:1.1;
+      font-weight:900;
+    }
+    .summary{
+      margin:0 0 12px;
+      font-size:16px;
+      line-height:1.6;
+      color:rgba(0,0,0,.86);
+    }
 
-    .subhead{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.12px;color:var(--muted)}
+    .subhead{
+      margin:12px 0 6px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.12px;
+      color:var(--muted);
+    }
     ul{margin:0 0 10px;padding-left:18px}
     li{margin:6px 0;line-height:1.35}
 
-    .cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+    .cta{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:10px;
+    }
     .btnMini{
       appearance:none;
       border:1px solid var(--rule);
@@ -215,8 +222,13 @@
       align-items:center;
       justify-content:center;
       line-height:1;
+      user-select:none;
     }
-    .btnMini.primary{background:#111;color:#fff;border-color:#111}
+    .btnMini.primary{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
 
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .chip{
@@ -246,6 +258,7 @@
       .pageTitle{font-size:36px}
       .row{grid-template-columns:1fr}
       h2{font-size:24px}
+      .thumb{min-height:0}
     }
   </style>
 </head>
@@ -271,14 +284,8 @@
     <section class="panel" aria-label="Media videos">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
-
-        <div class="filters">
-          <select class="sel" id="timeFilter" aria-label="Time filter">
-            <option value="today" selected>Today</option>
-            <option value="7d">Past 7 days</option>
-            <option value="all">All in feed</option>
-          </select>
-        </div>
+        <button class="btn secondary" id="btnToday" type="button" aria-pressed="false" title="Show videos published today only">Today</button>
+        <button class="btn secondary" id="btnWeek" type="button" aria-pressed="true" title="Show last 7 days">7D</button>
 
         <div class="search">
           <input id="q" type="search" placeholder="Search videos, channels, topics…" autocomplete="off" />
@@ -299,6 +306,10 @@
     const DATA_URL = "/data/media.json";
     const $ = (id) => document.getElementById(id);
 
+    const state = {
+      mode: "week" // "today" | "week"
+    };
+
     function fmtUtc(iso){
       try{ return new Date(iso).toUTCString().replace("GMT","UTC"); }
       catch(e){ return iso || ""; }
@@ -309,7 +320,6 @@
         .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
-
     function mediaArticleUrl(id){
       return `${window.location.origin}/media/${encodeURIComponent(id)}.html`;
     }
@@ -317,7 +327,7 @@
     async function shareLink(title, text, url){
       if (navigator.share) {
         try { await navigator.share({ title, text, url }); return; }
-        catch(e){ return; }
+        catch(e){ /* ignore */ }
       }
       const draft = `${title}\n\n${text}\n\n${url}`;
       try{
@@ -328,40 +338,38 @@
       }
     }
 
-    function withinTimeFilter(publishedIso, mode){
-      if (!publishedIso) return mode === "all";
-      const d = new Date(publishedIso);
-      if (Number.isNaN(d.getTime())) return mode === "all";
+    function isSameUtcDay(a, b){
+      return a.getUTCFullYear()===b.getUTCFullYear() &&
+             a.getUTCMonth()===b.getUTCMonth() &&
+             a.getUTCDate()===b.getUTCDate();
+    }
 
+    function filterByMode(items){
       const now = new Date();
-
-      if (mode === "all") return true;
-
-      if (mode === "today") {
-        // "Today" in UTC (so it matches your workflow timestamps)
-        return d.getUTCFullYear() === now.getUTCFullYear()
-          && d.getUTCMonth() === now.getUTCMonth()
-          && d.getUTCDate() === now.getUTCDate();
+      if (state.mode === "today"){
+        return items.filter(v=>{
+          const d = new Date(v.published_at || v.published || v.publishedAt || "");
+          return isSameUtcDay(d, now);
+        });
       }
-
-      if (mode === "7d") {
-        const ms = now.getTime() - d.getTime();
-        return ms >= 0 && ms <= 7 * 24 * 3600 * 1000;
-      }
-
-      return true;
+      // week
+      const cutoff = Date.now() - 7*24*3600*1000;
+      return items.filter(v=>{
+        const d = new Date(v.published_at || v.published || v.publishedAt || "");
+        return d.getTime() >= cutoff;
+      });
     }
 
     function cardHtml(v){
       const id = (v.id || "").toString().trim();
       const title = (v.title || "Untitled").toString();
       const channel = (v.channel || v.publisher || "YouTube").toString();
-      const published = v.published_at || v.published || "";
+      const published = v.published_at || v.published || v.publishedAt || "";
       const url = (v.url || "").toString();
 
-      // Prefer HTTPS thumbnails (YouTube)
-      let thumb = (v.thumbnail || v.image || "").toString().trim();
-      if (thumb && thumb.startsWith("http://")) thumb = thumb.replace("http://","https://");
+      // Always prefer YouTube CDN thumb if possible
+      const thumb =
+        (v.thumbnail || v.image || "").toString().trim();
 
       const ai = v.ai || {};
       const summary = (ai.summary || "").toString();
@@ -388,7 +396,7 @@
             <div>
               <h2>${escapeHtml(title)}</h2>
 
-              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : `<p class="summary">AI summary pending (or transcript unavailable).</p>`}
+              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : `<p class="summary" style="color:var(--muted)">AI summary not available yet.</p>`}
 
               ${bullets.length ? `
                 <div class="subhead">Key points</div>
@@ -407,7 +415,7 @@
                 <button class="btnMini" type="button"
                   data-share="${escapeHtml(shareUrl)}"
                   data-title="${escapeHtml(title)}"
-                  data-text="${escapeHtml(summary ? summary.slice(0,220) : '')}">
+                  data-text="${escapeHtml((summary || "").slice(0,220))}">
                   Share
                 </button>
               </div>
@@ -442,7 +450,16 @@
       });
     }
 
-    function render(payload){
+    function setMode(mode){
+      state.mode = mode;
+      const t = $("btnToday"), w = $("btnWeek");
+      if (t && w){
+        t.setAttribute("aria-pressed", mode==="today" ? "true" : "false");
+        w.setAttribute("aria-pressed", mode==="week" ? "true" : "false");
+      }
+    }
+
+    function render(payload, query=""){
       const updatedAt = payload.updated_at || "";
       $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
 
@@ -452,33 +469,39 @@
 
       const all = Array.isArray(payload.items) ? payload.items : [];
 
-      // time filter first
-      const mode = $("timeFilter").value || "today";
-      const filteredByTime = all.filter(v => withinTimeFilter(v.published_at || v.published || "", mode));
-
-      // then search filter
-      const items = applySearch(filteredByTime, $("q").value);
+      // mode filter first
+      const modeFiltered = filterByMode(all);
+      const items = applySearch(modeFiltered, query);
 
       $("grid").innerHTML = items.length
         ? items.map(cardHtml).join("")
-        : `<div class="errorBox"><strong>No videos matched.</strong><br/>Try “Past 7 days” or clear search.</div>`;
+        : `<div class="errorBox"><strong>No videos matched your selection.</strong><br/>Try switching Today/7D or clearing search.</div>`;
 
       bindShareButtons();
     }
 
     async function load(){
       $("year").textContent = new Date().getFullYear();
+      setMode("week"); // default: last 7 days
 
       try{
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
 
-        // events
-        $("q").addEventListener("input", ()=>render(payload));
-        $("timeFilter").addEventListener("change", ()=>render(payload));
+        render(payload, $("q").value);
 
-        render(payload);
+        $("q").addEventListener("input", ()=> render(payload, $("q").value));
+
+        $("btnToday").addEventListener("click", ()=>{
+          setMode("today");
+          render(payload, $("q").value);
+        });
+        $("btnWeek").addEventListener("click", ()=>{
+          setMode("week");
+          render(payload, $("q").value);
+        });
+
       }catch(err){
         $("updatedLine").textContent = "Could not load Media.";
         $("grid").innerHTML = `
