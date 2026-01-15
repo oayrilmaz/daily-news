@@ -1,8 +1,10 @@
 // scripts/generate_media.js
 // PTD Today — Media Builder
-// - Fetches YouTube RSS from selected channels
-// - Tries captions via timedtext (if available), fallback to description
-// - Uses OpenAI to summarize and produce PTD-style "article pages" per video
+// - Accepts MEDIA_CHANNELS as comma-separated channel URLs OR @handles OR UC IDs
+// - Resolves channelId (UC...) automatically
+// - Fetches YouTube RSS for recent videos
+// - Tries captions via timedtext (if available), else uses description
+// - Uses OpenAI to summarize and produces PTD-style article pages per video
 // Output:
 //   - data/media.json
 //   - media/<videoId>.html
@@ -23,24 +25,50 @@ function optEnv(name, fallback = "") {
 const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = optEnv("GA_ID", ""); // optional
 
-const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24")); // total to publish
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
-const DAYS = Number(optEnv("MEDIA_DAYS", "7")); // ✅ past week default
+const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "12")); // total to publish
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "4"));
 
-// IMPORTANT: Set your 20 channels via env in Actions:
-// YT_CHANNELS="UCxxx,UCyyy,..."
-const DEFAULT_CHANNELS = [
-  // fallback only (if env not set)
-  "UC0jLzOK3mWr4YcUuG3KzZmw",
-  "UC4l7cLFsPzQYdMwvZRVqNag",
-  "UCJ2Kx0pPZzJyaRlwviCJPdA",
-  "UCvB8R7oZJxge5tR3MUpxYfw"
+// Prefer hours (your workflow uses MEDIA_LOOKBACK_HOURS)
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "168")); // 7 days default
+// Back-compat: if MEDIA_DAYS is set, it can override (optional)
+const DAYS = Number(optEnv("MEDIA_DAYS", "0"));
+const LOOKBACK_MS =
+  (DAYS > 0 ? DAYS * 24 : LOOKBACK_HOURS) * 3600 * 1000;
+
+// ---- Default 20 sources (edit anytime) ----
+// You can override via env: MEDIA_CHANNELS="https://www.youtube.com/@...,https://www.youtube.com/@..., ..."
+const DEFAULT_MEDIA_CHANNELS = [
+  "https://www.youtube.com/@HitachiEnergy",
+  "https://www.youtube.com/@SiemensEnergy",
+  "https://www.youtube.com/@SchneiderElectric",
+  "https://www.youtube.com/@ABB",
+
+  "https://www.youtube.com/@GEVernova",
+  "https://www.youtube.com/@eaton",
+  "https://www.youtube.com/@microsoftdatacenters",
+  "https://www.youtube.com/@GoogleCloudTech",
+
+  "https://www.youtube.com/@IEA",
+  "https://www.youtube.com/@NREL",
+  "https://www.youtube.com/@ENERGYSTAR",
+  "https://www.youtube.com/@USDepartmentofEnergy",
+
+  "https://www.youtube.com/@PJMInterconnection",
+  "https://www.youtube.com/@ERCOTISO",
+  "https://www.youtube.com/@NationalGridUK",
+  "https://www.youtube.com/@DukeEnergy",
+
+  "https://www.youtube.com/@EPRI",
+  "https://www.youtube.com/@IEEEorg",
+  "https://www.youtube.com/@CIGRE",
+  "https://www.youtube.com/@ElectricPowerResearch"
 ];
 
-const YT_CHANNELS = (optEnv("YT_CHANNELS", "")
-  .split(",").map(s=>s.trim()).filter(Boolean)
+// MEDIA_CHANNELS can be: @handle, full channel URL, /user/... URL, or UC... channelId
+const MEDIA_CHANNELS = (optEnv("MEDIA_CHANNELS", "")
+  .split(",").map(s => s.trim()).filter(Boolean)
 );
-const CHANNELS = YT_CHANNELS.length ? YT_CHANNELS : DEFAULT_CHANNELS;
+const CHANNEL_SOURCES = MEDIA_CHANNELS.length ? MEDIA_CHANNELS : DEFAULT_MEDIA_CHANNELS;
 
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
 function writeFile(filePath, content) { ensureDir(path.dirname(filePath)); fs.writeFileSync(filePath, content, "utf8"); }
@@ -58,18 +86,58 @@ const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 async function fetchText(url, headers = {}, retries = 3) {
   const h = {
     "user-agent": "PTD-Bot/1.0 (+https://ptdtoday.com)",
-    "accept": "application/atom+xml, application/rss+xml, application/xml, text/xml, text/plain, */*;q=0.5",
+    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     ...headers
   };
   for (let i=0;i<retries;i++){
     try{
-      const r = await fetch(url, { headers: h });
+      const r = await fetch(url, { headers: h, redirect: "follow" });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.text();
     }catch(e){
       if(i===retries-1) throw e;
-      await sleep(400*(i+1));
+      await sleep(500*(i+1));
     }
+  }
+}
+
+function normalizeChannelSource(s){
+  const v = (s || "").trim();
+  if (!v) return "";
+  if (v.startsWith("UC") && v.length > 10) return v; // channelId
+  if (v.startsWith("@")) return `https://www.youtube.com/${v}`;
+  if (v.startsWith("http://") || v.startsWith("https://")) return v;
+  // allow bare handle without '@'
+  if (/^[A-Za-z0-9._-]+$/.test(v)) return `https://www.youtube.com/@${v}`;
+  return v;
+}
+
+async function resolveChannelId(source){
+  const s = normalizeChannelSource(source);
+
+  if (s.startsWith("UC") && s.length > 10) return s;
+
+  // Fetch channel page HTML and extract "channelId":"UC..."
+  try{
+    const html = await fetchText(s, { "accept-language": "en-US,en;q=0.8" }, 3);
+
+    // Common patterns:
+    // "channelId":"UC...."
+    let m = html.match(/"channelId"\s*:\s*"([^"]+)"/i);
+    if (m && m[1]) return m[1];
+
+    // Sometimes: externalId:"UC...."
+    m = html.match(/"externalId"\s*:\s*"([^"]+)"/i);
+    if (m && m[1]) return m[1];
+
+    // Or: https://www.youtube.com/channel/UC...
+    m = html.match(/\/channel\/(UC[a-zA-Z0-9_-]{10,})/);
+    if (m && m[1]) return m[1];
+
+    return "";
+  }catch(e){
+    console.warn("Channel resolve failed:", source, e.message);
+    return "";
   }
 }
 
@@ -80,19 +148,21 @@ function parseYouTubeRSS(xml) {
     const id    = (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i)||[])[1]||"";
     const pub   = (e.match(/<published>([\s\S]*?)<\/published>/i)||[])[1]||"";
     const ch    = clean((e.match(/<name>([\s\S]*?)<\/name>/i)||[])[1]||"YouTube");
+
     const desc  = clean(
       (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i)||[])[1] ||
       (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i)||[])[1] || ""
     );
 
-    const publishedIso = pub ? new Date(pub).toISOString() : new Date().toISOString();
+    const published_at = pub ? new Date(pub).toISOString() : new Date().toISOString();
 
     return {
       id,
       title,
       channel: ch,
-      published_at: publishedIso,
+      published_at,
       url: id ? `https://www.youtube.com/watch?v=${id}` : "",
+      // Always YouTube CDN thumb
       thumbnail: id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "",
       description: desc
     };
@@ -100,6 +170,7 @@ function parseYouTubeRSS(xml) {
 }
 
 async function fetchCaptions(videoId) {
+  // Captions endpoint (works if captions are public/available)
   const url = `https://www.youtube.com/api/timedtext?lang=en&v=${encodeURIComponent(videoId)}`;
   try{
     const xml = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
@@ -226,7 +297,7 @@ function renderMediaArticleHtml(item) {
       <div class="rule"></div>
     </header>
 
-    <div class="meta">VIDEO • ${escapeHtml(channel)} • ${escapeHtml(published ? new Date(published).toUTCString().replace("GMT","UTC") : "")}</div>
+    <div class="meta">VIDEO • ${escapeHtml(channel)} • ${escapeHtml(published)}</div>
     <h1>${escapeHtml(title)}</h1>
     ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
 
@@ -297,7 +368,7 @@ Rules:
 - Summarize ONLY what is present in the provided transcript/description.
 - If transcript is missing or thin, be explicit: "Based on the available description…"
 - Keep it useful for power transmission, substations, data centers power, renewables, critical minerals, and AI infrastructure.
-- No speculation beyond the text.
+- No publisher praise, no speculation beyond the text.
 Return VALID JSON only.
 `.trim();
 
@@ -338,9 +409,9 @@ Return JSON with EXACT keys:
 
   return {
     summary: (obj.summary || "").toString().slice(0, 600),
-    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(x=>String(x)).slice(0, 5) : [],
-    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(x=>String(x)).slice(0, 6) : [],
-    tags: Array.isArray(obj.tags) ? obj.tags.map(x=>String(x)).slice(0, 12) : []
+    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(String).slice(0, 5) : [],
+    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(String).slice(0, 6) : [],
+    tags: Array.isArray(obj.tags) ? obj.tags.map(String).slice(0, 12) : []
   };
 }
 
@@ -348,11 +419,24 @@ async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const openai = new OpenAI({ apiKey });
 
-  const cutoffMs = Date.now() - DAYS * 24 * 3600 * 1000;
+  const cutoffMs = Date.now() - LOOKBACK_MS;
   const all = [];
 
-  for (const ch of CHANNELS) {
-    const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ch)}`;
+  // 0) Resolve channel IDs
+  const channelIds = [];
+  for (const src of CHANNEL_SOURCES) {
+    const cid = await resolveChannelId(src);
+    if (cid) channelIds.push(cid);
+    await sleep(120);
+  }
+
+  if (!channelIds.length) {
+    throw new Error("No channelIds resolved. Check MEDIA_CHANNELS values.");
+  }
+
+  // 1) Fetch RSS from channels
+  for (const chId of channelIds) {
+    const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(chId)}`;
     try{
       const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
       const vids = parseYouTubeRSS(xml)
@@ -360,24 +444,27 @@ async function main() {
         .slice(0, MAX_PER_CH);
 
       all.push(...vids);
-      await sleep(120);
+      await sleep(140);
     }catch(e){
-      console.warn("YT feed failed:", ch, e.message);
+      console.warn("YT feed failed:", chId, e.message);
     }
   }
 
+  // 2) Dedupe + sort
   const seen = new Set();
   let videos = all.filter(v => (v.id && !seen.has(v.id) && seen.add(v.id)));
   videos.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
   videos = videos.slice(0, MAX_VIDEOS);
 
+  // 3) Captions + AI summaries
   for (const v of videos) {
     v.transcript = await fetchCaptions(v.id);
     if (!v.transcript) v.transcript = "";
     v.ai = await summarizeVideo(openai, v);
-    await sleep(150);
+    await sleep(180);
   }
 
+  // 4) Write media pages
   const outItems = videos.map(v => ({
     id: v.id,
     title: v.title,
