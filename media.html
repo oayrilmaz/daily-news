@@ -111,6 +111,17 @@
     }
     .btn:hover{filter:brightness(.98)}
 
+    .filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .sel{
+      border:1px solid var(--rule);
+      border-radius:999px;
+      padding:8px 12px;
+      background:#fff;
+      font-family:inherit;
+      font-size:14px;
+      outline:none;
+    }
+
     .search{flex:1 1 320px;display:flex;align-items:center;margin-left:auto}
     .search input{
       width:100%;
@@ -131,33 +142,7 @@
       background:rgba(0,0,0,.02);
     }
 
-    .headRow{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      padding:10px 14px;
-      border-bottom:1px solid var(--rule);
-      background:#fff;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid var(--rule);
-      background:var(--pill);
-      font-size:13px;
-      color:rgba(0,0,0,.78);
-    }
-    .tiny{color:var(--muted);font-size:13px}
-
-    .grid{
-      display:grid;
-      grid-template-columns:1fr;
-    }
+    .grid{display:grid;grid-template-columns:1fr}
 
     .card{
       padding:16px 14px;
@@ -188,12 +173,12 @@
       background:#f4f4f4;
       position:relative;
       display:block;
+      text-decoration:none;
     }
     .thumb img{
       width:100%;
       height:auto;
       display:block;
-      background:#f4f4f4;
     }
     .play{
       position:absolute;
@@ -207,36 +192,14 @@
       letter-spacing:.1px;
     }
 
-    h2{
-      margin:0 0 10px;
-      font-size:28px;
-      line-height:1.1;
-      font-weight:900;
-    }
-    .summary{
-      margin:0 0 12px;
-      font-size:16px;
-      line-height:1.6;
-      color:rgba(0,0,0,.86);
-    }
+    h2{margin:0 0 10px;font-size:28px;line-height:1.1;font-weight:900}
+    .summary{margin:0 0 12px;font-size:16px;line-height:1.6;color:rgba(0,0,0,.86)}
 
-    .subhead{
-      margin:12px 0 6px;
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.12px;
-      color:var(--muted);
-    }
+    .subhead{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.12px;color:var(--muted)}
     ul{margin:0 0 10px;padding-left:18px}
     li{margin:6px 0;line-height:1.35}
 
-    .cta{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      margin-top:10px;
-    }
+    .cta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
     .btnMini{
       appearance:none;
       border:1px solid var(--rule);
@@ -252,13 +215,8 @@
       align-items:center;
       justify-content:center;
       line-height:1;
-      user-select:none;
     }
-    .btnMini.primary{
-      background:#111;
-      color:#fff;
-      border-color:#111;
-    }
+    .btnMini.primary{background:#111;color:#fff;border-color:#111}
 
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .chip{
@@ -313,6 +271,15 @@
     <section class="panel" aria-label="Media videos">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
+
+        <div class="filters">
+          <select class="sel" id="timeFilter" aria-label="Time filter">
+            <option value="today" selected>Today</option>
+            <option value="7d">Past 7 days</option>
+            <option value="all">All in feed</option>
+          </select>
+        </div>
+
         <div class="search">
           <input id="q" type="search" placeholder="Search videos, channels, topics…" autocomplete="off" />
         </div>
@@ -320,14 +287,6 @@
 
       <div class="notice" id="disclaimerLine">
         Informational only — AI-generated summaries; may contain errors. Verify with the original video.
-      </div>
-
-      <div class="headRow">
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <span class="pill" id="countPill">Items: —</span>
-          <span class="pill" id="rangePill">Range: —</span>
-        </div>
-        <div class="tiny" id="modeHint">Past 7 days (rolling)</div>
       </div>
 
       <div class="grid" id="grid"></div>
@@ -338,7 +297,6 @@
 
   <script>
     const DATA_URL = "/data/media.json";
-    const DEFAULT_DAYS = 7; // ✅ past week by default
     const $ = (id) => document.getElementById(id);
 
     function fmtUtc(iso){
@@ -370,19 +328,28 @@
       }
     }
 
-    function safeDateMs(v){
-      const ms = Date.parse(v || "");
-      return Number.isFinite(ms) ? ms : NaN;
-    }
+    function withinTimeFilter(publishedIso, mode){
+      if (!publishedIso) return mode === "all";
+      const d = new Date(publishedIso);
+      if (Number.isNaN(d.getTime())) return mode === "all";
 
-    // ✅ Past N days filter (rolling)
-    function applyPastDays(items, days){
-      const now = Date.now();
-      const cutoff = now - (days * 24 * 60 * 60 * 1000);
-      return (items || []).filter(v => {
-        const ms = safeDateMs(v.published_at || v.published || "");
-        return Number.isFinite(ms) && ms >= cutoff;
-      });
+      const now = new Date();
+
+      if (mode === "all") return true;
+
+      if (mode === "today") {
+        // "Today" in UTC (so it matches your workflow timestamps)
+        return d.getUTCFullYear() === now.getUTCFullYear()
+          && d.getUTCMonth() === now.getUTCMonth()
+          && d.getUTCDate() === now.getUTCDate();
+      }
+
+      if (mode === "7d") {
+        const ms = now.getTime() - d.getTime();
+        return ms >= 0 && ms <= 7 * 24 * 3600 * 1000;
+      }
+
+      return true;
     }
 
     function cardHtml(v){
@@ -391,7 +358,10 @@
       const channel = (v.channel || v.publisher || "YouTube").toString();
       const published = v.published_at || v.published || "";
       const url = (v.url || "").toString();
-      const thumb = (v.thumbnail || v.image || "").toString();
+
+      // Prefer HTTPS thumbnails (YouTube)
+      let thumb = (v.thumbnail || v.image || "").toString().trim();
+      if (thumb && thumb.startsWith("http://")) thumb = thumb.replace("http://","https://");
 
       const ai = v.ai || {};
       const summary = (ai.summary || "").toString();
@@ -418,7 +388,7 @@
             <div>
               <h2>${escapeHtml(title)}</h2>
 
-              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : `<p class="summary"><em>AI summary pending for this video.</em></p>`}
+              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : `<p class="summary">AI summary pending (or transcript unavailable).</p>`}
 
               ${bullets.length ? `
                 <div class="subhead">Key points</div>
@@ -451,12 +421,11 @@
       q = normalize(q).trim();
       if(!q) return items;
       return items.filter(v=>{
-        const ai = v.ai || {};
         const hay = [
           v.title, v.channel, v.publisher,
-          ai.summary,
-          ...(Array.isArray(ai.bullets) ? ai.bullets : []),
-          ...(Array.isArray(ai.tags) ? ai.tags : [])
+          v.ai?.summary,
+          ...(Array.isArray(v.ai?.bullets) ? v.ai.bullets : []),
+          ...(Array.isArray(v.ai?.tags) ? v.ai.tags : [])
         ].map(normalize).join(" ");
         return hay.includes(q);
       });
@@ -473,7 +442,7 @@
       });
     }
 
-    function render(payload, query=""){
+    function render(payload){
       const updatedAt = payload.updated_at || "";
       $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
 
@@ -483,30 +452,33 @@
 
       const all = Array.isArray(payload.items) ? payload.items : [];
 
-      // ✅ Always show something: last 7 days default (rolling)
-      const recent = applyPastDays(all, DEFAULT_DAYS);
-      $("modeHint").textContent = `Past ${DEFAULT_DAYS} days (rolling)`;
+      // time filter first
+      const mode = $("timeFilter").value || "today";
+      const filteredByTime = all.filter(v => withinTimeFilter(v.published_at || v.published || "", mode));
 
-      $("rangePill").textContent = `Range: Past ${DEFAULT_DAYS} days`;
-      $("countPill").textContent = `Items: ${recent.length}`;
+      // then search filter
+      const items = applySearch(filteredByTime, $("q").value);
 
-      const itemsSearched = applySearch(recent, query);
-
-      $("grid").innerHTML = itemsSearched.length
-        ? itemsSearched.map(cardHtml).join("")
-        : `<div class="errorBox"><strong>No videos matched your search.</strong><br/>Try a broader keyword.</div>`;
+      $("grid").innerHTML = items.length
+        ? items.map(cardHtml).join("")
+        : `<div class="errorBox"><strong>No videos matched.</strong><br/>Try “Past 7 days” or clear search.</div>`;
 
       bindShareButtons();
     }
 
     async function load(){
       $("year").textContent = new Date().getFullYear();
+
       try{
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
-        render(payload, $("q").value);
-        $("q").addEventListener("input", ()=>render(payload, $("q").value));
+
+        // events
+        $("q").addEventListener("input", ()=>render(payload));
+        $("timeFilter").addEventListener("change", ()=>render(payload));
+
+        render(payload);
       }catch(err){
         $("updatedLine").textContent = "Could not load Media.";
         $("grid").innerHTML = `
