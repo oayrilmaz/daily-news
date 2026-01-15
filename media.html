@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <title>PTD Today — Media</title>
-  <meta name="description" content="PTD Today Media — curated channels with short AI summaries for power transmission, substations, data centers, renewables, and critical minerals." />
+  <meta name="description" content="PTD Today Media — today’s YouTube videos with AI summaries for power transmission, substations, data centers, renewables, and critical minerals." />
   <link rel="canonical" href="https://ptdtoday.com/media.html" />
 
   <!-- Open Graph (Media) -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="PTD Today — Media" />
-  <meta property="og:description" content="Curated media channels with AI summaries + PTD-style writeups." />
+  <meta property="og:description" content="Today’s curated YouTube videos with AI summaries + PTD-style writeups." />
   <meta property="og:url" content="https://ptdtoday.com/media.html" />
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="PTD Today — Media" />
-  <meta name="twitter:description" content="Curated media channels with AI summaries + PTD-style writeups." />
+  <meta name="twitter:description" content="Today’s curated YouTube videos with AI summaries + PTD-style writeups." />
   <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png" />
 
   <style>
@@ -34,6 +34,8 @@
       --btn:#111;
       --btnInk:#fff;
       --card:#fff;
+      --warnBg: rgba(255, 244, 214, 0.8);
+      --warnInk: #6b4e00;
     }
 
     *{box-sizing:border-box}
@@ -131,10 +133,30 @@
       background:rgba(0,0,0,.02);
     }
 
-    .grid{
-      display:grid;
-      grid-template-columns:1fr;
+    .headRow{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 14px;
+      border-bottom:1px solid var(--rule);
+      background:#fff;
+      align-items:center;
+      flex-wrap:wrap;
     }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--pill);
+      font-size:13px;
+      color:rgba(0,0,0,.78);
+    }
+    .tiny{color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:1fr}
 
     .card{
       padding:16px 14px;
@@ -153,7 +175,7 @@
 
     .row{
       display:grid;
-      grid-template-columns: 260px 1fr;
+      grid-template-columns: 280px 1fr;
       gap:14px;
       align-items:start;
     }
@@ -164,15 +186,15 @@
       border:1px solid var(--rule);
       background:#f4f4f4;
       position:relative;
-      text-decoration:none;
       display:block;
+      text-decoration:none;
     }
     .thumb img{
       width:100%;
       height:auto;
       display:block;
     }
-    .badge{
+    .play{
       position:absolute;
       right:10px;
       bottom:10px;
@@ -197,17 +219,15 @@
       color:rgba(0,0,0,.86);
     }
 
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--rule);
-      background:rgba(0,0,0,.02);
+    .subhead{
+      margin:12px 0 6px;
       font-size:12px;
-      color:rgba(0,0,0,.76);
+      text-transform:uppercase;
+      letter-spacing:.12px;
+      color:var(--muted);
     }
+    ul{margin:0 0 10px;padding-left:18px}
+    li{margin:6px 0;line-height:1.35}
 
     .cta{
       display:flex;
@@ -231,11 +251,33 @@
       align-items:center;
       justify-content:center;
       line-height:1;
+      user-select:none;
     }
     .btnMini.primary{
       background:#111;
       color:#fff;
       border-color:#111;
+    }
+
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:rgba(0,0,0,.02);
+      font-size:12px;
+      color:rgba(0,0,0,.76);
+    }
+
+    .warnBox{
+      padding:14px;
+      margin:14px;
+      border:1px solid rgba(140,100,0,.25);
+      border-radius:12px;
+      background:var(--warnBg);
+      color:var(--warnInk);
     }
 
     .errorBox{
@@ -276,16 +318,24 @@
     <h1 class="pageTitle">Media</h1>
     <div class="updated" id="updatedLine">Loading…</div>
 
-    <section class="panel" aria-label="Media channels">
+    <section class="panel" aria-label="Media videos">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
         <div class="search">
-          <input id="q" type="search" placeholder="Search channels, topics, tags…" autocomplete="off" />
+          <input id="q" type="search" placeholder="Search today’s videos (title, channel, tags)..." autocomplete="off" />
         </div>
       </div>
 
       <div class="notice" id="disclaimerLine">
-        Informational only — AI-generated summaries; may contain errors. Verify with the original source.
+        Informational only — AI-generated summaries; may contain errors. Verify with the original video.
+      </div>
+
+      <div class="headRow">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="pill" id="countPill">Videos today: —</span>
+          <span class="pill" id="todayPill">Today (UTC): —</span>
+        </div>
+        <div class="tiny" id="hintLine">Showing videos published since 00:00 UTC</div>
       </div>
 
       <div class="grid" id="grid"></div>
@@ -295,12 +345,7 @@
   </div>
 
   <script>
-    // IMPORTANT:
-    // This page shows "channels" but it still reads the same data file:
-    // /data/media.json
-    // Each item should look like:
-    // { id, title, channel, url, thumbnail, published_at, ai: { summary, tags } }
-
+    // Expects: /data/media.json with ITEMS AS VIDEOS (id = YouTube videoId)
     const DATA_URL = "/data/media.json";
     const $ = (id) => document.getElementById(id);
 
@@ -315,8 +360,29 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    function ptdSummaryUrl(id){
-      return `${window.location.origin}/media/${encodeURIComponent(id)}.html`;
+    function utcMidnightMs(d = new Date()){
+      return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0);
+    }
+
+    function videoThumb(v){
+      // Prefer data thumbnail, else derive from YouTube video id
+      const id = (v.id || "").toString().trim();
+      const t = (v.thumbnail || v.image || "").toString().trim();
+      if (t) return t;
+      if (id) return `https://i.ytimg.com/vi/${encodeURIComponent(id)}/hqdefault.jpg`;
+      return "";
+    }
+
+    function videoUrl(v){
+      const u = (v.url || "").toString().trim();
+      if (u) return u;
+      const id = (v.id || "").toString().trim();
+      if (id) return `https://www.youtube.com/watch?v=${encodeURIComponent(id)}`;
+      return "";
+    }
+
+    function ptdSummaryUrl(videoId){
+      return `${window.location.origin}/media/${encodeURIComponent(videoId)}.html`;
     }
 
     async function shareLink(title, text, url){
@@ -333,32 +399,60 @@
       }
     }
 
+    function applySearch(items, q){
+      q = normalize(q).trim();
+      if(!q) return items;
+      return items.filter(v=>{
+        const hay = [
+          v.title, v.channel, v.publisher,
+          v.ai && v.ai.summary,
+          ...(v.ai && Array.isArray(v.ai.bullets) ? v.ai.bullets : []),
+          ...(v.ai && Array.isArray(v.ai.takeaways) ? v.ai.takeaways : []),
+          ...(v.ai && Array.isArray(v.ai.tags) ? v.ai.tags : [])
+        ].map(normalize).join(" ");
+        return hay.includes(q);
+      });
+    }
+
+    function isVideoShape(items){
+      // We expect: id (videoId), title, published_at, url (watch), channel, thumbnail, ai.*
+      if(!items.length) return true;
+      const sample = items[0] || {};
+      const id = (sample.id || "").toString();
+      const hasVideoLikeId = id.length >= 8 && !id.startsWith("@") && !id.includes(" ");
+      // If user accidentally gave channels list, url will be channel URL and id won't be videoId-ish
+      return hasVideoLikeId;
+    }
+
     function cardHtml(v){
       const id = (v.id || "").toString().trim();
       const title = (v.title || "Untitled").toString();
-      const group = (v.channel || v.category || v.publisher || "Media").toString();
+      const channel = (v.channel || v.publisher || "YouTube").toString();
       const published = v.published_at || v.published || "";
-      const url = (v.url || "").toString();
-      const thumb = (v.thumbnail || v.image || "").toString();
+      const url = videoUrl(v);
+      const thumb = videoThumb(v);
 
-      const summary = (v.ai && v.ai.summary) ? String(v.ai.summary) : "";
-      const tags = (v.ai && Array.isArray(v.ai.tags)) ? v.ai.tags : [];
+      const ai = v.ai || {};
+      const summary = (ai.summary || "").toString().trim();
+      const bullets = Array.isArray(ai.bullets) ? ai.bullets : [];
+      const takeaways = Array.isArray(ai.takeaways) ? ai.takeaways : [];
+      const tags = Array.isArray(ai.tags) ? ai.tags : [];
 
       const meta = [
-        "CHANNEL",
-        group,
+        "VIDEO",
+        channel,
         published ? fmtUtc(published) : ""
       ].filter(Boolean).join(" • ");
 
-      const summaryPage = id ? ptdSummaryUrl(id) : "";
+      const shareUrl = ptdSummaryUrl(id);
 
       return `
         <article class="card">
           <div class="meta">${escapeHtml(meta)}</div>
           <div class="row">
-            <a class="thumb" href="${escapeHtml(url || summaryPage || '#')}" target="_blank" rel="noopener" aria-label="Open channel">
+            <a class="thumb" href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open on YouTube">
               ${thumb ? `<img loading="lazy" src="${escapeHtml(thumb)}" alt="">` : ""}
-              <span class="badge">Open</span>
+              <span class="play">▶ Watch</span>
             </a>
 
             <div>
@@ -366,19 +460,29 @@
 
               ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ""}
 
+              ${bullets.length ? `
+                <div class="subhead">Key points</div>
+                <ul>${bullets.slice(0,6).map(b=>`<li>${escapeHtml(b)}</li>`).join("")}</ul>
+              ` : ""}
+
+              ${takeaways.length ? `
+                <div class="subhead">So what</div>
+                <ul>${takeaways.slice(0,6).map(t=>`<li>${escapeHtml(t)}</li>`).join("")}</ul>
+              ` : ""}
+
               ${tags.length ? `
                 <div class="chips">
-                  ${tags.slice(0,10).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}
+                  ${tags.slice(0,12).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}
                 </div>
               ` : ""}
 
               <div class="cta">
-                ${summaryPage ? `<a class="btnMini primary" href="${escapeHtml(summaryPage)}" target="_blank" rel="noopener">Open PTD Summary</a>` : ""}
-                ${url ? `<a class="btnMini" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open Channel</a>` : ""}
+                <a class="btnMini primary" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener">Open PTD Summary</a>
+                <a class="btnMini" href="${escapeHtml(url)}" target="_blank" rel="noopener">YouTube</a>
                 <button class="btnMini" type="button"
-                  data-share="${escapeHtml(summaryPage || url || location.href)}"
+                  data-share="${escapeHtml(shareUrl)}"
                   data-title="${escapeHtml(title)}"
-                  data-text="${escapeHtml(summary ? summary.slice(0,220) : '')}">
+                  data-text="${escapeHtml((summary || "").slice(0,220))}">
                   Share
                 </button>
               </div>
@@ -386,19 +490,6 @@
           </div>
         </article>
       `;
-    }
-
-    function applySearch(items, q){
-      q = normalize(q).trim();
-      if(!q) return items;
-      return items.filter(v=>{
-        const hay = [
-          v.title, v.channel, v.category, v.publisher,
-          v.ai?.summary,
-          ...(Array.isArray(v.ai?.tags) ? v.ai.tags : [])
-        ].map(normalize).join(" ");
-        return hay.includes(q);
-      });
     }
 
     function bindShareButtons(){
@@ -412,20 +503,48 @@
       });
     }
 
+    function filterTodayUtc(items){
+      const cut = utcMidnightMs(new Date());
+      return (items || []).filter(v=>{
+        const iso = v.published_at || v.published || "";
+        const t = Date.parse(iso);
+        if (!Number.isFinite(t)) return false;
+        return t >= cut;
+      });
+    }
+
     function render(payload, query=""){
       const updatedAt = payload.updated_at || "";
       $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
 
       $("disclaimerLine").textContent =
         payload.disclaimer ||
-        "Informational only — AI-generated summaries; may contain errors. Verify with the original source.";
+        "Informational only — AI-generated summaries; may contain errors. Verify with the original video.";
 
       const all = Array.isArray(payload.items) ? payload.items : [];
-      const items = applySearch(all, query);
+
+      // Today-only (UTC)
+      const today = filterTodayUtc(all);
+      const items = applySearch(today, query);
+
+      const utcToday = new Date(utcMidnightMs(new Date()));
+      $("todayPill").textContent = `Today (UTC): ${utcToday.toISOString().slice(0,10)}`;
+      $("countPill").textContent = `Videos today: ${items.length}`;
+
+      if (!isVideoShape(all) && all.length){
+        $("grid").innerHTML = `
+          <div class="warnBox">
+            <strong>Your <code>/data/media.json</code> looks like a channel list, not a video list.</strong><br/>
+            This page expects items where <code>id</code> is a YouTube <em>videoId</em> (so thumbnails + PTD summaries work).<br/>
+            Fix: regenerate <code>data/media.json</code> from YouTube RSS videos (not channel URLs).
+          </div>
+        `;
+        return;
+      }
 
       $("grid").innerHTML = items.length
         ? items.map(cardHtml).join("")
-        : `<div class="errorBox"><strong>No channels matched your search.</strong></div>`;
+        : `<div class="errorBox"><strong>No videos published today (UTC) matched your search.</strong></div>`;
 
       bindShareButtons();
     }
