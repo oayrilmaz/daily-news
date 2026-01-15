@@ -280,7 +280,7 @@
       font-family:inherit;
       font-size:13px;
       outline:none;
-      max-width: 320px;
+      max-width: 360px;
     }
     .ttsHint{
       font-size:12px;
@@ -320,10 +320,7 @@
     }
 
     /* Word highlighting */
-    .w{
-      padding:0 1px;
-      border-radius:4px;
-    }
+    .w{ padding:0 1px; border-radius:4px; }
     .w.active{
       background: var(--hl-blue);
       box-shadow:0 0 0 1px rgba(0,0,0,.06) inset;
@@ -368,11 +365,10 @@
       <div class="tagline">First to Know. First to Lead.</div>
 
       <nav class="nav" aria-label="Primary navigation">
-  <a class="active" href="/index.html">Home</a>
-  <a href="/room.html">Room</a>
-  <a href="/media.html">Media</a>
-</nav>
-
+        <a class="active" href="/index.html">Home</a>
+        <a href="/room.html">Room</a>
+        <a href="/media.html">Media</a>
+      </nav>
 
       <div class="rule"></div>
     </header>
@@ -448,10 +444,7 @@
     }
 
     // -----------------------------
-    // BEST-POSSIBLE Human-like Reader (Web Speech API)
-    // Note: quality depends on voices installed on the user's device/browser.
-    // We: (1) auto-pick the best English voice, (2) let user choose voice/speed,
-    // (3) word-highlight with blue, and "important sections" in light red.
+    // HUMAN-LIKE READER (Web Speech API) + better “human” defaults
     // -----------------------------
     const TTS = {
       supported: ("speechSynthesis" in window) && ("SpeechSynthesisUtterance" in window),
@@ -517,7 +510,7 @@
       }
     }
 
-    // Build speakable chunks with importance flags
+    // IMPORTANT: What to watch + Action are red.
     function buildSpeakChunks(item){
       const title = (item.title || "").toString().trim();
       const lede  = (item.lede || item.summary || "").toString().trim();
@@ -530,7 +523,6 @@
       if (lede)  chunks.push({ text: lede,  imp: false });
       if (main)  chunks.push({ text: main,  imp: false });
 
-      // IMPORTANT sections (red highlight)
       if (watch.length){
         chunks.push({ text: "What to watch.", imp: true });
         chunks.push({ text: watch.join(". "), imp: true });
@@ -540,7 +532,6 @@
         chunks.push({ text: action, imp: true });
       }
 
-      // Split into paragraphs (keep imp flag per paragraph)
       const paras = [];
       for (const c of chunks){
         const parts = c.text.split(/\n\s*\n/g).map(s=>s.trim()).filter(Boolean);
@@ -560,25 +551,19 @@
       const paras = buildSpeakChunks(item);
       if (!paras.length) return null;
 
-      // Plain text for speech + offsets for mapping
       const plain = paras.map(p => p.text).join("\n\n").trim();
 
-      // Token offsets in the FULL plain string
+      // offsets of word tokens (non-space) for boundary mapping
       const offsets = [];
       let cursor = 0;
-      {
-        const re = /(\s+|[^\s]+)/g;
-        const parts = plain.match(re) || [];
-        for (const part of parts){
-          const isSpace = /^\s+$/.test(part);
-          if (!isSpace){
-            offsets.push(cursor);
-          }
-          cursor += part.length;
-        }
+      const partsAll = plain.match(/(\s+|[^\s]+)/g) || [];
+      for (const part of partsAll){
+        const isSpace = /^\s+$/.test(part);
+        if (!isSpace) offsets.push(cursor);
+        cursor += part.length;
       }
 
-      // Build HTML with per-word spans and per-paragraph importance
+      // per-word spans in HTML, per-paragraph importance
       let wordIndex = 0;
       const html = paras.map(p=>{
         const parts = p.text.match(/(\s+|[^\s]+)/g) || [];
@@ -598,32 +583,30 @@
       return { plain, spans, offsets };
     }
 
-    // Voice ranking: try to auto-pick the most natural English voice available.
     function scoreVoice(v){
       const name = (v.name || "").toLowerCase();
       const lang = (v.lang || "").toLowerCase();
 
       let s = 0;
 
-      // Prefer English US (you can switch to en-GB if you want)
-      if (lang === "en-us") s += 30;
-      else if (lang.startsWith("en-")) s += 18;
+      // English preference (will later filter by accent)
+      if (lang === "en-us") s += 35;
+      else if (lang.startsWith("en-")) s += 20;
 
-      // Prefer "premium/neural/natural/enhanced"
-      if (name.includes("neural")) s += 25;
-      if (name.includes("natural")) s += 22;
+      // Prefer natural/neural/premium/enhanced
+      if (name.includes("neural")) s += 28;
+      if (name.includes("natural")) s += 24;
       if (name.includes("premium")) s += 18;
-      if (name.includes("enhanced")) s += 15;
+      if (name.includes("enhanced")) s += 16;
 
-      // Common high-quality engines
+      // Common good engines
       if (name.includes("google")) s += 16;
       if (name.includes("microsoft")) s += 14;
-      if (name.includes("samantha")) s += 10;  // iOS
+      if (name.includes("samantha")) s += 10; // iOS
       if (name.includes("ava")) s += 8;
       if (name.includes("aria")) s += 8;
       if (name.includes("jenny")) s += 8;
 
-      // Prefer non-localService when available (often higher quality)
       if (v.localService === false) s += 6;
 
       return s;
@@ -637,21 +620,31 @@
       return vs;
     }
 
-    function bestEnglishVoice(){
+    function accentFilter(lang, accent){
+      lang = (lang || "").toLowerCase();
+      accent = (accent || "any").toLowerCase();
+      if (accent === "any") return lang.startsWith("en-");
+      if (accent === "us") return lang === "en-us";
+      if (accent === "uk") return lang === "en-gb";
+      if (accent === "au") return lang === "en-au";
+      if (accent === "ca") return lang === "en-ca";
+      if (accent === "in") return lang === "en-in";
+      return lang.startsWith("en-");
+    }
+
+    function bestVoiceForAccent(accent){
       const vs = TTS.voices || loadVoices();
-      const en = vs.filter(v => ((v.lang || "").toLowerCase().startsWith("en")));
+      const en = vs.filter(v => accentFilter(v.lang, accent));
       if (!en.length) return null;
       en.sort((a,b)=> scoreVoice(b) - scoreVoice(a));
       return en[0] || null;
     }
 
-    function fillVoiceSelect(selectEl){
+    function fillVoiceSelect(selectEl, accent){
       if (!selectEl) return;
       const vs = TTS.voices || loadVoices();
-      const en = vs.filter(v => ((v.lang || "").toLowerCase().startsWith("en")));
+      const en = vs.filter(v => accentFilter(v.lang, accent || "any"));
       selectEl.innerHTML = "";
-
-      const best = bestEnglishVoice();
 
       if (!en.length){
         const opt = document.createElement("option");
@@ -661,8 +654,8 @@
         return;
       }
 
-      // Keep top voices first (still show all)
       const sorted = [...en].sort((a,b)=> scoreVoice(b) - scoreVoice(a));
+      const best = bestVoiceForAccent(accent || "any");
 
       for (const v of sorted){
         const opt = document.createElement("option");
@@ -677,6 +670,21 @@
       if (!name) return null;
       const vs = TTS.voices || loadVoices();
       return vs.find(v => v.name === name) || null;
+    }
+
+    function applyPreset(preset, rateSel, pitchSel){
+      // “Human mode” defaults (subtle — avoids robotic)
+      if (!rateSel || !pitchSel) return;
+      if (preset === "natural"){
+        rateSel.value = "1.02";
+        pitchSel.value = "1.02";
+      } else if (preset === "presenter"){
+        rateSel.value = "1.06";
+        pitchSel.value = "1.03";
+      } else if (preset === "fast"){
+        rateSel.value = "1.12";
+        pitchSel.value = "1.02";
+      }
     }
 
     function startTtsForCard(card, item){
@@ -707,35 +715,35 @@
       if (ctrls) ctrls.classList.add("show");
       card.querySelectorAll("[data-action='tts']").forEach(b=>b.setAttribute("aria-pressed","true"));
 
-      // Ensure voices are loaded and selector is populated
-      const voiceSel = card.querySelector("[data-tts-voice]");
-      fillVoiceSelect(voiceSel);
+      const accentSel = card.querySelector("[data-tts-accent]");
+      const presetSel = card.querySelector("[data-tts-preset]");
+      const voiceSel  = card.querySelector("[data-tts-voice]");
+      const rateSel   = card.querySelector("[data-tts-rate]");
+      const pitchSel  = card.querySelector("[data-tts-pitch]");
 
-      // Build utterance
+      // Set preset defaults the first time card is opened
+      if (presetSel && !presetSel.getAttribute("data-init")){
+        presetSel.setAttribute("data-init","1");
+        applyPreset(presetSel.value, rateSel, pitchSel);
+      }
+
+      // Fill voices based on accent
+      const accent = accentSel ? accentSel.value : "any";
+      fillVoiceSelect(voiceSel, accent);
+
       const utter = new SpeechSynthesisUtterance(built.plain);
 
-      // Rate / Pitch (small pitch tweak makes many voices sound more natural)
-      const rateSel = card.querySelector("[data-tts-rate]");
-      const rateVal = rateSel ? Number(rateSel.value || "1") : 1;
-
-      const pitchSel = card.querySelector("[data-tts-pitch]");
-      const pitchVal = pitchSel ? Number(pitchSel.value || "1") : 1;
-
-      utter.rate = (Number.isFinite(rateVal) && rateVal>0) ? rateVal : 1;
-      utter.pitch = (Number.isFinite(pitchVal) && pitchVal>0) ? pitchVal : 1;
+      const rateVal  = rateSel ? Number(rateSel.value || "1.02") : 1.02;
+      const pitchVal = pitchSel ? Number(pitchSel.value || "1.02") : 1.02;
+      utter.rate  = (Number.isFinite(rateVal) && rateVal>0) ? rateVal : 1.02;
+      utter.pitch = (Number.isFinite(pitchVal) && pitchVal>0) ? pitchVal : 1.02;
       utter.volume = 1;
 
-      // Voice: use selected, else auto-best
       let chosen = null;
-      if (voiceSel && voiceSel.value){
-        chosen = resolveVoiceByName(voiceSel.value);
-      }
-      if (!chosen){
-        chosen = bestEnglishVoice();
-      }
+      if (voiceSel && voiceSel.value) chosen = resolveVoiceByName(voiceSel.value);
+      if (!chosen) chosen = bestVoiceForAccent(accent) || bestVoiceForAccent("any");
       if (chosen) utter.voice = chosen;
 
-      // Save state
       TTS.activeId = id;
       TTS.utter = utter;
       TTS.spans = built.spans;
@@ -743,7 +751,6 @@
       TTS.plain = built.plain;
       TTS.lastWordIndex = -1;
 
-      // Highlighting (best effort): onboundary word mapping
       let boundaryWorks = false;
 
       utter.onboundary = (ev)=>{
@@ -754,6 +761,7 @@
         const offs = TTS.offsets;
         if (!offs || !offs.length) return;
 
+        // binary search: last offset <= charIndex
         let lo=0, hi=offs.length-1, ans=0;
         while(lo<=hi){
           const mid = (lo+hi)>>1;
@@ -766,16 +774,17 @@
       utter.onend = ()=> stopTts();
       utter.onerror = ()=> stopTts();
 
-      // Fallback timed highlighter (approx)
+      // Fallback timed highlight (better estimate)
       const startFallbackTimer = ()=>{
         if (TTS.timer) { clearInterval(TTS.timer); TTS.timer = null; }
         const words = TTS.spans.length || 0;
         if (!words) return;
 
-        const wpmBase = 175;
+        // Estimate WPM with slight punctuation penalty
+        const baseWpm = 185;
         const rate = utter.rate || 1;
-        const wpm = Math.max(95, Math.min(320, wpmBase * rate));
-        const msPerWord = Math.max(140, Math.min(520, (60_000 / wpm)));
+        const wpm = Math.max(110, Math.min(340, baseWpm * rate));
+        let msPerWord = Math.max(120, Math.min(500, (60_000 / wpm)));
 
         let i = 0;
         setActiveSpan(0);
@@ -787,12 +796,11 @@
             }
           }catch(e){}
           i++;
-          if (i >= words){ return; }
+          if (i >= words) return;
           setActiveSpan(i);
         }, msPerWord);
       };
 
-      // Start speaking
       try{
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
@@ -804,9 +812,8 @@
       setTimeout(()=>{
         if (TTS.activeId !== id) return;
         if (!boundaryWorks) startFallbackTimer();
-      }, 700);
+      }, 650);
 
-      // Controls
       const btnPause = card.querySelector("[data-tts-pause]");
       const btnStop  = card.querySelector("[data-tts-stop]");
 
@@ -827,19 +834,24 @@
         btnStop.onclick = ()=> stopTts();
       }
 
-      // Any settings change => restart for best consistency
       const restart = ()=> startTtsForCard(card, item);
 
-      if (rateSel) rateSel.onchange = restart;
-      if (pitchSel) pitchSel.onchange = restart;
-      if (voiceSel) voiceSel.onchange = restart;
+      if (accentSel) accentSel.onchange = restart;
+      if (voiceSel)  voiceSel.onchange  = restart;
+      if (rateSel)   rateSel.onchange   = restart;
+      if (pitchSel)  pitchSel.onchange  = restart;
+
+      if (presetSel){
+        presetSel.onchange = ()=>{
+          applyPreset(presetSel.value, rateSel, pitchSel);
+          restart();
+        };
+      }
     }
 
-    // Load voices early (some browsers require an event)
     function initVoices(){
       if (!TTS.supported) return;
       loadVoices();
-      // Some browsers update voices asynchronously
       window.speechSynthesis.onvoiceschanged = ()=> loadVoices();
     }
     initVoices();
@@ -884,25 +896,41 @@
           </div>
 
           <div class="ttsControls" aria-label="Audio reader controls">
+            <select class="ttsSelect" data-tts-preset aria-label="Mode">
+              <option value="natural" selected>Human (Natural)</option>
+              <option value="presenter">Human (Presenter)</option>
+              <option value="fast">Fast</option>
+            </select>
+
+            <select class="ttsSelect" data-tts-accent aria-label="Accent">
+              <option value="any" selected>Accent: Any English</option>
+              <option value="us">Accent: US</option>
+              <option value="uk">Accent: UK</option>
+              <option value="au">Accent: AU</option>
+              <option value="ca">Accent: CA</option>
+              <option value="in">Accent: IN</option>
+            </select>
+
             <select class="ttsSelect" data-tts-voice aria-label="Voice"></select>
 
             <select class="ttsSelect" data-tts-rate aria-label="Speed">
               <option value="0.95">0.95×</option>
-              <option value="1" selected>1.0×</option>
-              <option value="1.05">1.05×</option>
-              <option value="1.1">1.1×</option>
-              <option value="1.15">1.15×</option>
+              <option value="1">1.0×</option>
+              <option value="1.02" selected>1.02×</option>
+              <option value="1.06">1.06×</option>
+              <option value="1.12">1.12×</option>
             </select>
 
             <select class="ttsSelect" data-tts-pitch aria-label="Pitch">
-              <option value="0.95">Pitch 0.95</option>
-              <option value="1" selected>Pitch 1.0</option>
+              <option value="0.98">Pitch 0.98</option>
+              <option value="1">Pitch 1.0</option>
+              <option value="1.02" selected>Pitch 1.02</option>
               <option value="1.05">Pitch 1.05</option>
             </select>
 
             <button class="btnMini" type="button" data-tts-pause>Pause</button>
             <button class="btnMini" type="button" data-tts-stop>Stop</button>
-            <span class="ttsHint">Blue highlight = reading. Red highlight = “important” sections (Watch/Action).</span>
+            <span class="ttsHint">Blue highlight = reading. Red highlight = Watch/Action.</span>
           </div>
 
           ${tags.length ? `<div class="tags">${tags.slice(0,12).map(t=>`<span class="tag">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
@@ -1032,8 +1060,12 @@
         });
       });
 
-      // Populate voice selectors now (after cards exist)
-      document.querySelectorAll("[data-tts-voice]").forEach(sel => fillVoiceSelect(sel));
+      // Populate all voice selectors (after cards exist)
+      document.querySelectorAll("[data-tts-voice]").forEach(sel => {
+        const card = sel.closest("article.card");
+        const accentSel = card ? card.querySelector("[data-tts-accent]") : null;
+        fillVoiceSelect(sel, accentSel ? accentSel.value : "any");
+      });
     }
 
     function focusFromHash(){
@@ -1077,6 +1109,14 @@
 
     $("btnRefresh").addEventListener("click", ()=>{ stopTts(); location.reload(); });
     window.addEventListener("hashchange", ()=>{ stopTts(); focusFromHash(); });
+
+    // Ensure voices load on more browsers
+    if (TTS.supported){
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = ()=> loadVoices();
+      // Some browsers only unlock voices after a user gesture; still fine.
+    }
+
     load();
   </script>
 </body>
