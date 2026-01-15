@@ -460,3 +460,23 @@
   </script>
 </body>
 </html>
+<script>
+fetch("/media/media-channels.json")
+  .then(r => r.json())
+  .then(data => {
+    const feed = document.getElementById("feed");
+    feed.innerHTML = data.channels.map(c => `
+      <div class="card">
+        <div class="meta">${c.category}</div>
+        <h2 class="title">${c.name}</h2>
+        <a class="btnMini primary" href="${c.youtube}" target="_blank" rel="noopener">
+          Open Channel
+        </a>
+      </div>
+    `).join("");
+  })
+  .catch(() => {
+    document.getElementById("feed").innerHTML =
+      "<div class='errorBox'>Media feed unavailable.</div>";
+  });
+</script>
