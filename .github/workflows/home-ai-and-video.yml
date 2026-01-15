@@ -31,7 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Keep local branch aligned with remote to avoid push rejection
       - name: Sync with latest main
         run: |
           git fetch origin main
@@ -55,58 +54,65 @@ jobs:
           SITE_ORIGIN: https://ptdtoday.com
         run: npm run generate:ai
 
-      # 3) Generate Media (YouTube → AI summaries + Media pages)
+      # 3) Generate Media (YouTube → AI summaries + Media pages) — PTD scope only (no politics)
       - name: Generate Media (YouTube → AI summaries)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
 
           # Output sizing
-          MEDIA_MAX_VIDEOS: "24"
+          MEDIA_MAX_VIDEOS: "18"
           MEDIA_MAX_PER_CHANNEL: "2"
-          MEDIA_LOOKBACK_HOURS: "168"   # past week
+          MEDIA_LOOKBACK_HOURS: "168"   # 7D
 
-          # Media channels (URLs or @handles; script must resolve to UC IDs)
+          # Filtering
+          MEDIA_FILTER_MODE: "hybrid"   # keywords + AI for borderline
+          MEDIA_MIN_MATCH_SCORE: "2"    # raise to 3 if you want stricter
+          MEDIA_MAX_FILTER_AI: "40"     # max borderline items sent to AI gate
+          MEDIA_CAPTIONS_LANG: "en"
+
+          # 40 channels (mix: vendors + operators + research + general news)
           MEDIA_CHANNELS: >-
             https://www.youtube.com/@HitachiEnergy,
             https://www.youtube.com/@SiemensEnergy,
             https://www.youtube.com/@SchneiderElectric,
             https://www.youtube.com/@ABB,
             https://www.youtube.com/@GEVernova,
-            https://www.youtube.com/@Eaton,
-            https://www.youtube.com/@EPRI,
-            https://www.youtube.com/@IEEEorg,
-            https://www.youtube.com/@CIGRE,
-            https://www.youtube.com/@ElectricPowerResearch,
+            https://www.youtube.com/@eaton,
+            https://www.youtube.com/@microsoftdatacenters,
+            https://www.youtube.com/@GoogleCloudTech,
             https://www.youtube.com/@IEA,
             https://www.youtube.com/@NREL,
             https://www.youtube.com/@USDepartmentofEnergy,
             https://www.youtube.com/@ENERGYSTAR,
-            https://www.youtube.com/@NationalGridUK,
             https://www.youtube.com/@PJMInterconnection,
             https://www.youtube.com/@ERCOTISO,
+            https://www.youtube.com/@NationalGridUK,
             https://www.youtube.com/@DukeEnergy,
-            https://www.youtube.com/@MicrosoftDatacenters,
-            https://www.youtube.com/@GoogleCloudTech,
-            https://www.youtube.com/@AmazonWebServices,
-            https://www.youtube.com/@Meta,
-            https://www.youtube.com/@NVIDIACorporation,
-            https://www.youtube.com/@Bloomberg,
+            https://www.youtube.com/@EPRI,
+            https://www.youtube.com/@IEEEorg,
+            https://www.youtube.com/@CIGRE,
+            https://www.youtube.com/@ElectricPowerResearch,
+            https://www.youtube.com/@BloombergTV,
             https://www.youtube.com/@CNBC,
-            https://www.youtube.com/@Reuters,
             https://www.youtube.com/@FoxBusiness,
+            https://www.youtube.com/@Reuters,
             https://www.youtube.com/@WSJ,
             https://www.youtube.com/@FinancialTimes,
             https://www.youtube.com/@TheEconomist,
+            https://www.youtube.com/@MarketWatch,
+            https://www.youtube.com/@TheVerge,
             https://www.youtube.com/@TechCrunch,
             https://www.youtube.com/@MITTechnologyReview,
-            https://www.youtube.com/@WIRED,
-            https://www.youtube.com/@TheVerge,
-            https://www.youtube.com/@RealEngineering,
-            https://www.youtube.com/@PracticalEngineeringChannel,
-            https://www.youtube.com/@EngineeringMindset,
-            https://www.youtube.com/@WorldEconomicForum,
-            https://www.youtube.com/@TED
+            https://www.youtube.com/@McKinsey,
+            https://www.youtube.com/@DeloitteUS,
+            https://www.youtube.com/@PwC,
+            https://www.youtube.com/@KPMG,
+            https://www.youtube.com/@NVIDIA,
+            https://www.youtube.com/@Intel,
+            https://www.youtube.com/@Google,
+            https://www.youtube.com/@Microsoft,
+            https://www.youtube.com/@AmazonWebServices
         run: node scripts/generate_media.js
 
       - name: Commit & push if changed
