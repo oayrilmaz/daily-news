@@ -86,7 +86,6 @@
     .panel{
       background:var(--paper);
       border:1px solid var(--rule);
-      border-radius:14a:14px;
       border-radius:14px;
       overflow:hidden;
     }
@@ -194,6 +193,7 @@
       width:100%;
       height:auto;
       display:block;
+      background:#f4f4f4;
     }
     .play{
       position:absolute;
@@ -252,6 +252,7 @@
       align-items:center;
       justify-content:center;
       line-height:1;
+      user-select:none;
     }
     .btnMini.primary{
       background:#111;
@@ -324,9 +325,9 @@
       <div class="headRow">
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="pill" id="countPill">Items: —</span>
-          <span class="pill" id="windowPill">Window: —</span>
+          <span class="pill" id="rangePill">Range: —</span>
         </div>
-        <div class="tiny" id="modeHint">Last 24 hours (fallback to latest)</div>
+        <div class="tiny" id="modeHint">Past 7 days (rolling)</div>
       </div>
 
       <div class="grid" id="grid"></div>
@@ -337,6 +338,7 @@
 
   <script>
     const DATA_URL = "/data/media.json";
+    const DEFAULT_DAYS = 7; // ✅ past week by default
     const $ = (id) => document.getElementById(id);
 
     function fmtUtc(iso){
@@ -368,20 +370,18 @@
       }
     }
 
-    function parseDateMs(value){
-      if (!value) return NaN;
-      const ms = Date.parse(value);
+    function safeDateMs(v){
+      const ms = Date.parse(v || "");
       return Number.isFinite(ms) ? ms : NaN;
     }
 
-    // FIX #2: last 24 hours window (not strict UTC calendar day)
-    function applyLastHours(items, hours){
+    // ✅ Past N days filter (rolling)
+    function applyPastDays(items, days){
       const now = Date.now();
-      const cutoff = now - (hours * 60 * 60 * 1000);
+      const cutoff = now - (days * 24 * 60 * 60 * 1000);
       return (items || []).filter(v => {
-        const ms = parseDateMs(v.published_at || v.published || v.date || "");
-        if (!Number.isFinite(ms)) return false;
-        return ms >= cutoff && ms <= (now + 5 * 60 * 1000); // small future tolerance
+        const ms = safeDateMs(v.published_at || v.published || "");
+        return Number.isFinite(ms) && ms >= cutoff;
       });
     }
 
@@ -418,7 +418,7 @@
             <div>
               <h2>${escapeHtml(title)}</h2>
 
-              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ""}
+              ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : `<p class="summary"><em>AI summary pending for this video.</em></p>`}
 
               ${bullets.length ? `
                 <div class="subhead">Key points</div>
@@ -473,7 +473,7 @@
       });
     }
 
-    function render(payload){
+    function render(payload, query=""){
       const updatedAt = payload.updated_at || "";
       $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
 
@@ -483,47 +483,30 @@
 
       const all = Array.isArray(payload.items) ? payload.items : [];
 
-      // last 24h
-      const last24 = applyLastHours(all, 24);
-      let base = last24;
-      let mode = "Last 24 hours";
+      // ✅ Always show something: last 7 days default (rolling)
+      const recent = applyPastDays(all, DEFAULT_DAYS);
+      $("modeHint").textContent = `Past ${DEFAULT_DAYS} days (rolling)`;
 
-      // fallback if empty
-      if (!base.length) {
-        base = all;
-        mode = "Latest (fallback)";
-      }
+      $("rangePill").textContent = `Range: Past ${DEFAULT_DAYS} days`;
+      $("countPill").textContent = `Items: ${recent.length}`;
 
-      // search
-      const q = $("q") ? $("q").value : "";
-      const filtered = applySearch(base, q);
+      const itemsSearched = applySearch(recent, query);
 
-      $("windowPill").textContent = `Window: ${mode}`;
-      $("countPill").textContent = `Items: ${filtered.length}`;
-      $("modeHint").textContent = (mode === "Last 24 hours") ? "Last 24 hours" : "Latest feed (fallback)";
-
-      $("grid").innerHTML = filtered.length
-        ? filtered.map(cardHtml).join("")
-        : `<div class="errorBox"><strong>No videos matched your search.</strong></div>`;
+      $("grid").innerHTML = itemsSearched.length
+        ? itemsSearched.map(cardHtml).join("")
+        : `<div class="errorBox"><strong>No videos matched your search.</strong><br/>Try a broader keyword.</div>`;
 
       bindShareButtons();
     }
 
     async function load(){
       $("year").textContent = new Date().getFullYear();
-
       try{
         const res = await fetch(DATA_URL, { cache: "no-store" });
         if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
         const payload = await res.json();
-
-        render(payload);
-
-        if ($("q")){
-          $("q").addEventListener("input", ()=>{
-            try { render(payload); } catch(e) {}
-          });
-        }
+        render(payload, $("q").value);
+        $("q").addEventListener("input", ()=>render(payload, $("q").value));
       }catch(err){
         $("updatedLine").textContent = "Could not load Media.";
         $("grid").innerHTML = `
