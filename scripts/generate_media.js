@@ -1,10 +1,9 @@
 // scripts/generate_media.js
-// PTD Today — Media Builder
-// - Accepts MEDIA_CHANNELS as comma-separated channel URLs OR @handles OR UC IDs
-// - Resolves channelId (UC...) automatically
-// - Fetches YouTube RSS for recent videos
-// - Tries captions via timedtext (if available), else uses description
-// - Uses OpenAI to summarize and produces PTD-style article pages per video
+// PTD Today — Media Builder (Scope-filtered)
+// - Accepts a large list of YouTube channel URLs / @handles / UC IDs
+// - Pulls recent videos via YouTube RSS
+// - Filters OUT politics and keeps ONLY PTD Today scope (grid, substations, data centers power, renewables, minerals, etc.)
+// - Optionally uses OpenAI to classify borderline items before summarizing
 // Output:
 //   - data/media.json
 //   - media/<videoId>.html
@@ -25,51 +24,53 @@ function optEnv(name, fallback = "") {
 const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = optEnv("GA_ID", ""); // optional
 
-const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "12")); // total to publish
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "4"));
+// Lookback control (hours)
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "168")); // default 7D
 
-// Prefer hours (your workflow uses MEDIA_LOOKBACK_HOURS)
-const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "168")); // 7 days default
-// Back-compat: if MEDIA_DAYS is set, it can override (optional)
-const DAYS = Number(optEnv("MEDIA_DAYS", "0"));
-const LOOKBACK_MS =
-  (DAYS > 0 ? DAYS * 24 : LOOKBACK_HOURS) * 3600 * 1000;
+// Output sizing
+const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "18")); // total publish
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "2")); // per channel
 
-// ---- Default 20 sources (edit anytime) ----
-// You can override via env: MEDIA_CHANNELS="https://www.youtube.com/@...,https://www.youtube.com/@..., ..."
-const DEFAULT_MEDIA_CHANNELS = [
+// Filtering controls
+// hybrid = keyword score + optional AI for borderline
+// keywords = keyword score only (fast, cheapest)
+// ai = always classify with AI (strictest, most expensive)
+const FILTER_MODE = (optEnv("MEDIA_FILTER_MODE", "hybrid") || "hybrid").toLowerCase();
+
+// Minimum match score to include (keyword scoring)
+// 2 is a good default; 3 is stricter.
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "2"));
+
+// How many borderline items we allow AI to classify per run (cost control)
+const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "40"));
+
+// Caption attempt
+const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
+
+// Channels input
+// Provide comma-separated list of:
+// - https://www.youtube.com/@handle
+// - https://www.youtube.com/channel/UCxxxx
+// - UCxxxx
+// - @handle
+const MEDIA_CHANNELS_RAW = optEnv("MEDIA_CHANNELS", "").trim();
+
+// If nothing provided, fall back to a tiny default (you should override in workflow)
+const DEFAULT_CHANNELS = [
   "https://www.youtube.com/@HitachiEnergy",
   "https://www.youtube.com/@SiemensEnergy",
   "https://www.youtube.com/@SchneiderElectric",
-  "https://www.youtube.com/@ABB",
-
-  "https://www.youtube.com/@GEVernova",
-  "https://www.youtube.com/@eaton",
-  "https://www.youtube.com/@microsoftdatacenters",
-  "https://www.youtube.com/@GoogleCloudTech",
-
-  "https://www.youtube.com/@IEA",
-  "https://www.youtube.com/@NREL",
-  "https://www.youtube.com/@ENERGYSTAR",
-  "https://www.youtube.com/@USDepartmentofEnergy",
-
-  "https://www.youtube.com/@PJMInterconnection",
-  "https://www.youtube.com/@ERCOTISO",
-  "https://www.youtube.com/@NationalGridUK",
-  "https://www.youtube.com/@DukeEnergy",
-
-  "https://www.youtube.com/@EPRI",
-  "https://www.youtube.com/@IEEEorg",
-  "https://www.youtube.com/@CIGRE",
-  "https://www.youtube.com/@ElectricPowerResearch"
+  "https://www.youtube.com/@ABB"
 ];
 
-// MEDIA_CHANNELS can be: @handle, full channel URL, /user/... URL, or UC... channelId
-const MEDIA_CHANNELS = (optEnv("MEDIA_CHANNELS", "")
-  .split(",").map(s => s.trim()).filter(Boolean)
+const CHANNEL_INPUTS = (MEDIA_CHANNELS_RAW
+  ? MEDIA_CHANNELS_RAW.split(",").map(s => s.trim()).filter(Boolean)
+  : DEFAULT_CHANNELS
 );
-const CHANNEL_SOURCES = MEDIA_CHANNELS.length ? MEDIA_CHANNELS : DEFAULT_MEDIA_CHANNELS;
 
+// -----------------------------
+// Helpers
+// -----------------------------
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
 function writeFile(filePath, content) { ensureDir(path.dirname(filePath)); fs.writeFileSync(filePath, content, "utf8"); }
 function writeJson(filePath, obj) { writeFile(filePath, JSON.stringify(obj, null, 2)); }
@@ -86,61 +87,140 @@ const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
 async function fetchText(url, headers = {}, retries = 3) {
   const h = {
     "user-agent": "PTD-Bot/1.0 (+https://ptdtoday.com)",
-    "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "accept": "application/atom+xml, application/rss+xml, application/xml, text/xml, text/plain, */*;q=0.5",
     ...headers
   };
   for (let i=0;i<retries;i++){
     try{
-      const r = await fetch(url, { headers: h, redirect: "follow" });
+      const r = await fetch(url, { headers: h });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.text();
     }catch(e){
       if(i===retries-1) throw e;
-      await sleep(500*(i+1));
+      await sleep(400*(i+1));
     }
   }
 }
 
-function normalizeChannelSource(s){
-  const v = (s || "").trim();
-  if (!v) return "";
-  if (v.startsWith("UC") && v.length > 10) return v; // channelId
-  if (v.startsWith("@")) return `https://www.youtube.com/${v}`;
-  if (v.startsWith("http://") || v.startsWith("https://")) return v;
-  // allow bare handle without '@'
-  if (/^[A-Za-z0-9._-]+$/.test(v)) return `https://www.youtube.com/@${v}`;
-  return v;
+function normalize(s){
+  return (s || "").toString().toLowerCase();
 }
 
-async function resolveChannelId(source){
-  const s = normalizeChannelSource(source);
+// -----------------------------
+// Scope filtering (NO politics, PTD scope only)
+// -----------------------------
+const HARD_BLOCK_TERMS = [
+  // Politics / elections / geopolitics (hard no)
+  "election", "elections", "vote", "voting", "campaign", "primary", "debate",
+  "president", "white house", "congress", "senate", "house of representatives",
+  "supreme court", "scotus", "governor", "mayor", "parliament", "prime minister",
+  "minister", "bill", "legislation", "hearing", "impeachment",
+  "ukraine", "russia", "gaza", "israel", "hamas", "iran", "china taiwan",
+  "border", "immigration", "refugee",
+  // Sports / celebrity (hard no)
+  "stanley cup", "nba", "nfl", "mlb", "nhl", "fifa", "world cup",
+  "celebrity", "actor", "actress", "music video", "trailer"
+];
 
-  if (s.startsWith("UC") && s.length > 10) return s;
+const PTD_SCOPE_TERMS = [
+  // Power grid / transmission / substations
+  "grid", "power grid", "electric grid", "transmission", "t&d", "substation",
+  "switchgear", "gis", "ais", "transformer", "power transformer", "reactor",
+  "series capacitor", "fsc", "statcom", "svc", "hvdc", "converter station",
+  "protection", "relay", "governor response", "inertia", "synthetic inertia",
+  "fault", "short circuit", "sc study", "load flow", "stability",
+  // Utilities / markets / operators
+  "utility", "utilities", "iso", "rto", "pJM", "ercot", "caiso", "nyiso", "isone",
+  "interconnection", "queue", "capacity market", "reliability", "reserve margin",
+  "n-1", "outage", "blackstart",
+  // Data centers / AI power
+  "data center", "datacenter", "ai power", "ai demand", "gpu", "server farm",
+  "behind the meter", "microgrid", "onsite generation",
+  // Renewables / storage
+  "renewables", "wind", "solar", "inverter", "grid-forming", "gfm",
+  "bess", "battery storage", "storage", "hydrogen", "electrolyzer",
+  // Generation mix relevant to grids
+  "nuclear", "smr", "gas turbine", "combined cycle", "peaking plant",
+  "lng", "pipeline", "gas supply", "generation", "power plant",
+  // Critical minerals / supply chain
+  "critical minerals", "rare earth", "lithium", "copper", "nickel", "graphite",
+  "uranium", "mining", "refining"
+];
 
-  // Fetch channel page HTML and extract "channelId":"UC..."
+// Some general “business news” words can appear in scope videos; don’t block them.
+// Instead we rely on scope scoring + hard politics block.
+function hasHardBlock(text){
+  const t = normalize(text);
+  return HARD_BLOCK_TERMS.some(w => t.includes(w));
+}
+
+function scoreScope(text){
+  const t = normalize(text);
+  let score = 0;
+  for (const w of PTD_SCOPE_TERMS){
+    if (t.includes(w)) score += 1;
+  }
+  return score;
+}
+
+// -----------------------------
+// YouTube channel resolving (URL/@handle -> UC id)
+// -----------------------------
+function extractUCFromUrl(u){
+  const s = (u || "").trim();
+  const m = s.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
+  return m ? m[1] : "";
+}
+function extractHandle(u){
+  const s = (u || "").trim();
+  // accepts @handle or .../ @handle
+  if (s.startsWith("@")) return s;
+  const m = s.match(/youtube\.com\/@([a-zA-Z0-9._-]+)/i);
+  return m ? `@${m[1]}` : "";
+}
+
+async function resolveChannelToUC(input){
+  const raw = (input || "").trim();
+  if (!raw) return "";
+
+  // direct UC id
+  if (/^UC[a-zA-Z0-9_-]{10,}$/.test(raw)) return raw;
+
+  // /channel/UC...
+  const uc = extractUCFromUrl(raw);
+  if (uc) return uc;
+
+  // @handle
+  const handle = extractHandle(raw);
+  if (!handle) return "";
+
+  // Resolve handle -> channel page HTML -> canonical channelId
+  // This is best-effort and can fail for some handles.
+  const url = `https://www.youtube.com/${handle}`;
   try{
-    const html = await fetchText(s, { "accept-language": "en-US,en;q=0.8" }, 3);
+    const html = await fetchText(url, { "accept-language":"en-US,en;q=0.8" }, 2);
 
-    // Common patterns:
-    // "channelId":"UC...."
-    let m = html.match(/"channelId"\s*:\s*"([^"]+)"/i);
-    if (m && m[1]) return m[1];
+    // Common patterns include:
+    // "channelId":"UCxxxx"
+    // or externalId="UCxxxx"
+    const m1 = html.match(/"channelId"\s*:\s*"(UC[^"]+)"/);
+    if (m1 && m1[1]) return m1[1];
 
-    // Sometimes: externalId:"UC...."
-    m = html.match(/"externalId"\s*:\s*"([^"]+)"/i);
-    if (m && m[1]) return m[1];
+    const m2 = html.match(/externalId\s*=\s*"(UC[^"]+)"/);
+    if (m2 && m2[1]) return m2[1];
 
-    // Or: https://www.youtube.com/channel/UC...
-    m = html.match(/\/channel\/(UC[a-zA-Z0-9_-]{10,})/);
-    if (m && m[1]) return m[1];
+    const m3 = html.match(/"externalId"\s*:\s*"(UC[^"]+)"/);
+    if (m3 && m3[1]) return m3[1];
 
     return "";
-  }catch(e){
-    console.warn("Channel resolve failed:", source, e.message);
+  }catch{
     return "";
   }
 }
 
+// -----------------------------
+// YouTube RSS parse
+// -----------------------------
 function parseYouTubeRSS(xml) {
   const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
   return entries.map(e => {
@@ -148,21 +228,16 @@ function parseYouTubeRSS(xml) {
     const id    = (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i)||[])[1]||"";
     const pub   = (e.match(/<published>([\s\S]*?)<\/published>/i)||[])[1]||"";
     const ch    = clean((e.match(/<name>([\s\S]*?)<\/name>/i)||[])[1]||"YouTube");
-
     const desc  = clean(
       (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i)||[])[1] ||
       (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i)||[])[1] || ""
     );
-
-    const published_at = pub ? new Date(pub).toISOString() : new Date().toISOString();
-
     return {
       id,
       title,
       channel: ch,
-      published_at,
+      published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
       url: id ? `https://www.youtube.com/watch?v=${id}` : "",
-      // Always YouTube CDN thumb
       thumbnail: id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : "",
       description: desc
     };
@@ -170,8 +245,7 @@ function parseYouTubeRSS(xml) {
 }
 
 async function fetchCaptions(videoId) {
-  // Captions endpoint (works if captions are public/available)
-  const url = `https://www.youtube.com/api/timedtext?lang=en&v=${encodeURIComponent(videoId)}`;
+  const url = `https://www.youtube.com/api/timedtext?lang=${encodeURIComponent(CAPTIONS_LANG)}&v=${encodeURIComponent(videoId)}`;
   try{
     const xml = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
     if (!xml || !xml.includes("<text")) return "";
@@ -212,7 +286,8 @@ function renderMediaArticleHtml(item) {
   const tags = Array.isArray(ai.tags) ? ai.tags : [];
 
   const canonical = `${SITE_ORIGIN}/media/${encodeURIComponent(id)}.html`;
-  const description = (summary || `PTD Today AI summary of a video from ${channel}.`).replace(/\s+/g," ").slice(0, 180);
+  const description = (summary || `PTD Today AI summary of a video from ${channel}.`)
+    .replace(/\s+/g," ").slice(0, 180);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -357,6 +432,58 @@ function renderMediaArticleHtml(item) {
 </html>`;
 }
 
+async function aiClassify(openai, v){
+  // Strict: include ONLY if it clearly fits PTD scope. Politics should be rejected.
+  const system = `
+You are a strict content gate for PTD Today Media.
+
+Accept ONLY if the video is primarily about:
+- power grid / transmission / substations / equipment (transformers, switchgear, HVDC, STATCOM, protection)
+- utilities / ISO-RTO operations / reliability / planning / interconnection
+- data center power / AI power demand / microgrids
+- renewables + storage (grid integration)
+- nuclear or gas/LNG ONLY when tied to power supply/infrastructure
+- critical minerals tied to energy infrastructure supply chains
+
+Reject if it is primarily:
+- politics, elections, geopolitics, government drama, political personalities
+- general business news not tied to energy infrastructure
+- sports, celebrity, entertainment
+
+Return JSON only: {"include": true|false, "reason": "short"}
+`.trim();
+
+  const user = `
+Title: ${v.title}
+Channel: ${v.channel}
+Published: ${v.published_at}
+
+Description:
+${(v.description || "").slice(0, 1800)}
+
+Transcript (may be missing):
+${(v.transcript || "").slice(0, 1800)}
+`.trim();
+
+  const resp = await openai.responses.create({
+    model: optEnv("OPENAI_FILTER_MODEL", optEnv("OPENAI_MODEL", "gpt-5-mini")),
+    input: [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ],
+    text: { format: { type: "json_object" } }
+  });
+
+  const text = resp.output_text || "";
+  try{
+    const obj = JSON.parse(text);
+    return { include: !!obj.include, reason: String(obj.reason || "") };
+  }catch{
+    // Fail closed (safer)
+    return { include: false, reason: "Classifier parse failed" };
+  }
+}
+
 async function summarizeVideo(openai, v) {
   const transcript = v.transcript || "";
   const desc = v.description || "";
@@ -367,8 +494,8 @@ You are PTD Today’s Media summarizer.
 Rules:
 - Summarize ONLY what is present in the provided transcript/description.
 - If transcript is missing or thin, be explicit: "Based on the available description…"
-- Keep it useful for power transmission, substations, data centers power, renewables, critical minerals, and AI infrastructure.
-- No publisher praise, no speculation beyond the text.
+- Keep it useful for grid/substations, data center power, renewables/storage, critical minerals.
+- Avoid politics. If the video is political, say so and keep it minimal.
 Return VALID JSON only.
 `.trim();
 
@@ -409,63 +536,108 @@ Return JSON with EXACT keys:
 
   return {
     summary: (obj.summary || "").toString().slice(0, 600),
-    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(String).slice(0, 5) : [],
-    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(String).slice(0, 6) : [],
-    tags: Array.isArray(obj.tags) ? obj.tags.map(String).slice(0, 12) : []
+    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(x=>String(x)).slice(0, 5) : [],
+    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(x=>String(x)).slice(0, 6) : [],
+    tags: Array.isArray(obj.tags) ? obj.tags.map(x=>String(x)).slice(0, 12) : []
   };
+}
+
+function shouldIncludeByKeywords(v){
+  const text = `${v.title}\n${v.channel}\n${v.description}`;
+  if (hasHardBlock(text)) return { include:false, reason:"hard-block" };
+  const score = scoreScope(text);
+  return { include: score >= MIN_MATCH_SCORE, score, reason:`score=${score}` };
 }
 
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const openai = new OpenAI({ apiKey });
 
-  const cutoffMs = Date.now() - LOOKBACK_MS;
-  const all = [];
+  const cutoffMs = Date.now() - LOOKBACK_HOURS * 3600 * 1000;
 
-  // 0) Resolve channel IDs
-  const channelIds = [];
-  for (const src of CHANNEL_SOURCES) {
-    const cid = await resolveChannelId(src);
-    if (cid) channelIds.push(cid);
+  // 1) Resolve channels to UC ids
+  const channelUcs = [];
+  for (const input of CHANNEL_INPUTS){
+    const uc = await resolveChannelToUC(input);
+    if (uc) channelUcs.push(uc);
     await sleep(120);
   }
-
-  if (!channelIds.length) {
-    throw new Error("No channelIds resolved. Check MEDIA_CHANNELS values.");
+  const uniqueUcs = [...new Set(channelUcs)];
+  if (!uniqueUcs.length){
+    throw new Error("No valid YouTube channel IDs resolved from MEDIA_CHANNELS.");
   }
 
-  // 1) Fetch RSS from channels
-  for (const chId of channelIds) {
-    const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(chId)}`;
+  // 2) Fetch RSS per channel
+  const all = [];
+  for (const uc of uniqueUcs) {
+    const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(uc)}`;
     try{
       const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
       const vids = parseYouTubeRSS(xml)
         .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
         .slice(0, MAX_PER_CH);
-
       all.push(...vids);
-      await sleep(140);
+      await sleep(120);
     }catch(e){
-      console.warn("YT feed failed:", chId, e.message);
+      console.warn("YT feed failed:", uc, e.message);
     }
   }
 
-  // 2) Dedupe + sort
+  // 3) Dedupe + sort newest first
   const seen = new Set();
   let videos = all.filter(v => (v.id && !seen.has(v.id) && seen.add(v.id)));
   videos.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
-  videos = videos.slice(0, MAX_VIDEOS);
 
-  // 3) Captions + AI summaries
-  for (const v of videos) {
-    v.transcript = await fetchCaptions(v.id);
-    if (!v.transcript) v.transcript = "";
-    v.ai = await summarizeVideo(openai, v);
-    await sleep(180);
+  // 4) First-pass filtering
+  let included = [];
+  let borderline = [];
+
+  for (const v of videos){
+    const k = shouldIncludeByKeywords(v);
+
+    if (FILTER_MODE === "ai"){
+      borderline.push({ v, k });
+      continue;
+    }
+
+    if (k.include){
+      included.push(v);
+    } else {
+      // Borderline only if not hard-block AND has at least 1 scope hit
+      const text = `${v.title}\n${v.channel}\n${v.description}`;
+      const score = scoreScope(text);
+      if (!hasHardBlock(text) && score > 0) borderline.push({ v, k: { ...k, score } });
+    }
   }
 
-  // 4) Write media pages
-  const outItems = videos.map(v => ({
+  // 5) Optional AI classification for borderline
+  if (FILTER_MODE === "hybrid" || FILTER_MODE === "ai"){
+    const toCheck = borderline.slice(0, MAX_FILTER_AI);
+
+    for (const { v } of toCheck){
+      // grab transcript to help classification
+      v.transcript = await fetchCaptions(v.id);
+      const verdict = await aiClassify(openai, v);
+      if (verdict.include){
+        included.push(v);
+      }
+      await sleep(150);
+    }
+  }
+
+  // 6) Final sort + cap
+  included.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
+  included = included.slice(0, MAX_VIDEOS);
+
+  // 7) Summaries + pages
+  for (const v of included) {
+    // Captions for better summary (if not already pulled)
+    if (typeof v.transcript !== "string") v.transcript = await fetchCaptions(v.id);
+    v.ai = await summarizeVideo(openai, v);
+    await sleep(150);
+  }
+
+  const outItems = included.map(v => ({
     id: v.id,
     title: v.title,
     channel: v.channel,
