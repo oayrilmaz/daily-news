@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <title>PTD Today — Media</title>
-  <meta name="description" content="PTD Today Media — curated videos with AI summaries for power transmission, substations, data centers, renewables, and critical minerals." />
+  <meta name="description" content="PTD Today Media — curated channels with short AI summaries for power transmission, substations, data centers, renewables, and critical minerals." />
   <link rel="canonical" href="https://ptdtoday.com/media.html" />
 
   <!-- Open Graph (Media) -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="PTD Today — Media" />
-  <meta property="og:description" content="Curated YouTube videos with AI summaries + PTD-style writeups." />
+  <meta property="og:description" content="Curated media channels with AI summaries + PTD-style writeups." />
   <meta property="og:url" content="https://ptdtoday.com/media.html" />
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png" />
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="PTD Today — Media" />
-  <meta name="twitter:description" content="Curated YouTube videos with AI summaries + PTD-style writeups." />
+  <meta name="twitter:description" content="Curated media channels with AI summaries + PTD-style writeups." />
   <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png" />
 
   <style>
@@ -164,13 +164,15 @@
       border:1px solid var(--rule);
       background:#f4f4f4;
       position:relative;
+      text-decoration:none;
+      display:block;
     }
     .thumb img{
       width:100%;
       height:auto;
       display:block;
     }
-    .play{
+    .badge{
       position:absolute;
       right:10px;
       bottom:10px;
@@ -195,15 +197,17 @@
       color:rgba(0,0,0,.86);
     }
 
-    .subhead{
-      margin:12px 0 6px;
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:rgba(0,0,0,.02);
       font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.12px;
-      color:var(--muted);
+      color:rgba(0,0,0,.76);
     }
-    ul{margin:0 0 10px;padding-left:18px}
-    li{margin:6px 0;line-height:1.35}
 
     .cta{
       display:flex;
@@ -232,18 +236,6 @@
       background:#111;
       color:#fff;
       border-color:#111;
-    }
-
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      padding:6px 10px;
-      border-radius:999px;
-      border:1px solid var(--rule);
-      background:rgba(0,0,0,.02);
-      font-size:12px;
-      color:rgba(0,0,0,.76);
     }
 
     .errorBox{
@@ -284,16 +276,16 @@
     <h1 class="pageTitle">Media</h1>
     <div class="updated" id="updatedLine">Loading…</div>
 
-    <section class="panel" aria-label="Media videos">
+    <section class="panel" aria-label="Media channels">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
         <div class="search">
-          <input id="q" type="search" placeholder="Search videos, channels, topics…" autocomplete="off" />
+          <input id="q" type="search" placeholder="Search channels, topics, tags…" autocomplete="off" />
         </div>
       </div>
 
       <div class="notice" id="disclaimerLine">
-        Informational only — AI-generated summaries; may contain errors. Verify with the original video.
+        Informational only — AI-generated summaries; may contain errors. Verify with the original source.
       </div>
 
       <div class="grid" id="grid"></div>
@@ -303,6 +295,12 @@
   </div>
 
   <script>
+    // IMPORTANT:
+    // This page shows "channels" but it still reads the same data file:
+    // /data/media.json
+    // Each item should look like:
+    // { id, title, channel, url, thumbnail, published_at, ai: { summary, tags } }
+
     const DATA_URL = "/data/media.json";
     const $ = (id) => document.getElementById(id);
 
@@ -317,7 +315,7 @@
         .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
     }
 
-    function mediaArticleUrl(id){
+    function ptdSummaryUrl(id){
       return `${window.location.origin}/media/${encodeURIComponent(id)}.html`;
     }
 
@@ -338,41 +336,35 @@
     function cardHtml(v){
       const id = (v.id || "").toString().trim();
       const title = (v.title || "Untitled").toString();
-      const channel = (v.channel || v.publisher || "YouTube").toString();
+      const group = (v.channel || v.category || v.publisher || "Media").toString();
       const published = v.published_at || v.published || "";
       const url = (v.url || "").toString();
       const thumb = (v.thumbnail || v.image || "").toString();
 
-      const summary = (v.ai && v.ai.summary) ? v.ai.summary : "";
-      const bullets = (v.ai && Array.isArray(v.ai.bullets)) ? v.ai.bullets : [];
+      const summary = (v.ai && v.ai.summary) ? String(v.ai.summary) : "";
       const tags = (v.ai && Array.isArray(v.ai.tags)) ? v.ai.tags : [];
 
       const meta = [
-        "VIDEO",
-        channel,
+        "CHANNEL",
+        group,
         published ? fmtUtc(published) : ""
       ].filter(Boolean).join(" • ");
 
-      const shareUrl = mediaArticleUrl(id);
+      const summaryPage = id ? ptdSummaryUrl(id) : "";
 
       return `
         <article class="card">
           <div class="meta">${escapeHtml(meta)}</div>
           <div class="row">
-            <a class="thumb" href="${escapeHtml(url)}" target="_blank" rel="noopener" aria-label="Open on YouTube">
+            <a class="thumb" href="${escapeHtml(url || summaryPage || '#')}" target="_blank" rel="noopener" aria-label="Open channel">
               ${thumb ? `<img loading="lazy" src="${escapeHtml(thumb)}" alt="">` : ""}
-              <span class="play">▶ Watch</span>
+              <span class="badge">Open</span>
             </a>
 
             <div>
               <h2>${escapeHtml(title)}</h2>
 
               ${summary ? `<p class="summary">${escapeHtml(summary)}</p>` : ""}
-
-              ${bullets.length ? `
-                <div class="subhead">Key points</div>
-                <ul>${bullets.slice(0,5).map(b=>`<li>${escapeHtml(b)}</li>`).join("")}</ul>
-              ` : ""}
 
               ${tags.length ? `
                 <div class="chips">
@@ -381,9 +373,12 @@
               ` : ""}
 
               <div class="cta">
-                <a class="btnMini primary" href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener">Open PTD Summary</a>
-                <a class="btnMini" href="${escapeHtml(url)}" target="_blank" rel="noopener">YouTube</a>
-                <button class="btnMini" type="button" data-share="${escapeHtml(shareUrl)}" data-title="${escapeHtml(title)}" data-text="${escapeHtml(summary ? summary.slice(0,220) : '')}">
+                ${summaryPage ? `<a class="btnMini primary" href="${escapeHtml(summaryPage)}" target="_blank" rel="noopener">Open PTD Summary</a>` : ""}
+                ${url ? `<a class="btnMini" href="${escapeHtml(url)}" target="_blank" rel="noopener">Open Channel</a>` : ""}
+                <button class="btnMini" type="button"
+                  data-share="${escapeHtml(summaryPage || url || location.href)}"
+                  data-title="${escapeHtml(title)}"
+                  data-text="${escapeHtml(summary ? summary.slice(0,220) : '')}">
                   Share
                 </button>
               </div>
@@ -398,9 +393,8 @@
       if(!q) return items;
       return items.filter(v=>{
         const hay = [
-          v.title, v.channel, v.publisher,
+          v.title, v.channel, v.category, v.publisher,
           v.ai?.summary,
-          ...(Array.isArray(v.ai?.bullets) ? v.ai.bullets : []),
           ...(Array.isArray(v.ai?.tags) ? v.ai.tags : [])
         ].map(normalize).join(" ");
         return hay.includes(q);
@@ -424,14 +418,14 @@
 
       $("disclaimerLine").textContent =
         payload.disclaimer ||
-        "Informational only — AI-generated summaries; may contain errors. Verify with the original video.";
+        "Informational only — AI-generated summaries; may contain errors. Verify with the original source.";
 
       const all = Array.isArray(payload.items) ? payload.items : [];
       const items = applySearch(all, query);
 
       $("grid").innerHTML = items.length
         ? items.map(cardHtml).join("")
-        : `<div class="errorBox"><strong>No videos matched your search.</strong></div>`;
+        : `<div class="errorBox"><strong>No channels matched your search.</strong></div>`;
 
       bindShareButtons();
     }
@@ -460,23 +454,3 @@
   </script>
 </body>
 </html>
-<script>
-fetch("/media/media-channels.json")
-  .then(r => r.json())
-  .then(data => {
-    const feed = document.getElementById("feed");
-    feed.innerHTML = data.channels.map(c => `
-      <div class="card">
-        <div class="meta">${c.category}</div>
-        <h2 class="title">${c.name}</h2>
-        <a class="btnMini primary" href="${c.youtube}" target="_blank" rel="noopener">
-          Open Channel
-        </a>
-      </div>
-    `).join("");
-  })
-  .catch(() => {
-    document.getElementById("feed").innerHTML =
-      "<div class='errorBox'>Media feed unavailable.</div>";
-  });
-</script>
