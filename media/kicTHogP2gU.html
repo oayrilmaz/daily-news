@@ -4,22 +4,22 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Boosting AI Performance: Networking for AI Inference — PTD Today</title>
-  <meta name="description" content="Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique infere" />
+  <meta name="description" content="Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gat" />
   <link rel="canonical" href="https://ptdtoday.com/media/kicTHogP2gU.html" />
 
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="PTD Today" />
   <meta property="og:title" content="Boosting AI Performance: Networking for AI Inference" />
-  <meta property="og:description" content="Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique infere" />
+  <meta property="og:description" content="Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gat" />
   <meta property="og:url" content="https://ptdtoday.com/media/kicTHogP2gU.html" />
   <meta property="og:image" content="https://i.ytimg.com/vi/kicTHogP2gU/hqdefault.jpg" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Boosting AI Performance: Networking for AI Inference" />
-  <meta name="twitter:description" content="Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique infere" />
+  <meta name="twitter:description" content="Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gat" />
   <meta name="twitter:image" content="https://i.ytimg.com/vi/kicTHogP2gU/hqdefault.jpg" />
 
-  <script type="application/ld+json">{&quot;@context&quot;:&quot;https://schema.org&quot;,&quot;@type&quot;:&quot;Article&quot;,&quot;headline&quot;:&quot;Boosting AI Performance: Networking for AI Inference&quot;,&quot;description&quot;:&quot;Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique infere&quot;,&quot;datePublished&quot;:&quot;2026-01-14T19:29:22.000Z&quot;,&quot;dateModified&quot;:&quot;2026-01-17T02:27:28.540Z&quot;,&quot;mainEntityOfPage&quot;:&quot;https://ptdtoday.com/media/kicTHogP2gU.html&quot;,&quot;publisher&quot;:{&quot;@type&quot;:&quot;Organization&quot;,&quot;name&quot;:&quot;PTD Today&quot;}}</script>
+  <script type="application/ld+json">{&quot;@context&quot;:&quot;https://schema.org&quot;,&quot;@type&quot;:&quot;Article&quot;,&quot;headline&quot;:&quot;Boosting AI Performance: Networking for AI Inference&quot;,&quot;description&quot;:&quot;Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gat&quot;,&quot;datePublished&quot;:&quot;2026-01-14T19:29:22.000Z&quot;,&quot;dateModified&quot;:&quot;2026-01-17T04:09:35.854Z&quot;,&quot;mainEntityOfPage&quot;:&quot;https://ptdtoday.com/media/kicTHogP2gU.html&quot;,&quot;publisher&quot;:{&quot;@type&quot;:&quot;Organization&quot;,&quot;name&quot;:&quot;PTD Today&quot;}}</script>
   
 
   <style>
@@ -72,7 +72,7 @@
 
     <div class="meta">VIDEO • Google Cloud • 2026-01-14T19:29:22.000Z</div>
     <h1>Boosting AI Performance: Networking for AI Inference</h1>
-    <p class="lede">Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique inference challenges by routing traffic with metrics that reflect GPU saturation, reducing latency and cold starts. The approach also inserts service extensions/guardrails at the network edge to sanitize requests, improve GPU utilization, and simplify governance for AI workloads.</p>
+    <p class="lede">Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gateway and AI-aware load balancing—leveraging metrics like KV cache utilization, prefix caching, and service extensions—to reduce latency, improve GPU utilization, and insert security guardrails at the network edge.</p>
 
     <div class="card">
       <div class="thumb">
@@ -86,17 +86,17 @@
 
         
           <div class="subhead">Key points</div>
-          <ul><li>Traditional network metrics (CPU-based) can miss GPU or TPU saturation, causing blind load balancing and congested replicas.</li><li>GKE Inference Gateway and AI-aware load balancers use inference-specific signals (KV cache utilization, queue depth) to identify least-loaded replicas.</li><li>Prefix caching and shadow cache copies let the gateway reuse prefill work, lowering GPU computation for similar prompts.</li><li>Body-based routing and LoRA-adapter awareness enable routing by model/context and support multiple model APIs without complex topology changes.</li><li>Service Extensions place API management and AI guardrails at the network layer to block or sanitize invalid requests before they consume GPU cycles.</li></ul>
+          <ul><li>Traditional networking and round-robin load balancing miss AI-specific signals (GPU/TPU saturation), causing inefficient routing and latency.</li><li>GKE Inference Gateway and Cloud Load Balancing use inference-specific metrics (e.g., KV cache utilization, queue depth) to identify least-loaded replicas.</li><li>Prefix caching and shadow copies let the gateway reuse prefill computations to reduce GPU work and cold starts.</li><li>Body-based routing and LoRA adapter awareness enable routing by model/context, simplifying multi-model deployments.</li><li>Service Extensions allow API management and AI guardrails in-network to sanitize prompts/responses and block invalid requests before they consume GPU time.</li></ul>
         
 
         
           <div class="subhead">So what</div>
-          <ul><li>Expose and act on GPU-specific metrics (KV cache, queue depth) to avoid blind traffic distribution and reduce inefficient GPU spikes that drive power and cooling costs.</li><li>Edge guardrails that drop invalid or policy-violating prompts before model execution can cut wasted GPU compute and reduce energy and cost per inference.</li><li>Cache-aware routing and reuse of prefill work lower average GPU workload and smooth peak demand—supporting smaller capacity buffers and better power provisioning.</li><li>Adopting inference-aware networking (GKE Inference Gateway + Cloud Load Balancing) may require network and orchestration changes but can materially improve TCO and operational stability for AI-heavy data centers.</li></ul>
+          <ul><li>Better GPU saturation from AI-aware networking reduces wasted compute cycles—directly impacting data center power draw and cost per inference.</li><li>Routing that minimizes cold starts and latency improves service performance, which can affect SLA-driven capacity planning and peak provisioning.</li><li>Network-level guardrails stop invalid or out-of-policy requests before they hit models, saving GPU cycles, reducing power consumption, and simplifying security operations.</li><li>Capacity planning must include AI-specific telemetry (cache utilization, queue depth) rather than traditional CPU metrics to avoid under- or over-provisioning compute and power.</li><li>Unified networking and inference APIs can streamline operations and reduce operational overhead for managing multi-model deployments in data centers.</li></ul>
         
 
         
           <div class="chips">
-            <span class="chip">AI-inference</span><span class="chip">GPU-utilization</span><span class="chip">load-balancing</span><span class="chip">GKE</span><span class="chip">data-center-efficiency</span><span class="chip">networking</span><span class="chip">edge-security</span><span class="chip">power-optimization</span>
+            <span class="chip">google-cloud</span><span class="chip">ai-inference</span><span class="chip">gke</span><span class="chip">load-balancing</span><span class="chip">gpu-utilization</span><span class="chip">data-center</span><span class="chip">networking</span><span class="chip">guardrails</span><span class="chip">latency</span><span class="chip">tco</span>
           </div>
         
       </div>
@@ -109,7 +109,7 @@
     (function(){
       var url = "https://ptdtoday.com/media/kicTHogP2gU.html";
       var title = "Boosting AI Performance: Networking for AI Inference";
-      var text = "Based on the available description, Victor Moreno (Google Cloud) explains how AI-aware networking—using GKE Inference Gateway and AI-specific load balancing—addresses unique infere";
+      var text = "Based on the available description, Victor Moreno from Google Cloud explains how networking must become AI-aware to support inference workloads. He outlines using GKE Inference Gat";
       var btn = document.getElementById("shareBtn");
       if(!btn) return;
       btn.addEventListener("click", async function(){
