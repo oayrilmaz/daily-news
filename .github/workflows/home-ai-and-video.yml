@@ -17,17 +17,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # --------------------------------------------------
-      # 0) Checkout
-      # --------------------------------------------------
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # --------------------------------------------------
-      # 1) Node setup
-      # --------------------------------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -37,18 +31,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # --------------------------------------------------
-      # 2) Sync with main
-      # --------------------------------------------------
       - name: Sync with latest main
         run: |
           git fetch origin main
           git checkout main
           git reset --hard origin/main
 
-      # --------------------------------------------------
-      # 3) Build Home feeds + short share pages
-      # --------------------------------------------------
+      # 1) Build Home feeds + YouTube + /s/ share pages
       - name: Build Home feed + YouTube + short share pages
         env:
           RECENT_HOURS: "60"
@@ -58,42 +47,35 @@ jobs:
           MAX_ENRICH: "50"
         run: node scripts/build.mjs
 
-      # --------------------------------------------------
-      # 4) Generate Daily AI Brief + articles
-      # --------------------------------------------------
+      # 2) Generate Daily AI Brief JSON + /articles/ pages
       - name: Generate Daily AI JSON + Article Pages
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
         run: npm run generate:ai
 
-      # --------------------------------------------------
-      # 5) Generate Media (YouTube → AI summaries)
-      #    ✔ PTD scope only
-      #    ✔ No politics
-      #    ✔ General news allowed if relevant
-      # --------------------------------------------------
+      # 3) Generate Media (YouTube → AI summaries + Media pages) — PTD scope only (no politics)
       - name: Generate Media (YouTube → AI summaries)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
 
-          # -------- Output sizing --------
+          # Output sizing
           MEDIA_MAX_VIDEOS: "18"
           MEDIA_MAX_PER_CHANNEL: "2"
 
-          # -------- Lookback logic --------
-          MEDIA_LOOKBACK_HOURS: "336"        # 14 days default
+          # Lookback + auto-expand when too few
+          MEDIA_LOOKBACK_HOURS: "168"        # 7D
           MEDIA_MIN_ITEMS: "10"
-          MEDIA_EXPAND_HOURS_IF_LOW: "720"   # auto-expand to 30 days
+          MEDIA_EXPAND_HOURS_IF_LOW: "720"   # 30D
 
-          # -------- Filtering --------
-          MEDIA_FILTER_MODE: "hybrid"        # keywords + AI gate
-          MEDIA_MIN_MATCH_SCORE: "1"         # allow borderline infra matches
+          # Filtering (relaxed)
+          MEDIA_FILTER_MODE: "hybrid"
+          MEDIA_MIN_MATCH_SCORE: "1"         # set to "0" if still too strict
           MEDIA_MAX_FILTER_AI: "40"
           MEDIA_CAPTIONS_LANG: "en"
 
-          # -------- Channels (40 total) --------
+          # Channels
           MEDIA_CHANNELS: >-
             https://www.youtube.com/@HitachiEnergy,
             https://www.youtube.com/@SiemensEnergy,
@@ -135,11 +117,9 @@ jobs:
             https://www.youtube.com/@Google,
             https://www.youtube.com/@Microsoft,
             https://www.youtube.com/@AmazonWebServices
+
         run: node scripts/generate_media.js
 
-      # --------------------------------------------------
-      # 6) Commit & push
-      # --------------------------------------------------
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions"
