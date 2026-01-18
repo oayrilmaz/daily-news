@@ -1,9 +1,8 @@
 // scripts/generate_media.js
-// PTD Today — Media Builder (Scope-filtered)
-// - Accepts a large list of YouTube channel URLs / @handles / UC IDs
-// - Pulls recent videos via YouTube RSS
-// - Filters OUT politics and keeps ONLY PTD Today scope (grid, substations, data centers power, renewables, minerals, etc.)
-// - Optionally uses OpenAI to classify borderline items before summarizing
+// PTD Today — Media Builder
+// - Fetches YouTube RSS from selected channels
+// - Tries captions via timedtext (if available), fallback to description
+// - Uses OpenAI to summarize and produces PTD-style pages per video
 // Output:
 //   - data/media.json
 //   - media/<videoId>.html
@@ -24,53 +23,23 @@ function optEnv(name, fallback = "") {
 const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = optEnv("GA_ID", ""); // optional
 
-// Lookback control (hours)
-const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "168")); // default 7D
+const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "18")); // total to publish
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
 
-// Output sizing
-const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "18")); // total publish
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "2")); // per channel
+// ✅ IMPORTANT: support HOURS (preferred) and keep DAYS as fallback.
+const DAYS_FALLBACK = Number(optEnv("MEDIA_DAYS", "7"));
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", String(DAYS_FALLBACK * 24)));
 
-// Filtering controls
-// hybrid = keyword score + optional AI for borderline
-// keywords = keyword score only (fast, cheapest)
-// ai = always classify with AI (strictest, most expensive)
-const FILTER_MODE = (optEnv("MEDIA_FILTER_MODE", "hybrid") || "hybrid").toLowerCase();
+// Optional: if too few items found in lookback window, expand automatically.
+const MIN_ITEMS = Number(optEnv("MEDIA_MIN_ITEMS", "8"));
+const EXPAND_HOURS_IF_LOW = Number(optEnv("MEDIA_EXPAND_HOURS_IF_LOW", "720")); // 30 days
 
-// Minimum match score to include (keyword scoring)
-// 2 is a good default; 3 is stricter.
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "2"));
+// Optional scope filter to keep results inside PTD Today portfolio
+// (You already asked for this: general channels, but only PTD scope)
+const SCOPE_KEYWORDS = (optEnv("MEDIA_SCOPE_KEYWORDS",
+  "power,grid,transmission,substation,transformer,HVDC,HV,renewable,wind,solar,energy,data center,datacenter,AI,utility,interconnection,load,dispatch,electricity,critical minerals,copper,rare earth,semiconductor"
+).split(",").map(s => s.trim().toLowerCase()).filter(Boolean));
 
-// How many borderline items we allow AI to classify per run (cost control)
-const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "40"));
-
-// Caption attempt
-const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
-
-// Channels input
-// Provide comma-separated list of:
-// - https://www.youtube.com/@handle
-// - https://www.youtube.com/channel/UCxxxx
-// - UCxxxx
-// - @handle
-const MEDIA_CHANNELS_RAW = optEnv("MEDIA_CHANNELS", "").trim();
-
-// If nothing provided, fall back to a tiny default (you should override in workflow)
-const DEFAULT_CHANNELS = [
-  "https://www.youtube.com/@HitachiEnergy",
-  "https://www.youtube.com/@SiemensEnergy",
-  "https://www.youtube.com/@SchneiderElectric",
-  "https://www.youtube.com/@ABB"
-];
-
-const CHANNEL_INPUTS = (MEDIA_CHANNELS_RAW
-  ? MEDIA_CHANNELS_RAW.split(",").map(s => s.trim()).filter(Boolean)
-  : DEFAULT_CHANNELS
-);
-
-// -----------------------------
-// Helpers
-// -----------------------------
 function ensureDir(p) { fs.mkdirSync(p, { recursive: true }); }
 function writeFile(filePath, content) { ensureDir(path.dirname(filePath)); fs.writeFileSync(filePath, content, "utf8"); }
 function writeJson(filePath, obj) { writeFile(filePath, JSON.stringify(obj, null, 2)); }
@@ -102,125 +71,6 @@ async function fetchText(url, headers = {}, retries = 3) {
   }
 }
 
-function normalize(s){
-  return (s || "").toString().toLowerCase();
-}
-
-// -----------------------------
-// Scope filtering (NO politics, PTD scope only)
-// -----------------------------
-const HARD_BLOCK_TERMS = [
-  // Politics / elections / geopolitics (hard no)
-  "election", "elections", "vote", "voting", "campaign", "primary", "debate",
-  "president", "white house", "congress", "senate", "house of representatives",
-  "supreme court", "scotus", "governor", "mayor", "parliament", "prime minister",
-  "minister", "bill", "legislation", "hearing", "impeachment",
-  "ukraine", "russia", "gaza", "israel", "hamas", "iran", "china taiwan",
-  "border", "immigration", "refugee",
-  // Sports / celebrity (hard no)
-  "stanley cup", "nba", "nfl", "mlb", "nhl", "fifa", "world cup",
-  "celebrity", "actor", "actress", "music video", "trailer"
-];
-
-const PTD_SCOPE_TERMS = [
-  // Power grid / transmission / substations
-  "grid", "power grid", "electric grid", "transmission", "t&d", "substation",
-  "switchgear", "gis", "ais", "transformer", "power transformer", "reactor",
-  "series capacitor", "fsc", "statcom", "svc", "hvdc", "converter station",
-  "protection", "relay", "governor response", "inertia", "synthetic inertia",
-  "fault", "short circuit", "sc study", "load flow", "stability",
-  // Utilities / markets / operators
-  "utility", "utilities", "iso", "rto", "pJM", "ercot", "caiso", "nyiso", "isone",
-  "interconnection", "queue", "capacity market", "reliability", "reserve margin",
-  "n-1", "outage", "blackstart",
-  // Data centers / AI power
-  "data center", "datacenter", "ai power", "ai demand", "gpu", "server farm",
-  "behind the meter", "microgrid", "onsite generation",
-  // Renewables / storage
-  "renewables", "wind", "solar", "inverter", "grid-forming", "gfm",
-  "bess", "battery storage", "storage", "hydrogen", "electrolyzer",
-  // Generation mix relevant to grids
-  "nuclear", "smr", "gas turbine", "combined cycle", "peaking plant",
-  "lng", "pipeline", "gas supply", "generation", "power plant",
-  // Critical minerals / supply chain
-  "critical minerals", "rare earth", "lithium", "copper", "nickel", "graphite",
-  "uranium", "mining", "refining"
-];
-
-// Some general “business news” words can appear in scope videos; don’t block them.
-// Instead we rely on scope scoring + hard politics block.
-function hasHardBlock(text){
-  const t = normalize(text);
-  return HARD_BLOCK_TERMS.some(w => t.includes(w));
-}
-
-function scoreScope(text){
-  const t = normalize(text);
-  let score = 0;
-  for (const w of PTD_SCOPE_TERMS){
-    if (t.includes(w)) score += 1;
-  }
-  return score;
-}
-
-// -----------------------------
-// YouTube channel resolving (URL/@handle -> UC id)
-// -----------------------------
-function extractUCFromUrl(u){
-  const s = (u || "").trim();
-  const m = s.match(/\/channel\/(UC[a-zA-Z0-9_-]+)/);
-  return m ? m[1] : "";
-}
-function extractHandle(u){
-  const s = (u || "").trim();
-  // accepts @handle or .../ @handle
-  if (s.startsWith("@")) return s;
-  const m = s.match(/youtube\.com\/@([a-zA-Z0-9._-]+)/i);
-  return m ? `@${m[1]}` : "";
-}
-
-async function resolveChannelToUC(input){
-  const raw = (input || "").trim();
-  if (!raw) return "";
-
-  // direct UC id
-  if (/^UC[a-zA-Z0-9_-]{10,}$/.test(raw)) return raw;
-
-  // /channel/UC...
-  const uc = extractUCFromUrl(raw);
-  if (uc) return uc;
-
-  // @handle
-  const handle = extractHandle(raw);
-  if (!handle) return "";
-
-  // Resolve handle -> channel page HTML -> canonical channelId
-  // This is best-effort and can fail for some handles.
-  const url = `https://www.youtube.com/${handle}`;
-  try{
-    const html = await fetchText(url, { "accept-language":"en-US,en;q=0.8" }, 2);
-
-    // Common patterns include:
-    // "channelId":"UCxxxx"
-    // or externalId="UCxxxx"
-    const m1 = html.match(/"channelId"\s*:\s*"(UC[^"]+)"/);
-    if (m1 && m1[1]) return m1[1];
-
-    const m2 = html.match(/externalId\s*=\s*"(UC[^"]+)"/);
-    if (m2 && m2[1]) return m2[1];
-
-    const m3 = html.match(/"externalId"\s*:\s*"(UC[^"]+)"/);
-    if (m3 && m3[1]) return m3[1];
-
-    return "";
-  }catch{
-    return "";
-  }
-}
-
-// -----------------------------
-// YouTube RSS parse
-// -----------------------------
 function parseYouTubeRSS(xml) {
   const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
   return entries.map(e => {
@@ -232,6 +82,7 @@ function parseYouTubeRSS(xml) {
       (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i)||[])[1] ||
       (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i)||[])[1] || ""
     );
+
     return {
       id,
       title,
@@ -245,7 +96,7 @@ function parseYouTubeRSS(xml) {
 }
 
 async function fetchCaptions(videoId) {
-  const url = `https://www.youtube.com/api/timedtext?lang=${encodeURIComponent(CAPTIONS_LANG)}&v=${encodeURIComponent(videoId)}`;
+  const url = `https://www.youtube.com/api/timedtext?lang=en&v=${encodeURIComponent(videoId)}`;
   try{
     const xml = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
     if (!xml || !xml.includes("<text")) return "";
@@ -271,6 +122,11 @@ function gaHead() {
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}');</script>`;
 }
 
+function inScope(text) {
+  const t = (text || "").toLowerCase();
+  return SCOPE_KEYWORDS.some(k => k && t.includes(k));
+}
+
 function renderMediaArticleHtml(item) {
   const id = item.id;
   const title = item.title || "PTD Today — Media";
@@ -286,8 +142,7 @@ function renderMediaArticleHtml(item) {
   const tags = Array.isArray(ai.tags) ? ai.tags : [];
 
   const canonical = `${SITE_ORIGIN}/media/${encodeURIComponent(id)}.html`;
-  const description = (summary || `PTD Today AI summary of a video from ${channel}.`)
-    .replace(/\s+/g," ").slice(0, 180);
+  const description = (summary || `PTD Today AI summary of a video from ${channel}.`).replace(/\s+/g," ").slice(0, 180);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -325,16 +180,13 @@ function renderMediaArticleHtml(item) {
   ${gaHead()}
 
   <style>
-    :root{
-      --bg:#ffffff; --ink:#111; --muted:#5c5c5c; --rule:rgba(0,0,0,.15); --soft:rgba(0,0,0,.06);
-      --pill:rgba(0,0,0,.04); --btn:#111; --btnInk:#fff;
-    }
+    :root{--bg:#fff;--ink:#111;--muted:#5c5c5c;--rule:rgba(0,0,0,.15);--pill:rgba(0,0,0,.04);--btn:#111;--btnInk:#fff}
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",Times,serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",Times,serif}
     a{color:inherit}
     .wrap{max-width:900px;margin:0 auto;padding:26px 16px 64px}
     .mast{text-align:center;padding:16px 0 10px}
-    .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
+    .brand{margin:0;font-size:52px;font-weight:700}
     .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
     .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
     .nav a{text-decoration:none;padding:7px 12px;border-radius:999px;border:1px solid transparent;color:rgba(0,0,0,.75);font-size:15px}
@@ -377,9 +229,7 @@ function renderMediaArticleHtml(item) {
     ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
 
     <div class="card">
-      <div class="thumb">
-        <img src="${escapeHtml(thumb)}" alt="">
-      </div>
+      <div class="thumb"><img src="${escapeHtml(thumb)}" alt=""></div>
       <div class="content">
         <div class="btnRow">
           <a class="btn" href="${escapeHtml(youtubeUrl)}" target="_blank" rel="noopener">Watch on YouTube</a>
@@ -396,11 +246,7 @@ function renderMediaArticleHtml(item) {
           <ul>${takeaways.slice(0,6).map(t=>`<li>${escapeHtml(t)}</li>`).join("")}</ul>
         ` : ""}
 
-        ${tags.length ? `
-          <div class="chips">
-            ${tags.slice(0,12).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}
-          </div>
-        ` : ""}
+        ${tags.length ? `<div class="chips">${tags.slice(0,12).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
       </div>
     </div>
 
@@ -416,72 +262,15 @@ function renderMediaArticleHtml(item) {
       if(!btn) return;
       btn.addEventListener("click", async function(){
         if (navigator.share) {
-          try { await navigator.share({ title: title, text: text, url: url }); return; }
-          catch(e){ return; }
+          try { await navigator.share({ title: title, text: text, url: url }); return; } catch(e){ return; }
         }
-        try{
-          await navigator.clipboard.writeText(url);
-          alert("Link copied.");
-        }catch(e){
-          prompt("Copy this link:", url);
-        }
+        try{ await navigator.clipboard.writeText(url); alert("Link copied."); }
+        catch(e){ prompt("Copy this link:", url); }
       });
     })();
   </script>
 </body>
 </html>`;
-}
-
-async function aiClassify(openai, v){
-  // Strict: include ONLY if it clearly fits PTD scope. Politics should be rejected.
-  const system = `
-You are a strict content gate for PTD Today Media.
-
-Accept ONLY if the video is primarily about:
-- power grid / transmission / substations / equipment (transformers, switchgear, HVDC, STATCOM, protection)
-- utilities / ISO-RTO operations / reliability / planning / interconnection
-- data center power / AI power demand / microgrids
-- renewables + storage (grid integration)
-- nuclear or gas/LNG ONLY when tied to power supply/infrastructure
-- critical minerals tied to energy infrastructure supply chains
-
-Reject if it is primarily:
-- politics, elections, geopolitics, government drama, political personalities
-- general business news not tied to energy infrastructure
-- sports, celebrity, entertainment
-
-Return JSON only: {"include": true|false, "reason": "short"}
-`.trim();
-
-  const user = `
-Title: ${v.title}
-Channel: ${v.channel}
-Published: ${v.published_at}
-
-Description:
-${(v.description || "").slice(0, 1800)}
-
-Transcript (may be missing):
-${(v.transcript || "").slice(0, 1800)}
-`.trim();
-
-  const resp = await openai.responses.create({
-    model: optEnv("OPENAI_FILTER_MODEL", optEnv("OPENAI_MODEL", "gpt-5-mini")),
-    input: [
-      { role: "system", content: system },
-      { role: "user", content: user }
-    ],
-    text: { format: { type: "json_object" } }
-  });
-
-  const text = resp.output_text || "";
-  try{
-    const obj = JSON.parse(text);
-    return { include: !!obj.include, reason: String(obj.reason || "") };
-  }catch{
-    // Fail closed (safer)
-    return { include: false, reason: "Classifier parse failed" };
-  }
 }
 
 async function summarizeVideo(openai, v) {
@@ -492,20 +281,18 @@ async function summarizeVideo(openai, v) {
 You are PTD Today’s Media summarizer.
 
 Rules:
-- Summarize ONLY what is present in the provided transcript/description.
-- If transcript is missing or thin, be explicit: "Based on the available description…"
-- Keep it useful for grid/substations, data center power, renewables/storage, critical minerals.
-- Avoid politics. If the video is political, say so and keep it minimal.
+- Summarize ONLY what is present in transcript/description.
+- If transcript is missing/thin, say: "Based on the available description..."
+- Keep it relevant to: power transmission, substations, utilities, grid ops, data centers power, renewables, critical minerals, and AI infrastructure.
+- Avoid politics/elections/geopolitics. If the video is not within the scope, return {"out_of_scope": true}.
 Return VALID JSON only.
 `.trim();
 
   const user = `
-VIDEO:
 Title: ${v.title}
 Channel: ${v.channel}
 Published: ${v.published_at}
 
-CONTENT (may be partial):
 Transcript:
 ${transcript ? transcript : "[No transcript available]"}
 
@@ -514,9 +301,10 @@ ${desc ? desc : "[No description available]"}
 
 Return JSON with EXACT keys:
 {
-  "summary": "2–3 sentences, human tone",
-  "bullets": ["5 concise bullets max"],
-  "takeaways": ["3–5 'so what' bullets for grid/data center decision-makers"],
+  "out_of_scope": false,
+  "summary": "2–3 sentences",
+  "bullets": ["up to 5"],
+  "takeaways": ["3–5 for decision-makers"],
   "tags": ["6–10 short tags"]
 }
 `.trim();
@@ -534,110 +322,92 @@ Return JSON with EXACT keys:
   let obj = {};
   try { obj = JSON.parse(text); } catch { obj = {}; }
 
-  return {
+  const out = {
+    out_of_scope: !!obj.out_of_scope,
     summary: (obj.summary || "").toString().slice(0, 600),
-    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(x=>String(x)).slice(0, 5) : [],
-    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(x=>String(x)).slice(0, 6) : [],
-    tags: Array.isArray(obj.tags) ? obj.tags.map(x=>String(x)).slice(0, 12) : []
+    bullets: Array.isArray(obj.bullets) ? obj.bullets.map(String).slice(0, 5) : [],
+    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(String).slice(0, 6) : [],
+    tags: Array.isArray(obj.tags) ? obj.tags.map(String).slice(0, 12) : []
   };
-}
-
-function shouldIncludeByKeywords(v){
-  const text = `${v.title}\n${v.channel}\n${v.description}`;
-  if (hasHardBlock(text)) return { include:false, reason:"hard-block" };
-  const score = scoreScope(text);
-  return { include: score >= MIN_MATCH_SCORE, score, reason:`score=${score}` };
+  return out;
 }
 
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const openai = new OpenAI({ apiKey });
 
-  const cutoffMs = Date.now() - LOOKBACK_HOURS * 3600 * 1000;
-
-  // 1) Resolve channels to UC ids
-  const channelUcs = [];
-  for (const input of CHANNEL_INPUTS){
-    const uc = await resolveChannelToUC(input);
-    if (uc) channelUcs.push(uc);
-    await sleep(120);
-  }
-  const uniqueUcs = [...new Set(channelUcs)];
-  if (!uniqueUcs.length){
-    throw new Error("No valid YouTube channel IDs resolved from MEDIA_CHANNELS.");
+  function cutoffFromHours(hours){
+    return Date.now() - hours * 3600 * 1000;
   }
 
-  // 2) Fetch RSS per channel
-  const all = [];
-  for (const uc of uniqueUcs) {
-    const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(uc)}`;
-    try{
-      const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
-      const vids = parseYouTubeRSS(xml)
-        .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
-        .slice(0, MAX_PER_CH);
-      all.push(...vids);
-      await sleep(120);
-    }catch(e){
-      console.warn("YT feed failed:", uc, e.message);
+  let cutoffMs = cutoffFromHours(LOOKBACK_HOURS);
+
+  const channels = (optEnv("YT_CHANNELS", "").split(",").map(s=>s.trim()).filter(Boolean));
+  const DEFAULT_CHANNELS = [
+    "UC0jLzOK3mWr4YcUuG3KzZmw", // Siemens (example)
+    "UC4l7cLFsPzQYdMwvZRVqNag", // Hitachi Energy (example)
+    "UCJ2Kx0pPZzJyaRlwviCJPdA", // ABB (example)
+    "UCvB8R7oZJxge5tR3MUpxYfw"  // Schneider (example)
+  ];
+  const CHANNELS = channels.length ? channels : DEFAULT_CHANNELS;
+
+  async function collect(cutoff){
+    const all = [];
+    for (const ch of CHANNELS) {
+      const feed = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ch)}`;
+      try{
+        const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
+        const vids = parseYouTubeRSS(xml)
+          .filter(v => new Date(v.published_at).getTime() >= cutoff)
+          .slice(0, MAX_PER_CH);
+        all.push(...vids);
+        await sleep(120);
+      }catch(e){
+        console.warn("YT feed failed:", ch, e.message);
+      }
     }
+    // dedupe + sort
+    const seen = new Set();
+    let vids = all.filter(v => (v.id && !seen.has(v.id) && seen.add(v.id)));
+    vids.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
+    return vids;
   }
 
-  // 3) Dedupe + sort newest first
-  const seen = new Set();
-  let videos = all.filter(v => (v.id && !seen.has(v.id) && seen.add(v.id)));
-  videos.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
+  // First pass
+  let videos = await collect(cutoffMs);
 
-  // 4) First-pass filtering
-  let included = [];
-  let borderline = [];
+  // ✅ If too few items, auto-expand lookback
+  if (videos.length < MIN_ITEMS) {
+    const expandedCutoff = cutoffFromHours(EXPAND_HOURS_IF_LOW);
+    videos = await collect(expandedCutoff);
+    cutoffMs = expandedCutoff;
+  }
 
-  for (const v of videos){
-    const k = shouldIncludeByKeywords(v);
+  videos = videos.slice(0, MAX_VIDEOS);
 
-    if (FILTER_MODE === "ai"){
-      borderline.push({ v, k });
+  // Captions + AI summaries + scope filtering
+  const kept = [];
+  for (const v of videos) {
+    v.transcript = await fetchCaptions(v.id);
+    if (!v.transcript) v.transcript = "";
+
+    // quick keyword filter before spending tokens
+    const quickText = `${v.title}\n${v.description || ""}\n${v.channel || ""}`;
+    const quickInScope = inScope(quickText);
+
+    if (!quickInScope) {
+      // skip obvious non-scope items early
       continue;
     }
 
-    if (k.include){
-      included.push(v);
-    } else {
-      // Borderline only if not hard-block AND has at least 1 scope hit
-      const text = `${v.title}\n${v.channel}\n${v.description}`;
-      const score = scoreScope(text);
-      if (!hasHardBlock(text) && score > 0) borderline.push({ v, k: { ...k, score } });
-    }
-  }
-
-  // 5) Optional AI classification for borderline
-  if (FILTER_MODE === "hybrid" || FILTER_MODE === "ai"){
-    const toCheck = borderline.slice(0, MAX_FILTER_AI);
-
-    for (const { v } of toCheck){
-      // grab transcript to help classification
-      v.transcript = await fetchCaptions(v.id);
-      const verdict = await aiClassify(openai, v);
-      if (verdict.include){
-        included.push(v);
-      }
-      await sleep(150);
-    }
-  }
-
-  // 6) Final sort + cap
-  included.sort((a,b)=> new Date(b.published_at) - new Date(a.published_at));
-  included = included.slice(0, MAX_VIDEOS);
-
-  // 7) Summaries + pages
-  for (const v of included) {
-    // Captions for better summary (if not already pulled)
-    if (typeof v.transcript !== "string") v.transcript = await fetchCaptions(v.id);
     v.ai = await summarizeVideo(openai, v);
+    if (v.ai?.out_of_scope) continue;
+
+    kept.push(v);
     await sleep(150);
   }
 
-  const outItems = included.map(v => ({
+  const outItems = kept.map(v => ({
     id: v.id,
     title: v.title,
     channel: v.channel,
@@ -656,6 +426,7 @@ async function main() {
     title: "PTD Today — Media",
     disclaimer: "Informational only — AI-generated summaries; may contain errors. Verify with the original video.",
     updated_at: new Date().toISOString(),
+    lookback_hours_used: Math.round((Date.now() - cutoffMs) / 3600000),
     items: outItems
   };
   writeJson(path.join("data", "media.json"), payload);
