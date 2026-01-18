@@ -1,7 +1,7 @@
 {
   "title": "PTD Today — Media",
   "disclaimer": "Informational only — AI-generated summaries; may contain errors. Verify with the original video.",
-  "updated_at": "2026-01-18T06:53:16.216Z",
+  "updated_at": "2026-01-18T07:38:13.740Z",
   "items": [
     {
       "id": "kicTHogP2gU",
@@ -11,31 +11,32 @@
       "url": "https://www.youtube.com/watch?v=kicTHogP2gU",
       "thumbnail": "https://i.ytimg.com/vi/kicTHogP2gU/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, Victor Moreno (Product Manager, Cloud Networking at Google) explains how AI-aware networking — via the GKE Inference Gateway and AI-optimized load balancing — improves GPU utilization, latency, and governance for inference workloads. The approach uses inference-specific metrics, prefix caching, body-based routing, LoRA adapter awareness, and network-level guardrails to reduce cold starts, cut compute waste, and streamline developer operations.",
+        "summary": "Based on the available description, Victor Moreno (Product Manager, Cloud Networking at Google) explains how networking must be AI-aware to support inference workloads. Google Cloud’s approach (GKE Inference Gateway + AI-aware load balancing and Service Extensions) uses inference-specific metrics and features like prefix caching and body-based routing to improve GPU utilization, reduce latency and cold starts, and insert guardrails at the network edge.",
         "bullets": [
-          "Traditional networking and generic metrics miss GPU/TPU saturation; inference needs specialized telemetry (e.g., KV cache utilization, queue depth).",
-          "AI-aware load balancing and the GKE Inference Gateway identify least-loaded replicas and reuse prefill computations via prefix cache shadowing.",
-          "Body-based routing and model-aware routing (LoRA awareness) let traffic be directed to the most appropriate model/replica.",
-          "Service Extensions enable inserting API management and AI guardrails into the network flow to sanitize prompts/responses before hitting models.",
-          "Results: fewer cold starts, higher GPU saturation, lower TCO, faster developer velocity, and reduced compute spent on invalid requests."
+          "Problem: traditional networking and CPU-based metrics miss GPU saturation and can send traffic to congested replicas, increasing latency and inefficiency.",
+          "Metrics-driven routing: the Inference Gateway and load balancer use inference-specific signals (e.g., KV cache utilization, queue depth) to identify and rank least-loaded replicas.",
+          "Cache-aware features: shadow copies of prefix caches and reuse of prefill computations reduce repeated GPU work and lower cold-start overhead.",
+          "Routing & model awareness: body-based routing for model identification and LoRA adapter awareness let requests hit the right model/replica faster.",
+          "Service Extensions/guardrails: network-level insertion of API management and prompt/response sanitization prevents invalid requests from consuming GPU cycles and reduces costs."
         ],
         "takeaways": [
-          "Improved GPU saturation from AI-aware networking can lower wasted compute and associated power draw — relevant for rack-level power and cooling planning.",
-          "Network-level caching and intelligent routing can smooth inference load patterns, helping avoid transient power spikes and easing capacity planning.",
-          "Edge guardrails that drop invalid prompts reduce unnecessary GPU cycles (and energy/cost), cutting operating expense for data-center operators.",
-          "Adopting unified inference networking reduces operational complexity across clusters, which can simplify power provisioning and fault-domain design."
+          "Maximizing GPU saturation via AI-aware networking reduces total cost of ownership — important for data center capacity and procurement decisions.",
+          "Specialized inference metrics (not CPU alone) are needed for accurate monitoring and autoscaling; update telemetry and power-management strategies accordingly.",
+          "Features that reduce cold starts and reuse prefill work can lower transient GPU demand and wasted compute, with direct energy and cost benefits.",
+          "Network-level guardrails that block invalid prompts before they hit models save GPU cycles (and associated power/cost) and simplify governance.",
+          "Adopting managed AI-networking components (GKE Inference Gateway, Cloud Load Balancing) affects infrastructure architecture and should be considered in operations and capacity planning."
         ],
         "tags": [
-          "ai-inference",
+          "AI inference",
           "networking",
-          "gpu-utilization",
-          "gke-inference-gateway",
-          "cloud-load-balancing",
-          "guardrails",
-          "prefix-caching",
-          "data-center",
-          "tco",
-          "performance"
+          "GPU utilization",
+          "load balancing",
+          "GKE Inference Gateway",
+          "cloud load balancing",
+          "data center ops",
+          "latency",
+          "security guardrails",
+          "prefetch/prefix cache"
         ]
       }
     },
@@ -47,31 +48,29 @@
       "url": "https://www.youtube.com/watch?v=WYyubfkeiQU",
       "thumbnail": "https://i.ytimg.com/vi/WYyubfkeiQU/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, this is a short promo for the open-world martial arts RPG Where Winds Meet showcasing NVIDIA’s DLSS 4 with Multi Frame Generation and RTX on. The clip emphasizes enhanced visuals and credits creator DigitalDreamsyt, hosted on the NVIDIA GeForce channel.",
+        "summary": "Based on the available description, there’s no transcript; the video appears to be a short promotional clip showing the open-world martial arts RPG Where Winds Meet running with NVIDIA RTX and DLSS 4 Multi Frame Generation. It highlights the game’s visuals and the use of DLSS 4/MFG to improve rendering performance and image quality.",
         "bullets": [
-          "Open-world martial arts RPG: Where Winds Meet",
-          "Showcases DLSS 4 with Multi Frame Generation and RTX On",
-          "Promotes enhanced visual fidelity and performance",
-          "Video credited to DigitalDreamsyt",
-          "Published on NVIDIA GeForce (2026-01-14)"
+          "Promotional showcase of Where Winds Meet with #RTXOn.",
+          "Highlights DLSS 4 with Multi Frame Generation (MFG) for improved rendering.",
+          "Footage credited to @DigitalDreamsyt.",
+          "No transcript available; focus is visual/performance demonstration."
         ],
         "takeaways": [
-          "Advanced features like DLSS 4 and RTX imply higher GPU compute intensity—expect increased power and cooling requirements when deploying such workloads in data centers or cloud-gaming nodes.",
-          "Demand for low-latency, GPU-backed cloud/edge gaming services could drive need for distributed edge sites with dense power and cooling capacity close to users.",
-          "Hardware refreshes to support new ray-tracing and upscaling tech may influence procurement cycles and increase demand for high-performance GPUs, with implications for supply chains and critical-minerals sourcing.",
-          "Operators should evaluate onsite renewable integration and energy storage to manage peak loads from GPU-heavy services and smooth grid impacts."
+          "DLSS 4 with MFG is an AI-driven frame synthesis technology that affects GPU compute patterns—data centers and cloud-gaming operators should evaluate impacts on GPU utilization and capacity planning.",
+          "Such advanced upscaling can improve frames-per-GPU (potentially raising throughput) but may shift peak power and cooling requirements—validate thermal and electrical provisioning under real workloads.",
+          "Operators offering game-streaming or GPU-accelerated rendering can use DLSS/MFG to optimize server density and energy per delivered frame, but must test actual power/performance tradeoffs before scaling.",
+          "Variable, bursty GPU loads associated with real-time AI rendering favor integrating energy storage, demand-response strategies, or flexible generation to smooth peaks and protect downstream grid assets."
         ],
         "tags": [
-          "WhereWindsMeet",
           "DLSS4",
           "MultiFrameGeneration",
-          "RTXOn",
+          "RTX",
+          "WhereWindsMeet",
           "NVIDIA",
-          "GeForce",
           "GPU",
-          "CloudGaming",
-          "DataCenter",
-          "Energy"
+          "cloud-gaming",
+          "AI-upscaling",
+          "power-efficiency"
         ]
       }
     },
@@ -83,29 +82,30 @@
       "url": "https://www.youtube.com/watch?v=6ofZASc_HCM",
       "thumbnail": "https://i.ytimg.com/vi/6ofZASc_HCM/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, GE Vernova highlights the importance of anticipating the remaining life of aging steam turbine rotors and deciding on next steps to preserve steam-plant reliability. The video points viewers to GE Vernova's rotor end-of-life resource and frames this work within the company's broader push to electrify and decarbonize.",
+        "summary": "Based on the available description, this GE Vernova video highlights the importance of anticipating the remaining life of steam turbine rotors and deciding next steps to protect plant reliability. It directs viewers to additional GE Vernova resources on rotor end-of-life (EOL) options and positions the company as focused on electrification and decarbonization.",
         "bullets": [
-          "Emphasizes anticipating steam turbine rotor remaining life and subsequent actions.",
-          "Frames the rotor as the backbone of steam-plant reliability.",
-          "Directs viewers to a GE Vernova rotor EOL resource for more information.",
-          "Positions the topic within GE Vernova's electrification and decarbonization efforts.",
-          "Includes links to subscribe and connect with GE Vernova channels."
+          "Emphasizes assessing aging steam turbine rotor remaining life to maintain plant reliability.",
+          "Frames rotor EOL planning as a critical element of steam plant asset management.",
+          "Points viewers to GE Vernova’s detailed rotor EOL resources for options and next steps.",
+          "Positions rotor lifecycle work within GE Vernova’s broader electrification and decarbonization efforts.",
+          "No transcript provided; summary based solely on the video description."
         ],
         "takeaways": [
-          "Assess rotor end-of-life proactively to reduce risk of unplanned outages that could affect grid stability and critical loads (e.g., data centers).",
-          "Incorporate rotor life assessments into maintenance and outage planning to align with capacity needs and integration of renewables or storage.",
-          "Leverage vendor resources (such as GE Vernova’s rotor-EOL guidance) when making lifecycle, repair, or replacement decisions."
+          "Plan rotor EOL into maintenance and asset-management schedules to avoid unplanned outages that could affect grid or critical-site power availability.",
+          "Evaluate repair, retrofit, or replacement options early to manage capacity risk and maintenance windows for substations, power plants, and data center backup systems.",
+          "Ensure vendor engagement and spare-part strategies are in place so rotor EOL decisions don’t create supply or downtime risks for grid operators or data center operators.",
+          "Consider rotor upgrades or lifecycle extensions alongside decarbonization and efficiency initiatives to align reliability with emissions goals."
         ],
         "tags": [
-          "steam-turbine",
-          "rotor-EOL",
-          "plant-reliability",
-          "power-plant-maintenance",
-          "GEVernova",
+          "steam turbine",
+          "rotor EOL",
+          "asset management",
+          "plant reliability",
+          "grid resilience",
+          "data center power",
+          "maintenance planning",
           "decarbonization",
-          "grid-resilience",
-          "lifecycle-management",
-          "critical-power"
+          "GE Vernova"
         ]
       }
     },
@@ -117,32 +117,32 @@
       "url": "https://www.youtube.com/watch?v=kSocjh8PZnQ",
       "thumbnail": "https://i.ytimg.com/vi/kSocjh8PZnQ/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description (no transcript provided), KPMG Poland’s podcast discusses how the luxury goods market is evolving: global \"luxury fatigue,\" the rise of \"affordable luxury,\" personalization and experiential offerings, ESG expectations (e.g., eco-leather, certifications), and the role of AI and craftsmanship in the future. The episode highlights that in Poland the luxury market is still growing though fragmented, with hotspots in hospitality, tourism (Baltic coast, spas), and a developing art market led by younger creators.",
+        "summary": "Based on the available description (no transcript provided), KPMG experts Andrzej Marczak and Tomasz Wiśniewski discuss how the luxury-goods market is shifting toward experiences, personalization and \"affordable luxury,\" while ESG and responsible sourcing gain importance. They note global \"luxury fatigue\" yet continued growth and fragmentation in Poland, with boosts from luxury tourism, art, hotels and a future shaped by AI, craftsmanship and human-centered experiences.",
         "bullets": [
-          "Global trends: \"luxury fatigue,\" concentrated spending (2% of richest account for 40% of market), and growing demand for experiences over possession (Gen Z).",
-          "Product and service shifts: personalization, exclusive experiences, and new aspirational categories including \"affordable luxury.\"",
-          "ESG and responsible luxury gaining importance—examples: eco-leathers and certification-driven claims.",
-          "Luxury brand-building expands into hotels, film and curated environments; tourism and premium hospitality are growth areas in Poland (Bałtyk, hotels, spas).",
-          "Future drivers include AI for personalization, continued emphasis on craftsmanship, and human-centered experiences; Polish market is growing but dispersed."
+          "Market trends: experience-first luxury, personalization, \"affordable luxury,\" and luxury fatigue globally.",
+          "Customer concentration: ~2% of the wealthiest clients account for roughly 40% of the market.",
+          "ESG and responsible luxury rising—examples include eco-leathers and product certifications.",
+          "Poland: growing but fragmented market; expansion in luxury tourism (Baltic, hotels, spas) and contemporary art.",
+          "Future drivers: AI integration, renewed emphasis on craftsmanship and human-focused brand experiences."
         ],
         "takeaways": [
-          "Rising premium hospitality and tourism in Poland implies localized increases in electricity demand and reliability requirements—consider capacity planning, backup generation and resilience for hotels and resorts.",
-          "Heightened ESG expectations mean luxury clients will favor facilities and suppliers with renewable energy, green certifications and transparent carbon accounting—renewable procurement and on-site generation/storage can be a competitive differentiator.",
-          "AI and personalization trends point to greater compute and low-latency needs—expect higher demand for data-center capacity, efficient cooling, and secure, certified power supplies.",
-          "A fragmented but expanding luxury sector suggests more distributed, smaller-scale high-demand sites (boutique hotels, galleries) that benefit from microgrids, behind-the-meter storage, and localized energy management.",
-          "Growth in premium consumer electronics and services tied to luxury/aspiration increases strain on charging and distribution infrastructure—coordinate grid upgrades and smart-charging solutions where luxury tourism and retail clusters are expanding."
+          "Growth in luxury hotels, spas and premium tourism implies localized increases in electricity and cooling demand—plan for targeted grid capacity and backup generation at those sites.",
+          "Greater use of AI and personalization signals rising compute needs; anticipate higher data-center power consumption and potential demand for colocated capacity.",
+          "ESG-driven sourcing and certifications create opportunities for onsite renewables and energy storage to meet sustainability commitments of luxury brands and venues.",
+          "Expansion of galleries, high-end retail and hospitality increases need for reliable, high-quality power and environmental controls—consider resilient power solutions and precision HVAC.",
+          "Concentration of high-value customers can justify investments in microgrids or dedicated resilience solutions for premium properties and flagship stores."
         ],
         "tags": [
           "luxury",
           "ESG",
-          "Poland",
-          "AI",
-          "hotels",
-          "tourism",
+          "poland",
+          "hospitality",
+          "ai",
           "personalization",
-          "data-centers",
-          "renewables",
-          "energy"
+          "premium-tourism",
+          "art-market",
+          "kpmg",
+          "affordable-luxury"
         ]
       }
     },
@@ -154,28 +154,30 @@
       "url": "https://www.youtube.com/watch?v=JZZJ49Tdc48",
       "thumbnail": "https://i.ytimg.com/vi/JZZJ49Tdc48/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, the video emphasizes that reliability has been PJM Interconnection’s top priority since 1927. It provides a high-level look at how PJM works to make sure electricity is available when customers need it.",
+        "summary": "Based on the available description, the video stresses that reliability has been PJM Interconnection’s top priority since 1927 and outlines how PJM works to make sure electricity is available when customers need it. It presents PJM’s long-standing focus on keeping the lights on and the systems that support that mission.",
         "bullets": [
-          "PJM has made reliability its primary mission since 1927.",
-          "The video offers an overview of how PJM ensures electricity is there when needed.",
-          "Intended as an explanatory piece about PJM’s operational role in keeping power available.",
-          "Useful as a general introduction to PJM for stakeholders affected by regional grid operations."
+          "PJM has prioritized reliability since 1927.",
+          "Video explains how PJM works to ensure electricity is there when needed.",
+          "Focus is on operational continuity and dependable power delivery.",
+          "Intended to communicate PJM’s role in maintaining a reliable grid."
         ],
         "takeaways": [
-          "If your asset is in PJM territory, recognize PJM’s central role in regional reliability and factor that into resilience planning.",
-          "Use the video as a primer before engaging with PJM on outage coordination, interconnection, or site contingency plans.",
-          "Incorporate PJM-focused processes into data center backup, capacity planning, and maintenance scheduling to reduce operational surprises."
+          "For grid operators and substation planners: anticipate PJM-driven reliability standards and coordinate planning/maintenance windows accordingly.",
+          "For data center operators: engage with PJM on reliability programs and contingency planning to protect critical loads.",
+          "For renewables and storage developers: design projects to meet PJM operational requirements so they support system reliability.",
+          "For procurement and asset managers: factor PJM’s reliability processes into sourcing, maintenance, and resiliency investments."
         ],
         "tags": [
-          "PJM",
+          "PJM Interconnection",
           "reliability",
-          "grid-operations",
+          "electricity",
+          "grid",
+          "power supply",
           "transmission",
-          "data-center-power",
-          "interconnection",
-          "renewables",
-          "energy-storage",
-          "capacity-planning"
+          "operations",
+          "grid planning",
+          "resilience",
+          "utilities"
         ]
       }
     },
@@ -187,30 +189,32 @@
       "url": "https://www.youtube.com/watch?v=RYWGAyaAKDk",
       "thumbnail": "https://i.ytimg.com/vi/RYWGAyaAKDk/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, Hitachi Energy frames grid modernization as a need to balance reliability, flexibility and efficiency while expanding capacity for the energy transition. The company emphasizes digital‑first power grid technologies intended to improve stability, reduce downtime and optimize performance across the system.",
+        "summary": "Based on the available description, Hitachi Energy frames grid modernization as balancing reliability, flexibility and efficiency while expanding capacity to support the energy transition. The company highlights power grid technologies with a digital core designed to improve stability, reduce downtime and optimize performance across the system.",
         "bullets": [
-          "Power systems must balance reliability, flexibility and efficiency while expanding capacity for the energy transition.",
-          "Hitachi Energy promotes power grid technologies with digital capabilities at the core.",
-          "Digital solutions are positioned to improve grid stability.",
-          "Aim to reduce downtime and optimize performance at every level of the power system."
+          "Modernization must balance reliability, flexibility and efficiency while expanding capacity for the energy transition.",
+          "Hitachi Energy positions digital technologies as central to grid performance improvements.",
+          "Core benefits promoted: improved stability, reduced downtime, and system-wide performance optimization.",
+          "Applicability spans substations, transmission/distribution assets, and broader system operations.",
+          "Description focuses on tech and outcomes; specific product or supply-chain details are not provided."
         ],
         "takeaways": [
-          "Assess digital‑first grid technologies to strengthen stability and reduce operational downtime.",
-          "Prioritize solutions that increase flexibility to integrate renewables and storage without compromising reliability.",
-          "When planning capacity expansion, emphasize efficiency and digital optimization to manage performance and costs.",
-          "Consider suppliers that offer end‑to‑end digital tools for monitoring and optimizing substations, data center power, and renewables integration."
+          "Invest in digital grid tools to boost stability and reduce unplanned outages—direct ROI for utilities and critical facilities.",
+          "Plan capacity expansions that accommodate renewable and storage integration while preserving reliability and flexibility.",
+          "Prioritize solutions that lower downtime and optimize operations to reduce O&M costs and risk for substations and data centers.",
+          "Engage vendors that offer end-to-end digital-enabled grid solutions to accelerate system-level performance gains.",
+          "Description does not address critical minerals or supply-chain constraints—assess those risks separately when sourcing hardware."
         ],
         "tags": [
-          "grid modernization",
-          "digitalization",
+          "grid-modernization",
+          "digital-grid",
           "reliability",
           "flexibility",
           "efficiency",
-          "energy transition",
-          "Hitachi Energy",
-          "grid stability",
-          "downtime reduction",
-          "renewables integration"
+          "renewables-integration",
+          "energy-storage",
+          "substations",
+          "data-center-power",
+          "uptime"
         ]
       }
     },
@@ -222,19 +226,19 @@
       "url": "https://www.youtube.com/watch?v=pzcumws77RU",
       "thumbnail": "https://i.ytimg.com/vi/pzcumws77RU/hqdefault.jpg",
       "ai": {
-        "summary": "Based on the available description, Hitachi Energy highlights energy efficiency, process optimization, and digital integration as core to industrial resilience. Working with customers and partners, they promote smarter systems designed to boost productivity, reliability, and sustainability across operations.",
+        "summary": "Based on the available description, Hitachi Energy emphasizes that resilient industries rely on energy efficiency, process optimization, and digital integration. The company partners with customers to build smarter systems aimed at improving productivity, reliability, and sustainability across operations.",
         "bullets": [
-          "Resilient industries rely on energy efficiency, process optimization, and digital integration.",
-          "Hitachi Energy partners with customers and other organizations to develop smarter systems.",
-          "Primary outcomes emphasized: improved productivity, reliability, and sustainability.",
-          "Focus applies broadly across industrial operations rather than a single sector.",
-          "Calls attention to integrated solutions rather than standalone fixes."
+          "Resilience for industry is built on energy efficiency, optimized processes, and digital integration.",
+          "Hitachi Energy collaborates with customers and partners to deploy smarter systems.",
+          "Primary goals are improved productivity, enhanced reliability, and greater sustainability.",
+          "Focus is on systems-level improvements rather than single-point solutions.",
+          "Call-to-action links to further details via the provided URL."
         ],
         "takeaways": [
-          "Prioritize energy-efficiency measures as a foundation for operational resilience and lower operating costs.",
-          "Evaluate digital integration and process-optimization tools to improve reliability and productivity in substations and data center power systems.",
-          "Engage vendors and partners early—co-developed, integrated solutions are presented as a path to meet sustainability targets.",
-          "Assess prospective technologies by how they contribute across productivity, reliability, and sustainability metrics."
+          "Prioritize energy-efficiency measures and process optimization to strengthen operational resilience.",
+          "Integrate digital tools to improve monitoring, control, and decision-making across assets.",
+          "Seek vendor and partner collaborations for systems-level upgrades that boost reliability and sustainability.",
+          "For grid and data center planning, emphasize solutions that deliver both productivity gains and operational continuity."
         ],
         "tags": [
           "energy-efficiency",
@@ -242,11 +246,10 @@
           "digital-integration",
           "grid-resilience",
           "data-center-power",
-          "sustainability",
+          "industrial-sustainability",
+          "reliability",
           "smart-systems",
-          "Hitachi-Energy",
-          "partnerships",
-          "industrial-transformation"
+          "Hitachi-Energy"
         ]
       }
     }
