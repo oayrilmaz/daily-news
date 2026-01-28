@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PTD Today — Groups</title>
+  <meta name="description" content="PTD Today — LinkedIn groups and community hubs." />
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --paper:#ffffff;
+      --ink:#111111;
+      --muted:#5c5c5c;
+      --rule:rgba(0,0,0,.15);
+      --soft:rgba(0,0,0,.06);
+      --pill:rgba(0,0,0,.04);
+      --btn:#111;
+      --btnInk:#fff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--ink);
+      font-family: Georgia, "Times New Roman", Times, serif;
+      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+    }
+    a{color:inherit}
+    .wrap{max-width:980px;margin:0 auto;padding:26px 16px 60px}
+    .mast{text-align:center;padding:16px 0 6px}
+    .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
+    .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
+
+    .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
+    .nav a{
+      text-decoration:none;padding:7px 12px;border-radius:999px;border:1px solid transparent;
+      color:rgba(0,0,0,.75);font-size:15px
+    }
+    .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
+    .nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
+    .rule{height:1px;background:var(--rule);margin:14px 0 0}
+
+    .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800;letter-spacing:.2px}
+    .updated{text-align:center;color:var(--muted);font-size:15px;margin:6px 0 18px}
+
+    .panel{background:var(--paper);border:1px solid var(--rule);border-radius:14px;overflow:hidden}
+    .notice{
+      padding:12px 14px;border-bottom:1px solid var(--rule);
+      color:rgba(0,0,0,.80);font-size:14px;background:rgba(0,0,0,.02)
+    }
+
+    .toolbar{
+      display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;
+      padding:14px;border-bottom:1px solid var(--rule);background:#fff
+    }
+    .search{
+      flex:1;min-width:220px;
+      border:1px solid var(--rule);border-radius:999px;
+      padding:10px 12px;font-family:inherit;font-size:14px;outline:none;
+      background:#fff;
+    }
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;
+      border:1px solid var(--rule);background:var(--pill);font-size:13px;color:rgba(0,0,0,.78)
+    }
+
+    .list{padding:0}
+    .item{padding:16px 14px;border-bottom:1px solid var(--soft);display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+    .item:last-child{border-bottom:none}
+
+    .meta{color:var(--muted);font-size:12px;letter-spacing:.14px;text-transform:uppercase;margin-bottom:6px}
+    .title{margin:0 0 6px;font-size:20px;font-weight:800}
+    .desc{margin:0;color:rgba(0,0,0,.86);line-height:1.6;font-size:15px;max-width:720px}
+
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .btn{
+      appearance:none;border:1px solid var(--rule);
+      background:var(--btn);color:var(--btnInk);
+      padding:9px 14px;border-radius:999px;cursor:pointer;
+      font-family:inherit;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center
+    }
+    .btn.secondary{background:#fff;color:#111}
+    .btn:hover{filter:brightness(.98)}
+
+    .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
+
+    @media (max-width:760px){
+      .brand{font-size:44px}
+      .pageTitle{font-size:36px}
+      .item{flex-direction:column}
+      .actions{width:100%}
+      .btn{width:100%}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="mast">
+      <h1 class="brand">PTD Today</h1>
+      <div class="tagline">First to Know. First to Lead.</div>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="/index.html">Home</a>
+        <a href="/room.html">Room</a>
+        <a href="/media.html">Media</a>
+        <a class="active" href="/groups.html">Groups</a>
+      </nav>
+
+      <div class="rule"></div>
+    </header>
+
+    <div class="pageTitle">Groups</div>
+    <div class="updated" id="updatedLine">LinkedIn communities curated by PTD Today</div>
+
+    <section class="panel">
+      <div class="notice">
+        These groups are where PTD Today content is shared and discussed — power transmission, grid infrastructure, AI, data centers, renewables, and HV ecosystems.
+      </div>
+
+      <div class="toolbar">
+        <input id="q" class="search" placeholder="Search groups by name, region, topic..." />
+        <span class="pill" id="countPill">Groups: —</span>
+      </div>
+
+      <div class="list" id="list"></div>
+    </section>
+
+    <div class="footer">© <span id="year"></span> PTD Today</div>
+  </div>
+
+  <script>
+    const GROUPS = [
+      {
+        title: "Next-Gen Power Transmission & Artificial Intelligence (AI) & Rare Earth & Data Center Hub",
+        url: "https://www.linkedin.com/groups/3848124/",
+        tags: ["Power Transmission", "AI", "Rare Earth", "Data Centers"]
+      },
+      {
+        title: "Energy & Power | Artificial Intelligence AI | GenAI | Machine Learning | Data Science | IoT Network",
+        url: "https://www.linkedin.com/groups/3843596/",
+        tags: ["Energy", "AI", "GenAI", "ML", "Data Science", "IoT"]
+      },
+      {
+        title: "Next-Gen Power Transmission & Artificial Intelligence (AI) & Rare Earth & Data Center Hub – EUROPE",
+        url: "https://www.linkedin.com/groups/3799941/",
+        tags: ["Europe", "Power Transmission", "AI", "Rare Earth", "Data Centers"]
+      },
+      {
+        title: "Next-Gen Power Transmission & AI & Rare Earth & Data Center Hub - ASIA and MIDDLE EAST",
+        url: "https://www.linkedin.com/groups/3799943/",
+        tags: ["Asia", "Middle East", "Power Transmission", "AI", "Rare Earth", "Data Centers"]
+      },
+      {
+        title: "GIS - Gas Insulated Switchgear",
+        url: "https://www.linkedin.com/groups/3853485/",
+        tags: ["GIS", "Substations", "Switchgear"]
+      },
+      {
+        title: "Power Transmission Business Hub",
+        url: "https://www.linkedin.com/groups/7480300/",
+        tags: ["Business", "Power Transmission", "Vendors", "Projects"]
+      },
+      {
+        title: "Global Civil & Electrical Construction Workforce Network",
+        url: "https://www.linkedin.com/groups/6944119/",
+        tags: ["Construction", "Workforce", "Civil", "Electrical"]
+      },
+      {
+        title: "Power Transmission & High Voltage Professionals",
+        url: "https://www.linkedin.com/groups/3795014/",
+        tags: ["High Voltage", "Transmission", "Professionals"]
+      },
+      {
+        title: "Power Transmission & Renewable Energy Leaders Network",
+        url: "https://www.linkedin.com/groups/3692314/",
+        tags: ["Transmission", "Renewables", "Leadership"]
+      },
+      {
+        title: "Power Grid & Artificial Intelligence (AI), Machine Learning, Data Science & Robotics – Think Tank",
+        url: "https://www.linkedin.com/groups/3799973/",
+        tags: ["Grid", "AI", "ML", "Data Science", "Robotics"]
+      }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+
+    function esc(s){
+      return (s ?? "").toString()
+        .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    }
+
+    function matches(g, q){
+      if (!q) return true;
+      const t = (g.title + " " + (g.tags||[]).join(" ")).toLowerCase();
+      return t.includes(q.toLowerCase());
+    }
+
+    function render(){
+      const q = $("q").value.trim();
+      const items = GROUPS.filter(g => matches(g, q));
+      $("countPill").textContent = "Groups: " + items.length;
+
+      $("list").innerHTML = items.map(g => {
+        const tags = (g.tags || []).slice(0, 8);
+        const meta = tags.length ? tags.join(" • ") : "LinkedIn Group";
+        return `
+          <div class="item">
+            <div>
+              <div class="meta">${esc(meta)}</div>
+              <h3 class="title">${esc(g.title)}</h3>
+              <p class="desc">${esc(g.url)}</p>
+            </div>
+            <div class="actions">
+              <a class="btn" href="${esc(g.url)}" target="_blank" rel="noopener">Open on LinkedIn</a>
+              <button class="btn secondary" type="button" data-copy="${esc(g.url)}">Copy link</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      // copy buttons
+      document.querySelectorAll("button[data-copy]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const url = btn.getAttribute("data-copy") || "";
+          try {
+            await navigator.clipboard.writeText(url);
+            alert("Link copied.");
+          } catch(e) {
+            prompt("Copy this link:", url);
+          }
+        });
+      });
+    }
+
+    $("year").textContent = new Date().getFullYear();
+    $("q").addEventListener("input", render);
+    render();
+  </script>
+</body>
+</html>
