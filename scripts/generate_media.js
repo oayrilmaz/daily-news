@@ -1,6 +1,6 @@
 // scripts/generate_media.js
 // PTD Today - Media Builder
-// Complete replacement package - strict PTD media scope
+// Complete replacement package - PTD portfolio focused
 
 import fs from "node:fs";
 import path from "node:path";
@@ -19,16 +19,15 @@ function optEnv(name, fallback = "") {
 const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
 const GA_ID = optEnv("GA_ID", "");
 
-const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "18"));
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "2"));
+const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24"));
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "5"));
 
-const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "168"));
-const MIN_ITEMS = Number(optEnv("MEDIA_MIN_ITEMS", "8"));
-const EXPAND_HOURS_IF_LOW = Number(optEnv("MEDIA_EXPAND_HOURS_IF_LOW", "720"));
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "720"));
+const EXPAND_HOURS_IF_LOW = Number(optEnv("MEDIA_EXPAND_HOURS_IF_LOW", "2160"));
 
 const FILTER_MODE = optEnv("MEDIA_FILTER_MODE", "hybrid").toLowerCase();
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "4"));
-const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "50"));
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "5"));
+const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "60"));
 const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
 
 function ensureDir(p) {
@@ -128,360 +127,6 @@ async function fetchCaptions(videoId) {
   }
 }
 
-function gaHead() {
-  if (!GA_ID) return "";
-
-  return `
-<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', '${GA_ID}');
-</script>`;
-}
-
-function renderMediaArticleHtml(item) {
-  const id = item.id;
-  const title = item.title || "PTD Today - Media";
-  const channel = item.channel || "YouTube";
-  const published = item.published_at || "";
-  const youtubeUrl = item.url || "";
-  const thumb = item.thumbnail || SITE_ORIGIN + "/assets/og-default.png";
-
-  const ai = item.ai || {};
-  const summary = ai.summary || "";
-  const bullets = Array.isArray(ai.bullets) ? ai.bullets : [];
-  const takeaways = Array.isArray(ai.takeaways) ? ai.takeaways : [];
-  const tags = Array.isArray(ai.tags) ? ai.tags : [];
-
-  const canonical = SITE_ORIGIN + "/media/" + encodeURIComponent(id) + ".html";
-  const description = (summary || "PTD Today AI summary of a video from " + channel + ".")
-    .replace(/\s+/g, " ")
-    .slice(0, 180);
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Article",
-    "headline": title,
-    "description": description,
-    "datePublished": published || new Date().toISOString(),
-    "dateModified": new Date().toISOString(),
-    "mainEntityOfPage": canonical,
-    "publisher": {
-      "@type": "Organization",
-      "name": "PTD Today"
-    }
-  };
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <title>${escapeHtml(title)} - PTD Today</title>
-  <meta name="description" content="${escapeHtml(description)}" />
-  <link rel="canonical" href="${escapeHtml(canonical)}" />
-
-  <meta property="og:type" content="article" />
-  <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:title" content="${escapeHtml(title)}" />
-  <meta property="og:description" content="${escapeHtml(description)}" />
-  <meta property="og:url" content="${escapeHtml(canonical)}" />
-  <meta property="og:image" content="${escapeHtml(thumb)}" />
-
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${escapeHtml(title)}" />
-  <meta name="twitter:description" content="${escapeHtml(description)}" />
-  <meta name="twitter:image" content="${escapeHtml(thumb)}" />
-
-  <script type="application/ld+json">${escapeHtml(JSON.stringify(jsonLd))}</script>
-  ${gaHead()}
-
-  <style>
-    :root{
-      --bg:#fff;
-      --ink:#111;
-      --muted:#5c5c5c;
-      --rule:rgba(0,0,0,.15);
-      --pill:rgba(0,0,0,.04);
-      --btn:#111;
-      --btnInk:#fff;
-    }
-
-    *{box-sizing:border-box}
-
-    body{
-      margin:0;
-      background:var(--bg);
-      color:var(--ink);
-      font-family:Georgia,"Times New Roman",Times,serif;
-      -webkit-font-smoothing:antialiased;
-      text-rendering:optimizeLegibility;
-    }
-
-    a{color:inherit}
-
-    .wrap{
-      max-width:900px;
-      margin:0 auto;
-      padding:26px 16px 64px;
-    }
-
-    .mast{
-      text-align:center;
-      padding:16px 0 10px;
-    }
-
-    .brand{
-      margin:0;
-      font-size:52px;
-      letter-spacing:.2px;
-      font-weight:700;
-    }
-
-    .tagline{
-      margin:6px 0 10px;
-      color:var(--muted);
-      font-style:italic;
-      font-size:16px;
-    }
-
-    .nav{
-      display:flex;
-      justify-content:center;
-      gap:14px;
-      flex-wrap:wrap;
-      margin:10px 0 10px;
-    }
-
-    .nav a{
-      text-decoration:none;
-      padding:7px 12px;
-      border-radius:999px;
-      border:1px solid transparent;
-      color:rgba(0,0,0,.75);
-      font-size:15px;
-    }
-
-    .nav a:hover{
-      border-color:var(--rule);
-      background:rgba(0,0,0,.02);
-    }
-
-    .nav a.active{
-      border-color:var(--rule);
-      background:rgba(0,0,0,.03);
-      font-weight:700;
-      color:rgba(0,0,0,.92);
-    }
-
-    .rule{
-      height:1px;
-      background:var(--rule);
-      margin:14px 0 0;
-    }
-
-    .meta{
-      color:var(--muted);
-      font-size:12px;
-      letter-spacing:.14px;
-      text-transform:uppercase;
-      margin:16px 0 8px;
-    }
-
-    h1{
-      margin:0 0 10px;
-      font-size:44px;
-      line-height:1.03;
-      font-weight:900;
-    }
-
-    .lede{
-      font-size:18px;
-      line-height:1.6;
-      color:rgba(0,0,0,.86);
-      margin:0 0 14px;
-    }
-
-    .card{
-      border:1px solid var(--rule);
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
-    }
-
-    .thumb img{
-      width:100%;
-      display:block;
-    }
-
-    .content{
-      padding:14px;
-    }
-
-    .subhead{
-      margin:18px 0 8px;
-      font-size:12px;
-      text-transform:uppercase;
-      letter-spacing:.12px;
-      color:var(--muted);
-    }
-
-    ul{
-      margin:0 0 12px;
-      padding-left:18px;
-    }
-
-    li{
-      margin:6px 0;
-    }
-
-    .chips{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      margin:14px 0 0;
-    }
-
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid var(--rule);
-      background:var(--pill);
-      font-size:13px;
-      color:rgba(0,0,0,.76);
-    }
-
-    .btnRow{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin:16px 0 0;
-    }
-
-    .btn{
-      appearance:none;
-      border:1px solid var(--rule);
-      background:var(--btn);
-      color:var(--btnInk);
-      padding:9px 14px;
-      border-radius:999px;
-      cursor:pointer;
-      font-family:inherit;
-      font-size:14px;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-    }
-
-    .btn.secondary{
-      background:#fff;
-      color:#111;
-    }
-
-    .footer{
-      text-align:center;
-      margin-top:24px;
-      color:var(--muted);
-      font-size:13px;
-    }
-
-    @media (max-width:760px){
-      .brand{font-size:44px}
-      h1{font-size:38px}
-    }
-  </style>
-</head>
-
-<body>
-  <div class="wrap">
-    <header class="mast">
-      <h1 class="brand">PTD Today</h1>
-      <div class="tagline">First to Know. First to Lead.</div>
-
-      <nav class="nav" aria-label="Primary navigation">
-        <a href="/index.html">Home</a>
-        <a href="/room.html">Room</a>
-        <a class="active" href="/media.html">Media</a>
-        <a href="/groups.html">Groups</a>
-      </nav>
-
-      <div class="rule"></div>
-    </header>
-
-    <div class="meta">VIDEO - ${escapeHtml(channel)} - ${escapeHtml(published)}</div>
-    <h1>${escapeHtml(title)}</h1>
-    ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
-
-    <div class="card">
-      <div class="thumb">
-        <img src="${escapeHtml(thumb)}" alt="">
-      </div>
-
-      <div class="content">
-        <div class="btnRow">
-          <a class="btn" href="${escapeHtml(youtubeUrl)}" target="_blank" rel="noopener">Watch on YouTube</a>
-          <button class="btn secondary" id="shareBtn" type="button">Share</button>
-        </div>
-
-        ${bullets.length ? `
-          <div class="subhead">Key points</div>
-          <ul>${bullets.slice(0, 8).map(b => `<li>${escapeHtml(b)}</li>`).join("")}</ul>
-        ` : ""}
-
-        ${takeaways.length ? `
-          <div class="subhead">So what</div>
-          <ul>${takeaways.slice(0, 6).map(t => `<li>${escapeHtml(t)}</li>`).join("")}</ul>
-        ` : ""}
-
-        ${tags.length ? `
-          <div class="chips">
-            ${tags.slice(0, 12).map(t => `<span class="chip">${escapeHtml(t)}</span>`).join("")}
-          </div>
-        ` : ""}
-      </div>
-    </div>
-
-    <div class="footer">© ${new Date().getFullYear()} PTD Today</div>
-  </div>
-
-  <script>
-    (function(){
-      var url = ${JSON.stringify(canonical)};
-      var title = ${JSON.stringify(title)};
-      var text = ${JSON.stringify(description)};
-      var btn = document.getElementById("shareBtn");
-
-      if(!btn) return;
-
-      btn.addEventListener("click", async function(){
-        if (navigator.share) {
-          try {
-            await navigator.share({ title: title, text: text, url: url });
-            return;
-          } catch(e) {
-            return;
-          }
-        }
-
-        try {
-          await navigator.clipboard.writeText(url);
-          alert("Link copied.");
-        } catch(e) {
-          prompt("Copy this link:", url);
-        }
-      });
-    })();
-  </script>
-</body>
-</html>`;
-}
-
 function normalize(s) {
   return (s || "")
     .toString()
@@ -491,13 +136,13 @@ function normalize(s) {
     .trim();
 }
 
-const CORE_GRID_TERMS = [
+const PRIMARY_PTD_TERMS = [
   "power transmission",
-  "transmission grid",
   "transmission line",
+  "transmission grid",
   "electric transmission",
-  "electric grid",
   "power grid",
+  "electric grid",
   "grid modernization",
   "grid reliability",
   "grid resilience",
@@ -523,8 +168,8 @@ const CORE_GRID_TERMS = [
   "switchgear",
   "transformer",
   "transformers",
-  "reactor",
   "shunt reactor",
+  "reactor",
   "capacitor bank",
   "protection relay",
   "relay protection",
@@ -541,32 +186,31 @@ const CORE_GRID_TERMS = [
   "tso",
   "pjm",
   "ercot",
-  "national grid",
-  "electricity demand",
+  "ferc",
+  "nerc",
   "load growth",
   "peak demand",
+  "electricity demand",
   "power system",
   "power systems",
   "distribution grid",
   "distribution system",
-  "renewable integration",
-  "renewables integration",
+  "microgrid",
+  "energy storage",
   "battery storage",
   "bess",
-  "energy storage",
-  "microgrid",
+  "renewable integration",
+  "renewables integration",
   "offshore wind",
   "solar interconnection",
   "wind interconnection",
-  "grid operator",
-  "grid operators",
-  "power outage",
-  "blackout",
   "grid planning",
   "transmission planning",
   "queue reform",
   "electric infrastructure",
-  "energy infrastructure"
+  "energy infrastructure",
+  "grid equipment",
+  "electrical equipment"
 ];
 
 const DATA_CENTER_POWER_TERMS = [
@@ -582,6 +226,9 @@ const DATA_CENTER_POWER_TERMS = [
   "datacenter load",
   "ai data center power",
   "ai data centers power",
+  "ai electricity demand",
+  "ai energy demand",
+  "data center energy demand",
   "data center cooling",
   "datacenter cooling",
   "liquid cooling",
@@ -598,13 +245,10 @@ const DATA_CENTER_POWER_TERMS = [
   "behind-the-meter",
   "behind the meter",
   "data center infrastructure",
-  "ai infrastructure power",
-  "data center energy demand",
-  "ai energy demand",
-  "ai electricity demand"
+  "ai infrastructure power"
 ];
 
-const AI_ENERGY_PAIR_A = [
+const AI_WORDS = [
   "ai",
   "artificial intelligence",
   "machine learning",
@@ -613,7 +257,6 @@ const AI_ENERGY_PAIR_A = [
   "data science",
   "digital twin",
   "automation",
-  "robotics",
   "gpu",
   "gpus",
   "compute",
@@ -623,7 +266,7 @@ const AI_ENERGY_PAIR_A = [
   "chip"
 ];
 
-const AI_ENERGY_PAIR_B = [
+const ENERGY_WORDS = [
   "grid",
   "power",
   "electricity",
@@ -645,7 +288,7 @@ const AI_ENERGY_PAIR_B = [
   "storage"
 ];
 
-const CRITICAL_INFRA_TERMS = [
+const MATERIAL_TERMS = [
   "critical minerals",
   "critical mineral",
   "rare earth",
@@ -656,40 +299,11 @@ const CRITICAL_INFRA_TERMS = [
   "lithium",
   "nickel",
   "graphite",
-  "supply chain",
   "transformer shortage",
-  "grid equipment",
-  "high voltage equipment",
-  "electrical equipment",
+  "supply chain",
   "electrification supply chain",
   "manufacturing capacity",
   "factory capacity"
-];
-
-const STRONG_SOURCE_CHANNELS = [
-  "ge vernova",
-  "siemens energy",
-  "hitachi energy",
-  "abb electrification",
-  "schneider electric",
-  "eaton",
-  "national grid",
-  "pjm interconnection",
-  "ercot",
-  "epri",
-  "cigre",
-  "iea",
-  "nrel",
-  "u.s. department of energy",
-  "us department of energy",
-  "department of energy",
-  "ieee power",
-  "ieee power & energy",
-  "rmi",
-  "wood mackenzie",
-  "energy systems integration group",
-  "grid strategies",
-  "ferc"
 ];
 
 const HARD_EXCLUDE_TERMS = [
@@ -727,8 +341,13 @@ const HARD_EXCLUDE_TERMS = [
   "career advice",
   "productivity hacks",
   "insurance",
+  "ubezpieczenia",
+  "ubezpieczeniach",
   "actuarial",
   "actuary",
+  "aktuariusze",
+  "aon",
+  "risk-management",
   "healthcare ai",
   "medical ai",
   "legal ai",
@@ -744,6 +363,14 @@ const HARD_EXCLUDE_TERMS = [
   "veed",
   "cinematic video generator",
   "content creator",
+  "cobot",
+  "flexpendant",
+  "jogging",
+  "operator onboarding",
+  "robotics training",
+  "e-learning",
+  "tutorial",
+  "training center",
   "election",
   "vote",
   "campaign",
@@ -775,6 +402,32 @@ const HARD_EXCLUDE_TERMS = [
   "scotus"
 ];
 
+const ENERGY_CHANNEL_BONUS = [
+  "ge vernova",
+  "siemens energy",
+  "hitachi energy",
+  "schneider electric",
+  "eaton",
+  "national grid",
+  "pjm interconnection",
+  "ercot",
+  "epri",
+  "cigre",
+  "iea",
+  "nrel",
+  "department of energy",
+  "u.s. department of energy",
+  "us department of energy",
+  "ieee power",
+  "ieee power & energy",
+  "ferc",
+  "nerc",
+  "grid strategies",
+  "rmi",
+  "wood mackenzie",
+  "energy systems integration group"
+];
+
 function hasAny(text, arr) {
   return arr.some(k => text.includes(k));
 }
@@ -787,98 +440,86 @@ function countMatches(text, arr) {
   return count;
 }
 
-function hasAiEnergyPair(text) {
-  return hasAny(text, AI_ENERGY_PAIR_A) && hasAny(text, AI_ENERGY_PAIR_B);
+function hasPrimaryPtd(text) {
+  return hasAny(text, PRIMARY_PTD_TERMS);
 }
 
-function hasDataCenterPowerMatch(text) {
+function hasDataCenterPower(text) {
   return hasAny(text, DATA_CENTER_POWER_TERMS);
 }
 
-function hasCoreGridMatch(text) {
-  return hasAny(text, CORE_GRID_TERMS);
+function hasAiEnergyPair(text) {
+  return hasAny(text, AI_WORDS) && hasAny(text, ENERGY_WORDS);
 }
 
-function hasCriticalInfraMatch(text) {
-  return hasAny(text, CRITICAL_INFRA_TERMS) && hasAny(text, AI_ENERGY_PAIR_B);
+function hasMaterialEnergyPair(text) {
+  return hasAny(text, MATERIAL_TERMS) && hasAny(text, ENERGY_WORDS);
 }
 
-function quickHardBlock(v) {
-  const text = normalize(`${v.title} ${v.channel} ${v.description || ""}`);
+function isHardExcluded(v) {
+  const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
   return hasAny(text, HARD_EXCLUDE_TERMS);
 }
 
 function keywordScore(v) {
-  const text = normalize(`${v.title} ${v.channel} ${v.description || ""}`);
+  const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
   const channel = normalize(v.channel || "");
 
-  if (hasAny(text, HARD_EXCLUDE_TERMS)) return -100;
+  if (hasAny(text, HARD_EXCLUDE_TERMS)) return -999;
 
   let score = 0;
 
-  score += countMatches(text, CORE_GRID_TERMS) * 3;
-  score += countMatches(text, DATA_CENTER_POWER_TERMS) * 3;
+  score += countMatches(text, PRIMARY_PTD_TERMS) * 4;
+  score += countMatches(text, DATA_CENTER_POWER_TERMS) * 4;
 
-  if (hasCriticalInfraMatch(text)) score += 4;
-  if (hasAiEnergyPair(text)) score += 4;
+  if (hasAiEnergyPair(text)) score += 5;
+  if (hasMaterialEnergyPair(text)) score += 5;
 
-  if (STRONG_SOURCE_CHANNELS.some(c => channel.includes(c))) score += 2;
+  if (ENERGY_CHANNEL_BONUS.some(c => channel.includes(c))) score += 3;
 
-  const broadOnly =
-    hasAny(text, ["cloud", "ai", "artificial intelligence", "gpu", "compute", "leadership", "business"]) &&
-    !hasCoreGridMatch(text) &&
-    !hasDataCenterPowerMatch(text) &&
-    !hasCriticalInfraMatch(text) &&
-    !hasAiEnergyPair(text);
+  const broadAiOnly =
+    hasAny(text, AI_WORDS) &&
+    !hasPrimaryPtd(text) &&
+    !hasDataCenterPower(text) &&
+    !hasMaterialEnergyPair(text);
 
-  if (broadOnly) score -= 6;
+  if (broadAiOnly) score -= 8;
 
   return score;
 }
 
-function isStrictlyRelevant(v) {
-  const text = normalize(`${v.title} ${v.channel} ${v.description || ""}`);
+function isRelevantByRules(v) {
+  const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
 
   if (hasAny(text, HARD_EXCLUDE_TERMS)) return false;
 
   return (
-    hasCoreGridMatch(text) ||
-    hasDataCenterPowerMatch(text) ||
-    hasCriticalInfraMatch(text) ||
-    hasAiEnergyPair(text)
+    hasPrimaryPtd(text) ||
+    hasDataCenterPower(text) ||
+    hasAiEnergyPair(text) ||
+    hasMaterialEnergyPair(text)
   );
 }
 
 async function aiGate(openai, v) {
   const system = `
-You are a very strict content gate for PTD Today.
+You are a strict content gate for PTD Today.
 
-PTD Today serves LinkedIn groups focused on:
-- Power transmission and distribution
-- Electric grid modernization, reliability, utilities, substations, HVDC, FACTS, GIS, transformers, switchgear
-- Renewable energy integration, storage, interconnection, microgrids
-- Data centers ONLY when the topic is electricity demand, power supply, cooling, grid connection, substations, energy infrastructure, or AI infrastructure power
-- AI / machine learning / GPUs / cloud ONLY when clearly connected to energy, grid, utilities, power systems, data center power, electricity, or infrastructure
-- Critical minerals / rare earth / copper ONLY when connected to electrification, grid, energy infrastructure, manufacturing, or supply chain
+ALLOW only if the video is materially about:
+- Power transmission or distribution
+- Electric grids, utilities, grid reliability, grid modernization, interconnection, substations
+- HVDC, FACTS, GIS, transformers, switchgear, high-voltage equipment
+- Renewable integration, battery storage, microgrids, grid planning
+- Data centers ONLY when about electricity demand, power supply, grid connection, cooling, substations, or energy infrastructure
+- AI, GPUs, cloud, or machine learning ONLY when clearly tied to energy, grid, utilities, power systems, data center power, electricity demand, or infrastructure
+- Critical minerals, copper, rare earths, or supply chain ONLY when tied to grid, energy infrastructure, electrification, or electrical equipment
 
 DISALLOW:
-- General AI unrelated to energy/grid/data center power
-- AI in insurance, healthcare, legal, retail, marketing, education, or creator tools
-- Gaming, entertainment, sports, leadership coaching, personal development
-- General cloud product demos unless clearly about energy/grid/data center power
-- Politics, elections, geopolitics, war, ideology, or general news unrelated to PTD scope
-
-Examples:
-- AI in insurance => DISALLOW
-- Marvel gaming trailer => DISALLOW
-- World Cup infrastructure costs => DISALLOW
-- AWS leadership mindset => DISALLOW
-- AI video creation with Gemini => DISALLOW
-- ABB robot jogging tutorial => DISALLOW unless directly about grid/electrical equipment manufacturing
-- AI data centers driving electricity demand => ALLOW
-- Grid modernization with AI => ALLOW
-- HVDC transmission project update => ALLOW
-- Transformer supply chain shortage => ALLOW
+- Insurance, actuarial work, finance-only AI, generic business AI
+- Sports, entertainment, gaming, personal leadership, mindset coaching
+- Generic robotics tutorials, cobot operation, FlexPendant jogging, training videos
+- Generic video creation tools, subtitles, dubbing, creator tools
+- Politics, elections, war, geopolitics, ideology
 
 Return JSON only:
 {"allow": true/false, "reason": "short", "topic": "short label"}
@@ -902,15 +543,10 @@ ${v.transcript || "[none]"}
       { role: "system", content: system },
       { role: "user", content: user }
     ],
-    text: {
-      format: {
-        type: "json_object"
-      }
-    }
+    text: { format: { type: "json_object" } }
   });
 
   let obj = {};
-
   try {
     obj = JSON.parse(resp.output_text || "{}");
   } catch {
@@ -919,8 +555,8 @@ ${v.transcript || "[none]"}
 
   return {
     allow: !!obj.allow,
-    reason: (obj.reason || "").toString().slice(0, 140),
-    topic: (obj.topic || "").toString().slice(0, 80)
+    reason: (obj.reason || "").toString().slice(0, 160),
+    topic: (obj.topic || "").toString().slice(0, 100)
   };
 }
 
@@ -932,16 +568,16 @@ async function summarizeVideo(openai, v) {
 You are PTD Today's Media summarizer.
 
 Audience:
-- Power transmission and distribution professionals
+- Power transmission professionals
 - Grid, utility, EPC, high-voltage, renewable integration, data center power, AI infrastructure, and critical energy infrastructure professionals
 
 Rules:
-- Summarize ONLY what is present in transcript/description.
+- Summarize only the transcript/description.
 - If transcript is missing, say: "Based on the available description..."
-- Do not speculate.
-- Do not add political commentary.
-- Keep the tone professional and useful for grid, data center, and energy infrastructure decision-makers.
-Return VALID JSON only.
+- Keep it useful for grid, data center, power transmission, EPC, utility, and energy infrastructure professionals.
+- No politics.
+- No speculation.
+Return valid JSON only.
 `.trim();
 
   const user = `
@@ -950,18 +586,17 @@ Title: ${v.title}
 Channel: ${v.channel}
 Published: ${v.published_at}
 
-CONTENT:
 Transcript:
 ${transcript ? transcript : "[No transcript available]"}
 
 Description:
 ${desc ? desc : "[No description available]"}
 
-Return JSON with EXACT keys:
+Return JSON with exact keys:
 {
-  "summary": "2-3 sentences, human tone",
+  "summary": "2-3 sentences",
   "bullets": ["5 concise bullets max"],
-  "takeaways": ["3-5 so what bullets for grid/data center decision-makers"],
+  "takeaways": ["3-5 so what bullets for PTD Today readers"],
   "tags": ["6-10 short tags"]
 }
 `.trim();
@@ -972,15 +607,10 @@ Return JSON with EXACT keys:
       { role: "system", content: system },
       { role: "user", content: user }
     ],
-    text: {
-      format: {
-        type: "json_object"
-      }
-    }
+    text: { format: { type: "json_object" } }
   });
 
   let obj = {};
-
   try {
     obj = JSON.parse(resp.output_text || "{}");
   } catch {
@@ -988,22 +618,161 @@ Return JSON with EXACT keys:
   }
 
   return {
-    summary: (obj.summary || "").toString().slice(0, 600),
+    summary: (obj.summary || "").toString().slice(0, 650),
     bullets: Array.isArray(obj.bullets) ? obj.bullets.map(String).slice(0, 5) : [],
-    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(String).slice(0, 6) : [],
-    tags: Array.isArray(obj.tags) ? obj.tags.map(String).slice(0, 12) : []
+    takeaways: Array.isArray(obj.takeaways) ? obj.takeaways.map(String).slice(0, 5) : [],
+    tags: Array.isArray(obj.tags) ? obj.tags.map(String).slice(0, 10) : []
   };
+}
+
+function gaHead() {
+  if (!GA_ID) return "";
+  return `
+<script async src="https://www.googletagmanager.com/gtag/js?id=${GA_ID}"></script>
+<script>
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_ID}');
+</script>`;
+}
+
+function renderMediaArticleHtml(item) {
+  const id = item.id;
+  const title = item.title || "PTD Today - Media";
+  const channel = item.channel || "YouTube";
+  const published = item.published_at || "";
+  const youtubeUrl = item.url || "";
+  const thumb = item.thumbnail || SITE_ORIGIN + "/assets/og-default.png";
+
+  const ai = item.ai || {};
+  const summary = ai.summary || "";
+  const bullets = Array.isArray(ai.bullets) ? ai.bullets : [];
+  const takeaways = Array.isArray(ai.takeaways) ? ai.takeaways : [];
+  const tags = Array.isArray(ai.tags) ? ai.tags : [];
+
+  const canonical = SITE_ORIGIN + "/media/" + encodeURIComponent(id) + ".html";
+  const description = (summary || "PTD Today AI summary of a video from " + channel + ".")
+    .replace(/\s+/g, " ")
+    .slice(0, 180);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": title,
+    "description": description,
+    "datePublished": published || new Date().toISOString(),
+    "dateModified": new Date().toISOString(),
+    "mainEntityOfPage": canonical,
+    "publisher": { "@type": "Organization", "name": "PTD Today" }
+  };
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)} - PTD Today</title>
+<meta name="description" content="${escapeHtml(description)}" />
+<link rel="canonical" href="${escapeHtml(canonical)}" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="PTD Today" />
+<meta property="og:title" content="${escapeHtml(title)}" />
+<meta property="og:description" content="${escapeHtml(description)}" />
+<meta property="og:url" content="${escapeHtml(canonical)}" />
+<meta property="og:image" content="${escapeHtml(thumb)}" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${escapeHtml(title)}" />
+<meta name="twitter:description" content="${escapeHtml(description)}" />
+<meta name="twitter:image" content="${escapeHtml(thumb)}" />
+<script type="application/ld+json">${escapeHtml(JSON.stringify(jsonLd))}</script>
+${gaHead()}
+<style>
+:root{--bg:#fff;--ink:#111;--muted:#5c5c5c;--rule:rgba(0,0,0,.15);--pill:rgba(0,0,0,.04);--btn:#111;--btnInk:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,"Times New Roman",Times,serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit}
+.wrap{max-width:900px;margin:0 auto;padding:26px 16px 64px}
+.mast{text-align:center;padding:16px 0 10px}
+.brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
+.tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
+.nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
+.nav a{text-decoration:none;padding:7px 12px;border-radius:999px;border:1px solid transparent;color:rgba(0,0,0,.75);font-size:15px}
+.nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
+.nav a.active{border-color:var(--rule);background:rgba(0,0,0,.03);font-weight:700;color:rgba(0,0,0,.92)}
+.rule{height:1px;background:var(--rule);margin:14px 0 0}
+.meta{color:var(--muted);font-size:12px;letter-spacing:.14px;text-transform:uppercase;margin:16px 0 8px}
+h1{margin:0 0 10px;font-size:44px;line-height:1.03;font-weight:900}
+.lede{font-size:18px;line-height:1.6;color:rgba(0,0,0,.86);margin:0 0 14px}
+.card{border:1px solid var(--rule);border-radius:14px;overflow:hidden;background:#fff}
+.thumb img{width:100%;display:block}
+.content{padding:14px}
+.subhead{margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.12px;color:var(--muted)}
+ul{margin:0 0 12px;padding-left:18px}
+li{margin:6px 0}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.chip{display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;border:1px solid var(--rule);background:var(--pill);font-size:13px;color:rgba(0,0,0,.76)}
+.btnRow{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}
+.btn{appearance:none;border:1px solid var(--rule);background:var(--btn);color:var(--btnInk);padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.secondary{background:#fff;color:#111}
+.footer{text-align:center;margin-top:24px;color:var(--muted);font-size:13px}
+@media(max-width:760px){.brand{font-size:44px}h1{font-size:38px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="mast">
+<h1 class="brand">PTD Today</h1>
+<div class="tagline">First to Know. First to Lead.</div>
+<nav class="nav" aria-label="Primary navigation">
+<a href="/index.html">Home</a>
+<a href="/room.html">Room</a>
+<a class="active" href="/media.html">Media</a>
+<a href="/groups.html">Groups</a>
+</nav>
+<div class="rule"></div>
+</header>
+<div class="meta">VIDEO - ${escapeHtml(channel)} - ${escapeHtml(published)}</div>
+<h1>${escapeHtml(title)}</h1>
+${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
+<div class="card">
+<div class="thumb"><img src="${escapeHtml(thumb)}" alt=""></div>
+<div class="content">
+<div class="btnRow">
+<a class="btn" href="${escapeHtml(youtubeUrl)}" target="_blank" rel="noopener">Watch on YouTube</a>
+<button class="btn secondary" id="shareBtn" type="button">Share</button>
+</div>
+${bullets.length ? `<div class="subhead">Key points</div><ul>${bullets.slice(0,8).map(b=>`<li>${escapeHtml(b)}</li>`).join("")}</ul>` : ""}
+${takeaways.length ? `<div class="subhead">So what</div><ul>${takeaways.slice(0,5).map(t=>`<li>${escapeHtml(t)}</li>`).join("")}</ul>` : ""}
+${tags.length ? `<div class="chips">${tags.slice(0,10).map(t=>`<span class="chip">${escapeHtml(t)}</span>`).join("")}</div>` : ""}
+</div>
+</div>
+<div class="footer">© ${new Date().getFullYear()} PTD Today</div>
+</div>
+<script>
+(function(){
+var url=${JSON.stringify(canonical)};
+var title=${JSON.stringify(title)};
+var text=${JSON.stringify(description)};
+var btn=document.getElementById("shareBtn");
+if(!btn)return;
+btn.addEventListener("click",async function(){
+if(navigator.share){
+try{await navigator.share({title:title,text:text,url:url});return;}catch(e){return;}
+}
+try{await navigator.clipboard.writeText(url);alert("Link copied.");}
+catch(e){prompt("Copy this link:",url);}
+});
+})();
+</script>
+</body>
+</html>`;
 }
 
 function parseMediaChannelsEnv() {
   const raw = optEnv("MEDIA_CHANNELS", "").trim();
-
   if (!raw) return [];
-
-  return raw
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean);
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
 }
 
 async function resolveToChannelId(input) {
@@ -1070,7 +839,6 @@ async function collectFromChannels(channelInputs, lookbackHours) {
   });
 
   videos.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-
   return videos;
 }
 
@@ -1081,17 +849,17 @@ async function main() {
   const channelInputs = parseMediaChannelsEnv();
 
   if (!channelInputs.length) {
-    throw new Error("MEDIA_CHANNELS is empty. Provide comma-separated YouTube URLs/handles/UC IDs.");
+    throw new Error("MEDIA_CHANNELS is empty. Add YouTube channels in workflow env.");
   }
 
   let videos = await collectFromChannels(channelInputs, LOOKBACK_HOURS);
 
-  if (videos.length < MIN_ITEMS && EXPAND_HOURS_IF_LOW > LOOKBACK_HOURS) {
-    console.log("Only " + videos.length + " items in " + LOOKBACK_HOURS + "h. Expanding to " + EXPAND_HOURS_IF_LOW + "h...");
+  if (videos.length < 12 && EXPAND_HOURS_IF_LOW > LOOKBACK_HOURS) {
+    console.log("Only " + videos.length + " items. Expanding lookback to " + EXPAND_HOURS_IF_LOW + " hours.");
     videos = await collectFromChannels(channelInputs, EXPAND_HOURS_IF_LOW);
   }
 
-  videos = videos.slice(0, Math.max(MAX_VIDEOS * 5, 120));
+  videos = videos.slice(0, Math.max(MAX_VIDEOS * 8, 180));
 
   const kept = [];
   const borderline = [];
@@ -1102,7 +870,7 @@ async function main() {
       continue;
     }
 
-    if (quickHardBlock(v)) {
+    if (isHardExcluded(v)) {
       console.log("Blocked: " + v.title + " | " + v.channel);
       continue;
     }
@@ -1115,7 +883,7 @@ async function main() {
     const score = keywordScore(v);
     v._score = score;
 
-    if (score >= MIN_MATCH_SCORE && isStrictlyRelevant(v)) {
+    if (score >= MIN_MATCH_SCORE && isRelevantByRules(v)) {
       kept.push(v);
     } else {
       borderline.push(v);
@@ -1130,8 +898,9 @@ async function main() {
       .slice(0, MAX_FILTER_AI);
 
     for (const v of slice) {
-      v.transcript = await fetchCaptions(v.id);
+      if (isHardExcluded(v)) continue;
 
+      v.transcript = await fetchCaptions(v.id);
       const gate = await aiGate(openai, v);
 
       if (gate.allow) {
@@ -1147,12 +916,9 @@ async function main() {
 
   let finalList = [...kept, ...gated];
 
+  finalList = finalList.filter(v => !isHardExcluded(v));
   finalList.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
   finalList = finalList.slice(0, MAX_VIDEOS);
-
-  if (!finalList.length) {
-    console.warn("No items passed the strict PTD filter. Increase MEDIA_LOOKBACK_HOURS or improve MEDIA_CHANNELS.");
-  }
 
   const outItems = [];
 
@@ -1191,13 +957,12 @@ async function main() {
       lookback_hours: LOOKBACK_HOURS,
       expand_hours_if_low: EXPAND_HOURS_IF_LOW,
       max_filter_ai: MAX_FILTER_AI,
-      scope: "Strict PTD: power transmission, grid, AI infrastructure power, data centers, renewables, HV equipment, GIS, critical energy infrastructure"
+      scope: "PTD portfolio: power transmission, grid, AI infrastructure power, data centers, renewables, HV equipment, GIS, critical energy infrastructure"
     },
     items: outItems
   };
 
   writeJson(path.join("data", "media.json"), payload);
-
   console.log("Wrote: data/media.json (" + outItems.length + ") and media/*.html");
 }
 
