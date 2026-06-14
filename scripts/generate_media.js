@@ -1,6 +1,8 @@
 // scripts/generate_media.js
 // PTD Today - Media Builder
-// Complete replacement package - portfolio-focused, no broad business fallback.
+// Search-first PTD portfolio version
+// This version collects videos from YouTube topic searches + trusted channels.
+// It blocks broad business, sports, gaming, insurance, generic AI, laundromat, and unrelated content.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -20,11 +22,11 @@ const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/,
 const GA_ID = optEnv("GA_ID", "");
 
 const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24"));
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "8"));
+const MAX_PER_CHANNEL = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
+const MAX_PER_SEARCH = Number(optEnv("MEDIA_MAX_PER_SEARCH", "8"));
 const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "2160")); // 90 days
-const FILTER_MODE = optEnv("MEDIA_FILTER_MODE", "hybrid").toLowerCase();
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "3"));
-const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "80"));
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "4"));
+const MAX_AI_GATE = Number(optEnv("MEDIA_MAX_FILTER_AI", "80"));
 const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
 
 const DEFAULT_CHANNELS = [
@@ -43,13 +45,35 @@ const DEFAULT_CHANNELS = [
   "https://www.youtube.com/@CIGRE",
   "https://www.youtube.com/@ferc",
   "https://www.youtube.com/@IEEEorg",
-  "https://www.youtube.com/@IEEEPowerEnergySociety",
   "https://www.youtube.com/@ABB",
   "https://www.youtube.com/@FluenceEnergy",
   "https://www.youtube.com/@WartsilaCorporation",
   "https://www.youtube.com/@NVIDIA",
   "https://www.youtube.com/@GoogleCloudTech",
-  "https://www.youtube.com/@MicrosoftCloud"
+  "https://www.youtube.com/@Microsoft"
+];
+
+const DEFAULT_SEARCH_QUERIES = [
+  "power transmission grid",
+  "electric grid modernization",
+  "grid reliability power transmission",
+  "HVDC transmission project",
+  "high voltage substation",
+  "GIS gas insulated switchgear",
+  "transformer shortage grid",
+  "power grid interconnection queue",
+  "data center power grid",
+  "AI data center electricity demand",
+  "AI energy demand grid",
+  "renewable energy grid integration",
+  "battery energy storage grid",
+  "microgrid utility power",
+  "offshore wind transmission grid",
+  "critical minerals electrification grid",
+  "electricity demand data centers",
+  "utility grid planning",
+  "power system reliability",
+  "transmission planning renewable interconnection"
 ];
 
 function ensureDir(p) {
@@ -75,7 +99,10 @@ function escapeHtml(str) {
 }
 
 const clean = (s = "") => s.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function fetchText(url, headers = {}, retries = 3) {
   const h = {
@@ -94,9 +121,11 @@ async function fetchText(url, headers = {}, retries = 3) {
       await sleep(500 * (i + 1));
     }
   }
+
+  return "";
 }
 
-function parseYouTubeRSS(xml) {
+function parseYouTubeRSS(xml, sourceType = "channel", sourceLabel = "") {
   const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
 
   return entries.map(e => {
@@ -118,7 +147,9 @@ function parseYouTubeRSS(xml) {
       published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
       url: id ? "https://www.youtube.com/watch?v=" + id : "",
       thumbnail: id ? "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg" : "",
-      description: desc
+      description: desc,
+      source_type: sourceType,
+      source_label: sourceLabel
     };
   }).filter(x => x.id && x.title);
 }
@@ -157,6 +188,114 @@ function normalize(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+function combinedText(v) {
+  return normalize(v.title + " " + v.channel + " " + (v.description || "") + " " + (v.source_label || ""));
+}
+
+const HARD_EXCLUDE = [
+  "laundromat",
+  "laundry",
+  "small business",
+  "owner salary",
+  "profit margin",
+  "rent income",
+  "side hustle",
+  "passive income",
+  "franchise",
+  "world cup",
+  "soccer",
+  "football",
+  "nfl",
+  "nba",
+  "nhl",
+  "mlb",
+  "gaming",
+  "gameplay",
+  "game trailer",
+  "character reveal",
+  "marvel",
+  "rivals",
+  "steam",
+  "epic games",
+  "playstation",
+  "xbox",
+  "nintendo",
+  "movie",
+  "film",
+  "celebrity",
+  "music video",
+  "mindset",
+  "high-performance coach",
+  "high performance coach",
+  "performance coach",
+  "leadership coaching",
+  "how to lead",
+  "show up every day",
+  "a-game",
+  "personal development",
+  "career advice",
+  "productivity hacks",
+  "insurance",
+  "ubezpieczenia",
+  "ubezpieczeniach",
+  "actuarial",
+  "actuary",
+  "aktuariusze",
+  "aon",
+  "risk-management",
+  "healthcare ai",
+  "medical ai",
+  "legal ai",
+  "education ai",
+  "retail ai",
+  "marketing ai",
+  "sales ai",
+  "customer service ai",
+  "video editing",
+  "creator tools",
+  "subtitles",
+  "dubbing",
+  "veed",
+  "cinematic video generator",
+  "content creator",
+  "cobot",
+  "flexpendant",
+  "jogging",
+  "operator onboarding",
+  "robotics training",
+  "e-learning",
+  "tutorial",
+  "training center",
+  "election",
+  "vote",
+  "campaign",
+  "candidate",
+  "parliament",
+  "congress",
+  "senate",
+  "president",
+  "democrat",
+  "republican",
+  "prime minister",
+  "ukraine",
+  "russia",
+  "israel",
+  "gaza",
+  "hamas",
+  "iran",
+  "war",
+  "invasion",
+  "border",
+  "immigration",
+  "abortion",
+  "gun",
+  "shooting",
+  "protest",
+  "riot",
+  "supreme court",
+  "scotus"
+];
 
 const STRONG_PTD_PHRASES = [
   "power transmission",
@@ -302,6 +441,30 @@ const AI_TERMS = [
   "digital twin"
 ];
 
+const ENERGY_CONTEXT = [
+  "power",
+  "electricity",
+  "energy",
+  "grid",
+  "utility",
+  "utilities",
+  "transmission",
+  "distribution",
+  "substation",
+  "data center",
+  "datacenter",
+  "cooling",
+  "load growth",
+  "demand",
+  "capacity",
+  "infrastructure",
+  "electrification",
+  "renewable",
+  "renewables",
+  "nuclear",
+  "storage"
+];
+
 const TRUSTED_ENERGY_CHANNELS = [
   "ge vernova",
   "siemens energy",
@@ -317,8 +480,7 @@ const TRUSTED_ENERGY_CHANNELS = [
   "epri",
   "cigre",
   "ferc",
-  "ieee power",
-  "ieee power & energy",
+  "ieee",
   "fluence",
   "wartsila",
   "abb"
@@ -328,109 +490,6 @@ const BROAD_TECH_CHANNELS = [
   "nvidia",
   "google cloud",
   "microsoft"
-];
-
-const HARD_EXCLUDE = [
-  "laundromat",
-  "laundry",
-  "small business",
-  "owner salary",
-  "profit margin",
-  "rent income",
-  "side hustle",
-  "passive income",
-  "world cup",
-  "soccer",
-  "football",
-  "nfl",
-  "nba",
-  "nhl",
-  "mlb",
-  "gaming",
-  "gameplay",
-  "game trailer",
-  "character reveal",
-  "marvel",
-  "rivals",
-  "steam",
-  "epic games",
-  "playstation",
-  "xbox",
-  "nintendo",
-  "movie",
-  "film",
-  "celebrity",
-  "music video",
-  "mindset",
-  "high-performance coach",
-  "high performance coach",
-  "performance coach",
-  "leadership coaching",
-  "how to lead",
-  "show up every day",
-  "a-game",
-  "personal development",
-  "career advice",
-  "productivity hacks",
-  "insurance",
-  "ubezpieczenia",
-  "ubezpieczeniach",
-  "actuarial",
-  "actuary",
-  "aktuariusze",
-  "aon",
-  "risk-management",
-  "healthcare ai",
-  "medical ai",
-  "legal ai",
-  "education ai",
-  "retail ai",
-  "marketing ai",
-  "sales ai",
-  "customer service ai",
-  "video editing",
-  "creator tools",
-  "subtitles",
-  "dubbing",
-  "veed",
-  "cinematic video generator",
-  "content creator",
-  "cobot",
-  "flexpendant",
-  "jogging",
-  "operator onboarding",
-  "robotics training",
-  "e-learning",
-  "tutorial",
-  "training center",
-  "election",
-  "vote",
-  "campaign",
-  "candidate",
-  "parliament",
-  "congress",
-  "senate",
-  "president",
-  "democrat",
-  "republican",
-  "prime minister",
-  "ukraine",
-  "russia",
-  "israel",
-  "gaza",
-  "hamas",
-  "iran",
-  "war",
-  "invasion",
-  "border",
-  "immigration",
-  "abortion",
-  "gun",
-  "shooting",
-  "protest",
-  "riot",
-  "supreme court",
-  "scotus"
 ];
 
 function hasAny(text, arr) {
@@ -445,22 +504,14 @@ function countMatches(text, arr) {
   return count;
 }
 
-function channelName(v) {
-  return normalize(v.channel || "");
-}
-
 function isTrustedEnergyChannel(v) {
-  const ch = channelName(v);
+  const ch = normalize(v.channel || "");
   return TRUSTED_ENERGY_CHANNELS.some(c => ch.includes(c));
 }
 
 function isBroadTechChannel(v) {
-  const ch = channelName(v);
+  const ch = normalize(v.channel || "");
   return BROAD_TECH_CHANNELS.some(c => ch.includes(c));
-}
-
-function combinedText(v) {
-  return normalize(v.title + " " + v.channel + " " + (v.description || ""));
 }
 
 function isHardExcluded(v) {
@@ -468,29 +519,7 @@ function isHardExcluded(v) {
 }
 
 function hasEnergyContext(text) {
-  return hasAny(text, [
-    "power",
-    "electricity",
-    "energy",
-    "grid",
-    "utility",
-    "utilities",
-    "transmission",
-    "distribution",
-    "substation",
-    "data center",
-    "datacenter",
-    "cooling",
-    "load growth",
-    "demand",
-    "capacity",
-    "infrastructure",
-    "electrification",
-    "renewable",
-    "renewables",
-    "nuclear",
-    "storage"
-  ]);
+  return hasAny(text, ENERGY_CONTEXT);
 }
 
 function keywordScore(v) {
@@ -500,15 +529,16 @@ function keywordScore(v) {
 
   let score = 0;
 
-  score += countMatches(text, STRONG_PTD_PHRASES) * 5;
+  score += countMatches(text, STRONG_PTD_PHRASES) * 6;
   score += countMatches(text, SUPPORTING_TERMS) * 1;
 
+  if (v.source_type === "search") score += 3;
   if (isTrustedEnergyChannel(v)) score += 4;
 
   if (hasAny(text, AI_TERMS) && hasEnergyContext(text)) score += 4;
-  if (hasAny(text, AI_TERMS) && !hasEnergyContext(text)) score -= 7;
+  if (hasAny(text, AI_TERMS) && !hasEnergyContext(text)) score -= 8;
 
-  if (isBroadTechChannel(v) && !hasEnergyContext(text)) score -= 10;
+  if (isBroadTechChannel(v) && !hasEnergyContext(text)) score -= 12;
   if (isBroadTechChannel(v) && hasEnergyContext(text)) score += 2;
 
   return score;
@@ -520,6 +550,8 @@ function isRelevantByRules(v) {
   if (hasAny(text, HARD_EXCLUDE)) return false;
 
   if (hasAny(text, STRONG_PTD_PHRASES)) return true;
+
+  if (v.source_type === "search" && countMatches(text, SUPPORTING_TERMS) >= 1) return true;
 
   if (isTrustedEnergyChannel(v) && countMatches(text, SUPPORTING_TERMS) >= 1) return true;
 
@@ -566,6 +598,8 @@ Return JSON only:
   const user = `
 Title: ${v.title}
 Channel: ${v.channel}
+Source: ${v.source_type || ""}
+Source label: ${v.source_label || ""}
 Published: ${v.published_at}
 
 Description:
@@ -810,6 +844,12 @@ function parseMediaChannelsEnv() {
   return raw.split(",").map(s => s.trim()).filter(Boolean);
 }
 
+function parseSearchQueriesEnv() {
+  const raw = optEnv("MEDIA_SEARCH_QUERIES", "").trim();
+  if (!raw) return DEFAULT_SEARCH_QUERIES;
+  return raw.split("|").map(s => s.trim()).filter(Boolean);
+}
+
 async function resolveToChannelId(input) {
   const s = input.trim();
 
@@ -853,9 +893,9 @@ async function collectFromChannels(channelInputs, lookbackHours) {
     try {
       const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
 
-      const vids = parseYouTubeRSS(xml)
+      const vids = parseYouTubeRSS(xml, "channel", inp)
         .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
-        .slice(0, MAX_PER_CH);
+        .slice(0, MAX_PER_CHANNEL);
 
       all.push(...vids);
       await sleep(120);
@@ -864,17 +904,45 @@ async function collectFromChannels(channelInputs, lookbackHours) {
     }
   }
 
+  return all;
+}
+
+async function collectFromSearchQueries(queries, lookbackHours) {
+  const cutoffMs = Date.now() - lookbackHours * 3600 * 1000;
+  const all = [];
+
+  for (const q of queries) {
+    const feed = "https://www.youtube.com/feeds/videos.xml?search_query=" + encodeURIComponent(q);
+
+    try {
+      const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
+
+      const vids = parseYouTubeRSS(xml, "search", q)
+        .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
+        .slice(0, MAX_PER_SEARCH);
+
+      all.push(...vids);
+      await sleep(120);
+    } catch (e) {
+      console.warn("YT search failed:", q, e.message);
+    }
+  }
+
+  return all;
+}
+
+function dedupeAndSort(videos) {
   const seen = new Set();
 
-  const videos = all.filter(v => {
+  const out = videos.filter(v => {
     if (!v.id) return false;
     if (seen.has(v.id)) return false;
     seen.add(v.id);
     return true;
   });
 
-  videos.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-  return videos;
+  out.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  return out;
 }
 
 async function main() {
@@ -882,19 +950,18 @@ async function main() {
   const openai = new OpenAI({ apiKey });
 
   const channelInputs = parseMediaChannelsEnv();
+  const searchQueries = parseSearchQueriesEnv();
 
-  let videos = await collectFromChannels(channelInputs, LOOKBACK_HOURS);
-  videos = videos.slice(0, Math.max(MAX_VIDEOS * 10, 240));
+  const fromSearch = await collectFromSearchQueries(searchQueries, LOOKBACK_HOURS);
+  const fromChannels = await collectFromChannels(channelInputs, LOOKBACK_HOURS);
+
+  let videos = dedupeAndSort([...fromSearch, ...fromChannels]);
+  videos = videos.slice(0, Math.max(MAX_VIDEOS * 12, 300));
 
   const kept = [];
   const borderline = [];
 
   for (const v of videos) {
-    if (FILTER_MODE === "off") {
-      kept.push(v);
-      continue;
-    }
-
     if (isHardExcluded(v)) {
       console.log("Blocked: " + v.title + " | " + v.channel);
       continue;
@@ -912,30 +979,28 @@ async function main() {
 
   const gated = [];
 
-  if ((FILTER_MODE === "hybrid" || FILTER_MODE === "ai") && borderline.length) {
-    const slice = borderline
-      .filter(v => !isHardExcluded(v))
-      .sort((a, b) => {
-        const sa = keywordScore(a);
-        const sb = keywordScore(b);
-        if (sb !== sa) return sb - sa;
-        return new Date(b.published_at) - new Date(a.published_at);
-      })
-      .slice(0, MAX_FILTER_AI);
+  const aiCandidates = borderline
+    .filter(v => !isHardExcluded(v))
+    .sort((a, b) => {
+      const sa = keywordScore(a);
+      const sb = keywordScore(b);
+      if (sb !== sa) return sb - sa;
+      return new Date(b.published_at) - new Date(a.published_at);
+    })
+    .slice(0, MAX_AI_GATE);
 
-    for (const v of slice) {
-      v.transcript = await fetchCaptions(v.id);
-      const gate = await aiGate(openai, v);
+  for (const v of aiCandidates) {
+    v.transcript = await fetchCaptions(v.id);
+    const gate = await aiGate(openai, v);
 
-      if (gate.allow) {
-        v._gate = gate;
-        gated.push(v);
-      } else {
-        console.log("AI gate rejected: " + v.title + " | " + v.channel + " | " + gate.reason);
-      }
-
-      await sleep(120);
+    if (gate.allow) {
+      v._gate = gate;
+      gated.push(v);
+    } else {
+      console.log("AI gate rejected: " + v.title + " | " + v.channel + " | " + gate.reason);
     }
+
+    await sleep(120);
   }
 
   let finalList = [...kept, ...gated];
@@ -966,6 +1031,8 @@ async function main() {
       url: v.url,
       thumbnail: v.thumbnail,
       score: keywordScore(v),
+      source_type: v.source_type,
+      source_label: v.source_label,
       gate: v._gate || null,
       ai: v.ai
     });
@@ -983,12 +1050,12 @@ async function main() {
     disclaimer: "Informational only - AI-generated summaries; may contain errors. Verify with the original video.",
     updated_at: new Date().toISOString(),
     channels_tracked: channelInputs,
+    searches_tracked: searchQueries,
     filter: {
-      mode: FILTER_MODE,
       min_match_score: MIN_MATCH_SCORE,
       lookback_hours: LOOKBACK_HOURS,
-      max_filter_ai: MAX_FILTER_AI,
-      scope: "PTD portfolio only: power transmission, grid, data center power, AI infrastructure power, renewables, HV equipment, GIS, substations, transformers, utilities, energy infrastructure"
+      max_ai_gate: MAX_AI_GATE,
+      scope: "Search-first PTD portfolio: power transmission, grid, substations, high voltage, utilities, data center power, AI electricity demand, renewables integration, storage, GIS, transformers, HVDC, FACTS, critical energy infrastructure"
     },
     items: outItems
   };
