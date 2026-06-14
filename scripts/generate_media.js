@@ -1,6 +1,8 @@
 // scripts/generate_media.js
 // PTD Today - Media Builder
-// Search-first reliable version for PTD Today portfolio.
+// Complete replacement package
+// Fixes: no fake search-query titles, no "YouTube" generic channel spam, no empty metadata cards.
+// Focus: power transmission, grid, substations, HV, utilities, data center power, AI electricity demand, renewables, storage, GIS, transformers, HVDC, FACTS.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -20,11 +22,11 @@ const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/,
 const GA_ID = optEnv("GA_ID", "");
 
 const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24"));
-const MAX_PER_CHANNEL = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
-const MAX_PER_SEARCH = Number(optEnv("MEDIA_MAX_PER_SEARCH", "10"));
+const MAX_PER_CHANNEL = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "8"));
+const MAX_PER_SEARCH = Number(optEnv("MEDIA_MAX_PER_SEARCH", "8"));
 const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "2160"));
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "2"));
-const MAX_AI_GATE = Number(optEnv("MEDIA_MAX_FILTER_AI", "60"));
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "3"));
+const MAX_AI_GATE = Number(optEnv("MEDIA_MAX_FILTER_AI", "80"));
 const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
 
 const DEFAULT_CHANNELS = [
@@ -100,7 +102,21 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-const clean = (s = "") => s.replace(/<!\[CDATA\[|\]\]>/g, "").trim();
+function decodeHtml(str) {
+  return (str || "")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\\u0026/g, "&")
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const clean = (s = "") => decodeHtml(s.replace(/<!\[CDATA\[|\]\]>/g, "").trim());
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -108,9 +124,9 @@ function sleep(ms) {
 
 async function fetchText(url, headers = {}, retries = 3) {
   const h = {
-    "user-agent": "Mozilla/5.0 PTD-Bot/1.0 (+https://ptdtoday.com)",
+    "user-agent": "Mozilla/5.0 (compatible; PTD-Bot/1.0; +https://ptdtoday.com)",
     "accept": "text/html,application/xhtml+xml,application/xml,application/atom+xml,application/rss+xml,text/xml,text/plain,*/*;q=0.8",
-    "accept-language": "en-US,en;q=0.8",
+    "accept-language": "en-US,en;q=0.9",
     ...headers
   };
 
@@ -139,8 +155,8 @@ function normalize(s) {
 
 function combinedText(v) {
   return normalize(
-    v.title + " " +
-    v.channel + " " +
+    (v.title || "") + " " +
+    (v.channel || "") + " " +
     (v.description || "") + " " +
     (v.source_label || "")
   );
@@ -474,17 +490,31 @@ function hasEnergyContext(text) {
   return hasAny(text, ENERGY_CONTEXT);
 }
 
+function isBadMetadata(v) {
+  const title = normalize(v.title || "");
+  const channel = normalize(v.channel || "");
+  const sourceLabel = normalize(v.source_label || "");
+
+  if (!title) return true;
+  if (title === sourceLabel) return true;
+  if (channel === "youtube") return true;
+  if (!v.id || v.id.length !== 11) return true;
+
+  return false;
+}
+
 function keywordScore(v) {
   const text = combinedText(v);
 
   if (hasAny(text, HARD_EXCLUDE)) return -999;
+  if (isBadMetadata(v)) return -999;
 
   let score = 0;
 
   score += countMatches(text, STRONG_PTD_PHRASES) * 6;
   score += countMatches(text, SUPPORTING_TERMS) * 1;
 
-  if (v.source_type === "search") score += 4;
+  if (v.source_type === "search") score += 3;
   if (isTrustedEnergyChannel(v)) score += 4;
 
   if (hasAny(text, AI_TERMS) && hasEnergyContext(text)) score += 4;
@@ -499,11 +529,12 @@ function keywordScore(v) {
 function isRelevantByRules(v) {
   const text = combinedText(v);
 
+  if (isBadMetadata(v)) return false;
   if (hasAny(text, HARD_EXCLUDE)) return false;
 
   if (hasAny(text, STRONG_PTD_PHRASES)) return true;
 
-  if (v.source_type === "search" && countMatches(text, SUPPORTING_TERMS) >= 1) return true;
+  if (v.source_type === "search" && countMatches(text, SUPPORTING_TERMS) >= 2) return true;
 
   if (isTrustedEnergyChannel(v) && countMatches(text, SUPPORTING_TERMS) >= 1) return true;
 
@@ -555,6 +586,86 @@ function parseYouTubeRSS(xml, sourceType = "channel", sourceLabel = "") {
   }).filter(x => x.id && x.title);
 }
 
+function parseVideoIdsFromSearchHtml(html, limit) {
+  const ids = [];
+  const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+  let m;
+
+  while ((m = re.exec(html)) !== null) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+    if (ids.length >= limit) break;
+  }
+
+  return ids;
+}
+
+async function fetchOEmbedMeta(videoId) {
+  const url = "https://www.youtube.com/oembed?url=" +
+    encodeURIComponent("https://www.youtube.com/watch?v=" + videoId) +
+    "&format=json";
+
+  try {
+    const txt = await fetchText(url, { "accept": "application/json,text/plain,*/*" }, 2);
+    const obj = JSON.parse(txt);
+
+    return {
+      title: decodeHtml(obj.title || ""),
+      channel: decodeHtml(obj.author_name || ""),
+      description: ""
+    };
+  } catch {
+    return {
+      title: "",
+      channel: "",
+      description: ""
+    };
+  }
+}
+
+async function fetchWatchPageMeta(videoId) {
+  const url = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+
+  try {
+    const html = await fetchText(url, { "accept": "text/html,*/*" }, 2);
+
+    const title =
+      decodeHtml((html.match(/<meta property="og:title" content="([^"]*)"/i) || [])[1] || "");
+
+    const description =
+      decodeHtml((html.match(/<meta property="og:description" content="([^"]*)"/i) || [])[1] || "");
+
+    const channel =
+      decodeHtml(
+        (html.match(/"ownerChannelName":"([^"]+)"/i) || [])[1] ||
+        (html.match(/"author":"([^"]+)"/i) || [])[1] ||
+        ""
+      );
+
+    return {
+      title,
+      channel,
+      description
+    };
+  } catch {
+    return {
+      title: "",
+      channel: "",
+      description: ""
+    };
+  }
+}
+
+async function fetchVideoMeta(videoId) {
+  const o = await fetchOEmbedMeta(videoId);
+  const w = await fetchWatchPageMeta(videoId);
+
+  return {
+    title: w.title || o.title || "",
+    channel: w.channel || o.channel || "",
+    description: w.description || o.description || ""
+  };
+}
+
 async function collectFromSearchQueries(queries) {
   const all = [];
 
@@ -565,30 +676,26 @@ async function collectFromSearchQueries(queries) {
 
     try {
       const html = await fetchText(url, { "accept": "text/html,*/*" }, 3);
-
-      const ids = [];
-      const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
-      let m;
-
-      while ((m = re.exec(html)) !== null) {
-        if (!ids.includes(m[1])) ids.push(m[1]);
-        if (ids.length >= MAX_PER_SEARCH) break;
-      }
+      const ids = parseVideoIdsFromSearchHtml(html, MAX_PER_SEARCH);
 
       for (const id of ids) {
         const meta = await fetchVideoMeta(id);
 
-        all.push({
+        const v = {
           id,
-          title: meta.title || q,
-          channel: meta.channel || "YouTube",
-          published_at: meta.published_at || new Date().toISOString(),
+          title: meta.title,
+          channel: meta.channel,
+          published_at: new Date().toISOString(),
           url: "https://www.youtube.com/watch?v=" + id,
           thumbnail: "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
           description: meta.description || "",
           source_type: "search",
           source_label: q
-        });
+        };
+
+        if (!isBadMetadata(v)) {
+          all.push(v);
+        }
 
         await sleep(80);
       }
@@ -600,42 +707,6 @@ async function collectFromSearchQueries(queries) {
   }
 
   return all;
-}
-
-async function fetchVideoMeta(videoId) {
-  const url = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
-
-  try {
-    const html = await fetchText(url, { "accept": "text/html,*/*" }, 2);
-
-    const title =
-      ((html.match(/<meta property="og:title" content="([^"]*)"/i) || [])[1] || "")
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, "&");
-
-    const description =
-      ((html.match(/<meta property="og:description" content="([^"]*)"/i) || [])[1] || "")
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, "&");
-
-    const channel =
-      ((html.match(/"ownerChannelName":"([^"]+)"/i) || [])[1] || "")
-        .replace(/\\u0026/g, "&");
-
-    return {
-      title,
-      description,
-      channel,
-      published_at: new Date().toISOString()
-    };
-  } catch {
-    return {
-      title: "",
-      description: "",
-      channel: "",
-      published_at: new Date().toISOString()
-    };
-  }
 }
 
 async function resolveToChannelId(input) {
@@ -685,7 +756,10 @@ async function collectFromChannels(channelInputs) {
         .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
         .slice(0, MAX_PER_CHANNEL);
 
-      all.push(...vids);
+      for (const v of vids) {
+        if (!isBadMetadata(v)) all.push(v);
+      }
+
       await sleep(120);
     } catch (e) {
       console.warn("YT feed failed:", chId, e.message);
@@ -821,9 +895,9 @@ You are PTD Today's Media summarizer.
 Write for power transmission, grid, utility, EPC, high-voltage, renewable integration, data center power, AI infrastructure, and energy infrastructure professionals.
 
 Rules:
-- Use only transcript/description.
-- If transcript is missing, say: "Based on the available description..."
-- No speculation.
+- Use the title, description, and transcript if available.
+- If transcript and description are missing, summarize cautiously from the title only and say "Based on the title metadata..."
+- No speculation beyond the title/description/transcript.
 - No political commentary.
 Return valid JSON only.
 `.trim();
@@ -1034,6 +1108,8 @@ async function main() {
   const borderline = [];
 
   for (const v of videos) {
+    if (isBadMetadata(v)) continue;
+
     if (isHardExcluded(v)) {
       console.log("Blocked: " + v.title + " | " + v.channel);
       continue;
@@ -1051,6 +1127,7 @@ async function main() {
 
   const gated = [];
   const aiCandidates = borderline
+    .filter(v => !isBadMetadata(v))
     .filter(v => !isHardExcluded(v))
     .sort((a, b) => keywordScore(b) - keywordScore(a))
     .slice(0, MAX_AI_GATE);
@@ -1071,6 +1148,7 @@ async function main() {
 
   let finalList = [...kept, ...gated];
 
+  finalList = finalList.filter(v => !isBadMetadata(v));
   finalList = finalList.filter(v => !isHardExcluded(v));
   finalList = finalList.filter(v => isRelevantByRules(v) || (v._gate && v._gate.allow));
 
@@ -1114,7 +1192,8 @@ async function main() {
       min_match_score: MIN_MATCH_SCORE,
       lookback_hours: LOOKBACK_HOURS,
       max_ai_gate: MAX_AI_GATE,
-      scope: "Search-first PTD portfolio: power transmission, grid, substations, high voltage, utilities, data center power, AI electricity demand, renewables integration, storage, GIS, transformers, HVDC, FACTS, critical energy infrastructure"
+      scope: "PTD portfolio: power transmission, grid, substations, high voltage, utilities, data center power, AI electricity demand, renewables integration, storage, GIS, transformers, HVDC, FACTS, critical energy infrastructure",
+      metadata_rule: "Rejects search-query titles, generic YouTube channels, and videos without real title/channel metadata."
     },
     items: outItems
   };
