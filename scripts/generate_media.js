@@ -1,6 +1,6 @@
 // scripts/generate_media.js
 // PTD Today - Media Builder
-// Complete replacement package - PTD portfolio focused
+// Balanced PTD package: avoids junk, but keeps enough relevant videos.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -20,15 +20,39 @@ const SITE_ORIGIN = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/,
 const GA_ID = optEnv("GA_ID", "");
 
 const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24"));
-const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "5"));
-
-const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "720"));
-const EXPAND_HOURS_IF_LOW = Number(optEnv("MEDIA_EXPAND_HOURS_IF_LOW", "2160"));
-
+const MAX_PER_CH = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "2160"));
 const FILTER_MODE = optEnv("MEDIA_FILTER_MODE", "hybrid").toLowerCase();
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "5"));
-const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "60"));
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "2"));
+const MAX_FILTER_AI = Number(optEnv("MEDIA_MAX_FILTER_AI", "80"));
 const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
+
+const DEFAULT_CHANNELS = [
+  "https://www.youtube.com/@GEVernova",
+  "https://www.youtube.com/@SiemensEnergy",
+  "https://www.youtube.com/@HitachiEnergy",
+  "https://www.youtube.com/@SchneiderElectric",
+  "https://www.youtube.com/@Eaton",
+  "https://www.youtube.com/@NationalGridUK",
+  "https://www.youtube.com/@PJMInterconnection",
+  "https://www.youtube.com/@ERCOTISO",
+  "https://www.youtube.com/@IEA",
+  "https://www.youtube.com/@NREL",
+  "https://www.youtube.com/@USDepartmentofEnergy",
+  "https://www.youtube.com/@EPRI",
+  "https://www.youtube.com/@CIGRE",
+  "https://www.youtube.com/@ferc",
+  "https://www.youtube.com/@BloombergTechnology",
+  "https://www.youtube.com/@BloombergTV",
+  "https://www.youtube.com/@Reuters",
+  "https://www.youtube.com/@CNBC",
+  "https://www.youtube.com/@GoogleCloudTech",
+  "https://www.youtube.com/@MicrosoftCloud",
+  "https://www.youtube.com/@Microsoft",
+  "https://www.youtube.com/@NVIDIA",
+  "https://www.youtube.com/@McKinsey",
+  "https://www.youtube.com/@TheEconomist"
+];
 
 function ensureDir(p) {
   fs.mkdirSync(p, { recursive: true });
@@ -69,7 +93,7 @@ async function fetchText(url, headers = {}, retries = 3) {
       return await r.text();
     } catch (e) {
       if (i === retries - 1) throw e;
-      await sleep(400 * (i + 1));
+      await sleep(500 * (i + 1));
     }
   }
 }
@@ -136,177 +160,121 @@ function normalize(s) {
     .trim();
 }
 
-const PRIMARY_PTD_TERMS = [
-  "power transmission",
-  "transmission line",
-  "transmission grid",
-  "electric transmission",
-  "power grid",
-  "electric grid",
-  "grid modernization",
-  "grid reliability",
-  "grid resilience",
-  "grid connection",
-  "grid interconnection",
-  "interconnection queue",
-  "interconnection",
-  "substation",
-  "substations",
-  "high voltage",
-  "extra high voltage",
-  "ehv",
-  "hvdc",
-  "facts",
-  "flexible ac transmission",
-  "statcom",
-  "svc",
-  "series capacitor",
-  "fixed series capacitor",
-  "synchronous condenser",
-  "gis",
-  "gas insulated switchgear",
-  "switchgear",
-  "transformer",
-  "transformers",
-  "shunt reactor",
-  "reactor",
-  "capacitor bank",
-  "protection relay",
-  "relay protection",
-  "scada",
-  "ems",
-  "dms",
-  "pmu",
-  "phasor",
-  "synchrophasor",
-  "utility",
-  "utilities",
-  "iso",
-  "rto",
-  "tso",
-  "pjm",
-  "ercot",
-  "ferc",
-  "nerc",
-  "load growth",
-  "peak demand",
-  "electricity demand",
-  "power system",
-  "power systems",
-  "distribution grid",
-  "distribution system",
-  "microgrid",
-  "energy storage",
-  "battery storage",
-  "bess",
-  "renewable integration",
-  "renewables integration",
-  "offshore wind",
-  "solar interconnection",
-  "wind interconnection",
-  "grid planning",
-  "transmission planning",
-  "queue reform",
-  "electric infrastructure",
-  "energy infrastructure",
-  "grid equipment",
-  "electrical equipment"
-];
-
-const DATA_CENTER_POWER_TERMS = [
-  "data center power",
-  "datacenter power",
-  "data center electricity",
-  "datacenter electricity",
-  "data center energy",
-  "datacenter energy",
-  "data center grid",
-  "datacenter grid",
-  "data center load",
-  "datacenter load",
-  "ai data center power",
-  "ai data centers power",
-  "ai electricity demand",
-  "ai energy demand",
-  "data center energy demand",
-  "data center cooling",
-  "datacenter cooling",
-  "liquid cooling",
-  "power usage effectiveness",
-  "pue",
-  "ups",
-  "pdu",
-  "backup power",
-  "power supply",
-  "electricity supply",
-  "grid capacity",
-  "power capacity",
-  "power availability",
-  "behind-the-meter",
-  "behind the meter",
-  "data center infrastructure",
-  "ai infrastructure power"
-];
-
-const AI_WORDS = [
-  "ai",
-  "artificial intelligence",
-  "machine learning",
-  "genai",
-  "generative ai",
-  "data science",
-  "digital twin",
-  "automation",
-  "gpu",
-  "gpus",
-  "compute",
-  "semiconductor",
-  "semiconductors",
-  "chips",
-  "chip"
-];
-
-const ENERGY_WORDS = [
-  "grid",
+const PTD_TERMS = [
   "power",
   "electricity",
   "energy",
-  "utility",
-  "utilities",
+  "grid",
   "transmission",
   "distribution",
   "substation",
+  "substations",
+  "high voltage",
+  "hvdc",
+  "facts",
+  "statcom",
+  "svc",
+  "gis",
+  "switchgear",
+  "transformer",
+  "transformers",
+  "reactor",
+  "capacitor",
+  "protection",
+  "relay",
+  "scada",
+  "utility",
+  "utilities",
+  "interconnection",
+  "load growth",
+  "electric demand",
+  "electricity demand",
+  "peak demand",
+  "power system",
+  "power systems",
+  "renewable",
+  "renewables",
+  "solar",
+  "wind",
+  "offshore wind",
+  "battery",
+  "bess",
+  "storage",
+  "microgrid",
+  "nuclear",
   "data center",
   "datacenter",
-  "infrastructure",
-  "load growth",
+  "ai infrastructure",
   "cooling",
-  "electrification",
-  "renewables",
-  "renewable",
-  "nuclear",
-  "storage"
-];
-
-const MATERIAL_TERMS = [
+  "liquid cooling",
+  "ups",
+  "pdu",
+  "grid capacity",
+  "power capacity",
   "critical minerals",
-  "critical mineral",
   "rare earth",
-  "rare earths",
   "copper",
-  "aluminum",
-  "aluminium",
-  "lithium",
-  "nickel",
-  "graphite",
-  "transformer shortage",
-  "supply chain",
-  "electrification supply chain",
-  "manufacturing capacity",
-  "factory capacity"
+  "electrification",
+  "energy infrastructure",
+  "electric infrastructure",
+  "electrical equipment",
+  "grid equipment",
+  "epc"
 ];
 
-const HARD_EXCLUDE_TERMS = [
+const STRONG_PTD_PHRASES = [
+  "power transmission",
+  "electric grid",
+  "power grid",
+  "grid modernization",
+  "grid reliability",
+  "grid resilience",
+  "grid interconnection",
+  "interconnection queue",
+  "transmission line",
+  "transmission planning",
+  "data center power",
+  "data center electricity",
+  "data center energy",
+  "ai energy demand",
+  "ai electricity demand",
+  "ai data center",
+  "renewable integration",
+  "energy storage",
+  "battery storage",
+  "gas insulated switchgear",
+  "high voltage equipment",
+  "transformer shortage",
+  "electricity demand"
+];
+
+const TRUSTED_CHANNELS = [
+  "ge vernova",
+  "siemens energy",
+  "hitachi energy",
+  "schneider electric",
+  "eaton",
+  "national grid",
+  "pjm interconnection",
+  "ercot",
+  "iea",
+  "nrel",
+  "department of energy",
+  "epri",
+  "cigre",
+  "ferc",
+  "bloomberg technology",
+  "bloomberg television",
+  "reuters",
+  "cnbc",
+  "google cloud tech",
+  "microsoft",
+  "nvidia",
+  "mckinsey",
+  "the economist"
+];
+
+const HARD_EXCLUDE = [
   "world cup",
   "soccer",
   "football",
@@ -347,7 +315,6 @@ const HARD_EXCLUDE_TERMS = [
   "actuary",
   "aktuariusze",
   "aon",
-  "risk-management",
   "healthcare ai",
   "medical ai",
   "legal ai",
@@ -402,32 +369,6 @@ const HARD_EXCLUDE_TERMS = [
   "scotus"
 ];
 
-const ENERGY_CHANNEL_BONUS = [
-  "ge vernova",
-  "siemens energy",
-  "hitachi energy",
-  "schneider electric",
-  "eaton",
-  "national grid",
-  "pjm interconnection",
-  "ercot",
-  "epri",
-  "cigre",
-  "iea",
-  "nrel",
-  "department of energy",
-  "u.s. department of energy",
-  "us department of energy",
-  "ieee power",
-  "ieee power & energy",
-  "ferc",
-  "nerc",
-  "grid strategies",
-  "rmi",
-  "wood mackenzie",
-  "energy systems integration group"
-];
-
 function hasAny(text, arr) {
   return arr.some(k => text.includes(k));
 }
@@ -440,86 +381,80 @@ function countMatches(text, arr) {
   return count;
 }
 
-function hasPrimaryPtd(text) {
-  return hasAny(text, PRIMARY_PTD_TERMS);
-}
-
-function hasDataCenterPower(text) {
-  return hasAny(text, DATA_CENTER_POWER_TERMS);
-}
-
-function hasAiEnergyPair(text) {
-  return hasAny(text, AI_WORDS) && hasAny(text, ENERGY_WORDS);
-}
-
-function hasMaterialEnergyPair(text) {
-  return hasAny(text, MATERIAL_TERMS) && hasAny(text, ENERGY_WORDS);
+function isTrustedChannel(v) {
+  const ch = normalize(v.channel || "");
+  return TRUSTED_CHANNELS.some(c => ch.includes(c));
 }
 
 function isHardExcluded(v) {
   const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
-  return hasAny(text, HARD_EXCLUDE_TERMS);
+  return hasAny(text, HARD_EXCLUDE);
 }
 
 function keywordScore(v) {
   const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
-  const channel = normalize(v.channel || "");
 
-  if (hasAny(text, HARD_EXCLUDE_TERMS)) return -999;
+  if (hasAny(text, HARD_EXCLUDE)) return -999;
 
   let score = 0;
 
-  score += countMatches(text, PRIMARY_PTD_TERMS) * 4;
-  score += countMatches(text, DATA_CENTER_POWER_TERMS) * 4;
+  score += countMatches(text, STRONG_PTD_PHRASES) * 5;
+  score += countMatches(text, PTD_TERMS) * 1;
 
-  if (hasAiEnergyPair(text)) score += 5;
-  if (hasMaterialEnergyPair(text)) score += 5;
+  if (isTrustedChannel(v)) score += 2;
 
-  if (ENERGY_CHANNEL_BONUS.some(c => channel.includes(c))) score += 3;
+  const broadAi = hasAny(text, ["ai", "artificial intelligence", "machine learning", "gpu", "cloud", "data science"]);
+  const hasEnergy = hasAny(text, ["energy", "power", "electricity", "grid", "utility", "data center", "datacenter", "infrastructure", "cooling"]);
 
-  const broadAiOnly =
-    hasAny(text, AI_WORDS) &&
-    !hasPrimaryPtd(text) &&
-    !hasDataCenterPower(text) &&
-    !hasMaterialEnergyPair(text);
-
-  if (broadAiOnly) score -= 8;
+  if (broadAi && hasEnergy) score += 3;
+  if (broadAi && !hasEnergy) score -= 5;
 
   return score;
 }
 
-function isRelevantByRules(v) {
+function isRelevant(v) {
   const text = normalize(v.title + " " + v.channel + " " + (v.description || ""));
+  if (hasAny(text, HARD_EXCLUDE)) return false;
 
-  if (hasAny(text, HARD_EXCLUDE_TERMS)) return false;
+  if (hasAny(text, STRONG_PTD_PHRASES)) return true;
 
-  return (
-    hasPrimaryPtd(text) ||
-    hasDataCenterPower(text) ||
-    hasAiEnergyPair(text) ||
-    hasMaterialEnergyPair(text)
-  );
+  const termCount = countMatches(text, PTD_TERMS);
+  if (termCount >= 2) return true;
+
+  const broadAi = hasAny(text, ["ai", "artificial intelligence", "machine learning", "gpu", "cloud", "data science"]);
+  const hasEnergy = hasAny(text, ["energy", "power", "electricity", "grid", "utility", "data center", "datacenter", "infrastructure", "cooling"]);
+  if (broadAi && hasEnergy) return true;
+
+  if (isTrustedChannel(v) && termCount >= 1) return true;
+
+  return false;
 }
 
 async function aiGate(openai, v) {
   const system = `
-You are a strict content gate for PTD Today.
+You are a balanced content gate for PTD Today.
 
-ALLOW only if the video is materially about:
-- Power transmission or distribution
-- Electric grids, utilities, grid reliability, grid modernization, interconnection, substations
-- HVDC, FACTS, GIS, transformers, switchgear, high-voltage equipment
-- Renewable integration, battery storage, microgrids, grid planning
-- Data centers ONLY when about electricity demand, power supply, grid connection, cooling, substations, or energy infrastructure
-- AI, GPUs, cloud, or machine learning ONLY when clearly tied to energy, grid, utilities, power systems, data center power, electricity demand, or infrastructure
-- Critical minerals, copper, rare earths, or supply chain ONLY when tied to grid, energy infrastructure, electrification, or electrical equipment
+ALLOW if the video is useful for at least one PTD Today audience:
+- power transmission
+- electric grid
+- utilities
+- high-voltage equipment
+- substations
+- renewables integration
+- data center power or cooling
+- AI infrastructure energy demand
+- critical minerals for electrification
+- energy infrastructure
+- EPC or major infrastructure delivery
 
 DISALLOW:
-- Insurance, actuarial work, finance-only AI, generic business AI
-- Sports, entertainment, gaming, personal leadership, mindset coaching
-- Generic robotics tutorials, cobot operation, FlexPendant jogging, training videos
-- Generic video creation tools, subtitles, dubbing, creator tools
-- Politics, elections, war, geopolitics, ideology
+- sports, gaming, entertainment
+- generic leadership or mindset coaching
+- insurance or actuarial AI
+- healthcare/legal/retail/marketing AI
+- generic video editing or creator tools
+- generic robotics operation tutorials unless clearly about electrical/grid equipment manufacturing
+- politics, elections, war, ideology
 
 Return JSON only:
 {"allow": true/false, "reason": "short", "topic": "short label"}
@@ -567,16 +502,13 @@ async function summarizeVideo(openai, v) {
   const system = `
 You are PTD Today's Media summarizer.
 
-Audience:
-- Power transmission professionals
-- Grid, utility, EPC, high-voltage, renewable integration, data center power, AI infrastructure, and critical energy infrastructure professionals
+Write for power transmission, grid, utility, EPC, high-voltage, renewable integration, data center power, AI infrastructure, and energy infrastructure professionals.
 
 Rules:
-- Summarize only the transcript/description.
+- Use only transcript/description.
 - If transcript is missing, say: "Based on the available description..."
-- Keep it useful for grid, data center, power transmission, EPC, utility, and energy infrastructure professionals.
-- No politics.
 - No speculation.
+- No political commentary.
 Return valid JSON only.
 `.trim();
 
@@ -771,7 +703,7 @@ catch(e){prompt("Copy this link:",url);}
 
 function parseMediaChannelsEnv() {
   const raw = optEnv("MEDIA_CHANNELS", "").trim();
-  if (!raw) return [];
+  if (!raw) return DEFAULT_CHANNELS;
   return raw.split(",").map(s => s.trim()).filter(Boolean);
 }
 
@@ -847,19 +779,9 @@ async function main() {
   const openai = new OpenAI({ apiKey });
 
   const channelInputs = parseMediaChannelsEnv();
-
-  if (!channelInputs.length) {
-    throw new Error("MEDIA_CHANNELS is empty. Add YouTube channels in workflow env.");
-  }
-
   let videos = await collectFromChannels(channelInputs, LOOKBACK_HOURS);
 
-  if (videos.length < 12 && EXPAND_HOURS_IF_LOW > LOOKBACK_HOURS) {
-    console.log("Only " + videos.length + " items. Expanding lookback to " + EXPAND_HOURS_IF_LOW + " hours.");
-    videos = await collectFromChannels(channelInputs, EXPAND_HOURS_IF_LOW);
-  }
-
-  videos = videos.slice(0, Math.max(MAX_VIDEOS * 8, 180));
+  videos = videos.slice(0, Math.max(MAX_VIDEOS * 10, 240));
 
   const kept = [];
   const borderline = [];
@@ -875,15 +797,10 @@ async function main() {
       continue;
     }
 
-    if (FILTER_MODE === "ai") {
-      borderline.push(v);
-      continue;
-    }
-
     const score = keywordScore(v);
     v._score = score;
 
-    if (score >= MIN_MATCH_SCORE && isRelevantByRules(v)) {
+    if (score >= MIN_MATCH_SCORE && isRelevant(v)) {
       kept.push(v);
     } else {
       borderline.push(v);
@@ -894,12 +811,16 @@ async function main() {
 
   if ((FILTER_MODE === "hybrid" || FILTER_MODE === "ai") && borderline.length) {
     const slice = borderline
-      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .filter(v => !isHardExcluded(v))
+      .sort((a, b) => {
+        const sa = keywordScore(a);
+        const sb = keywordScore(b);
+        if (sb !== sa) return sb - sa;
+        return new Date(b.published_at) - new Date(a.published_at);
+      })
       .slice(0, MAX_FILTER_AI);
 
     for (const v of slice) {
-      if (isHardExcluded(v)) continue;
-
       v.transcript = await fetchCaptions(v.id);
       const gate = await aiGate(openai, v);
 
@@ -917,7 +838,23 @@ async function main() {
   let finalList = [...kept, ...gated];
 
   finalList = finalList.filter(v => !isHardExcluded(v));
-  finalList.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+
+  if (!finalList.length) {
+    console.warn("No filtered items. Using trusted-channel fallback.");
+    finalList = videos
+      .filter(v => !isHardExcluded(v))
+      .filter(v => isTrustedChannel(v))
+      .sort((a, b) => new Date(b.published_at) - new Date(a.published_at))
+      .slice(0, MAX_VIDEOS);
+  }
+
+  finalList.sort((a, b) => {
+    const sa = keywordScore(a);
+    const sb = keywordScore(b);
+    if (sb !== sa) return sb - sa;
+    return new Date(b.published_at) - new Date(a.published_at);
+  });
+
   finalList = finalList.slice(0, MAX_VIDEOS);
 
   const outItems = [];
@@ -933,7 +870,7 @@ async function main() {
       published_at: v.published_at,
       url: v.url,
       thumbnail: v.thumbnail,
-      score: v._score ?? null,
+      score: keywordScore(v),
       gate: v._gate || null,
       ai: v.ai
     });
@@ -955,9 +892,8 @@ async function main() {
       mode: FILTER_MODE,
       min_match_score: MIN_MATCH_SCORE,
       lookback_hours: LOOKBACK_HOURS,
-      expand_hours_if_low: EXPAND_HOURS_IF_LOW,
       max_filter_ai: MAX_FILTER_AI,
-      scope: "PTD portfolio: power transmission, grid, AI infrastructure power, data centers, renewables, HV equipment, GIS, critical energy infrastructure"
+      scope: "Balanced PTD: power transmission, grid, data center power, AI infrastructure, renewables, HV equipment, GIS, energy infrastructure"
     },
     items: outItems
   };
