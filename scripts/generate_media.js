@@ -1,8 +1,6 @@
 // scripts/generate_media.js
 // PTD Today - Media Builder
-// Search-first PTD portfolio version
-// This version collects videos from YouTube topic searches + trusted channels.
-// It blocks broad business, sports, gaming, insurance, generic AI, laundromat, and unrelated content.
+// Search-first reliable version for PTD Today portfolio.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -23,10 +21,10 @@ const GA_ID = optEnv("GA_ID", "");
 
 const MAX_VIDEOS = Number(optEnv("MEDIA_MAX_VIDEOS", "24"));
 const MAX_PER_CHANNEL = Number(optEnv("MEDIA_MAX_PER_CHANNEL", "6"));
-const MAX_PER_SEARCH = Number(optEnv("MEDIA_MAX_PER_SEARCH", "8"));
-const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "2160")); // 90 days
-const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "4"));
-const MAX_AI_GATE = Number(optEnv("MEDIA_MAX_FILTER_AI", "80"));
+const MAX_PER_SEARCH = Number(optEnv("MEDIA_MAX_PER_SEARCH", "10"));
+const LOOKBACK_HOURS = Number(optEnv("MEDIA_LOOKBACK_HOURS", "2160"));
+const MIN_MATCH_SCORE = Number(optEnv("MEDIA_MIN_MATCH_SCORE", "2"));
+const MAX_AI_GATE = Number(optEnv("MEDIA_MAX_FILTER_AI", "60"));
 const CAPTIONS_LANG = optEnv("MEDIA_CAPTIONS_LANG", "en");
 
 const DEFAULT_CHANNELS = [
@@ -65,6 +63,7 @@ const DEFAULT_SEARCH_QUERIES = [
   "data center power grid",
   "AI data center electricity demand",
   "AI energy demand grid",
+  "AI infrastructure power demand",
   "renewable energy grid integration",
   "battery energy storage grid",
   "microgrid utility power",
@@ -73,7 +72,10 @@ const DEFAULT_SEARCH_QUERIES = [
   "electricity demand data centers",
   "utility grid planning",
   "power system reliability",
-  "transmission planning renewable interconnection"
+  "transmission planning renewable interconnection",
+  "substation transformer grid modernization",
+  "grid capacity data center load growth",
+  "electric utilities load growth AI data centers"
 ];
 
 function ensureDir(p) {
@@ -106,8 +108,9 @@ function sleep(ms) {
 
 async function fetchText(url, headers = {}, retries = 3) {
   const h = {
-    "user-agent": "PTD-Bot/1.0 (+https://ptdtoday.com)",
-    "accept": "application/atom+xml, application/rss+xml, application/xml, text/xml, text/plain, */*;q=0.5",
+    "user-agent": "Mozilla/5.0 PTD-Bot/1.0 (+https://ptdtoday.com)",
+    "accept": "text/html,application/xhtml+xml,application/xml,application/atom+xml,application/rss+xml,text/xml,text/plain,*/*;q=0.8",
+    "accept-language": "en-US,en;q=0.8",
     ...headers
   };
 
@@ -125,61 +128,6 @@ async function fetchText(url, headers = {}, retries = 3) {
   return "";
 }
 
-function parseYouTubeRSS(xml, sourceType = "channel", sourceLabel = "") {
-  const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
-
-  return entries.map(e => {
-    const title = clean((e.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "");
-    const id = (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i) || [])[1] || "";
-    const pub = (e.match(/<published>([\s\S]*?)<\/published>/i) || [])[1] || "";
-    const ch = clean((e.match(/<name>([\s\S]*?)<\/name>/i) || [])[1] || "YouTube");
-
-    const desc = clean(
-      (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i) || [])[1] ||
-      (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i) || [])[1] ||
-      ""
-    );
-
-    return {
-      id,
-      title,
-      channel: ch,
-      published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
-      url: id ? "https://www.youtube.com/watch?v=" + id : "",
-      thumbnail: id ? "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg" : "",
-      description: desc,
-      source_type: sourceType,
-      source_label: sourceLabel
-    };
-  }).filter(x => x.id && x.title);
-}
-
-async function fetchCaptions(videoId) {
-  const url = "https://www.youtube.com/api/timedtext?lang=" +
-    encodeURIComponent(CAPTIONS_LANG) +
-    "&v=" +
-    encodeURIComponent(videoId);
-
-  try {
-    const xml = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
-    if (!xml || !xml.includes("<text")) return "";
-
-    const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map(m => m[1]);
-
-    return texts.join(" ")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 12000);
-  } catch {
-    return "";
-  }
-}
-
 function normalize(s) {
   return (s || "")
     .toString()
@@ -190,7 +138,12 @@ function normalize(s) {
 }
 
 function combinedText(v) {
-  return normalize(v.title + " " + v.channel + " " + (v.description || "") + " " + (v.source_label || ""));
+  return normalize(
+    v.title + " " +
+    v.channel + " " +
+    (v.description || "") + " " +
+    (v.source_label || "")
+  );
 }
 
 const HARD_EXCLUDE = [
@@ -243,7 +196,6 @@ const HARD_EXCLUDE = [
   "actuary",
   "aktuariusze",
   "aon",
-  "risk-management",
   "healthcare ai",
   "medical ai",
   "legal ai",
@@ -532,7 +484,7 @@ function keywordScore(v) {
   score += countMatches(text, STRONG_PTD_PHRASES) * 6;
   score += countMatches(text, SUPPORTING_TERMS) * 1;
 
-  if (v.source_type === "search") score += 3;
+  if (v.source_type === "search") score += 4;
   if (isTrustedEnergyChannel(v)) score += 4;
 
   if (hasAny(text, AI_TERMS) && hasEnergyContext(text)) score += 4;
@@ -560,6 +512,233 @@ function isRelevantByRules(v) {
   if (countMatches(text, SUPPORTING_TERMS) >= 3) return true;
 
   return false;
+}
+
+function parseMediaChannelsEnv() {
+  const raw = optEnv("MEDIA_CHANNELS", "").trim();
+  if (!raw) return DEFAULT_CHANNELS;
+  return raw.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function parseSearchQueriesEnv() {
+  const raw = optEnv("MEDIA_SEARCH_QUERIES", "").trim();
+  if (!raw) return DEFAULT_SEARCH_QUERIES;
+  return raw.split("|").map(s => s.trim()).filter(Boolean);
+}
+
+function parseYouTubeRSS(xml, sourceType = "channel", sourceLabel = "") {
+  const entries = xml.match(/<entry[\s\S]*?<\/entry>/gi) || [];
+
+  return entries.map(e => {
+    const title = clean((e.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || "");
+    const id = (e.match(/<yt:videoId>([\s\S]*?)<\/yt:videoId>/i) || [])[1] || "";
+    const pub = (e.match(/<published>([\s\S]*?)<\/published>/i) || [])[1] || "";
+    const ch = clean((e.match(/<name>([\s\S]*?)<\/name>/i) || [])[1] || "YouTube");
+
+    const desc = clean(
+      (e.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/i) || [])[1] ||
+      (e.match(/<content[^>]*>([\s\S]*?)<\/content>/i) || [])[1] ||
+      ""
+    );
+
+    return {
+      id,
+      title,
+      channel: ch,
+      published_at: pub ? new Date(pub).toISOString() : new Date().toISOString(),
+      url: id ? "https://www.youtube.com/watch?v=" + id : "",
+      thumbnail: id ? "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg" : "",
+      description: desc,
+      source_type: sourceType,
+      source_label: sourceLabel
+    };
+  }).filter(x => x.id && x.title);
+}
+
+async function collectFromSearchQueries(queries) {
+  const all = [];
+
+  for (const q of queries) {
+    const url = "https://www.youtube.com/results?search_query=" +
+      encodeURIComponent(q) +
+      "&sp=CAI%253D";
+
+    try {
+      const html = await fetchText(url, { "accept": "text/html,*/*" }, 3);
+
+      const ids = [];
+      const re = /"videoId":"([a-zA-Z0-9_-]{11})"/g;
+      let m;
+
+      while ((m = re.exec(html)) !== null) {
+        if (!ids.includes(m[1])) ids.push(m[1]);
+        if (ids.length >= MAX_PER_SEARCH) break;
+      }
+
+      for (const id of ids) {
+        const meta = await fetchVideoMeta(id);
+
+        all.push({
+          id,
+          title: meta.title || q,
+          channel: meta.channel || "YouTube",
+          published_at: meta.published_at || new Date().toISOString(),
+          url: "https://www.youtube.com/watch?v=" + id,
+          thumbnail: "https://i.ytimg.com/vi/" + id + "/hqdefault.jpg",
+          description: meta.description || "",
+          source_type: "search",
+          source_label: q
+        });
+
+        await sleep(80);
+      }
+
+      await sleep(150);
+    } catch (e) {
+      console.warn("YT search scrape failed:", q, e.message);
+    }
+  }
+
+  return all;
+}
+
+async function fetchVideoMeta(videoId) {
+  const url = "https://www.youtube.com/watch?v=" + encodeURIComponent(videoId);
+
+  try {
+    const html = await fetchText(url, { "accept": "text/html,*/*" }, 2);
+
+    const title =
+      ((html.match(/<meta property="og:title" content="([^"]*)"/i) || [])[1] || "")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, "&");
+
+    const description =
+      ((html.match(/<meta property="og:description" content="([^"]*)"/i) || [])[1] || "")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, "&");
+
+    const channel =
+      ((html.match(/"ownerChannelName":"([^"]+)"/i) || [])[1] || "")
+        .replace(/\\u0026/g, "&");
+
+    return {
+      title,
+      description,
+      channel,
+      published_at: new Date().toISOString()
+    };
+  } catch {
+    return {
+      title: "",
+      description: "",
+      channel: "",
+      published_at: new Date().toISOString()
+    };
+  }
+}
+
+async function resolveToChannelId(input) {
+  const s = input.trim();
+
+  if (/^UC[a-zA-Z0-9_-]{10,}$/.test(s)) return s;
+
+  let handle = "";
+
+  if (s.includes("/@")) {
+    handle = s.split("/@")[1].split(/[/?#]/)[0];
+  } else if (s.startsWith("@")) {
+    handle = s.slice(1);
+  }
+
+  if (!handle) return "";
+
+  const url = "https://www.youtube.com/@" + encodeURIComponent(handle);
+
+  try {
+    const html = await fetchText(url, { "accept": "text/html,*/*" }, 2);
+    const m = html.match(/"channelId":"(UC[a-zA-Z0-9_-]+)"/);
+    return m ? m[1] : "";
+  } catch {
+    return "";
+  }
+}
+
+async function collectFromChannels(channelInputs) {
+  const cutoffMs = Date.now() - LOOKBACK_HOURS * 3600 * 1000;
+  const all = [];
+
+  for (const inp of channelInputs) {
+    const chId = await resolveToChannelId(inp);
+
+    if (!chId) {
+      console.warn("Could not resolve channel:", inp);
+      continue;
+    }
+
+    const feed = "https://www.youtube.com/feeds/videos.xml?channel_id=" + encodeURIComponent(chId);
+
+    try {
+      const xml = await fetchText(feed, {}, 3);
+
+      const vids = parseYouTubeRSS(xml, "channel", inp)
+        .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
+        .slice(0, MAX_PER_CHANNEL);
+
+      all.push(...vids);
+      await sleep(120);
+    } catch (e) {
+      console.warn("YT feed failed:", chId, e.message);
+    }
+  }
+
+  return all;
+}
+
+function dedupeAndSort(videos) {
+  const seen = new Set();
+
+  const out = videos.filter(v => {
+    if (!v.id) return false;
+    if (seen.has(v.id)) return false;
+    seen.add(v.id);
+    return true;
+  });
+
+  out.sort((a, b) => {
+    const sa = keywordScore(a);
+    const sb = keywordScore(b);
+    if (sb !== sa) return sb - sa;
+    return new Date(b.published_at) - new Date(a.published_at);
+  });
+
+  return out;
+}
+
+async function fetchCaptions(videoId) {
+  const url = "https://www.youtube.com/api/timedtext?lang=" +
+    encodeURIComponent(CAPTIONS_LANG) +
+    "&v=" +
+    encodeURIComponent(videoId);
+
+  try {
+    const xml = await fetchText(url, {}, 2);
+    if (!xml || !xml.includes("<text")) return "";
+
+    const texts = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map(m => m[1]);
+
+    return texts.join(" ")
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 12000);
+  } catch {
+    return "";
+  }
 }
 
 async function aiGate(openai, v) {
@@ -838,122 +1017,15 @@ catch(e){prompt("Copy this link:",url);}
 </html>`;
 }
 
-function parseMediaChannelsEnv() {
-  const raw = optEnv("MEDIA_CHANNELS", "").trim();
-  if (!raw) return DEFAULT_CHANNELS;
-  return raw.split(",").map(s => s.trim()).filter(Boolean);
-}
-
-function parseSearchQueriesEnv() {
-  const raw = optEnv("MEDIA_SEARCH_QUERIES", "").trim();
-  if (!raw) return DEFAULT_SEARCH_QUERIES;
-  return raw.split("|").map(s => s.trim()).filter(Boolean);
-}
-
-async function resolveToChannelId(input) {
-  const s = input.trim();
-
-  if (/^UC[a-zA-Z0-9_-]{10,}$/.test(s)) return s;
-
-  let handle = "";
-
-  if (s.includes("/@")) {
-    handle = s.split("/@")[1].split(/[/?#]/)[0];
-  } else if (s.startsWith("@")) {
-    handle = s.slice(1);
-  }
-
-  if (!handle) return "";
-
-  const url = "https://www.youtube.com/@" + encodeURIComponent(handle);
-
-  try {
-    const html = await fetchText(url, { "accept-language": "en-US,en;q=0.8" }, 2);
-    const m = html.match(/"channelId":"(UC[a-zA-Z0-9_-]+)"/);
-    return m ? m[1] : "";
-  } catch {
-    return "";
-  }
-}
-
-async function collectFromChannels(channelInputs, lookbackHours) {
-  const cutoffMs = Date.now() - lookbackHours * 3600 * 1000;
-  const all = [];
-
-  for (const inp of channelInputs) {
-    const chId = await resolveToChannelId(inp);
-
-    if (!chId) {
-      console.warn("Could not resolve channel:", inp);
-      continue;
-    }
-
-    const feed = "https://www.youtube.com/feeds/videos.xml?channel_id=" + encodeURIComponent(chId);
-
-    try {
-      const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
-
-      const vids = parseYouTubeRSS(xml, "channel", inp)
-        .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
-        .slice(0, MAX_PER_CHANNEL);
-
-      all.push(...vids);
-      await sleep(120);
-    } catch (e) {
-      console.warn("YT feed failed:", chId, e.message);
-    }
-  }
-
-  return all;
-}
-
-async function collectFromSearchQueries(queries, lookbackHours) {
-  const cutoffMs = Date.now() - lookbackHours * 3600 * 1000;
-  const all = [];
-
-  for (const q of queries) {
-    const feed = "https://www.youtube.com/feeds/videos.xml?search_query=" + encodeURIComponent(q);
-
-    try {
-      const xml = await fetchText(feed, { "accept-language": "en-US,en;q=0.8" }, 3);
-
-      const vids = parseYouTubeRSS(xml, "search", q)
-        .filter(v => new Date(v.published_at).getTime() >= cutoffMs)
-        .slice(0, MAX_PER_SEARCH);
-
-      all.push(...vids);
-      await sleep(120);
-    } catch (e) {
-      console.warn("YT search failed:", q, e.message);
-    }
-  }
-
-  return all;
-}
-
-function dedupeAndSort(videos) {
-  const seen = new Set();
-
-  const out = videos.filter(v => {
-    if (!v.id) return false;
-    if (seen.has(v.id)) return false;
-    seen.add(v.id);
-    return true;
-  });
-
-  out.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-  return out;
-}
-
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
   const openai = new OpenAI({ apiKey });
 
-  const channelInputs = parseMediaChannelsEnv();
   const searchQueries = parseSearchQueriesEnv();
+  const channelInputs = parseMediaChannelsEnv();
 
-  const fromSearch = await collectFromSearchQueries(searchQueries, LOOKBACK_HOURS);
-  const fromChannels = await collectFromChannels(channelInputs, LOOKBACK_HOURS);
+  const fromSearch = await collectFromSearchQueries(searchQueries);
+  const fromChannels = await collectFromChannels(channelInputs);
 
   let videos = dedupeAndSort([...fromSearch, ...fromChannels]);
   videos = videos.slice(0, Math.max(MAX_VIDEOS * 12, 300));
@@ -978,15 +1050,9 @@ async function main() {
   }
 
   const gated = [];
-
   const aiCandidates = borderline
     .filter(v => !isHardExcluded(v))
-    .sort((a, b) => {
-      const sa = keywordScore(a);
-      const sb = keywordScore(b);
-      if (sb !== sa) return sb - sa;
-      return new Date(b.published_at) - new Date(a.published_at);
-    })
+    .sort((a, b) => keywordScore(b) - keywordScore(a))
     .slice(0, MAX_AI_GATE);
 
   for (const v of aiCandidates) {
@@ -1008,14 +1074,7 @@ async function main() {
   finalList = finalList.filter(v => !isHardExcluded(v));
   finalList = finalList.filter(v => isRelevantByRules(v) || (v._gate && v._gate.allow));
 
-  finalList.sort((a, b) => {
-    const sa = keywordScore(a);
-    const sb = keywordScore(b);
-    if (sb !== sa) return sb - sa;
-    return new Date(b.published_at) - new Date(a.published_at);
-  });
-
-  finalList = finalList.slice(0, MAX_VIDEOS);
+  finalList = dedupeAndSort(finalList).slice(0, MAX_VIDEOS);
 
   const outItems = [];
 
