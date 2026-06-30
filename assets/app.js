@@ -2,7 +2,7 @@ const DATA_URL = "/briefs/daily-ai.json";
 const $ = (id) => document.getElementById(id);
 
 const OMEGA_SPOTLIGHT_URL = "/partners/omega-enerji-teknolojileri.html";
-const OMEGA_OFFICIAL_URL = "https://www.omegaenerjiteknolojileri.com";
+const OMEGA_OFFICIAL_URL = "https://www.omegaenerjiteknolojileri.com/en/";
 
 function fmtUtc(iso){
   try { return new Date(iso).toUTCString().replace("GMT","UTC"); }
