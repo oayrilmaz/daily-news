@@ -1,27 +1,40 @@
 const DATA_URL = "/briefs/daily-ai.json";
 const $ = (id) => document.getElementById(id);
 
+const OMEGA_SPOTLIGHT_URL = "/partners/omega-enerji-teknolojileri.html";
+const OMEGA_OFFICIAL_URL = "https://www.omegaenerjiteknolojileri.com";
+
 function fmtUtc(iso){
   try { return new Date(iso).toUTCString().replace("GMT","UTC"); }
   catch { return iso || ""; }
 }
-function normalize(s){ return (s || "").toString().toLowerCase(); }
+
+function normalize(s){
+  return (s || "").toString().toLowerCase();
+}
+
 function escapeHtml(str){
   return (str ?? "").toString()
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
 }
+
 function slugify(s){
   return normalize(s)
     .replace(/[^a-z0-9]+/g,"-")
     .replace(/(^-|-$)/g,"")
     .slice(0,80) || "item";
 }
+
 function wordCount(text){
   const t = (text || "").toString().trim();
   if(!t) return 0;
   return t.split(/\s+/).length;
 }
+
 function readMins(text){
   const w = wordCount(text);
   const mins = Math.max(1, Math.round(w / 200));
@@ -31,18 +44,75 @@ function readMins(text){
 function applySearch(items, q){
   q = normalize(q).trim();
   if(!q) return items;
+
   return items.filter(it=>{
     const hay = [
-      it.title, it.dek, it.summary, it.body, it.category, it.region,
+      it.title,
+      it.dek,
+      it.summary,
+      it.body,
+      it.category,
+      it.region,
       ...(Array.isArray(it.tags) ? it.tags : [])
     ].map(normalize).join(" ");
+
     return hay.includes(q);
   });
+}
+
+function omegaSponsoredHtml(){
+  const shareUrl = `${location.origin}${OMEGA_SPOTLIGHT_URL}`;
+
+  return `
+    <article class="card sponsored-spotlight-card" id="omega-sponsored-spotlight" data-id="omega-sponsored-spotlight" data-share="${escapeHtml(shareUrl)}">
+      <div class="sponsored-label">Sponsored Partner Spotlight</div>
+
+      <h3 class="headline sponsored-headline">
+        <a href="${escapeHtml(OMEGA_SPOTLIGHT_URL)}">
+          Omega Enerji Teknolojileri
+        </a>
+      </h3>
+
+      <p class="dek sponsored-dek">
+        Powering the electrical backbone behind critical infrastructure.
+      </p>
+
+      <p class="sponsored-copy">
+        Omega provides engineering, manufacturing, and project-based solutions in
+        low-voltage electrical panels, MCCs, automation/control panels, and data center
+        electrical infrastructure.
+      </p>
+
+      <p class="sponsored-meta">
+        1,200+ global references • 40+ countries • 45+ data center references •
+        10,000 cubicles/year capacity
+      </p>
+
+      <div class="actions">
+        <a class="actionBtn sponsored-primary" href="${escapeHtml(OMEGA_SPOTLIGHT_URL)}">
+          Read Spotlight
+        </a>
+
+        <a class="actionBtn" href="${escapeHtml(OMEGA_OFFICIAL_URL)}" target="_blank" rel="noopener">
+          Visit Omega
+        </a>
+
+        <button class="actionBtn" type="button" data-action="share">
+          Share
+        </button>
+      </div>
+
+      <p class="sponsored-disclosure">
+        Sponsored content prepared as part of a 30-day PTD Today visibility pilot.
+      </p>
+    </article>
+  `;
 }
 
 function cardHtml(item){
   const tags = Array.isArray(item.tags) ? item.tags : [];
   const created = item.created_at || item.createdAt || item.publishedAt || "";
+
   const kicker = [
     item.category ? item.category.toUpperCase() : "BRIEFING",
     item.region ? item.region.toUpperCase() : "GLOBAL",
@@ -91,6 +161,7 @@ function render(payload, query=""){
   const dateUtc = payload.date_utc || payload.date || "";
 
   $("updatedLine").textContent = updatedAt ? `Updated — ${fmtUtc(updatedAt)}` : "Updated —";
+
   $("disclaimerLine").textContent =
     payload.disclaimer ||
     "Informational only — AI-assisted; may contain errors. Not investment or engineering advice.";
@@ -102,12 +173,15 @@ function render(payload, query=""){
 
   $("countPill").textContent = `Items: ${items.length}`;
 
+  const omegaCard = omegaSponsoredHtml();
+
   $("feed").innerHTML = items.length
-    ? items.map(cardHtml).join("")
-    : `<div class="errorBox">No items matched your search.</div>`;
+    ? omegaCard + items.map(cardHtml).join("")
+    : omegaCard + `<div class="errorBox">No items matched your search.</div>`;
 
   // Expand if URL has #id
   const hash = decodeURIComponent((location.hash || "").replace(/^#/, ""));
+
   if(hash){
     const el = document.getElementById(hash);
     if(el){
@@ -125,7 +199,9 @@ async function doShare(title, url){
       await navigator.share({ title, url });
       return;
     }
-  }catch(_){ /* ignore */ }
+  }catch(_){
+    // ignore
+  }
 
   try{
     await navigator.clipboard.writeText(url);
@@ -139,7 +215,11 @@ async function load(){
   $("year").textContent = new Date().getFullYear();
 
   const res = await fetch(DATA_URL, { cache: "no-store" });
-  if(!res.ok) throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
+
+  if(!res.ok){
+    throw new Error(`Failed to load ${DATA_URL} (${res.status})`);
+  }
+
   const payload = await res.json();
 
   render(payload, $("q").value);
@@ -154,35 +234,44 @@ async function load(){
     if(!card) return;
 
     const action = btn.getAttribute("data-action");
+
     if(action === "toggle"){
       const expanded = card.classList.toggle("expanded");
       btn.textContent = expanded ? "Close" : "Read";
+
       if(expanded){
         history.replaceState(null, "", `#${encodeURIComponent(card.dataset.id)}`);
       }else{
         history.replaceState(null, "", location.pathname);
       }
+
       return;
     }
 
     if(action === "share"){
       const url = card.dataset.share || location.href;
-      const h = card.querySelector(".headline")?.textContent || "PTD Today";
+      const h = card.querySelector(".headline")?.textContent?.trim() || "PTD Today";
       await doShare(h, url);
     }
   });
 }
 
 $("btnRefresh").addEventListener("click", ()=>location.reload());
-$("btnTop").addEventListener("click", ()=>window.scrollTo({top:0,behavior:"smooth"}));
+
+if($("btnTop")){
+  $("btnTop").addEventListener("click", ()=>window.scrollTo({top:0,behavior:"smooth"}));
+}
 
 load().catch(err=>{
   $("updatedLine").textContent = "Could not load briefing.";
   $("disclaimerLine").textContent = "";
+
   $("feed").innerHTML = `
+    ${omegaSponsoredHtml()}
     <div class="errorBox">
       <strong>Briefing not available yet.</strong><br/>
       Expected file: <code>${DATA_URL}</code><br/>
       <div style="margin-top:10px;color:#6b665c;">${escapeHtml(err.message || String(err))}</div>
-    </div>`;
+    </div>
+  `;
 });
