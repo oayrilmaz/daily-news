@@ -46,8 +46,8 @@
       --btnInk:#fff;
 
       /* Highlight colors */
-      --hl-blue: rgba(173, 216, 230, 0.75); /* light blue */
-      --hl-red:  rgba(255, 182, 193, 0.75); /* light red */
+      --hl-blue: rgba(173, 216, 230, 0.75);
+      --hl-red:  rgba(255, 182, 193, 0.75);
     }
 
     *{box-sizing:border-box}
@@ -168,6 +168,8 @@
       font-size:14px;
       font-weight:800;
       line-height:1;
+      cursor:pointer;
+      font-family:inherit;
     }
 
     .sponsored-button.secondary{
@@ -178,13 +180,6 @@
 
     .sponsored-button:hover{
       opacity:.86;
-    }
-
-    .sponsored-disclosure{
-      margin-top:12px;
-      margin-bottom:0 !important;
-      font-size:12px !important;
-      color:rgba(0,0,0,.55) !important;
     }
 
     .panel{
@@ -505,14 +500,14 @@
           Read the Spotlight →
         </a>
 
-        <a class="sponsored-button secondary" href="https://www.omegaenerjiteknolojileri.com" target="_blank" rel="noopener">
+        <a class="sponsored-button secondary" href="https://www.omegaenerjiteknolojileri.com/en/" target="_blank" rel="noopener">
           Visit Omega →
         </a>
-      </div>
 
-      <p class="sponsored-disclosure">
-        Sponsored content prepared as part of a 30-day PTD Today visibility pilot.
-      </p>
+        <button class="sponsored-button secondary" type="button" onclick="shareOmegaSpotlight()">
+          Share →
+        </button>
+      </div>
     </section>
 
     <section class="panel" aria-label="Daily briefing">
@@ -573,6 +568,14 @@
       }catch(e){
         prompt("Copy this draft for LinkedIn:", draft);
       }
+    }
+
+    async function shareOmegaSpotlight(){
+      const title = "Omega Enerji Teknolojileri | Sponsored Partner Spotlight | PTD Today";
+      const text = "Omega Enerji Teknolojileri: Powering the electrical backbone behind critical infrastructure.";
+      const url = `${window.location.origin}/partners/omega-enerji-teknolojileri.html`;
+
+      await shareLink(title, text, url);
     }
 
     function paragraphsToHtml(text){
@@ -649,7 +652,6 @@
       }
     }
 
-    // IMPORTANT: What to watch + Action are red.
     function buildSpeakChunks(item){
       const title = (item.title || "").toString().trim();
       const lede  = (item.lede || item.summary || "").toString().trim();
@@ -692,7 +694,6 @@
 
       const plain = paras.map(p => p.text).join("\n\n").trim();
 
-      // offsets of word tokens (non-space) for boundary mapping
       const offsets = [];
       let cursor = 0;
       const partsAll = plain.match(/(\s+|[^\s]+)/g) || [];
@@ -702,7 +703,6 @@
         cursor += part.length;
       }
 
-      // per-word spans in HTML, per-paragraph importance
       let wordIndex = 0;
       const html = paras.map(p=>{
         const parts = p.text.match(/(\s+|[^\s]+)/g) || [];
@@ -728,20 +728,17 @@
 
       let s = 0;
 
-      // English preference (will later filter by accent)
       if (lang === "en-us") s += 35;
       else if (lang.startsWith("en-")) s += 20;
 
-      // Prefer natural/neural/premium/enhanced
       if (name.includes("neural")) s += 28;
       if (name.includes("natural")) s += 24;
       if (name.includes("premium")) s += 18;
       if (name.includes("enhanced")) s += 16;
 
-      // Common good engines
       if (name.includes("google")) s += 16;
       if (name.includes("microsoft")) s += 14;
-      if (name.includes("samantha")) s += 10; // iOS
+      if (name.includes("samantha")) s += 10;
       if (name.includes("ava")) s += 8;
       if (name.includes("aria")) s += 8;
       if (name.includes("jenny")) s += 8;
@@ -812,7 +809,6 @@
     }
 
     function applyPreset(preset, rateSel, pitchSel){
-      // “Human mode” defaults (subtle — avoids robotic)
       if (!rateSel || !pitchSel) return;
       if (preset === "natural"){
         rateSel.value = "1.02";
@@ -860,13 +856,11 @@
       const rateSel   = card.querySelector("[data-tts-rate]");
       const pitchSel  = card.querySelector("[data-tts-pitch]");
 
-      // Set preset defaults the first time card is opened
       if (presetSel && !presetSel.getAttribute("data-init")){
         presetSel.setAttribute("data-init","1");
         applyPreset(presetSel.value, rateSel, pitchSel);
       }
 
-      // Fill voices based on accent
       const accent = accentSel ? accentSel.value : "any";
       fillVoiceSelect(voiceSel, accent);
 
@@ -900,7 +894,6 @@
         const offs = TTS.offsets;
         if (!offs || !offs.length) return;
 
-        // binary search: last offset <= charIndex
         let lo=0, hi=offs.length-1, ans=0;
         while(lo<=hi){
           const mid = (lo+hi)>>1;
@@ -913,13 +906,11 @@
       utter.onend = ()=> stopTts();
       utter.onerror = ()=> stopTts();
 
-      // Fallback timed highlight (better estimate)
       const startFallbackTimer = ()=>{
         if (TTS.timer) { clearInterval(TTS.timer); TTS.timer = null; }
         const words = TTS.spans.length || 0;
         if (!words) return;
 
-        // Estimate WPM with slight punctuation penalty
         const baseWpm = 185;
         const rate = utter.rate || 1;
         const wpm = Math.max(110, Math.min(340, baseWpm * rate));
@@ -996,9 +987,6 @@
     initVoices();
     window.addEventListener("beforeunload", ()=> stopTts());
 
-    // -----------------------------
-    // Cards
-    // -----------------------------
     function cardHtml(item){
       const id = (item.id || "").toString().trim() || ("ai-" + Math.random().toString(36).slice(2));
       const meta = [
@@ -1199,7 +1187,6 @@
         });
       });
 
-      // Populate all voice selectors (after cards exist)
       document.querySelectorAll("[data-tts-voice]").forEach(sel => {
         const card = sel.closest("article.card");
         const accentSel = card ? card.querySelector("[data-tts-accent]") : null;
@@ -1249,11 +1236,9 @@
     $("btnRefresh").addEventListener("click", ()=>{ stopTts(); location.reload(); });
     window.addEventListener("hashchange", ()=>{ stopTts(); focusFromHash(); });
 
-    // Ensure voices load on more browsers
     if (TTS.supported){
       loadVoices();
       window.speechSynthesis.onvoiceschanged = ()=> loadVoices();
-      // Some browsers only unlock voices after a user gesture; still fine.
     }
 
     load();
