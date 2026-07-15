@@ -80,6 +80,28 @@
     .pageTitle{text-align:center;margin:18px 0 2px;font-size:44px;font-weight:800;letter-spacing:.2px}
     .updated{text-align:center;color:var(--muted);font-size:15px;margin:6px 0 18px}
 
+    .siteViews{
+      display:flex;
+      justify-content:center;
+      margin:-6px 0 20px;
+    }
+    .siteViewsPill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:7px;
+      padding:8px 13px;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:var(--pill);
+      color:rgba(0,0,0,.74);
+      font-size:14px;
+      font-weight:700;
+      line-height:1;
+      white-space:nowrap;
+    }
+    .siteViewsPill[hidden]{display:none}
+
     .sponsored-spotlight{
       margin:22px 0 24px;padding:22px 18px;border:1px solid rgba(0,0,0,.16);
       border-radius:16px;background:linear-gradient(180deg,rgba(0,0,0,.025),#fff);
@@ -237,6 +259,14 @@
     <h1 class="pageTitle">Daily AI Briefing</h1>
     <div class="updated" id="updatedLine">Loading…</div>
 
+    <div class="siteViews">
+      <span class="siteViewsPill" id="siteViewsPill" hidden>
+        <span aria-hidden="true">👁</span>
+        <span id="siteViewCount">—</span>
+        <span>PTDToday.com views</span>
+      </span>
+    </div>
+
     <section class="sponsored-spotlight" aria-label="Sponsored Partner Spotlight">
       <div class="sponsored-label">Sponsored Partner Spotlight</div>
       <h2>Omega Enerji Teknolojileri</h2>
@@ -302,6 +332,8 @@
   <script>
     const DATA_URL = "/briefs/daily-ai.json";
     const VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view";
+    const SITE_VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/site";
+    const SITE_VIEW_SESSION_KEY = "ptdtoday_site_view_counted";
     const $ = (id) => document.getElementById(id);
 
     /*
@@ -408,6 +440,51 @@
           return articleId ? readArticleViewCount(articleId) : Promise.resolve();
         })
       );
+    }
+
+    function updateSiteViewDisplay(views){
+      const pill = $("siteViewsPill");
+      const count = $("siteViewCount");
+
+      if(!pill || !count)return;
+
+      count.textContent = formatViews(views);
+      pill.hidden = false;
+    }
+
+    async function loadAndRegisterSiteView(){
+      try{
+        let method = "GET";
+
+        try{
+          if(sessionStorage.getItem(SITE_VIEW_SESSION_KEY) !== "1"){
+            method = "POST";
+          }
+        }catch(e){
+          method = "POST";
+        }
+
+        const response = await fetch(SITE_VIEW_API,{
+          method,
+          mode:"cors",
+          cache:"no-store"
+        });
+
+        if(!response.ok){
+          throw new Error(`Site view request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        updateSiteViewDisplay(Number(data.views) || 0);
+
+        if(method === "POST"){
+          try{
+            sessionStorage.setItem(SITE_VIEW_SESSION_KEY,"1");
+          }catch(e){}
+        }
+      }catch(error){
+        console.error("Could not load PTDToday.com views:",error);
+      }
     }
 
     async function shareLink(title,text,url){
@@ -1263,6 +1340,7 @@
 
     async function load(){
       $("year").textContent = new Date().getFullYear();
+      loadAndRegisterSiteView();
 
       try{
         const res = await fetch(DATA_URL,{cache:"no-store"});
