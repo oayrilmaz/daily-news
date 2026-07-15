@@ -45,7 +45,8 @@ function writeJson(filePath, obj) {
 }
 
 function escapeHtml(str) {
-  return (str ?? "").toString()
+  return (str ?? "")
+    .toString()
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -56,7 +57,11 @@ function escapeHtml(str) {
 function toTextParagraphs(s) {
   const t = (s || "").toString().trim();
   if (!t) return [];
-  return t.split(/\n\s*\n/g).map(x => x.trim()).filter(Boolean);
+
+  return t
+    .split(/\n\s*\n/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 function renderArticleHtml({ siteOrigin, item, payload }) {
@@ -66,32 +71,56 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
   const body = (item.body || "").toString().trim();
   const category = (item.category || "Brief").toString();
   const region = (item.region || "Global").toString();
-  const createdAt = (item.created_at || payload.updated_at || "").toString();
+  const createdAt = (
+    item.created_at ||
+    payload.updated_at ||
+    ""
+  ).toString();
 
-  const description =
-    (lede || body || "PTD Today — AI-generated intelligence briefing.")
-      .replace(/\s+/g, " ")
-      .slice(0, 180);
+  const description = (
+    lede ||
+    body ||
+    "PTD Today — AI-generated intelligence briefing."
+  )
+    .replace(/\s+/g, " ")
+    .slice(0, 180);
 
   const base = siteOrigin.replace(/\/$/, "");
   const url = `${base}/articles/${encodeURIComponent(id)}.html`;
 
-  const bodyParas = toTextParagraphs(body).map(p => `<p>${escapeHtml(p)}</p>`).join("\n");
-  const watch = Array.isArray(item.watchlist) ? item.watchlist : [];
-  const tags = Array.isArray(item.tags) ? item.tags : [];
+  const bodyParas = toTextParagraphs(body)
+    .map((p) => `<p>${escapeHtml(p)}</p>`)
+    .join("\n");
+
+  const watch = Array.isArray(item.watchlist)
+    ? item.watchlist
+    : [];
+
+  const tags = Array.isArray(item.tags)
+    ? item.tags
+    : [];
 
   const ogImage = `${base}/assets/og-default.png`;
 
-  // JSON-LD (do NOT HTML-escape this JSON)
+  // JSON-LD — do not HTML-escape this JSON.
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
-    "headline": title,
-    "description": description,
-    "datePublished": createdAt || payload.updated_at || new Date().toISOString(),
-    "dateModified": payload.updated_at || createdAt || new Date().toISOString(),
-    "mainEntityOfPage": url,
-    "publisher": { "@type": "Organization", "name": "PTD Today" }
+    headline: title,
+    description,
+    datePublished:
+      createdAt ||
+      payload.updated_at ||
+      new Date().toISOString(),
+    dateModified:
+      payload.updated_at ||
+      createdAt ||
+      new Date().toISOString(),
+    mainEntityOfPage: url,
+    publisher: {
+      "@type": "Organization",
+      name: "PTD Today"
+    }
   };
 
   return `<!doctype html>
@@ -99,23 +128,56 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>${escapeHtml(title)} — PTD Today</title>
-  <meta name="description" content="${escapeHtml(description)}" />
-  <link rel="canonical" href="${escapeHtml(url)}" />
+
+  <meta
+    name="description"
+    content="${escapeHtml(description)}"
+  />
+
+  <link
+    rel="canonical"
+    href="${escapeHtml(url)}"
+  />
 
   <!-- Open Graph -->
   <meta property="og:type" content="article" />
   <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:title" content="${escapeHtml(title)}" />
-  <meta property="og:description" content="${escapeHtml(description)}" />
-  <meta property="og:url" content="${escapeHtml(url)}" />
-  <meta property="og:image" content="${escapeHtml(ogImage)}" />
+  <meta
+    property="og:title"
+    content="${escapeHtml(title)}"
+  />
+  <meta
+    property="og:description"
+    content="${escapeHtml(description)}"
+  />
+  <meta
+    property="og:url"
+    content="${escapeHtml(url)}"
+  />
+  <meta
+    property="og:image"
+    content="${escapeHtml(ogImage)}"
+  />
 
   <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${escapeHtml(title)}" />
-  <meta name="twitter:description" content="${escapeHtml(description)}" />
-  <meta name="twitter:image" content="${escapeHtml(ogImage)}" />
+  <meta
+    name="twitter:card"
+    content="summary_large_image"
+  />
+  <meta
+    name="twitter:title"
+    content="${escapeHtml(title)}"
+  />
+  <meta
+    name="twitter:description"
+    content="${escapeHtml(description)}"
+  />
+  <meta
+    name="twitter:image"
+    content="${escapeHtml(ogImage)}"
+  />
 
   <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 
@@ -130,97 +192,333 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
       --btn:#111;
       --btnInk:#fff;
     }
-    *{box-sizing:border-box}
+
+    *{
+      box-sizing:border-box;
+    }
+
     body{
-      margin:0;background:var(--bg);color:var(--ink);
-      font-family: Georgia,"Times New Roman",Times,serif;
-      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Georgia,"Times New Roman",Times,serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
     }
-    a{color:inherit}
-    .wrap{max-width:900px;margin:0 auto;padding:26px 16px 64px}
-    .mast{text-align:center;padding:16px 0 10px}
-    .brand{margin:0;font-size:52px;letter-spacing:.2px;font-weight:700}
-    .tagline{margin:6px 0 10px;color:var(--muted);font-style:italic;font-size:16px}
-    .nav{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin:10px 0 10px}
+
+    a{
+      color:inherit;
+    }
+
+    .wrap{
+      max-width:900px;
+      margin:0 auto;
+      padding:26px 16px 64px;
+    }
+
+    .mast{
+      text-align:center;
+      padding:16px 0 10px;
+    }
+
+    .brand{
+      margin:0;
+      font-size:52px;
+      letter-spacing:.2px;
+      font-weight:700;
+    }
+
+    .tagline{
+      margin:6px 0 10px;
+      color:var(--muted);
+      font-style:italic;
+      font-size:16px;
+    }
+
+    .nav{
+      display:flex;
+      justify-content:center;
+      gap:14px;
+      flex-wrap:wrap;
+      margin:10px 0;
+    }
+
     .nav a{
-      text-decoration:none;padding:7px 12px;border-radius:999px;border:1px solid transparent;
-      color:rgba(0,0,0,.75);font-size:15px
+      text-decoration:none;
+      padding:7px 12px;
+      border-radius:999px;
+      border:1px solid transparent;
+      color:rgba(0,0,0,.75);
+      font-size:15px;
     }
-    .nav a:hover{border-color:var(--rule);background:rgba(0,0,0,.02)}
-    .rule{height:1px;background:var(--rule);margin:14px 0 0}
 
-    .meta{color:var(--muted);font-size:12px;letter-spacing:.14px;text-transform:uppercase;margin:16px 0 8px}
-    h1{margin:0 0 10px;font-size:44px;line-height:1.03;font-weight:900}
-    .lede{font-size:18px;line-height:1.6;color:rgba(0,0,0,.86);margin:0 0 14px}
-    .content{border-top:1px solid var(--soft);padding-top:14px;font-size:17px;line-height:1.75;color:rgba(0,0,0,.86)}
-    .content p{margin:0 0 14px}
+    .nav a:hover{
+      border-color:var(--rule);
+      background:rgba(0,0,0,.02);
+    }
 
-    .subhead{margin:18px 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.12px;color:var(--muted)}
-    ul{margin:0 0 12px;padding-left:18px}
-    li{margin:6px 0}
+    .rule{
+      height:1px;
+      background:var(--rule);
+      margin:14px 0 0;
+    }
 
-    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+    .meta{
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.14px;
+      text-transform:uppercase;
+      margin:16px 0 8px;
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:44px;
+      line-height:1.03;
+      font-weight:900;
+    }
+
+    .lede{
+      font-size:18px;
+      line-height:1.6;
+      color:rgba(0,0,0,.86);
+      margin:0 0 14px;
+    }
+
+    .content{
+      border-top:1px solid var(--soft);
+      padding-top:14px;
+      font-size:17px;
+      line-height:1.75;
+      color:rgba(0,0,0,.86);
+    }
+
+    .content p{
+      margin:0 0 14px;
+    }
+
+    .subhead{
+      margin:18px 0 8px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.12px;
+      color:var(--muted);
+    }
+
+    ul{
+      margin:0 0 12px;
+      padding-left:18px;
+    }
+
+    li{
+      margin:6px 0;
+    }
+
+    .chips{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:14px 0 0;
+    }
+
     .chip{
-      display:inline-flex;align-items:center;padding:7px 10px;border-radius:999px;
-      border:1px solid var(--rule);background:var(--pill);font-size:13px;color:rgba(0,0,0,.76)
+      display:inline-flex;
+      align-items:center;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--pill);
+      font-size:13px;
+      color:rgba(0,0,0,.76);
     }
 
-    .btnRow{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0 0}
-    .btn{
-      appearance:none;border:1px solid var(--rule);background:var(--btn);color:var(--btnInk);
-      padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:14px
+    .btnRow{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin:16px 0 0;
     }
-    .btn.secondary{background:#fff;color:#111}
-    .footer{text-align:center;margin-top:24px;color:var(--muted);font-size:13px}
+
+    .btn{
+      appearance:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      border:1px solid var(--rule);
+      background:var(--btn);
+      color:var(--btnInk);
+      padding:9px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:14px;
+      text-decoration:none;
+    }
+
+    .btn.secondary{
+      background:#fff;
+      color:#111;
+    }
+
+    .article-view-counter{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:9px 14px;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:var(--pill);
+      color:var(--muted);
+      font-family:Georgia,"Times New Roman",Times,serif;
+      font-size:14px;
+      font-weight:700;
+      line-height:1;
+      white-space:nowrap;
+    }
+
+    .article-view-counter[hidden]{
+      display:none;
+    }
+
+    .footer{
+      text-align:center;
+      margin-top:24px;
+      color:var(--muted);
+      font-size:13px;
+    }
 
     @media (max-width:760px){
-      .brand{font-size:44px}
-      h1{font-size:38px}
+      .brand{
+        font-size:44px;
+      }
+
+      h1{
+        font-size:38px;
+      }
     }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <header class="mast">
       <h1 class="brand">PTD Today</h1>
-      <div class="tagline">First to Know. First to Lead.</div>
-      <nav class="nav" aria-label="Primary navigation">
+
+      <div class="tagline">
+        First to Know. First to Lead.
+      </div>
+
+      <nav
+        class="nav"
+        aria-label="Primary navigation"
+      >
         <a href="/index.html">Home</a>
         <a href="/room.html">Room</a>
       </nav>
+
       <div class="rule"></div>
     </header>
 
-    <div class="meta">${escapeHtml(category)} • ${escapeHtml(region)} • ${escapeHtml(createdAt)}</div>
+    <div class="meta">
+      ${escapeHtml(category)} •
+      ${escapeHtml(region)} •
+      ${escapeHtml(createdAt)}
+    </div>
+
     <h1>${escapeHtml(title)}</h1>
-    ${lede ? `<p class="lede">${escapeHtml(lede)}</p>` : ""}
+
+    ${
+      lede
+        ? `<p class="lede">${escapeHtml(lede)}</p>`
+        : ""
+    }
 
     <div class="content">
-      ${bodyParas || `<p>${escapeHtml(item.summary || "")}</p>`}
+      ${
+        bodyParas ||
+        `<p>${escapeHtml(item.summary || "")}</p>`
+      }
 
-      ${watch.length ? `
+      ${
+        watch.length
+          ? `
         <div class="subhead">What to watch</div>
-        <ul>${watch.slice(0,10).map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul>
-      ` : ""}
 
-      ${item.action_for_readers ? `
+        <ul>
+          ${watch
+            .slice(0, 10)
+            .map((w) => `<li>${escapeHtml(w)}</li>`)
+            .join("")}
+        </ul>
+      `
+          : ""
+      }
+
+      ${
+        item.action_for_readers
+          ? `
         <div class="subhead">Action</div>
-        <p>${escapeHtml(item.action_for_readers)}</p>
-      ` : ""}
+
+        <p>
+          ${escapeHtml(item.action_for_readers)}
+        </p>
+      `
+          : ""
+      }
     </div>
 
     <div class="chips">
-      <span class="chip">${escapeHtml(category)}</span>
-      <span class="chip">${escapeHtml(region)}</span>
-      ${(tags || []).slice(0, 10).map(t => `<span class="chip">${escapeHtml(t)}</span>`).join("")}
+      <span class="chip">
+        ${escapeHtml(category)}
+      </span>
+
+      <span class="chip">
+        ${escapeHtml(region)}
+      </span>
+
+      ${tags
+        .slice(0, 10)
+        .map(
+          (tag) =>
+            `<span class="chip">${escapeHtml(tag)}</span>`
+        )
+        .join("")}
     </div>
 
     <div class="btnRow">
-      <a class="btn secondary" href="/index.html#${encodeURIComponent(id)}">Back to Home</a>
-      <button class="btn" type="button" id="shareBtn">Share</button>
+      <a
+        class="btn secondary"
+        href="/index.html#${encodeURIComponent(id)}"
+      >
+        Back to Home
+      </a>
+
+      <span
+        class="article-view-counter"
+        id="articleViewCounter"
+        aria-label="Article views"
+      >
+        <span aria-hidden="true">👁</span>
+        <span id="articleViewCount">—</span>
+        <span>views</span>
+      </span>
+
+      <button
+        class="btn"
+        type="button"
+        id="shareBtn"
+      >
+        Share
+      </button>
     </div>
 
-    <div class="footer">© ${new Date().getFullYear()} PTD Today</div>
+    <div class="footer">
+      © ${new Date().getFullYear()} PTD Today
+    </div>
   </div>
 
   <script>
@@ -228,20 +526,96 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
       var url = ${JSON.stringify(url)};
       var title = ${JSON.stringify(title)};
       var text = ${JSON.stringify(description)};
-      var btn = document.getElementById("shareBtn");
-      if(!btn) return;
-      btn.addEventListener("click", async function(){
-        if (navigator.share) {
-          try { await navigator.share({ title: title, text: text, url: url }); return; }
-          catch(e){ return; }
+      var articleId = ${JSON.stringify(id)};
+
+      var shareBtn =
+        document.getElementById("shareBtn");
+
+      var counter =
+        document.getElementById("articleViewCounter");
+
+      var countElement =
+        document.getElementById("articleViewCount");
+
+      if (shareBtn) {
+        shareBtn.addEventListener(
+          "click",
+          async function(){
+            if (navigator.share) {
+              try {
+                await navigator.share({
+                  title: title,
+                  text: text,
+                  url: url
+                });
+
+                return;
+              } catch (error) {
+                return;
+              }
+            }
+
+            try {
+              await navigator.clipboard.writeText(url);
+              alert("Article link copied.");
+            } catch (error) {
+              prompt(
+                "Copy this article link:",
+                url
+              );
+            }
+          }
+        );
+      }
+
+      async function registerArticleView() {
+        if (
+          !counter ||
+          !countElement ||
+          !articleId
+        ) {
+          return;
         }
-        try{
-          await navigator.clipboard.writeText(url);
-          alert("Article link copied.");
-        }catch(e){
-          prompt("Copy this article link:", url);
+
+        var apiUrl =
+          "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view/" +
+          encodeURIComponent(articleId);
+
+        try {
+          var response = await fetch(apiUrl, {
+            method: "POST",
+            mode: "cors",
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              "View counter request failed"
+            );
+          }
+
+          var data = await response.json();
+          var views = Number(data.views) || 0;
+
+          countElement.textContent =
+            new Intl.NumberFormat("en-US", {
+              notation:
+                views >= 1000
+                  ? "compact"
+                  : "standard",
+              maximumFractionDigits:1
+            }).format(views);
+        } catch (error) {
+          console.error(
+            "View counter error:",
+            error
+          );
+
+          counter.hidden = true;
         }
-      });
+      }
+
+      registerArticleView();
     })();
   </script>
 </body>
@@ -250,7 +624,12 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
 
 async function main() {
   const apiKey = mustEnv("OPENAI_API_KEY");
-  const siteOrigin = optEnv("SITE_ORIGIN", "https://ptdtoday.com").replace(/\/$/, "");
+
+  const siteOrigin = optEnv(
+    "SITE_ORIGIN",
+    "https://ptdtoday.com"
+  ).replace(/\/$/, "");
+
   const client = new OpenAI({ apiKey });
 
   const today = utcDateOnly();
@@ -278,6 +657,7 @@ STYLE:
 
   const user = `
 Generate today's brief for date_utc = "${today}".
+
 Return JSON with this exact structure:
 
 {
@@ -286,8 +666,14 @@ Return JSON with this exact structure:
   "updated_at": "${now}",
   "date_utc": "${today}",
   "sections": [
-    { "heading": "Top Themes", "bullets": ["...","..."] },
-    { "heading": "What to Watch (24–72h)", "bullets": ["...","..."] }
+    {
+      "heading": "Top Themes",
+      "bullets": ["...","..."]
+    },
+    {
+      "heading": "What to Watch (24–72h)",
+      "bullets": ["...","..."]
+    }
   ],
   "items": [
     {
@@ -318,36 +704,73 @@ REQUIREMENTS:
   const resp = await client.responses.create({
     model: "gpt-5-mini",
     input: [
-      { role: "system", content: system },
-      { role: "user", content: user }
+      {
+        role: "system",
+        content: system
+      },
+      {
+        role: "user",
+        content: user
+      }
     ],
-    text: { format: { type: "json_object" } }
+    text: {
+      format: {
+        type: "json_object"
+      }
+    }
   });
 
   const text = resp.output_text;
-  if (!text) throw new Error("No output_text returned from OpenAI");
+
+  if (!text) {
+    throw new Error(
+      "No output_text returned from OpenAI"
+    );
+  }
 
   let payload;
+
   try {
     payload = JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Model returned non-JSON. First 200 chars: ${text.slice(0, 200)}`);
+  } catch (error) {
+    throw new Error(
+      `Model returned non-JSON. First 200 chars: ${text.slice(0, 200)}`
+    );
   }
 
-  // Write JSON used by Home
-  writeJson(path.join("briefs", "daily-ai.json"), payload);
+  // Write JSON used by Home.
+  writeJson(
+    path.join("briefs", "daily-ai.json"),
+    payload
+  );
 
-  // Build per-article HTML pages
-  const items = Array.isArray(payload.items) ? payload.items : [];
+  // Build per-article HTML pages.
+  const items = Array.isArray(payload.items)
+    ? payload.items
+    : [];
+
   for (const item of items) {
-    const id = (item.id || "").toString().trim();
+    const id = (item.id || "")
+      .toString()
+      .trim();
+
     if (!id) continue;
 
-    const html = renderArticleHtml({ siteOrigin, item, payload });
-    writeFile(path.join("articles", `${id}.html`), html);
+    const html = renderArticleHtml({
+      siteOrigin,
+      item,
+      payload
+    });
+
+    writeFile(
+      path.join("articles", `${id}.html`),
+      html
+    );
   }
 
-  console.log("Wrote: briefs/daily-ai.json, articles/*.html");
+  console.log(
+    "Wrote: briefs/daily-ai.json, articles/*.html"
+  );
 }
 
 main().catch((err) => {
