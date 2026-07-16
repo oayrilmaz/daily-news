@@ -54,7 +54,11 @@ jobs:
           SITE_ORIGIN: https://ptdtoday.com
         run: npm run generate:ai
 
-      # 3) Generate Media (YouTube → AI summaries + Media pages) — PTD scope only (no politics)
+      # 3) Rebuild historical archive, 7/30-day trends and AI outlook
+      - name: Rebuild Historical Intelligence
+        run: node scripts/backfill_history_from_articles.js
+
+      # 4) Generate Media (YouTube → AI summaries + Media pages)
       - name: Generate Media (YouTube → AI summaries)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -65,13 +69,13 @@ jobs:
           MEDIA_MAX_PER_CHANNEL: "2"
 
           # Lookback + auto-expand when too few
-          MEDIA_LOOKBACK_HOURS: "168"        # 7D
+          MEDIA_LOOKBACK_HOURS: "168"
           MEDIA_MIN_ITEMS: "10"
-          MEDIA_EXPAND_HOURS_IF_LOW: "720"   # 30D
+          MEDIA_EXPAND_HOURS_IF_LOW: "720"
 
-          # Filtering (relaxed)
+          # Filtering
           MEDIA_FILTER_MODE: "hybrid"
-          MEDIA_MIN_MATCH_SCORE: "1"         # set to "0" if still too strict
+          MEDIA_MIN_MATCH_SCORE: "1"
           MEDIA_MAX_FILTER_AI: "40"
           MEDIA_CAPTIONS_LANG: "en"
 
@@ -117,19 +121,29 @@ jobs:
             https://www.youtube.com/@Google,
             https://www.youtube.com/@Microsoft,
             https://www.youtube.com/@AmazonWebServices
-
         run: node scripts/generate_media.js
 
+      # 5) Verify historical files were generated
+      - name: Verify Market Intelligence Files
+        run: |
+          test -f briefs/trends.json
+          test -f briefs/outlook.json
+          test -f briefs/backfill-report.json
+          test -d history
+          echo "Historical intelligence files are ready."
+
+      # 6) Commit all generated files
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
 
           git add -A
+
           if git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          git commit -m "Update PTD Today feeds"
+          git commit -m "Update PTD Today feeds and market intelligence"
           git push origin main
