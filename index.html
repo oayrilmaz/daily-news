@@ -1046,14 +1046,81 @@
       `;
     }
 
+    function fallbackMomentumRows(items,key){
+      const counts = new Map();
+
+      for(const item of items){
+        let values = [];
+
+        if(key === "topics"){
+          values = Array.isArray(item.tags) ? item.tags : [];
+        }else if(key === "categories"){
+          values = [item.category || "Other"];
+        }else if(key === "regions"){
+          values = [item.region || "Global"];
+        }else if(key === "countries"){
+          values = Array.isArray(item.countries) ? item.countries : [];
+        }
+
+        for(const raw of values){
+          const name = (raw || "").toString().trim();
+          if(!name)continue;
+          counts.set(name,(counts.get(name) || 0) + 1);
+        }
+      }
+
+      return [...counts.entries()]
+        .map(([name,count])=>({
+          name,
+          label:key === "topics"
+            ? name.replace(/[-_]+/g," ").replace(/\b\w/g,c=>c.toUpperCase())
+            : name,
+          short_count:count,
+          long_count:count,
+          short_daily_rate:count,
+          long_daily_rate:count,
+          momentum_percent:0,
+          direction:"Stable"
+        }))
+        .sort((a,b)=>b.short_count-a.short_count || a.name.localeCompare(b.name))
+        .slice(0,8);
+    }
+
     function renderMomentumPulse(days){
       const trends = MarketPulse.trends;
+      const items = Array.isArray(MarketPulse.payload?.items)
+        ? MarketPulse.payload.items
+        : [];
 
       if(!trends){
+        const label = days === 7 ? "Last 7 Days" : "Last 30 Days";
+        const topicRows = fallbackMomentumRows(items,"topics");
+        const categoryRows = fallbackMomentumRows(items,"categories");
+        const countryRows = fallbackMomentumRows(items,"countries");
+        const regionRows = fallbackMomentumRows(items,"regions");
+        const geographyRows = countryRows.length ? countryRows : regionRows;
+        const geographyTitle = countryRows.length
+          ? "Country Baseline"
+          : "Regional Baseline";
+
         $("marketPulseContent").innerHTML = `
-          <div class="pulseEmpty">
-            Trend data is not available yet. Confirm that
-            <code>briefs/trends.json</code> was generated and deployed.
+          <div class="pulseSummaryGrid">
+            ${pulseMetricHtml("Signals",numberFormat(items.length),"Current daily briefing baseline")}
+            ${pulseMetricHtml("Archive Status","Building","Historical files not available yet")}
+            ${pulseMetricHtml("Time Horizon",label,"Full comparison starts after archive accumulation")}
+            ${pulseMetricHtml("Mode","Early Baseline","Not a completed historical trend")}
+          </div>
+
+          <div class="pulseColumns">
+            ${momentumListHtml("Current Topic Baseline",topicRows)}
+            ${momentumListHtml("Current Category Baseline",categoryRows)}
+            ${momentumListHtml(geographyTitle,geographyRows)}
+          </div>
+
+          <div class="pulseStatus" style="margin-top:12px;">
+            Early-baseline mode: this is derived from today’s briefing only. It is not yet a true
+            ${escapeHtml(label.toLowerCase())} comparison. Historical trend calculations will replace
+            this automatically when <code>briefs/trends.json</code> is available.
           </div>
         `;
         return;
@@ -1094,18 +1161,83 @@
       `;
     }
 
+    function fallbackOutlookEntries(horizon){
+      const items = Array.isArray(MarketPulse.payload?.items)
+        ? MarketPulse.payload.items
+        : [];
+
+      const topicMap = new Map();
+
+      for(const item of items){
+        const tags = Array.isArray(item.tags) && item.tags.length
+          ? item.tags
+          : [item.category || "Power Grid"];
+
+        for(const raw of tags){
+          const key = (raw || "").toString().trim();
+          if(!key)continue;
+
+          const current = topicMap.get(key) || {
+            key,
+            label:key.replace(/[-_]+/g," ").replace(/\b\w/g,c=>c.toUpperCase()),
+            count:0,
+            confidenceTotal:0
+          };
+
+          current.count += 1;
+          current.confidenceTotal += Number(item.confidence_score || 0.65);
+          topicMap.set(key,current);
+        }
+      }
+
+      return [...topicMap.values()]
+        .sort((a,b)=>b.count-a.count || b.confidenceTotal-a.confidenceTotal)
+        .slice(0,8)
+        .map(entry=>{
+          const averageConfidence = entry.count
+            ? entry.confidenceTotal / entry.count
+            : 0.65;
+
+          const probability = Math.max(
+            0.55,
+            Math.min(
+              0.82,
+              0.5 + entry.count * 0.035 + (averageConfidence - 0.55) * 0.45
+            )
+          );
+
+          return {
+            key:entry.key,
+            label:entry.label,
+            horizon_days:horizon,
+            direction:"Stable",
+            momentum_percent:0,
+            probability,
+            confidence:entry.count >= 3 ? "Medium" : "Low",
+            evidence_signal_count:entry.count,
+            statement:
+              `Current daily signals suggest ${entry.label} may remain an active monitoring theme over the next ${horizon} days.`
+          };
+        });
+    }
+
     function renderOutlook(horizon){
       const outlook = MarketPulse.outlook;
       const key = horizon === 7 ? "next_7_days" : "next_30_days";
       const label = horizon === 7 ? "7-Day AI Outlook" : "30-Day AI Outlook";
-      const entries = outlook?.horizons?.[key]?.topics || [];
 
-      if(!outlook || !entries.length){
+      let entries = outlook?.horizons?.[key]?.topics || [];
+      let isFallback = false;
+
+      if(!entries.length){
+        entries = fallbackOutlookEntries(horizon);
+        isFallback = true;
+      }
+
+      if(!entries.length){
         $("marketPulseContent").innerHTML = `
           <div class="pulseEmpty">
-            ${escapeHtml(label)} is not available yet. Confirm that
-            <code>briefs/outlook.json</code> was generated and deployed.
-            Outlook quality improves as the historical archive grows.
+            ${escapeHtml(label)} cannot be produced because no current intelligence signals are available.
           </div>
         `;
         return;
@@ -1140,8 +1272,14 @@
         </div>
 
         <div class="pulseStatus" style="margin-top:12px;">
-          AI-generated probabilistic scenarios based on PTD Today signal history—not guarantees,
-          verified market forecasts, investment advice, or engineering instructions.
+          ${
+            isFallback
+              ? `Early-outlook mode: based on today’s briefing only because <code>briefs/outlook.json</code>
+                 is not yet available. These probabilities are preliminary and will be replaced automatically
+                 once the historical outlook engine is deployed.`
+              : `AI-generated probabilistic scenarios based on PTD Today signal history—not guarantees,
+                 verified market forecasts, investment advice, or engineering instructions.`
+          }
         </div>
       `;
     }
@@ -1167,27 +1305,35 @@
       if(tab === "7d"){
         renderMomentumPulse(7);
         $("pulseStatus").textContent =
-          "Seven-day movement compared with the broader 30-day signal-frequency baseline.";
+          MarketPulse.trends
+            ? "Seven-day movement compared with the broader 30-day signal-frequency baseline."
+            : "Early baseline shown until the historical trend file is available.";
         return;
       }
 
       if(tab === "30d"){
         renderMomentumPulse(30);
         $("pulseStatus").textContent =
-          "Thirty-day market memory built from the daily historical archive.";
+          MarketPulse.trends
+            ? "Thirty-day market memory built from the daily historical archive."
+            : "Early baseline shown until the 30-day archive is available.";
         return;
       }
 
       if(tab === "outlook7"){
         renderOutlook(7);
         $("pulseStatus").textContent =
-          "Probabilistic 7-day scenarios derived from archived signal frequency and confidence metadata.";
+          MarketPulse.outlook
+            ? "Probabilistic 7-day scenarios derived from archived signal frequency and confidence metadata."
+            : "Preliminary 7-day scenarios derived from today’s signals while history is building.";
         return;
       }
 
       renderOutlook(30);
       $("pulseStatus").textContent =
-        "Probabilistic 30-day scenarios derived from archived signal frequency and confidence metadata.";
+        MarketPulse.outlook
+          ? "Probabilistic 30-day scenarios derived from archived signal frequency and confidence metadata."
+          : "Preliminary 30-day scenarios derived from today’s signals while history is building.";
     }
 
     async function initMarketPulse(payload){
