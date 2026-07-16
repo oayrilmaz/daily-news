@@ -39,6 +39,15 @@
   }
   </script>
 
+
+  <!-- Leaflet interactive map -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
   <style>
     :root{
       --bg:#ffffff;
@@ -228,6 +237,157 @@
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
     #crawlLinks{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
+
+    /* Global Intelligence Map */
+    .intelMapSection{
+      margin:0 0 24px;
+      padding:18px;
+      border:1px solid var(--rule);
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 8px 22px rgba(0,0,0,.035);
+    }
+    .intelMapHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .intelMapTitle{
+      margin:0 0 5px;
+      font-size:30px;
+      line-height:1.08;
+      font-weight:900;
+    }
+    .intelMapIntro{
+      margin:0;
+      max-width:680px;
+      color:rgba(0,0,0,.72);
+      font-size:15px;
+      line-height:1.5;
+    }
+    .intelMapReset{
+      appearance:none;
+      border:1px solid var(--rule);
+      background:#fff;
+      color:#111;
+      padding:8px 12px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:13px;
+      font-weight:700;
+    }
+    .intelMapReset:hover{background:rgba(0,0,0,.03)}
+    .intelMapFilters{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:0 0 12px;
+    }
+    .mapFilter{
+      appearance:none;
+      border:1px solid var(--rule);
+      background:#fff;
+      color:#111;
+      padding:7px 11px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:13px;
+    }
+    .mapFilter.active{
+      background:#111;
+      color:#fff;
+      border-color:#111;
+    }
+    .intelMapGrid{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 300px;
+      gap:14px;
+      align-items:stretch;
+    }
+    #globalIntelligenceMap{
+      width:100%;
+      min-height:470px;
+      border:1px solid var(--rule);
+      border-radius:14px;
+      overflow:hidden;
+      background:#eef2f3;
+      z-index:1;
+    }
+    .intelPanel{
+      border:1px solid var(--rule);
+      border-radius:14px;
+      padding:15px;
+      background:linear-gradient(180deg,rgba(0,0,0,.018),#fff);
+      min-height:470px;
+    }
+    .intelPanelEyebrow{
+      margin:0 0 8px;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+    }
+    .intelPanelTitle{
+      margin:0 0 8px;
+      font-size:25px;
+      line-height:1.1;
+      font-weight:900;
+    }
+    .intelPanelSummary{
+      margin:0 0 14px;
+      color:rgba(0,0,0,.72);
+      font-size:14px;
+      line-height:1.5;
+    }
+    .intelStatRow{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      padding:9px 0;
+      border-top:1px solid var(--soft);
+      font-size:14px;
+    }
+    .intelStatRow strong{font-size:16px}
+    .intelLatest{
+      margin-top:14px;
+      padding-top:13px;
+      border-top:1px solid var(--rule);
+    }
+    .intelLatestTitle{
+      margin:0 0 9px;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+    }
+    .intelLatestList{
+      margin:0;
+      padding-left:18px;
+    }
+    .intelLatestList li{
+      margin:0 0 8px;
+      font-size:14px;
+      line-height:1.35;
+    }
+    .intelMapStatus{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .leaflet-container{
+      font-family:Georgia,"Times New Roman",Times,serif;
+    }
+    .leaflet-control-attribution{
+      font-size:9px;
+    }
+
     @media (max-width:760px){
       .brand{font-size:44px}
       .pageTitle{font-size:36px}
@@ -236,6 +396,11 @@
       .sponsored-spotlight{padding:18px 16px;margin:18px 0 22px}
       .sponsored-spotlight h2{font-size:29px}
       .sponsored-spotlight h3{font-size:18px}
+      .intelMapSection{padding:14px}
+      .intelMapTitle{font-size:27px}
+      .intelMapGrid{grid-template-columns:1fr}
+      #globalIntelligenceMap{min-height:390px}
+      .intelPanel{min-height:auto}
     }
   </style>
 </head>
@@ -301,6 +466,66 @@
       </div>
     </section>
 
+    <section class="intelMapSection" aria-label="Global Power Intelligence Map">
+      <div class="intelMapHead">
+        <div>
+          <h2 class="intelMapTitle">🌍 Global Power Intelligence Map</h2>
+          <p class="intelMapIntro">
+            Explore today’s power-grid, substation, data-center, renewable and infrastructure signals.
+            Select a country to focus the briefing below.
+          </p>
+        </div>
+
+        <button class="intelMapReset" id="resetMapFilter" type="button">
+          Show Global Briefing
+        </button>
+      </div>
+
+      <div class="intelMapFilters" aria-label="Map category filters">
+        <button class="mapFilter active" type="button" data-map-category="All">All</button>
+        <button class="mapFilter" type="button" data-map-category="Power Grid">Power Grid</button>
+        <button class="mapFilter" type="button" data-map-category="Substations">Substations</button>
+        <button class="mapFilter" type="button" data-map-category="Data Centers">Data Centers</button>
+        <button class="mapFilter" type="button" data-map-category="Renewables">Renewables</button>
+        <button class="mapFilter" type="button" data-map-category="OEM/EPC">OEM/EPC</button>
+        <button class="mapFilter" type="button" data-map-category="Markets">Markets</button>
+        <button class="mapFilter" type="button" data-map-category="Policy">Policy</button>
+      </div>
+
+      <div class="intelMapGrid">
+        <div id="globalIntelligenceMap" role="application" aria-label="Interactive world intelligence map"></div>
+
+        <aside class="intelPanel" id="intelCountryPanel" aria-live="polite">
+          <div class="intelPanelEyebrow">Global overview</div>
+          <h3 class="intelPanelTitle">Select a country</h3>
+          <p class="intelPanelSummary">
+            Click any country to view matching intelligence and filter the Daily AI Briefing.
+          </p>
+
+          <div class="intelStatRow">
+            <span>Signals shown</span>
+            <strong id="mapSignalCount">—</strong>
+          </div>
+
+          <div class="intelStatRow">
+            <span>Active category</span>
+            <strong id="mapActiveCategory">All</strong>
+          </div>
+
+          <div class="intelLatest">
+            <div class="intelLatestTitle">Latest intelligence</div>
+            <ul class="intelLatestList" id="mapLatestList">
+              <li>Choose a country to begin exploring.</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+
+      <div class="intelMapStatus" id="intelMapStatus">
+        Loading country boundaries…
+      </div>
+    </section>
+
     <section class="panel" aria-label="Daily briefing">
       <div class="toolbar">
         <button class="btn" id="btnRefresh" type="button">Refresh</button>
@@ -329,6 +554,12 @@
     <div id="crawlLinks" aria-hidden="true"></div>
   </div>
 
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
   <script>
     const DATA_URL = "/briefs/daily-ai.json";
     const VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view";
@@ -341,6 +572,356 @@
       Open is not separately POSTed here because the article page itself records the view.
     */
     const countedReadViews = new Set();
+
+
+    const MAP_GEOJSON_URL =
+      "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json";
+
+    const MAP_REGION_BY_COUNTRY = {
+      "United States of America":"North America",
+      "United States":"North America",
+      "Canada":"North America",
+      "Mexico":"North America",
+      "Brazil":"LATAM",
+      "Argentina":"LATAM",
+      "Chile":"LATAM",
+      "Colombia":"LATAM",
+      "Peru":"LATAM",
+      "United Kingdom":"Europe",
+      "France":"Europe",
+      "Germany":"Europe",
+      "Italy":"Europe",
+      "Spain":"Europe",
+      "Portugal":"Europe",
+      "Netherlands":"Europe",
+      "Belgium":"Europe",
+      "Norway":"Europe",
+      "Sweden":"Europe",
+      "Finland":"Europe",
+      "Denmark":"Europe",
+      "Poland":"Europe",
+      "Greece":"Europe",
+      "Turkey":"Middle East",
+      "Türkiye":"Middle East",
+      "Saudi Arabia":"Middle East",
+      "United Arab Emirates":"Middle East",
+      "Qatar":"Middle East",
+      "Oman":"Middle East",
+      "Israel":"Middle East",
+      "Egypt":"Middle East",
+      "India":"Asia",
+      "China":"Asia",
+      "Japan":"Asia",
+      "South Korea":"Asia",
+      "Indonesia":"Asia",
+      "Malaysia":"Asia",
+      "Singapore":"Asia",
+      "Thailand":"Asia",
+      "Vietnam":"Asia",
+      "Philippines":"Asia",
+      "Australia":"Asia",
+      "New Zealand":"Asia",
+      "South Africa":"Africa",
+      "Nigeria":"Africa",
+      "Kenya":"Africa",
+      "Morocco":"Africa",
+      "Algeria":"Africa"
+    };
+
+    const IntelligenceMap = {
+      map:null,
+      geoLayer:null,
+      payload:null,
+      selectedCountry:"",
+      selectedRegion:"",
+      category:"All"
+    };
+
+    function normalizeCountryName(value){
+      const name = (value || "").toString().trim();
+      if(name === "United States of America")return "United States";
+      return name;
+    }
+
+    function itemMatchesMapSelection(item){
+      if(
+        IntelligenceMap.category !== "All" &&
+        (item.category || "") !== IntelligenceMap.category
+      ){
+        return false;
+      }
+
+      if(!IntelligenceMap.selectedCountry){
+        return true;
+      }
+
+      const countries = Array.isArray(item.countries)
+        ? item.countries.map(normalizeCountryName)
+        : [];
+
+      if(countries.length){
+        return countries.includes(IntelligenceMap.selectedCountry);
+      }
+
+      /*
+        Current briefing data may only contain a region.
+        This fallback keeps Phase 1 useful until the generator adds countries[].
+      */
+      return (
+        (item.region || "") === IntelligenceMap.selectedRegion
+      );
+    }
+
+    function mapFilteredItems(){
+      const allItems = Array.isArray(IntelligenceMap.payload?.items)
+        ? IntelligenceMap.payload.items
+        : [];
+
+      return allItems.filter(itemMatchesMapSelection);
+    }
+
+    function mapActivityLevel(count){
+      if(count >= 6)return 4;
+      if(count >= 4)return 3;
+      if(count >= 2)return 2;
+      if(count >= 1)return 1;
+      return 0;
+    }
+
+    function mapCountryStyle(feature){
+      const rawName = feature?.properties?.name || "";
+      const country = normalizeCountryName(rawName);
+      const region = MAP_REGION_BY_COUNTRY[rawName] || MAP_REGION_BY_COUNTRY[country] || "";
+      const items = Array.isArray(IntelligenceMap.payload?.items)
+        ? IntelligenceMap.payload.items
+        : [];
+
+      const count = items.filter(item=>{
+        if(
+          IntelligenceMap.category !== "All" &&
+          (item.category || "") !== IntelligenceMap.category
+        ){
+          return false;
+        }
+
+        const countries = Array.isArray(item.countries)
+          ? item.countries.map(normalizeCountryName)
+          : [];
+
+        if(countries.length){
+          return countries.includes(country);
+        }
+
+        return region && (item.region || "") === region;
+      }).length;
+
+      const level = mapActivityLevel(count);
+      const fills = [
+        "#e7e7e7",
+        "#b9d7a7",
+        "#f4d35e",
+        "#f29e4c",
+        "#d1495b"
+      ];
+
+      return {
+        color:"#ffffff",
+        weight:.8,
+        fillColor:fills[level],
+        fillOpacity:.88
+      };
+    }
+
+    function updateMapPanel(){
+      const items = mapFilteredItems();
+      const title = $("intelCountryPanel")?.querySelector(".intelPanelTitle");
+      const eyebrow = $("intelCountryPanel")?.querySelector(".intelPanelEyebrow");
+      const summary = $("intelCountryPanel")?.querySelector(".intelPanelSummary");
+      const latest = $("mapLatestList");
+
+      if(eyebrow){
+        eyebrow.textContent = IntelligenceMap.selectedCountry
+          ? "Country intelligence"
+          : "Global overview";
+      }
+
+      if(title){
+        title.textContent = IntelligenceMap.selectedCountry || "Global Intelligence";
+      }
+
+      if(summary){
+        summary.textContent = IntelligenceMap.selectedCountry
+          ? `Showing ${IntelligenceMap.selectedRegion || "matching"} intelligence associated with ${IntelligenceMap.selectedCountry}.`
+          : "Explore the map or use a category filter to focus today’s global briefing.";
+      }
+
+      if($("mapSignalCount")){
+        $("mapSignalCount").textContent = items.length;
+      }
+
+      if($("mapActiveCategory")){
+        $("mapActiveCategory").textContent = IntelligenceMap.category;
+      }
+
+      if(latest){
+        latest.innerHTML = items.length
+          ? items.slice(0,5).map(item=>
+              `<li>${escapeHtml(item.title || "Untitled")}</li>`
+            ).join("")
+          : "<li>No matching signals in the current daily briefing.</li>";
+      }
+
+      if($("intelMapStatus")){
+        $("intelMapStatus").textContent = IntelligenceMap.selectedCountry
+          ? `${IntelligenceMap.selectedCountry} selected • ${items.length} matching signal${items.length === 1 ? "" : "s"}`
+          : `${items.length} signal${items.length === 1 ? "" : "s"} shown globally`;
+      }
+    }
+
+    function applyMapSelectionToBriefing(){
+      if(!IntelligenceMap.payload)return;
+
+      const items = mapFilteredItems();
+      const payload = {
+        ...IntelligenceMap.payload,
+        items
+      };
+
+      /*
+        Render the filtered briefing while preserving the global source payload.
+      */
+      render(payload,$("q").value);
+      updateMapPanel();
+    }
+
+    function resetMapSelection(){
+      IntelligenceMap.selectedCountry = "";
+      IntelligenceMap.selectedRegion = "";
+
+      if(IntelligenceMap.geoLayer){
+        IntelligenceMap.geoLayer.setStyle(mapCountryStyle);
+      }
+
+      if(IntelligenceMap.map){
+        IntelligenceMap.map.setView([20,0],2);
+      }
+
+      applyMapSelectionToBriefing();
+    }
+
+    async function initGlobalIntelligenceMap(payload){
+      IntelligenceMap.payload = payload;
+
+      if(!window.L || !$("globalIntelligenceMap")){
+        if($("intelMapStatus")){
+          $("intelMapStatus").textContent = "Interactive map could not be loaded.";
+        }
+        return;
+      }
+
+      if(!IntelligenceMap.map){
+        IntelligenceMap.map = L.map("globalIntelligenceMap",{
+          worldCopyJump:true,
+          minZoom:1.5,
+          maxZoom:6,
+          zoomControl:true,
+          attributionControl:true
+        }).setView([20,0],2);
+
+        L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            maxZoom:6,
+            attribution:"&copy; OpenStreetMap contributors"
+          }
+        ).addTo(IntelligenceMap.map);
+      }
+
+      try{
+        const response = await fetch(MAP_GEOJSON_URL,{cache:"force-cache"});
+        if(!response.ok){
+          throw new Error(`Country map failed (${response.status})`);
+        }
+
+        const geojson = await response.json();
+
+        if(IntelligenceMap.geoLayer){
+          IntelligenceMap.geoLayer.remove();
+        }
+
+        IntelligenceMap.geoLayer = L.geoJSON(geojson,{
+          style:mapCountryStyle,
+          onEachFeature:(feature,layer)=>{
+            const rawName = feature?.properties?.name || "";
+            const country = normalizeCountryName(rawName);
+
+            layer.bindTooltip(country,{
+              sticky:true,
+              direction:"top"
+            });
+
+            layer.on({
+              mouseover:(event)=>{
+                event.target.setStyle({
+                  weight:2,
+                  color:"#111"
+                });
+              },
+              mouseout:(event)=>{
+                IntelligenceMap.geoLayer.resetStyle(event.target);
+              },
+              click:(event)=>{
+                IntelligenceMap.selectedCountry = country;
+                IntelligenceMap.selectedRegion =
+                  MAP_REGION_BY_COUNTRY[rawName] ||
+                  MAP_REGION_BY_COUNTRY[country] ||
+                  "";
+
+                IntelligenceMap.map.fitBounds(
+                  event.target.getBounds(),
+                  {padding:[18,18],maxZoom:4}
+                );
+
+                applyMapSelectionToBriefing();
+              }
+            });
+          }
+        }).addTo(IntelligenceMap.map);
+
+        updateMapPanel();
+      }catch(error){
+        console.error("Could not initialize global map:",error);
+
+        if($("intelMapStatus")){
+          $("intelMapStatus").textContent =
+            "Country boundaries could not be loaded. The briefing remains available below.";
+        }
+      }
+
+      document.querySelectorAll("[data-map-category]").forEach(button=>{
+        button.onclick = ()=>{
+          IntelligenceMap.category =
+            button.getAttribute("data-map-category") || "All";
+
+          document.querySelectorAll("[data-map-category]").forEach(item=>{
+            item.classList.toggle(
+              "active",
+              item === button
+            );
+          });
+
+          if(IntelligenceMap.geoLayer){
+            IntelligenceMap.geoLayer.setStyle(mapCountryStyle);
+          }
+
+          applyMapSelectionToBriefing();
+        };
+      });
+
+      if($("resetMapFilter")){
+        $("resetMapFilter").onclick = resetMapSelection;
+      }
+    }
 
     function fmtUtc(iso){
       try{return new Date(iso).toUTCString().replace("GMT","UTC");}
@@ -1351,11 +1932,18 @@
 
         const payload = await res.json();
 
+        IntelligenceMap.payload = payload;
         render(payload,$("q").value);
+        initGlobalIntelligenceMap(payload);
 
         $("q").addEventListener("input",()=>{
           stopTts();
-          render(payload,$("q").value);
+
+          if(IntelligenceMap.selectedCountry || IntelligenceMap.category !== "All"){
+            applyMapSelectionToBriefing();
+          }else{
+            render(payload,$("q").value);
+          }
         });
       }catch(err){
         $("updatedLine").textContent = "Could not load briefing.";
