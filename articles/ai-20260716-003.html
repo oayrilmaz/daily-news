@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>On-site storage and flexible loads reshape data-center power design — PTD Today</title>
+
+  <meta
+    name="description"
+    content="Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures."
+  />
+
+  <link
+    rel="canonical"
+    href="https://ptdtoday.com/articles/ai-20260716-003.html"
+  />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article" />
+  <meta property="og:site_name" content="PTD Today" />
+  <meta
+    property="og:title"
+    content="On-site storage and flexible loads reshape data-center power design"
+  />
+  <meta
+    property="og:description"
+    content="Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures."
+  />
+  <meta
+    property="og:url"
+    content="https://ptdtoday.com/articles/ai-20260716-003.html"
+  />
+  <meta
+    property="og:image"
+    content="https://ptdtoday.com/assets/og-default.png"
+  />
+
+  <!-- Twitter -->
+  <meta
+    name="twitter:card"
+    content="summary_large_image"
+  />
+  <meta
+    name="twitter:title"
+    content="On-site storage and flexible loads reshape data-center power design"
+  />
+  <meta
+    name="twitter:description"
+    content="Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures."
+  />
+  <meta
+    name="twitter:image"
+    content="https://ptdtoday.com/assets/og-default.png"
+  />
+
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"On-site storage and flexible loads reshape data-center power design","description":"Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures.","datePublished":"2026-07-16T00:12:05.150Z","dateModified":"2026-07-16T00:12:05.150Z","mainEntityOfPage":"https://ptdtoday.com/articles/ai-20260716-003.html","publisher":{"@type":"Organization","name":"PTD Today"}}</script>
+
+  <style>
+    :root{
+      --bg:#ffffff;
+      --ink:#111111;
+      --muted:#5c5c5c;
+      --rule:rgba(0,0,0,.15);
+      --soft:rgba(0,0,0,.06);
+      --pill:rgba(0,0,0,.04);
+      --btn:#111;
+      --btnInk:#fff;
+    }
+
+    *{
+      box-sizing:border-box;
+    }
+
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Georgia,"Times New Roman",Times,serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+
+    a{
+      color:inherit;
+    }
+
+    .wrap{
+      max-width:900px;
+      margin:0 auto;
+      padding:26px 16px 64px;
+    }
+
+    .mast{
+      text-align:center;
+      padding:16px 0 10px;
+    }
+
+    .brand{
+      margin:0;
+      font-size:52px;
+      letter-spacing:.2px;
+      font-weight:700;
+    }
+
+    .tagline{
+      margin:6px 0 10px;
+      color:var(--muted);
+      font-style:italic;
+      font-size:16px;
+    }
+
+    .nav{
+      display:flex;
+      justify-content:center;
+      gap:14px;
+      flex-wrap:wrap;
+      margin:10px 0;
+    }
+
+    .nav a{
+      text-decoration:none;
+      padding:7px 12px;
+      border-radius:999px;
+      border:1px solid transparent;
+      color:rgba(0,0,0,.75);
+      font-size:15px;
+    }
+
+    .nav a:hover{
+      border-color:var(--rule);
+      background:rgba(0,0,0,.02);
+    }
+
+    .rule{
+      height:1px;
+      background:var(--rule);
+      margin:14px 0 0;
+    }
+
+    .meta{
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.14px;
+      text-transform:uppercase;
+      margin:16px 0 8px;
+    }
+
+    h1{
+      margin:0 0 10px;
+      font-size:44px;
+      line-height:1.03;
+      font-weight:900;
+    }
+
+    .lede{
+      font-size:18px;
+      line-height:1.6;
+      color:rgba(0,0,0,.86);
+      margin:0 0 14px;
+    }
+
+    .content{
+      border-top:1px solid var(--soft);
+      padding-top:14px;
+      font-size:17px;
+      line-height:1.75;
+      color:rgba(0,0,0,.86);
+    }
+
+    .content p{
+      margin:0 0 14px;
+    }
+
+    .subhead{
+      margin:18px 0 8px;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.12px;
+      color:var(--muted);
+    }
+
+    ul{
+      margin:0 0 12px;
+      padding-left:18px;
+    }
+
+    li{
+      margin:6px 0;
+    }
+
+    .chips{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:14px 0 0;
+    }
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:var(--pill);
+      font-size:13px;
+      color:rgba(0,0,0,.76);
+    }
+
+    .btnRow{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin:16px 0 0;
+    }
+
+    .btn{
+      appearance:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:38px;
+      border:1px solid var(--rule);
+      background:var(--btn);
+      color:var(--btnInk);
+      padding:9px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:14px;
+      text-decoration:none;
+    }
+
+    .btn.secondary{
+      background:#fff;
+      color:#111;
+    }
+
+    .article-view-counter{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      min-height:38px;
+      padding:9px 14px;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:var(--pill);
+      color:var(--muted);
+      font-family:Georgia,"Times New Roman",Times,serif;
+      font-size:14px;
+      font-weight:700;
+      line-height:1;
+      white-space:nowrap;
+    }
+
+    .article-view-counter[hidden]{
+      display:none;
+    }
+
+    .footer{
+      text-align:center;
+      margin-top:24px;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    @media (max-width:760px){
+      .brand{
+        font-size:44px;
+      }
+
+      h1{
+        font-size:38px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <header class="mast">
+      <h1 class="brand">PTD Today</h1>
+
+      <div class="tagline">
+        First to Know. First to Lead.
+      </div>
+
+      <nav
+        class="nav"
+        aria-label="Primary navigation"
+      >
+        <a href="/index.html">Home</a>
+        <a href="/room.html">Room</a>
+      </nav>
+
+      <div class="rule"></div>
+    </header>
+
+    <div class="meta">
+      Data Centers •
+      North America •
+      2026-07-16T00:12:05.150Z
+    </div>
+
+    <h1>On-site storage and flexible loads reshape data-center power design</h1>
+
+    <p class="lede">Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures.</p>
+
+    <div class="content">
+      <p>Operators are modeling battery fleets not only for UPS and resiliency but also for market participation and grid services. This dual-use framing changes cycling profiles and warranty negotiations with OEMs. UPS designers are being asked to optimize for fast dispatch and frequent partial cycles rather than rare full-capacity events. PPA and offtake agreements are incorporating terms for capacity availability during system peaks and potential revenue-sharing for ancillary services. Cooling architectures are adapting to variable dispatch windows linked to grid signals, tightening integration between building management and energy systems. Risk scenarios include shortened battery life under aggressive market-use patterns and warranty disputes. What to monitor are the definitions of &#039;available capacity&#039; in service agreements and the operational thresholds for switching between resiliency and market use. Expect accelerated dialogue between CIOs and energy managers on operational trade-offs.</p>
+
+      
+        <div class="subhead">What to watch</div>
+
+        <ul>
+          <li>Contract language on battery availability and cycling</li><li>OEM warranty terms for market-use batteries</li>
+        </ul>
+      
+
+      
+        <div class="subhead">Action</div>
+
+        <p>
+          Review battery warranties and define clear operational modes that protect resiliency while enabling market participation.
+        </p>
+      
+    </div>
+
+    <div class="chips">
+      <span class="chip">
+        Data Centers
+      </span>
+
+      <span class="chip">
+        North America
+      </span>
+
+      <span class="chip">data-center</span><span class="chip">batteries</span><span class="chip">UPS</span>
+    </div>
+
+    <div class="btnRow">
+      <a
+        class="btn secondary"
+        href="/index.html#ai-20260716-003"
+      >
+        Back to Home
+      </a>
+
+      <span
+        class="article-view-counter"
+        id="articleViewCounter"
+        aria-label="Article views"
+      >
+        <span aria-hidden="true">👁</span>
+        <span id="articleViewCount">—</span>
+        <span>views</span>
+      </span>
+
+      <button
+        class="btn"
+        type="button"
+        id="shareBtn"
+      >
+        Share
+      </button>
+    </div>
+
+    <div class="footer">
+      © 2026 PTD Today
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      var url = "https://ptdtoday.com/articles/ai-20260716-003.html";
+      var title = "On-site storage and flexible loads reshape data-center power design";
+      var text = "Scenario signals suggest data centers increasingly treat on-site batteries and flexible compute as first-line grid services, changing UPS sizing and PPA structures.";
+      var articleId = "ai-20260716-003";
+
+      var shareBtn =
+        document.getElementById("shareBtn");
+
+      var counter =
+        document.getElementById("articleViewCounter");
+
+      var countElement =
+        document.getElementById("articleViewCount");
+
+      if (shareBtn) {
+        shareBtn.addEventListener(
+          "click",
+          async function(){
+            if (navigator.share) {
+              try {
+                await navigator.share({
+                  title: title,
+                  text: text,
+                  url: url
+                });
+
+                return;
+              } catch (error) {
+                return;
+              }
+            }
+
+            try {
+              await navigator.clipboard.writeText(url);
+              alert("Article link copied.");
+            } catch (error) {
+              prompt(
+                "Copy this article link:",
+                url
+              );
+            }
+          }
+        );
+      }
+
+      async function registerArticleView() {
+        if (
+          !counter ||
+          !countElement ||
+          !articleId
+        ) {
+          return;
+        }
+
+        var apiUrl =
+          "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view/" +
+          encodeURIComponent(articleId);
+
+        try {
+          var response = await fetch(apiUrl, {
+            method: "POST",
+            mode: "cors",
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              "View counter request failed"
+            );
+          }
+
+          var data = await response.json();
+          var views = Number(data.views) || 0;
+
+          countElement.textContent =
+            new Intl.NumberFormat("en-US", {
+              notation:
+                views >= 1000
+                  ? "compact"
+                  : "standard",
+              maximumFractionDigits:1
+            }).format(views);
+        } catch (error) {
+          console.error(
+            "View counter error:",
+            error
+          );
+
+          counter.hidden = true;
+        }
+      }
+
+      registerArticleView();
+    })();
+  </script>
+</body>
+</html>
