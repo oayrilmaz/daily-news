@@ -1,7 +1,3 @@
-// PTD Today generate_ai_news.js — PART 1 OF 5
-// CONCATENATE PARTS 1→5 IN ORDER.
-// Remove only these three header comment lines if desired.
-
 // scripts/generate_ai_news.js
 // PTD Today — Daily AI Intelligence Generator
 //
@@ -9,13 +5,16 @@
 //   - briefs/daily-ai.json
 //   - briefs/trends.json
 //   - briefs/outlook.json
-//   - history/YYYY-MM-DD.json
+//   - briefs/map-signals.json       (rolling 24-hour, maximum 50)
+//   - history/YYYY-MM-DD.json        (merged, not overwritten)
 //   - articles/<id>.html
 //
 // Design goals:
 //   - Preserve the current PTD Today homepage/article format.
 //   - Add country metadata for the interactive world map.
-//   - Preserve every generated briefing in a historical archive.
+//   - Keep the homepage/article feed at 10 full intelligence articles.
+//   - Maintain a separate rolling map dataset of up to 50 unique signals.
+//   - Preserve generated signals in a merged historical archive.
 //   - Derive transparent 7-day and 30-day trend summaries.
 //   - Produce probabilistic AI outlooks that are explicitly scenarios,
 //     not guarantees or engineering/investment advice.
@@ -58,6 +57,33 @@ function utcDateOnly(date = new Date()) {
 
 function compactDate(dateOnly) {
   return dateOnly.replace(/-/g, "");
+}
+
+function compactTimestamp(isoValue) {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) {
+    return String(isoValue || "").replace(/[^0-9]/g, "").slice(0, 14);
+  }
+
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  const second = String(date.getUTCSeconds()).padStart(2, "0");
+
+  return `${year}${month}${day}${hour}${minute}${second}`;
+}
+
+function hoursBetween(olderIso, newerIso) {
+  const older = new Date(olderIso).getTime();
+  const newer = new Date(newerIso).getTime();
+
+  if (!Number.isFinite(older) || !Number.isFinite(newer)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return (newer - older) / 3_600_000;
 }
 
 function ensureDir(dirPath) {
@@ -198,6 +224,31 @@ function normalizeKey(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function stableHash(value) {
+  const input = String(value || "");
+  let hash = 2166136261;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+function signalDedupKey(item) {
+  const countries = cleanStringArray(item?.countries, 8)
+    .map(normalizeCountryName)
+    .sort()
+    .join("|");
+
+  return [
+    normalizeKey(item?.title),
+    normalizeKey(item?.category),
+    countries
+  ].join("::");
+}
+
 /* -------------------------------------------------------------------------- */
 /* Controlled taxonomies                                                      */
 /* -------------------------------------------------------------------------- */
@@ -292,10 +343,6 @@ const REGION_COUNTRIES = {
     "New Zealand"
   ],
   LATAM: [
-// PTD Today generate_ai_news.js — PART 2 OF 5
-// CONCATENATE PARTS 1→5 IN ORDER.
-// Remove only these three header comment lines if desired.
-
     "Brazil",
     "Argentina",
     "Chile",
@@ -418,6 +465,9 @@ function normalizeItem(item, index, dateOnly, now) {
       ? item.confidence_label
       : confidenceLabel,
     confidence_score: round(confidenceScore, 2),
+    importance_score: Math.round(
+      clamp(item?.importance_score ?? item?.importance ?? 70, 40, 100)
+    ),
     tags,
     watchlist,
     action_for_readers: cleanString(
@@ -472,6 +522,191 @@ function normalizePayload(payload, dateOnly, now) {
     date_utc: cleanString(payload?.date_utc, dateOnly),
     sections: normalizeSections(payload?.sections),
     items
+  };
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* Rolling 24-hour map signal engine                                           */
+/* -------------------------------------------------------------------------- */
+
+function toMapSignal(item, generatedAt) {
+  const countries = cleanStringArray(item?.countries, 8)
+    .map(normalizeCountryName)
+    .filter(Boolean);
+
+  const signalId = [
+    "sig",
+    compactTimestamp(item?.created_at || generatedAt),
+    stableHash(
+      [
+        item?.title,
+        item?.category,
+        item?.region,
+        countries.join("|")
+      ].join("::")
+    )
+  ].join("-");
+
+  return {
+    signal_id: signalId,
+    article_id: cleanString(item?.id),
+    created_at: cleanString(item?.created_at, generatedAt),
+    category: normalizeCategory(item?.category),
+    region: normalizeRegion(item?.region),
+    countries,
+    title: cleanString(item?.title, "Untitled intelligence signal"),
+    summary: cleanString(
+      item?.summary || item?.lede,
+      "AI-generated intelligence signal for monitoring."
+    ),
+    confidence_label: cleanString(item?.confidence_label, "Medium"),
+    confidence_score: round(
+      clamp(item?.confidence_score, 0.55, 0.9),
+      2
+    ),
+    importance_score: Math.round(
+      clamp(item?.importance_score ?? 70, 40, 100)
+    ),
+    tags: cleanStringArray(item?.tags, 12),
+    watchlist: cleanStringArray(item?.watchlist, 6),
+    dedup_key: signalDedupKey(item)
+  };
+}
+
+function buildRollingMapSignals({
+  existingPayload,
+  currentItems,
+  generatedAt,
+  rollingHours = 24,
+  maximumSignals = 50
+}) {
+  const existingSignals = Array.isArray(existingPayload?.signals)
+    ? existingPayload.signals
+    : [];
+
+  const incomingSignals = currentItems.map((item) =>
+    toMapSignal(item, generatedAt)
+  );
+
+  const combined = [
+    ...incomingSignals,
+    ...existingSignals
+  ];
+
+  const seen = new Set();
+  const filtered = [];
+
+  for (const signal of combined) {
+    const createdAt = cleanString(signal?.created_at);
+
+    if (
+      !createdAt ||
+      hoursBetween(createdAt, generatedAt) > rollingHours ||
+      hoursBetween(createdAt, generatedAt) < -1
+    ) {
+      continue;
+    }
+
+    const key =
+      cleanString(signal?.dedup_key) ||
+      signalDedupKey(signal);
+
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+
+    filtered.push({
+      ...signal,
+      dedup_key: key
+    });
+  }
+
+  filtered.sort((a, b) => {
+    const importanceDifference =
+      Number(b.importance_score || 0) -
+      Number(a.importance_score || 0);
+
+    if (importanceDifference !== 0) {
+      return importanceDifference;
+    }
+
+    return String(b.created_at).localeCompare(
+      String(a.created_at)
+    );
+  });
+
+  const signals = filtered.slice(0, maximumSignals);
+
+  const countryCounts = countBy(
+    signals,
+    (signal) => signal.countries || []
+  );
+
+  const regionCounts = countBy(
+    signals,
+    (signal) => signal.region
+  );
+
+  const categoryCounts = countBy(
+    signals,
+    (signal) => signal.category
+  );
+
+  return {
+    generated_at: generatedAt,
+    rolling_hours: rollingHours,
+    maximum_signals: maximumSignals,
+    signal_count: signals.length,
+    country_count: countryCounts.size,
+    methodology: {
+      summary:
+        "Rolling map signals are built from the latest PTD Today hourly intelligence generations, deduplicated and limited to the most important 50 signals from the previous 24 hours.",
+      caution:
+        "Signals are AI-generated intelligence scenarios and may contain errors. Country assignment is included only when the model can justify it."
+    },
+    coverage: {
+      countries: mapToRankedArray(countryCounts, 100),
+      regions: mapToRankedArray(regionCounts, 20),
+      categories: mapToRankedArray(categoryCounts, 20)
+    },
+    signals
+  };
+}
+
+function mergeDailyHistory(existingPayload, currentPayload) {
+  const existingItems = Array.isArray(existingPayload?.items)
+    ? existingPayload.items
+    : [];
+
+  const currentItems = Array.isArray(currentPayload?.items)
+    ? currentPayload.items
+    : [];
+
+  const itemsByKey = new Map();
+
+  for (const item of [...currentItems, ...existingItems]) {
+    const key = signalDedupKey(item);
+    if (!key || itemsByKey.has(key)) continue;
+    itemsByKey.set(key, item);
+  }
+
+  const mergedItems = [...itemsByKey.values()]
+    .sort((a, b) =>
+      String(b.created_at || "").localeCompare(
+        String(a.created_at || "")
+      )
+    )
+    .slice(0, 300);
+
+  return {
+    ...existingPayload,
+    ...currentPayload,
+    updated_at: currentPayload.updated_at,
+    date_utc: currentPayload.date_utc,
+    items: mergedItems,
+    archive_mode: "merged-hourly-signals",
+    signal_count: mergedItems.length
   };
 }
 
@@ -585,10 +820,6 @@ function rankedCountMap(rankedArray) {
     ])
   );
 }
-
-// PTD Today generate_ai_news.js — PART 3 OF 5
-// CONCATENATE PARTS 1→5 IN ORDER.
-// Remove only these three header comment lines if desired.
 
 function calculateMomentum(shortWindow, longWindow, key) {
   const shortMap = rankedCountMap(shortWindow[key]);
@@ -880,10 +1111,6 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
 
     a{color:inherit}
 
-// PTD Today generate_ai_news.js — PART 4 OF 5
-// CONCATENATE PARTS 1→5 IN ORDER.
-// Remove only these three header comment lines if desired.
-
     .wrap{
       max-width:900px;
       margin:0 auto;
@@ -1174,10 +1401,6 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
       if (shareBtn) {
         shareBtn.addEventListener("click", async function(){
           if (navigator.share) {
-// PTD Today generate_ai_news.js — PART 5 OF 5
-// CONCATENATE PARTS 1→5 IN ORDER.
-// Remove only these three header comment lines if desired.
-
             try {
               await navigator.share({
                 title: title,
@@ -1261,6 +1484,11 @@ CRITICAL RULES:
 - Output MUST be valid JSON matching the requested schema.
 - No markdown and no extra text outside the JSON object.
 
+MAP COVERAGE AND IMPORTANCE:
+- Each item must include an "importance_score" integer from 40 to 100.
+- Higher importance means broader operational, investment, supply-chain, or infrastructure relevance.
+- Avoid giving every item the same importance score.
+
 COUNTRY METADATA:
 - Each item must include a "countries" array.
 - Use explicit countries only when the scenario is meaningfully associated
@@ -1318,6 +1546,7 @@ Return JSON with exactly this structure:
       "summary": "Two or three concise sentences for the homepage card.",
       "confidence_label": "Low" | "Medium" | "High",
       "confidence_score": 0.0,
+      "importance_score": 0,
       "tags": ["tag1", "tag2"],
       "watchlist": ["specific item to monitor", "specific item to monitor"],
       "action_for_readers": "One sentence action."
@@ -1326,9 +1555,21 @@ Return JSON with exactly this structure:
 }
 
 REQUIREMENTS:
-- Exactly 10 items.
+- Exactly 10 full-featured items for the homepage/article feed.
 - IDs must be unique and use date ${compactDate(dateOnly)}.
 - confidence_score must be between 0.55 and 0.90.
+- importance_score must be an integer between 40 and 100.
+- Geographic balance target per generation:
+  - North America: approximately 2 items
+  - Europe: approximately 2 items
+  - Asia: approximately 2 items
+  - Middle East: approximately 1 item
+  - LATAM: approximately 1 item
+  - Africa: approximately 1 item
+  - Global: approximately 1 item
+- Across the 10 items, aim to cover at least 8 explicit countries when responsibly possible.
+- Prefer one or two justified countries per country-specific signal.
+- Do not repeatedly use only the United States, Germany, China, India, or the United Kingdom.
 - Include a useful mix of categories and regions.
 - countries must be [] when a specific-country assignment is not justified.
 - Do not include source lines or URLs.
@@ -1400,7 +1641,7 @@ async function main() {
   const payload = await generateBrief(client, today, now);
 
   /*
-   * Current homepage payload.
+   * Current homepage payload: always the latest 10 full articles.
    */
   writeJson(
     path.join(briefsDir, "daily-ai.json"),
@@ -1408,12 +1649,58 @@ async function main() {
   );
 
   /*
-   * Historical archive. Re-running on the same UTC date safely replaces
-   * that day's archive with the latest generated version.
+   * Rolling 24-hour map dataset: maximum 50 unique signals.
    */
+  const mapSignalsPath = path.join(
+    briefsDir,
+    "map-signals.json"
+  );
+
+  const existingMapSignals = readJsonIfExists(
+    mapSignalsPath,
+    null
+  );
+
+  const rollingMapSignals = buildRollingMapSignals({
+    existingPayload: existingMapSignals,
+    currentItems: payload.items,
+    generatedAt: now,
+    rollingHours: Number(
+      optEnv("MAP_SIGNAL_HOURS", "24")
+    ),
+    maximumSignals: Number(
+      optEnv("MAP_SIGNAL_LIMIT", "50")
+    )
+  });
+
   writeJson(
-    path.join(historyDir, `${today}.json`),
+    mapSignalsPath,
+    rollingMapSignals
+  );
+
+  /*
+   * Historical archive: merge hourly generations instead of replacing
+   * the entire UTC day. This gives the 7-day and 30-day engines a richer
+   * evidence base while keeping the homepage at only 10 articles.
+   */
+  const todayHistoryPath = path.join(
+    historyDir,
+    `${today}.json`
+  );
+
+  const existingTodayHistory = readJsonIfExists(
+    todayHistoryPath,
+    null
+  );
+
+  const mergedTodayHistory = mergeDailyHistory(
+    existingTodayHistory,
     payload
+  );
+
+  writeJson(
+    todayHistoryPath,
+    mergedTodayHistory
   );
 
   /*
@@ -1458,6 +1745,7 @@ async function main() {
   console.log(`- ${path.join(briefsDir, "daily-ai.json")}`);
   console.log(`- ${path.join(briefsDir, "trends.json")}`);
   console.log(`- ${path.join(briefsDir, "outlook.json")}`);
+  console.log(`- ${path.join(briefsDir, "map-signals.json")}`);
   console.log(`- ${path.join(historyDir, `${today}.json`)}`);
   console.log(`- ${articlesDir}/*.html`);
 }
