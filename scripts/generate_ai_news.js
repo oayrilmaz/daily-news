@@ -5,7 +5,7 @@
 //   - briefs/daily-ai.json
 //   - briefs/trends.json
 //   - briefs/outlook.json
-//   - briefs/map-signals.json       (rolling 24-hour, maximum 50)
+//   - briefs/map-signals.json       (latest 50 unique signals)
 //   - history/YYYY-MM-DD.json        (merged, not overwritten)
 //   - articles/<id>.html
 //
@@ -13,7 +13,7 @@
 //   - Preserve the current PTD Today homepage/article format.
 //   - Add country metadata for the interactive world map.
 //   - Keep the homepage/article feed at 10 full intelligence articles.
-//   - Maintain a separate rolling map dataset of up to 50 unique signals.
+//   - Maintain a separate map dataset containing the latest 50 unique signals.
 //   - Preserve generated signals in a merged historical archive.
 //   - Derive transparent 7-day and 30-day trend summaries.
 //   - Produce probabilistic AI outlooks that are explicitly scenarios,
@@ -527,7 +527,7 @@ function normalizePayload(payload, dateOnly, now) {
 
 
 /* -------------------------------------------------------------------------- */
-/* Rolling 24-hour map signal engine                                           */
+/* Latest 50 map signal engine                                           */
 /* -------------------------------------------------------------------------- */
 
 function toMapSignal(item, generatedAt) {
@@ -574,11 +574,11 @@ function toMapSignal(item, generatedAt) {
   };
 }
 
-function buildRollingMapSignals({
+function buildLatestMapSignals({
   existingPayload,
   currentItems,
+  historicalItems,
   generatedAt,
-  rollingHours = 24,
   maximumSignals = 50
 }) {
   const existingSignals = Array.isArray(existingPayload?.signals)
@@ -589,25 +589,29 @@ function buildRollingMapSignals({
     toMapSignal(item, generatedAt)
   );
 
+  const historySignals = (Array.isArray(historicalItems)
+    ? historicalItems
+    : []
+  ).map((item) =>
+    toMapSignal(item, item?.created_at || generatedAt)
+  );
+
+  /*
+   * Order matters:
+   * 1) newest current generation
+   * 2) already-published map signals
+   * 3) historical archive used to fill remaining slots immediately
+   */
   const combined = [
     ...incomingSignals,
-    ...existingSignals
+    ...existingSignals,
+    ...historySignals
   ];
 
   const seen = new Set();
-  const filtered = [];
+  const unique = [];
 
   for (const signal of combined) {
-    const createdAt = cleanString(signal?.created_at);
-
-    if (
-      !createdAt ||
-      hoursBetween(createdAt, generatedAt) > rollingHours ||
-      hoursBetween(createdAt, generatedAt) < -1
-    ) {
-      continue;
-    }
-
     const key =
       cleanString(signal?.dedup_key) ||
       signalDedupKey(signal);
@@ -616,27 +620,29 @@ function buildRollingMapSignals({
 
     seen.add(key);
 
-    filtered.push({
+    unique.push({
       ...signal,
       dedup_key: key
     });
   }
 
-  filtered.sort((a, b) => {
-    const importanceDifference =
-      Number(b.importance_score || 0) -
-      Number(a.importance_score || 0);
+  unique.sort((a, b) => {
+    const dateDifference =
+      String(b.created_at || "").localeCompare(
+        String(a.created_at || "")
+      );
 
-    if (importanceDifference !== 0) {
-      return importanceDifference;
+    if (dateDifference !== 0) {
+      return dateDifference;
     }
 
-    return String(b.created_at).localeCompare(
-      String(a.created_at)
+    return (
+      Number(b.importance_score || 0) -
+      Number(a.importance_score || 0)
     );
   });
 
-  const signals = filtered.slice(0, maximumSignals);
+  const signals = unique.slice(0, maximumSignals);
 
   const countryCounts = countBy(
     signals,
@@ -655,15 +661,23 @@ function buildRollingMapSignals({
 
   return {
     generated_at: generatedAt,
-    rolling_hours: rollingHours,
+    mode: "latest-50",
     maximum_signals: maximumSignals,
     signal_count: signals.length,
     country_count: countryCounts.size,
+    oldest_signal_at:
+      signals.length
+        ? signals[signals.length - 1].created_at
+        : null,
+    newest_signal_at:
+      signals.length
+        ? signals[0].created_at
+        : null,
     methodology: {
       summary:
-        "Rolling map signals are built from the latest PTD Today hourly intelligence generations, deduplicated and limited to the most important 50 signals from the previous 24 hours.",
+        "The map shows the latest 50 unique PTD Today intelligence signals. Existing history is used immediately to fill the dataset, and newer hourly signals replace older ones automatically.",
       caution:
-        "Signals are AI-generated intelligence scenarios and may contain errors. Country assignment is included only when the model can justify it."
+        "Signals are AI-generated intelligence scenarios and may contain errors. Country assignment is included only when justified."
     },
     coverage: {
       countries: mapToRankedArray(countryCounts, 100),
@@ -1649,39 +1663,8 @@ async function main() {
   );
 
   /*
-   * Rolling 24-hour map dataset: maximum 50 unique signals.
-   */
-  const mapSignalsPath = path.join(
-    briefsDir,
-    "map-signals.json"
-  );
-
-  const existingMapSignals = readJsonIfExists(
-    mapSignalsPath,
-    null
-  );
-
-  const rollingMapSignals = buildRollingMapSignals({
-    existingPayload: existingMapSignals,
-    currentItems: payload.items,
-    generatedAt: now,
-    rollingHours: Number(
-      optEnv("MAP_SIGNAL_HOURS", "24")
-    ),
-    maximumSignals: Number(
-      optEnv("MAP_SIGNAL_LIMIT", "50")
-    )
-  });
-
-  writeJson(
-    mapSignalsPath,
-    rollingMapSignals
-  );
-
-  /*
    * Historical archive: merge hourly generations instead of replacing
-   * the entire UTC day. This gives the 7-day and 30-day engines a richer
-   * evidence base while keeping the homepage at only 10 articles.
+   * the entire UTC day.
    */
   const todayHistoryPath = path.join(
     historyDir,
@@ -1701,6 +1684,41 @@ async function main() {
   writeJson(
     todayHistoryPath,
     mergedTodayHistory
+  );
+
+  /*
+   * Read history immediately so the map can be seeded with the latest
+   * 50 previously published signals on the very first run.
+   */
+  const historyPayloadsForMap =
+    readHistoryPayloads(historyDir);
+
+  const historicalItemsForMap =
+    flattenHistoryItems(historyPayloadsForMap);
+
+  const mapSignalsPath = path.join(
+    briefsDir,
+    "map-signals.json"
+  );
+
+  const existingMapSignals = readJsonIfExists(
+    mapSignalsPath,
+    null
+  );
+
+  const latestMapSignals = buildLatestMapSignals({
+    existingPayload: existingMapSignals,
+    currentItems: payload.items,
+    historicalItems: historicalItemsForMap,
+    generatedAt: now,
+    maximumSignals: Number(
+      optEnv("MAP_SIGNAL_LIMIT", "50")
+    )
+  });
+
+  writeJson(
+    mapSignalsPath,
+    latestMapSignals
   );
 
   /*
