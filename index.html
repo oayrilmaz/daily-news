@@ -803,7 +803,7 @@
           </div>
         </div>
 
-        <div class="pulseTabs" role="tablist" aria-label="Market intelligence time horizon">
+        <div class="pulseTabs" role="tablist" aria-label="Market intelligence view">
           <button class="pulseTab active" type="button" data-pulse-tab="24h" role="tab">
             Last 24 Hours
           </button>
@@ -1302,11 +1302,11 @@
 
       if(tab === "24h"){
         const data = live24HourAnalytics();
-        renderWindowPulse(data,"Last 24 Hours");
+        renderWindowPulse(data,"Latest 50 Signals");
         $("pulseStatus").textContent =
           MarketPulse.mapSignals.length
-            ? `Rolling 24-hour intelligence: ${MarketPulse.mapSignals.length} unique signals loaded from map-signals.json.`
-            : "Current daily briefing snapshot. Rolling map signals are not available yet.";
+            ? `Latest intelligence: ${MarketPulse.mapSignals.length} unique signals loaded from map-signals.json.`
+            : "Latest article snapshot. The 50-signal map dataset is not available yet.";
         return;
       }
 
@@ -1580,7 +1580,7 @@
       if(summary){
         summary.textContent = IntelligenceMap.selectedCountry
           ? `Showing ${IntelligenceMap.selectedRegion || "matching"} intelligence associated with ${IntelligenceMap.selectedCountry}.`
-          : "Explore the map or use a category filter to focus the latest rolling 24-hour intelligence.";
+          : "Explore the map or use a category filter to focus the latest 50-signal intelligence.";
       }
 
       if($("mapSignalCount")){
@@ -1596,7 +1596,7 @@
           ? items.slice(0,5).map(item=>
               `<li>${escapeHtml(item.title || "Untitled")}</li>`
             ).join("")
-          : "<li>No matching signals in the rolling 24-hour intelligence dataset.</li>";
+          : "<li>No matching signals in the latest 50-signal intelligence dataset.</li>";
       }
 
       if($("intelMapStatus")){
