@@ -847,6 +847,7 @@
 
   <script>
     const DATA_URL = "/briefs/daily-ai.json";
+    const MAP_SIGNALS_URL = "/briefs/map-signals.json";
     const TRENDS_URL = "/briefs/trends.json";
     const OUTLOOK_URL = "/briefs/outlook.json";
     const VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view";
@@ -865,6 +866,7 @@
       trends:null,
       outlook:null,
       payload:null,
+      mapSignals:[],
       activeTab:"24h"
     };
 
@@ -895,9 +897,13 @@
     }
 
     function live24HourAnalytics(){
-      const items = Array.isArray(MarketPulse.payload?.items)
-        ? MarketPulse.payload.items
-        : [];
+      const items = Array.isArray(MarketPulse.mapSignals) && MarketPulse.mapSignals.length
+        ? MarketPulse.mapSignals
+        : (
+            Array.isArray(MarketPulse.payload?.items)
+              ? MarketPulse.payload.items
+              : []
+          );
 
       const categories = new Map();
       const regions = new Map();
@@ -1298,7 +1304,9 @@
         const data = live24HourAnalytics();
         renderWindowPulse(data,"Last 24 Hours");
         $("pulseStatus").textContent =
-          "Current daily briefing snapshot. This view does not require historical files.";
+          MarketPulse.mapSignals.length
+            ? `Rolling 24-hour intelligence: ${MarketPulse.mapSignals.length} unique signals loaded from map-signals.json.`
+            : "Current daily briefing snapshot. Rolling map signals are not available yet.";
         return;
       }
 
@@ -1339,13 +1347,17 @@
     async function initMarketPulse(payload){
       MarketPulse.payload = payload;
 
-      const [trendsResult,outlookResult] = await Promise.allSettled([
+      const [trendsResult,outlookResult,mapSignalsResult] = await Promise.allSettled([
         fetch(TRENDS_URL,{cache:"no-store"}).then(response=>{
           if(!response.ok)throw new Error(`Trends request failed (${response.status})`);
           return response.json();
         }),
         fetch(OUTLOOK_URL,{cache:"no-store"}).then(response=>{
           if(!response.ok)throw new Error(`Outlook request failed (${response.status})`);
+          return response.json();
+        }),
+        fetch(MAP_SIGNALS_URL,{cache:"no-store"}).then(response=>{
+          if(!response.ok)throw new Error(`Map signals request failed (${response.status})`);
           return response.json();
         })
       ]);
@@ -1356,12 +1368,22 @@
       MarketPulse.outlook =
         outlookResult.status === "fulfilled" ? outlookResult.value : null;
 
+      MarketPulse.mapSignals =
+        mapSignalsResult.status === "fulfilled" &&
+        Array.isArray(mapSignalsResult.value?.signals)
+          ? mapSignalsResult.value.signals
+          : [];
+
       if(trendsResult.status === "rejected"){
         console.warn("Could not load trends.json:",trendsResult.reason);
       }
 
       if(outlookResult.status === "rejected"){
         console.warn("Could not load outlook.json:",outlookResult.reason);
+      }
+
+      if(mapSignalsResult.status === "rejected"){
+        console.warn("Could not load map-signals.json:",mapSignalsResult.reason);
       }
 
       document.querySelectorAll("[data-pulse-tab]").forEach(button=>{
@@ -1432,6 +1454,7 @@
       map:null,
       geoLayer:null,
       payload:null,
+      briefingPayload:null,
       selectedCountry:"",
       selectedRegion:"",
       category:"All"
@@ -1472,12 +1495,17 @@
       );
     }
 
+    function filterItemsForMapSelection(items){
+      return (Array.isArray(items) ? items : [])
+        .filter(itemMatchesMapSelection);
+    }
+
     function mapFilteredItems(){
       const allItems = Array.isArray(IntelligenceMap.payload?.items)
         ? IntelligenceMap.payload.items
         : [];
 
-      return allItems.filter(itemMatchesMapSelection);
+      return filterItemsForMapSelection(allItems);
     }
 
     function mapActivityLevel(count){
@@ -1552,7 +1580,7 @@
       if(summary){
         summary.textContent = IntelligenceMap.selectedCountry
           ? `Showing ${IntelligenceMap.selectedRegion || "matching"} intelligence associated with ${IntelligenceMap.selectedCountry}.`
-          : "Explore the map or use a category filter to focus today’s global briefing.";
+          : "Explore the map or use a category filter to focus the latest rolling 24-hour intelligence.";
       }
 
       if($("mapSignalCount")){
@@ -1568,7 +1596,7 @@
           ? items.slice(0,5).map(item=>
               `<li>${escapeHtml(item.title || "Untitled")}</li>`
             ).join("")
-          : "<li>No matching signals in the current daily briefing.</li>";
+          : "<li>No matching signals in the rolling 24-hour intelligence dataset.</li>";
       }
 
       if($("intelMapStatus")){
@@ -1579,16 +1607,22 @@
     }
 
     function applyMapSelectionToBriefing(){
-      if(!IntelligenceMap.payload)return;
+      if(!IntelligenceMap.briefingPayload)return;
 
-      const items = mapFilteredItems();
+      const briefingItems = Array.isArray(IntelligenceMap.briefingPayload.items)
+        ? IntelligenceMap.briefingPayload.items
+        : [];
+
+      const items = filterItemsForMapSelection(briefingItems);
+
       const payload = {
-        ...IntelligenceMap.payload,
+        ...IntelligenceMap.briefingPayload,
         items
       };
 
       /*
-        Render the filtered briefing while preserving the global source payload.
+        The map uses up to 50 rolling compact signals.
+        The article feed remains the latest 10 full articles.
       */
       render(payload,$("q").value);
       updateMapPanel();
@@ -1610,7 +1644,26 @@
     }
 
     async function initGlobalIntelligenceMap(payload){
+      IntelligenceMap.briefingPayload = payload;
       IntelligenceMap.payload = payload;
+
+      try{
+        const signalResponse = await fetch(MAP_SIGNALS_URL,{cache:"no-store"});
+
+        if(signalResponse.ok){
+          const signalPayload = await signalResponse.json();
+
+          if(Array.isArray(signalPayload?.signals) && signalPayload.signals.length){
+            IntelligenceMap.payload = {
+              ...payload,
+              updated_at:signalPayload.generated_at || payload.updated_at,
+              items:signalPayload.signals
+            };
+          }
+        }
+      }catch(error){
+        console.warn("Rolling map signals are not available yet:",error);
+      }
 
       if(!window.L || !$("globalIntelligenceMap")){
         if($("intelMapStatus")){
