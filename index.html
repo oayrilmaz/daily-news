@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -628,6 +630,121 @@
       background:rgba(0,0,0,.01);
     }
 
+
+
+    /* Compact homepage accordion */
+    .mainAccordion{
+      margin:0 0 12px;
+      border:1px solid var(--rule);
+      border-radius:14px;
+      background:#fff;
+      overflow:hidden;
+      box-shadow:0 6px 18px rgba(0,0,0,.025);
+    }
+    .mainAccordion > summary{
+      list-style:none;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding:17px 18px;
+      cursor:pointer;
+      font-size:22px;
+      line-height:1.15;
+      font-weight:900;
+      user-select:none;
+      background:#fff;
+    }
+    .mainAccordion > summary::-webkit-details-marker{display:none}
+    .mainAccordion > summary::after{
+      content:"+";
+      flex:0 0 auto;
+      width:30px;
+      height:30px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      font-size:22px;
+      font-weight:500;
+      line-height:1;
+    }
+    .mainAccordion[open] > summary{
+      border-bottom:1px solid var(--rule);
+      background:rgba(0,0,0,.018);
+    }
+    .mainAccordion[open] > summary::after{content:"−"}
+    .accordionContent{min-width:0}
+    .accordionContent > .sections,
+    .accordionContent > .intelMapSection,
+    .accordionContent > .marketPulse,
+    .accordionContent > .feed,
+    .accordionContent > .sponsored-spotlight{
+      margin:0;
+      border:0;
+      border-radius:0;
+      box-shadow:none;
+    }
+    .accordionContent > .intelMapSection,
+    .accordionContent > .marketPulse,
+    .accordionContent > .sponsored-spotlight{padding:18px}
+
+    /* Compact article rows */
+    .card{
+      padding:0;
+      border-bottom:1px solid var(--soft);
+    }
+    .cardHead{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:14px;
+      align-items:center;
+      padding:15px 16px;
+    }
+    .cardHeadText{min-width:0}
+    .card .meta{margin-bottom:6px}
+    .card .title{
+      margin:0;
+      font-size:23px;
+      line-height:1.18;
+    }
+    .cardToggle{
+      appearance:none;
+      width:34px;
+      height:34px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:#fff;
+      color:#111;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:24px;
+      line-height:1;
+    }
+    .cardToggle:hover{background:rgba(0,0,0,.035)}
+    .cardExpandable{
+      display:none;
+      padding:0 16px 18px;
+      border-top:1px solid var(--soft);
+    }
+    .card.is-open .cardExpandable{display:block}
+    .card.is-open .cardHead{background:rgba(0,0,0,.012)}
+    .card.is-open .cardToggle{background:#111;color:#fff;border-color:#111}
+    .card .lede{margin-top:14px}
+
+    @media (max-width:760px){
+      .mainAccordion > summary{padding:15px 14px;font-size:19px}
+      .accordionContent > .intelMapSection,
+      .accordionContent > .marketPulse,
+      .accordionContent > .sponsored-spotlight{padding:14px}
+      .cardHead{padding:13px 14px;gap:10px}
+      .card .title{font-size:20px}
+      .cardExpandable{padding:0 14px 16px}
+    }
     @media (max-width:760px){
       .brand{font-size:44px}
       .pageTitle{font-size:36px}
@@ -677,39 +794,6 @@
       </span>
     </div>
 
-    <section class="sponsored-spotlight" aria-label="Sponsored Partner Spotlight">
-      <div class="sponsored-label">Sponsored Partner Spotlight</div>
-      <h2>Omega Enerji Teknolojileri</h2>
-      <h3>Powering the Electrical Backbone Behind Critical Infrastructure</h3>
-
-      <p>
-        Omega provides engineering, manufacturing, and project-based solutions in
-        low-voltage electrical panels, MCCs, automation/control panels, and data center
-        electrical infrastructure.
-      </p>
-
-      <p class="sponsored-meta">
-        1,200+ global references • 40+ countries • 45+ data center references •
-        10,000 cubicles/year capacity
-      </p>
-
-      <div class="sponsored-actions">
-        <a class="sponsored-button" href="/partners/omega-enerji-teknolojileri.html">
-          Read the Spotlight →
-        </a>
-
-        <a class="sponsored-button secondary"
-           href="https://www.omegaenerjiteknolojileri.com/en/"
-           target="_blank"
-           rel="noopener">
-          Visit Omega →
-        </a>
-
-        <button class="sponsored-button secondary" type="button" onclick="shareOmegaSpotlight()">
-          Share →
-        </button>
-      </div>
-    </section>
 
     <section class="panel" aria-label="Daily briefing">
       <div class="toolbar">
@@ -731,7 +815,15 @@
         <div class="tiny" id="modelHint">AI-generated briefing</div>
       </div>
 
-      <div class="sections" id="sections"></div>
+      <details class="mainAccordion" data-accordion="summary" open>
+        <summary>Today’s Intelligence Summary</summary>
+        <div class="accordionContent">
+          <div class="sections" id="sections"></div>
+        </div>
+      </details>
+      <details class="mainAccordion" data-accordion="map">
+        <summary>Global Power Intelligence Map</summary>
+        <div class="accordionContent">
       <section class="intelMapSection" aria-label="Global Power Intelligence Map">
         <div class="intelMapHead">
           <div>
@@ -791,7 +883,12 @@
           Loading country boundaries…
         </div>
       </section>
+        </div>
+      </details>
 
+      <details class="mainAccordion" data-accordion="pulse">
+        <summary>Market Pulse &amp; AI Outlook</summary>
+        <div class="accordionContent">
       <section class="marketPulse" aria-label="Market Pulse and AI Outlook">
         <div class="marketPulseHead">
           <div>
@@ -832,8 +929,57 @@
           </div>
         </div>
       </section>
-      <div class="feed" id="feed"></div>
+        </div>
+      </details>
+
+      <details class="mainAccordion" data-accordion="feed">
+        <summary>Daily Intelligence Feed</summary>
+        <div class="accordionContent">
+          <div class="feed" id="feed"></div>
+        </div>
+      </details>
     </section>
+
+
+
+    <details class="mainAccordion" data-accordion="sponsor">
+      <summary>Sponsored Partner Spotlight</summary>
+      <div class="accordionContent">
+<section class="sponsored-spotlight" aria-label="Sponsored Partner Spotlight">
+      <div class="sponsored-label">Sponsored Partner Spotlight</div>
+      <h2>Omega Enerji Teknolojileri</h2>
+      <h3>Powering the Electrical Backbone Behind Critical Infrastructure</h3>
+
+      <p>
+        Omega provides engineering, manufacturing, and project-based solutions in
+        low-voltage electrical panels, MCCs, automation/control panels, and data center
+        electrical infrastructure.
+      </p>
+
+      <p class="sponsored-meta">
+        1,200+ global references • 40+ countries • 45+ data center references •
+        10,000 cubicles/year capacity
+      </p>
+
+      <div class="sponsored-actions">
+        <a class="sponsored-button" href="/partners/omega-enerji-teknolojileri.html">
+          Read the Spotlight →
+        </a>
+
+        <a class="sponsored-button secondary"
+           href="https://www.omegaenerjiteknolojileri.com/en/"
+           target="_blank"
+           rel="noopener">
+          Visit Omega →
+        </a>
+
+        <button class="sponsored-button secondary" type="button" onclick="shareOmegaSpotlight()">
+          Share →
+        </button>
+      </div>
+    </section>
+      </div>
+    </details>
 
     <div class="footer">© <span id="year"></span> PTD Today</div>
     <div id="crawlLinks" aria-hidden="true"></div>
@@ -2237,6 +2383,13 @@
 
       const det = card.querySelector(".readMore");
       if(det && !det.open)det.open = true;
+      card.classList.add("is-open");
+      const cardToggle = card.querySelector("[data-action='toggle']");
+      if(cardToggle){
+        cardToggle.textContent = "−";
+        cardToggle.setAttribute("aria-expanded","true");
+        cardToggle.setAttribute("aria-label","Collapse article");
+      }
 
       const built = renderSpeakableBody(card,item);
 
@@ -2443,141 +2596,123 @@
 
       return `
         <article class="card" id="${escapeHtml(id)}" data-id="${escapeHtml(id)}">
-          <div class="meta">${escapeHtml(meta)}</div>
-          <h2 class="title">${escapeHtml(item.title || "Untitled")}</h2>
-          <p class="lede">${escapeHtml(lede)}</p>
+          <div class="cardHead">
+            <div class="cardHeadText">
+              <div class="meta">${escapeHtml(meta)}</div>
+              <h2 class="title">${escapeHtml(item.title || "Untitled")}</h2>
+            </div>
 
-          <div class="actions">
             <button
-              class="btnMini primary"
+              class="cardToggle"
               type="button"
               data-action="toggle"
               data-id="${escapeHtml(id)}"
-            >
-              Read
-            </button>
-
-            <button
-              class="btnMini"
-              type="button"
-              data-action="tts"
-              data-id="${escapeHtml(id)}"
-              aria-pressed="false"
-              title="AI Reader"
-            >
-              🔊
-            </button>
-
-            <button
-              class="btnMini"
-              type="button"
-              data-action="share"
-              data-id="${escapeHtml(id)}"
-            >
-              Share
-            </button>
-
-            <a
-              class="btnMini"
-              href="${escapeHtml(articlePageUrl(id))}"
-              target="_blank"
-              rel="noopener"
-            >
-              Open
-            </a>
-
-            <span
-              class="viewCount"
-              aria-label="Article views"
-              title="Article views"
-            >
-              <span aria-hidden="true">👁</span>
-              <span data-view-count="${escapeHtml(id)}">—</span>
-              <span>views</span>
-            </span>
-
-            ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
-            ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
-
-            <span class="chip">
-              Confidence: ${escapeHtml(confLabel)}
-              ${confScore !== "" ? ` (${escapeHtml(confScore)})` : ""}
-            </span>
+              aria-expanded="false"
+              aria-label="Expand article"
+            >+</button>
           </div>
 
-          <div class="ttsControls" aria-label="Audio reader controls">
-            <select class="ttsSelect" data-tts-preset aria-label="Mode">
-              <option value="natural" selected>Human (Natural)</option>
-              <option value="presenter">Human (Presenter)</option>
-              <option value="fast">Fast</option>
-            </select>
+          <div class="cardExpandable">
+            <p class="lede">${escapeHtml(lede)}</p>
 
-            <select class="ttsSelect" data-tts-accent aria-label="Accent">
-              <option value="any" selected>Accent: Any English</option>
-              <option value="us">Accent: US</option>
-              <option value="uk">Accent: UK</option>
-              <option value="au">Accent: AU</option>
-              <option value="ca">Accent: CA</option>
-              <option value="in">Accent: IN</option>
-            </select>
+            <div class="actions">
+              <button
+                class="btnMini"
+                type="button"
+                data-action="tts"
+                data-id="${escapeHtml(id)}"
+                aria-pressed="false"
+                title="AI Reader"
+              >🔊 Audio</button>
 
-            <select class="ttsSelect" data-tts-voice aria-label="Voice"></select>
+              <button
+                class="btnMini"
+                type="button"
+                data-action="share"
+                data-id="${escapeHtml(id)}"
+              >Share</button>
 
-            <select class="ttsSelect" data-tts-rate aria-label="Speed">
-              <option value="0.95">0.95×</option>
-              <option value="1">1.0×</option>
-              <option value="1.02" selected>1.02×</option>
-              <option value="1.06">1.06×</option>
-              <option value="1.12">1.12×</option>
-            </select>
+              <a
+                class="btnMini"
+                href="${escapeHtml(articlePageUrl(id))}"
+                target="_blank"
+                rel="noopener"
+              >Open</a>
 
-            <select class="ttsSelect" data-tts-pitch aria-label="Pitch">
-              <option value="0.98">Pitch 0.98</option>
-              <option value="1">Pitch 1.0</option>
-              <option value="1.02" selected>Pitch 1.02</option>
-              <option value="1.05">Pitch 1.05</option>
-            </select>
+              <span class="viewCount" aria-label="Article views" title="Article views">
+                <span aria-hidden="true">👁</span>
+                <span data-view-count="${escapeHtml(id)}">—</span>
+                <span>views</span>
+              </span>
 
-            <button class="btnMini" type="button" data-tts-pause>Pause</button>
-            <button class="btnMini" type="button" data-tts-stop>Stop</button>
-            <span class="ttsHint">Blue highlight = reading. Red highlight = Watch/Action.</span>
-          </div>
+              ${item.category ? `<span class="chip">${escapeHtml(item.category)}</span>` : ""}
+              ${item.region ? `<span class="chip">${escapeHtml(item.region)}</span>` : ""}
 
-          ${tags.length
-            ? `<div class="tags">${tags.slice(0,12).map(
-                t=>`<span class="tag">${escapeHtml(t)}</span>`
-              ).join("")}</div>`
-            : ""
-          }
-
-          <details class="readMore" id="details-${escapeHtml(id)}">
-            <summary>Read</summary>
-
-            <div class="body">
-              ${body
-                ? paragraphsToHtml(body)
-                : (item.summary ? paragraphsToHtml(item.summary) : "")
-              }
-
-              ${watch.length
-                ? `
-                  <div class="subhead">What to watch</div>
-                  <ul>${watch.slice(0,10).map(
-                    w=>`<li>${escapeHtml(w)}</li>`
-                  ).join("")}</ul>
-                `
-                : ""
-              }
-
-              ${action
-                ? `
-                  <div class="subhead">Action</div>
-                  <p>${escapeHtml(action)}</p>
-                `
-                : ""
-              }
+              <span class="chip">
+                Confidence: ${escapeHtml(confLabel)}
+                ${confScore !== "" ? ` (${escapeHtml(confScore)})` : ""}
+              </span>
             </div>
-          </details>
+
+            <div class="ttsControls" aria-label="Audio reader controls">
+              <select class="ttsSelect" data-tts-preset aria-label="Mode">
+                <option value="natural" selected>Human (Natural)</option>
+                <option value="presenter">Human (Presenter)</option>
+                <option value="fast">Fast</option>
+              </select>
+              <select class="ttsSelect" data-tts-accent aria-label="Accent">
+                <option value="any" selected>Accent: Any English</option>
+                <option value="us">Accent: US</option>
+                <option value="uk">Accent: UK</option>
+                <option value="au">Accent: AU</option>
+                <option value="ca">Accent: CA</option>
+                <option value="in">Accent: IN</option>
+              </select>
+              <select class="ttsSelect" data-tts-voice aria-label="Voice"></select>
+              <select class="ttsSelect" data-tts-rate aria-label="Speed">
+                <option value="0.95">0.95×</option>
+                <option value="1">1.0×</option>
+                <option value="1.02" selected>1.02×</option>
+                <option value="1.06">1.06×</option>
+                <option value="1.12">1.12×</option>
+              </select>
+              <select class="ttsSelect" data-tts-pitch aria-label="Pitch">
+                <option value="0.98">Pitch 0.98</option>
+                <option value="1">Pitch 1.0</option>
+                <option value="1.02" selected>Pitch 1.02</option>
+                <option value="1.05">Pitch 1.05</option>
+              </select>
+              <button class="btnMini" type="button" data-tts-pause>Pause</button>
+              <button class="btnMini" type="button" data-tts-stop>Stop</button>
+              <span class="ttsHint">Blue highlight = reading. Red highlight = Watch/Action.</span>
+            </div>
+
+            ${tags.length
+              ? `<div class="tags">${tags.slice(0,12).map(
+                  t=>`<span class="tag">${escapeHtml(t)}</span>`
+                ).join("")}</div>`
+              : ""
+            }
+
+            <details class="readMore" id="details-${escapeHtml(id)}" open>
+              <summary>Read</summary>
+              <div class="body">
+                ${body
+                  ? paragraphsToHtml(body)
+                  : (item.summary ? paragraphsToHtml(item.summary) : "")
+                }
+                ${watch.length
+                  ? `<div class="subhead">What to watch</div>
+                     <ul>${watch.slice(0,10).map(w=>`<li>${escapeHtml(w)}</li>`).join("")}</ul>`
+                  : ""
+                }
+                ${action
+                  ? `<div class="subhead">Action</div><p>${escapeHtml(action)}</p>`
+                  : ""
+                }
+              </div>
+            </details>
+          </div>
         </article>
       `;
     }
@@ -2683,21 +2818,34 @@
           stopTts();
 
           const id = btn.getAttribute("data-id");
-          const det = document.getElementById("details-" + id);
+          const card = id
+            ? document.querySelector(`article.card[data-id="${CSS.escape(id)}"]`)
+            : null;
+          const det = id ? document.getElementById("details-" + id) : null;
 
-          if(!det || !id)return;
+          if(!card || !det || !id)return;
 
-          const open = !det.open;
-          det.open = open;
-          btn.textContent = open ? "Hide" : "Read";
+          const willOpen = !card.classList.contains("is-open");
 
-          if(open){
-            history.replaceState(
-              null,
-              "",
-              "#" + encodeURIComponent(id)
-            );
+          document.querySelectorAll("article.card.is-open").forEach(otherCard=>{
+            if(otherCard === card)return;
+            otherCard.classList.remove("is-open");
+            const otherButton = otherCard.querySelector("[data-action='toggle']");
+            if(otherButton){
+              otherButton.textContent = "+";
+              otherButton.setAttribute("aria-expanded","false");
+              otherButton.setAttribute("aria-label","Expand article");
+            }
+          });
 
+          card.classList.toggle("is-open",willOpen);
+          det.open = true;
+          btn.textContent = willOpen ? "−" : "+";
+          btn.setAttribute("aria-expanded",willOpen ? "true" : "false");
+          btn.setAttribute("aria-label",willOpen ? "Collapse article" : "Expand article");
+
+          if(willOpen){
+            history.replaceState(null,"","#" + encodeURIComponent(id));
             await registerReadView(id);
           }
         });
@@ -2760,9 +2908,15 @@
         `[data-action='toggle'][data-id='${CSS.escape(id)}']`
       );
 
-      if(det && !det.open){
+      if(det){
         det.open = true;
-        if(btn)btn.textContent = "Hide";
+        const card = el.matches("article.card") ? el : el.closest("article.card");
+        if(card)card.classList.add("is-open");
+        if(btn){
+          btn.textContent = "−";
+          btn.setAttribute("aria-expanded","true");
+          btn.setAttribute("aria-label","Collapse article");
+        }
 
         /*
           A hash link can open a Read section automatically.
@@ -2770,6 +2924,59 @@
         */
         registerReadView(id);
       }
+    }
+
+    function initializeMainAccordions(){
+      const accordions = [...document.querySelectorAll("details.mainAccordion")];
+      if(!accordions.length)return;
+
+      const openOnly = (target)=>{
+        accordions.forEach(item=>{
+          if(item !== target)item.open = false;
+        });
+
+        if(target?.dataset.accordion === "map" && target.open){
+          requestAnimationFrame(()=>{
+            setTimeout(()=>{
+              if(IntelligenceMap.map){
+                IntelligenceMap.map.invalidateSize();
+              }
+            },80);
+          });
+        }
+      };
+
+      accordions.forEach(item=>{
+        item.addEventListener("toggle",()=>{
+          if(item.open)openOnly(item);
+        });
+      });
+
+      const isDesktop = window.matchMedia("(min-width: 761px)");
+      if(!isDesktop.matches || !("IntersectionObserver" in window))return;
+
+      let autoOpening = false;
+      const observer = new IntersectionObserver((entries)=>{
+        if(autoOpening)return;
+
+        const candidate = entries
+          .filter(entry=>entry.isIntersecting && entry.intersectionRatio >= 0.55)
+          .sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
+
+        if(!candidate)return;
+        const item = candidate.target;
+        if(item.open)return;
+
+        autoOpening = true;
+        item.open = true;
+        openOnly(item);
+        setTimeout(()=>{autoOpening=false;},180);
+      },{
+        threshold:[0.55,0.7],
+        rootMargin:"-12% 0px -20% 0px"
+      });
+
+      accordions.forEach(item=>observer.observe(item));
     }
 
     async function load(){
@@ -2831,6 +3038,7 @@
       window.speechSynthesis.onvoiceschanged = ()=>loadVoices();
     }
 
+    initializeMainAccordions();
     load();
   </script>
 </body>
