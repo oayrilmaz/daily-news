@@ -2,8 +2,11 @@ name: Home AI + Video (PTD Today)
 
 on:
   workflow_dispatch:
+
+  # Run once per day to control OpenAI usage and operating cost.
+  # 05:15 UTC = 08:15 Türkiye time during UTC+3.
   schedule:
-    - cron: "15 * * * *" # every hour at :15 UTC
+    - cron: "15 5 * * *"
 
 permissions:
   contents: write
@@ -15,8 +18,13 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
+      # ----------------------------------------------------------------------
+      # 1. Repository and runtime
+      # ----------------------------------------------------------------------
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -37,7 +45,10 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
-      # 1) Build Home feeds + YouTube + /s/ share pages
+      # ----------------------------------------------------------------------
+      # 2. Existing PTD Today source feeds
+      # ----------------------------------------------------------------------
+
       - name: Build Home feed + YouTube + short share pages
         env:
           RECENT_HOURS: "60"
@@ -47,18 +58,41 @@ jobs:
           MAX_ENRICH: "50"
         run: node scripts/build.mjs
 
-      # 2) Generate Daily AI Brief JSON + /articles/ pages
+      # ----------------------------------------------------------------------
+      # 3. Generate structured daily intelligence
+      # ----------------------------------------------------------------------
+
       - name: Generate Daily AI JSON + Article Pages
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SITE_ORIGIN: https://ptdtoday.com
+          KNOWLEDGE_DIR: knowledge
+          HISTORY_DIR: history
+          BRIEFS_DIR: briefs
+          ARTICLES_DIR: articles
+          MAP_SIGNAL_LIMIT: "50"
         run: npm run generate:ai
 
-      # 3) Rebuild historical archive, 7/30-day trends and AI outlook
+      # ----------------------------------------------------------------------
+      # 4. Give entities automatic lifecycle behavior
+      # ----------------------------------------------------------------------
+
+      - name: Update Entity Lifecycle + Time Machine Snapshot
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/update_entity_lifecycle.js
+
+      # ----------------------------------------------------------------------
+      # 5. Rebuild historical analytics from accumulated intelligence
+      # ----------------------------------------------------------------------
+
       - name: Rebuild Historical Intelligence
         run: node scripts/backfill_history_from_articles.js
 
-      # 4) Generate Media (YouTube → AI summaries + Media pages)
+      # ----------------------------------------------------------------------
+      # 6. Generate Media intelligence
+      # ----------------------------------------------------------------------
+
       - name: Generate Media (YouTube → AI summaries)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -123,16 +157,42 @@ jobs:
             https://www.youtube.com/@AmazonWebServices
         run: node scripts/generate_media.js
 
-      # 5) Verify historical files were generated
-      - name: Verify Market Intelligence Files
+      # ----------------------------------------------------------------------
+      # 7. Validate every critical output before committing
+      # ----------------------------------------------------------------------
+
+      - name: Verify Briefing and Historical Files
         run: |
+          test -f briefs/daily-ai.json
+          test -f briefs/map-signals.json
           test -f briefs/trends.json
           test -f briefs/outlook.json
-          test -f briefs/backfill-report.json
           test -d history
-          echo "Historical intelligence files are ready."
+          echo "Briefing and historical intelligence files are ready."
 
-      # 6) Commit all generated files
+      - name: Verify Knowledge Graph Files
+        run: |
+          test -f knowledge/developments.json
+          test -f knowledge/entities.json
+          test -f knowledge/relationships.json
+          test -f knowledge/timeline-events.json
+          test -f knowledge/knowledge-diff.json
+          echo "Core knowledge graph files are ready."
+
+      - name: Verify Entity Lifecycle and Snapshot
+        run: |
+          TODAY_UTC="$(date -u +%F)"
+
+          test -f knowledge/entity-lifecycle.json
+          test -f "knowledge/snapshots/${TODAY_UTC}.json"
+
+          echo "Entity lifecycle and Time Machine snapshot are ready."
+          echo "Snapshot: knowledge/snapshots/${TODAY_UTC}.json"
+
+      # ----------------------------------------------------------------------
+      # 8. Commit all automatically generated knowledge
+      # ----------------------------------------------------------------------
+
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions"
@@ -145,5 +205,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update PTD Today feeds and market intelligence"
+          git commit -m "Update PTD Today living intelligence"
           git push origin main
