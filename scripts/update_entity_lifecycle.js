@@ -5,27 +5,31 @@
 // -------
 // Gives PTDToday's knowledge graph temporal behavior.
 //
-// The script reads:
+// Reads:
 //   - knowledge/entities.json
 //   - knowledge/developments.json
 //   - knowledge/relationships.json
 //
-// It writes:
-//   - knowledge/entities.json                 (enriched in place)
-//   - knowledge/entity-lifecycle.json         (summary and ranked states)
-//   - knowledge/snapshots/YYYY-MM-DD.json     (daily Time Machine snapshot)
+// Writes:
+//   - knowledge/entities.json
+//   - knowledge/entity-lifecycle.json
+//   - knowledge/snapshots/YYYY-MM-DD.json
 //
 // IMPORTANT
 // ---------
 // - Nothing is deleted.
 // - Dormant, historical, merged, and deprecated entities remain available.
-// - Statuses are calculated from evidence already stored in PTDToday.
-// - The scoring rules are deterministic and transparent.
+// - New entities are not called "accelerating" until enough historical
+//   coverage exists for a meaningful comparison.
 // - Entity-type-specific decay prevents countries, standards, and mature
-//   technologies from disappearing simply because they were quiet recently.
+//   technologies from disappearing merely because they were quiet recently.
 
 import fs from "fs";
 import path from "path";
+
+/* -------------------------------------------------------------------------- */
+/* Configuration                                                              */
+/* -------------------------------------------------------------------------- */
 
 const KNOWLEDGE_DIR = process.env.KNOWLEDGE_DIR || "knowledge";
 const ENTITIES_PATH = path.join(KNOWLEDGE_DIR, "entities.json");
@@ -37,6 +41,13 @@ const SNAPSHOTS_DIR = path.join(KNOWLEDGE_DIR, "snapshots");
 const NOW = new Date();
 const NOW_ISO = NOW.toISOString();
 const TODAY = NOW_ISO.slice(0, 10);
+
+/*
+ * A true 30-day-vs-previous-30-day momentum comparison requires sufficient
+ * historical coverage. Until then, momentum is null and explicitly reported
+ * as "insufficient_history".
+ */
+const MIN_MOMENTUM_HISTORY_DAYS = 45;
 
 const HALF_LIFE_DAYS = {
   Country: Number.POSITIVE_INFINITY,
@@ -59,6 +70,10 @@ const HALF_LIFE_DAYS = {
 
 const DEFAULT_HALF_LIFE_DAYS = 240;
 
+/* -------------------------------------------------------------------------- */
+/* Filesystem helpers                                                         */
+/* -------------------------------------------------------------------------- */
+
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
@@ -67,6 +82,7 @@ function readJson(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Required file not found: ${filePath}`);
   }
+
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
@@ -74,6 +90,10 @@ function writeJson(filePath, value) {
   ensureDir(path.dirname(filePath));
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
 }
+
+/* -------------------------------------------------------------------------- */
+/* Date and numeric helpers                                                   */
+/* -------------------------------------------------------------------------- */
 
 function toDate(value) {
   const date = new Date(value);
@@ -83,8 +103,13 @@ function toDate(value) {
 function daysBetween(older, newer = NOW) {
   const oldDate = toDate(older);
   const newDate = toDate(newer);
+
   if (!oldDate || !newDate) return Number.POSITIVE_INFINITY;
-  return Math.max(0, (newDate.getTime() - oldDate.getTime()) / 86_400_000);
+
+  return Math.max(
+    0,
+    (newDate.getTime() - oldDate.getTime()) / 86_400_000
+  );
 }
 
 function clamp(value, min, max) {
@@ -98,10 +123,19 @@ function round(value, digits = 1) {
   return Math.round(Number(value) * multiplier) / multiplier;
 }
 
+function unique(values) {
+  return [...new Set((values || []).filter(Boolean))];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Index construction                                                         */
+/* -------------------------------------------------------------------------- */
+
 function buildIndexes(developmentsPayload, relationshipsPayload) {
   const developments = Array.isArray(developmentsPayload?.developments)
     ? developmentsPayload.developments
     : [];
+
   const relationships = Array.isArray(relationshipsPayload?.relationships)
     ? relationshipsPayload.relationships
     : [];
@@ -109,9 +143,25 @@ function buildIndexes(developmentsPayload, relationshipsPayload) {
   const developmentsByEntity = new Map();
   const relationshipsByEntity = new Map();
 
+  let earliestDevelopmentAt = null;
+  let latestDevelopmentAt = null;
+
   for (const development of developments) {
+    const createdAt = toDate(development.created_at);
+
+    if (createdAt) {
+      if (!earliestDevelopmentAt || createdAt < earliestDevelopmentAt) {
+        earliestDevelopmentAt = createdAt;
+      }
+
+      if (!latestDevelopmentAt || createdAt > latestDevelopmentAt) {
+        latestDevelopmentAt = createdAt;
+      }
+    }
+
     for (const entity of development.entities || []) {
       if (!entity?.entity_id) continue;
+
       const list = developmentsByEntity.get(entity.entity_id) || [];
       list.push(development);
       developmentsByEntity.set(entity.entity_id, list);
@@ -119,22 +169,53 @@ function buildIndexes(developmentsPayload, relationshipsPayload) {
   }
 
   for (const relationship of relationships) {
-    for (const entityId of [relationship?.from_entity_id, relationship?.to_entity_id]) {
+    for (const entityId of [
+      relationship?.from_entity_id,
+      relationship?.to_entity_id
+    ]) {
       if (!entityId) continue;
+
       const list = relationshipsByEntity.get(entityId) || [];
       list.push(relationship);
       relationshipsByEntity.set(entityId, list);
     }
   }
 
-  return { developmentsByEntity, relationshipsByEntity };
+  const historyCoverageDays =
+    earliestDevelopmentAt && latestDevelopmentAt
+      ? Math.max(
+          1,
+          Math.floor(
+            (latestDevelopmentAt.getTime() -
+              earliestDevelopmentAt.getTime()) /
+              86_400_000
+          ) + 1
+        )
+      : 0;
+
+  return {
+    developments,
+    relationships,
+    developmentsByEntity,
+    relationshipsByEntity,
+    earliestDevelopmentAt:
+      earliestDevelopmentAt?.toISOString() || null,
+    latestDevelopmentAt:
+      latestDevelopmentAt?.toISOString() || null,
+    historyCoverageDays
+  };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Scoring                                                                    */
+/* -------------------------------------------------------------------------- */
 
 function recencyScore(entity) {
   if (entity.type === "Country") return 100;
 
   const daysSinceLastSeen = daysBetween(entity.last_seen_at);
-  const halfLife = HALF_LIFE_DAYS[entity.type] ?? DEFAULT_HALF_LIFE_DAYS;
+  const halfLife =
+    HALF_LIFE_DAYS[entity.type] ?? DEFAULT_HALF_LIFE_DAYS;
 
   if (!Number.isFinite(daysSinceLastSeen)) return 0;
   if (!Number.isFinite(halfLife)) return 100;
@@ -153,37 +234,66 @@ function developmentActivity(entityId, indexes) {
   let previous30 = 0;
   let last90 = 0;
   let totalImportance = 0;
+
   const countries = new Set();
   const categories = new Set();
+  const dates = new Set();
 
   for (const development of developments) {
     const age = daysBetween(development.created_at);
+
     if (age <= 30) last30 += 1;
     else if (age <= 60) previous30 += 1;
+
     if (age <= 90) last90 += 1;
 
     totalImportance += Number(development.importance_score || 0);
 
-    for (const country of development.countries || []) countries.add(country);
-    if (development.category) categories.add(development.category);
+    if (development.date_utc) {
+      dates.add(development.date_utc);
+    }
+
+    for (const country of development.countries || []) {
+      countries.add(country);
+    }
+
+    if (development.category) {
+      categories.add(development.category);
+    }
   }
 
   const averageImportance = developments.length
     ? totalImportance / developments.length
     : 0;
 
-  const velocity = previous30 > 0
-    ? last30 / previous30
-    : last30 > 0
-      ? 2
-      : 0;
+  const hasEnoughHistory =
+    indexes.historyCoverageDays >= MIN_MOMENTUM_HISTORY_DAYS;
+
+  let velocity = null;
+  let momentumStatus = "insufficient_history";
+
+  if (hasEnoughHistory && previous30 > 0) {
+    velocity = last30 / previous30;
+    momentumStatus = "measured";
+  } else if (hasEnoughHistory && previous30 === 0 && last30 === 0) {
+    velocity = 1;
+    momentumStatus = "measured";
+  } else if (hasEnoughHistory && previous30 === 0 && last30 > 0) {
+    /*
+     * Activity exists only in the recent window. We mark it as a new signal,
+     * not mathematically "accelerating", because there is no previous baseline.
+     */
+    momentumStatus = "new_activity_without_baseline";
+  }
 
   return {
     development_count: developments.length,
+    active_date_count: dates.size,
     developments_last_30_days: last30,
     developments_previous_30_days: previous30,
     developments_last_90_days: last90,
-    velocity: round(velocity, 2),
+    velocity: velocity === null ? null : round(velocity, 2),
+    momentum_status: momentumStatus,
     average_importance: round(averageImportance, 1),
     country_count: countries.size,
     category_count: categories.size,
@@ -194,10 +304,12 @@ function developmentActivity(entityId, indexes) {
 
 function relationshipActivity(entityId, indexes) {
   const relationships = indexes.relationshipsByEntity.get(entityId) || [];
+
   const activeRelationships = relationships.filter(
-    (relationship) => !["merged", "deprecated", "inactive"].includes(
-      String(relationship.status || "active").toLowerCase()
-    )
+    (relationship) =>
+      !["merged", "deprecated", "inactive"].includes(
+        String(relationship.status || "active").toLowerCase()
+      )
   );
 
   const connectedEntityIds = new Set();
@@ -226,9 +338,25 @@ function relationshipActivity(entityId, indexes) {
   };
 }
 
+function calculateMomentum(activity) {
+  if (activity.momentum_status !== "measured") {
+    return null;
+  }
+
+  const velocity = Number(activity.velocity);
+
+  if (!Number.isFinite(velocity)) return null;
+
+  return round(
+    clamp((velocity - 1) * 50, -100, 100),
+    1
+  );
+}
+
 function calculateScores(entity, indexes) {
   const activity = developmentActivity(entity.entity_id, indexes);
   const relationship = relationshipActivity(entity.entity_id, indexes);
+
   const recency = recencyScore(entity);
 
   const activityScore = clamp(
@@ -248,7 +376,8 @@ function calculateScores(entity, indexes) {
   );
 
   const geographicScore = clamp(
-    activity.country_count * 18 + activity.category_count * 8,
+    activity.country_count * 18 +
+      activity.category_count * 8,
     0,
     100
   );
@@ -264,8 +393,6 @@ function calculateScores(entity, indexes) {
     1
   );
 
-  const momentum = round(clamp((activity.velocity - 1) * 50, -100, 100), 1);
-
   return {
     overall,
     recency: round(recency, 1),
@@ -273,35 +400,68 @@ function calculateScores(entity, indexes) {
     relationships: round(relationshipScore, 1),
     geography: round(geographicScore, 1),
     importance: round(importanceScore, 1),
-    momentum,
-    metrics: { ...activity, ...relationship }
+    momentum: calculateMomentum(activity),
+    momentumStatus: activity.momentum_status,
+    metrics: {
+      ...activity,
+      ...relationship
+    }
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Lifecycle status                                                           */
+/* -------------------------------------------------------------------------- */
+
 function calculateLifecycleStatus(entity, scores) {
   const existingStatus = String(entity.status || "").toLowerCase();
+
   if (existingStatus === "merged") return "merged";
   if (existingStatus === "deprecated") return "deprecated";
+
   if (entity.type === "Country") return "active";
 
   const ageDays = daysBetween(entity.first_seen_at);
   const inactiveDays = daysBetween(entity.last_seen_at);
-  const velocity = scores.metrics.velocity;
   const recent = scores.metrics.developments_last_30_days;
 
   if (inactiveDays > 730) return "historical";
 
-  if (ageDays <= 45 && recent <= 3 && scores.overall < 70) {
-    return "emerging";
-  }
-
-  if (recent >= 2 && velocity >= 1.5 && scores.overall >= 55) {
+  /*
+   * An entity can accelerate only when momentum is genuinely measured.
+   */
+  if (
+    scores.momentumStatus === "measured" &&
+    scores.momentum !== null &&
+    scores.momentum >= 20 &&
+    recent >= 2 &&
+    scores.overall >= 55
+  ) {
     return "accelerating";
   }
 
-  if (scores.momentum <= -35 && inactiveDays > 30) return "cooling";
-  if (scores.overall >= 58) return "active";
-  if (scores.overall >= 42) return "stable";
+  /*
+   * During cold start, recently discovered entities remain emerging rather
+   * than being incorrectly promoted to accelerating.
+   */
+  if (
+    ageDays <= 60 &&
+    scores.metrics.development_count <= 4
+  ) {
+    return "emerging";
+  }
+
+  if (
+    scores.momentumStatus === "measured" &&
+    scores.momentum !== null &&
+    scores.momentum <= -35 &&
+    inactiveDays > 30
+  ) {
+    return "cooling";
+  }
+
+  if (scores.overall >= 62) return "active";
+  if (scores.overall >= 45) return "stable";
   if (scores.overall >= 25) return "cooling";
   return "dormant";
 }
@@ -312,31 +472,47 @@ function lifecycleReason(status, scores, entity) {
 
   switch (status) {
     case "emerging":
-      return "Recently discovered and still building evidence and relationships.";
+      return scores.momentumStatus === "insufficient_history"
+        ? "Recently discovered; historical coverage is not yet sufficient to measure acceleration."
+        : "Recently discovered and still building evidence and relationships.";
+
     case "accelerating":
-      return `Recent activity is expanding, with ${recent} development(s) in the last 30 days.`;
+      return `Measured recent activity is expanding, with ${recent} development(s) in the last 30 days.`;
+
     case "active":
       return "Maintains strong current relevance across developments and relationships.";
+
     case "stable":
-      return "Remains relevant, but recent activity is broadly steady.";
+      return "Remains relevant, while current activity is broadly steady.";
+
     case "cooling":
-      return "Recent activity or momentum has weakened relative to its earlier state.";
+      return "Recent activity or measured momentum has weakened relative to its earlier state.";
+
     case "dormant":
       return `Currently has limited recent activity; last meaningful signal was approximately ${inactiveDays} day(s) ago.`;
+
     case "historical":
       return "Retained for historical and Time Machine exploration.";
+
     case "merged":
       return "The entity has been merged into or succeeded by another entity.";
+
     case "deprecated":
       return "The entity record is preserved but should no longer be used for new relationships.";
+
     default:
       return "Lifecycle status calculated from current PTDToday evidence.";
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Entity enrichment                                                          */
+/* -------------------------------------------------------------------------- */
+
 function enrichEntity(entity, indexes) {
   const scores = calculateScores(entity, indexes);
   const lifecycleStatus = calculateLifecycleStatus(entity, scores);
+
   const priorLifecycle = entity.lifecycle || {};
   const statusChanged = priorLifecycle.status !== lifecycleStatus;
 
@@ -346,20 +522,25 @@ function enrichEntity(entity, indexes) {
       status: lifecycleStatus,
       reason: lifecycleReason(lifecycleStatus, scores, entity),
       calculated_at: NOW_ISO,
-      status_changed_at: statusChanged
-        ? NOW_ISO
-        : priorLifecycle.status_changed_at || NOW_ISO,
-      previous_status: statusChanged
-        ? priorLifecycle.status || null
-        : priorLifecycle.previous_status || null,
-      active_view: !["dormant", "historical", "merged", "deprecated"].includes(
-        lifecycleStatus
-      ),
-      successor_entity_id: entity.successor_entity_id || null
+      status_changed_at:
+        statusChanged
+          ? NOW_ISO
+          : priorLifecycle.status_changed_at || NOW_ISO,
+      previous_status:
+        statusChanged
+          ? priorLifecycle.status || null
+          : priorLifecycle.previous_status || null,
+      active_view:
+        !["dormant", "historical", "merged", "deprecated"].includes(
+          lifecycleStatus
+        ),
+      successor_entity_id:
+        entity.successor_entity_id || null
     },
     scores: {
       importance: scores.overall,
       momentum: scores.momentum,
+      momentum_status: scores.momentumStatus,
       recency: scores.recency,
       activity: scores.activity,
       relationship_density: scores.relationships,
@@ -371,40 +552,53 @@ function enrichEntity(entity, indexes) {
   };
 }
 
-function buildLifecycleSummary(entities) {
+/* -------------------------------------------------------------------------- */
+/* Output builders                                                            */
+/* -------------------------------------------------------------------------- */
+
+function buildLifecycleSummary(entities, indexes) {
   const byStatus = {};
   const byType = {};
 
   for (const entity of entities) {
     const status = entity.lifecycle?.status || "unknown";
     const type = entity.type || "Unknown";
+
     byStatus[status] = (byStatus[status] || 0) + 1;
     byType[type] = (byType[type] || 0) + 1;
   }
+
+  const compactEntity = (entity) => ({
+    entity_id: entity.entity_id,
+    slug: entity.slug,
+    name: entity.name,
+    type: entity.type,
+    lifecycle_status: entity.lifecycle?.status,
+    importance_score: entity.scores?.importance,
+    momentum_score: entity.scores?.momentum,
+    momentum_status: entity.scores?.momentum_status,
+    last_seen_at: entity.last_seen_at
+  });
 
   const rank = (filter, sorter) =>
     entities
       .filter(filter)
       .sort(sorter)
       .slice(0, 50)
-      .map((entity) => ({
-        entity_id: entity.entity_id,
-        slug: entity.slug,
-        name: entity.name,
-        type: entity.type,
-        lifecycle_status: entity.lifecycle?.status,
-        importance_score: entity.scores?.importance,
-        momentum_score: entity.scores?.momentum,
-        last_seen_at: entity.last_seen_at
-      }));
+      .map(compactEntity);
 
   return {
-    schema_version: "1.0",
+    schema_version: "1.1-cold-start-aware",
     generated_at: NOW_ISO,
     date_utc: TODAY,
     methodology: {
       summary:
         "Entity lifecycle status is calculated from recency, development activity, relationship density, geographic reach, linked-development importance, and entity-type-specific time decay.",
+      momentum:
+        `Momentum remains null with status "insufficient_history" until at least ${MIN_MOMENTUM_HISTORY_DAYS} days of knowledge history exist. This prevents new entities from being falsely classified as accelerating.`,
+      history_coverage_days: indexes.historyCoverageDays,
+      earliest_development_at: indexes.earliestDevelopmentAt,
+      latest_development_at: indexes.latestDevelopmentAt,
       statuses: [
         "emerging",
         "accelerating",
@@ -421,27 +615,62 @@ function buildLifecycleSummary(entities) {
     },
     totals: {
       entity_count: entities.length,
-      active_view_count: entities.filter((entity) => entity.lifecycle?.active_view).length,
-      hidden_from_active_view_count: entities.filter((entity) => !entity.lifecycle?.active_view).length
+      active_view_count: entities.filter(
+        (entity) => entity.lifecycle?.active_view
+      ).length,
+      hidden_from_active_view_count: entities.filter(
+        (entity) => !entity.lifecycle?.active_view
+      ).length,
+      measured_momentum_count: entities.filter(
+        (entity) => entity.scores?.momentum_status === "measured"
+      ).length,
+      insufficient_history_count: entities.filter(
+        (entity) =>
+          entity.scores?.momentum_status === "insufficient_history"
+      ).length
     },
     by_status: byStatus,
     by_type: byType,
     rankings: {
       most_important: rank(
         () => true,
-        (a, b) => Number(b.scores?.importance || 0) - Number(a.scores?.importance || 0)
+        (a, b) =>
+          Number(b.scores?.importance || 0) -
+          Number(a.scores?.importance || 0)
       ),
+
       fastest_accelerating: rank(
-        (entity) => Number(entity.scores?.momentum || 0) > 0,
-        (a, b) => Number(b.scores?.momentum || 0) - Number(a.scores?.momentum || 0)
+        (entity) =>
+          entity.scores?.momentum_status === "measured" &&
+          Number(entity.scores?.momentum || 0) > 0,
+        (a, b) =>
+          Number(b.scores?.momentum || 0) -
+          Number(a.scores?.momentum || 0)
       ),
+
+      emerging: rank(
+        (entity) => entity.lifecycle?.status === "emerging",
+        (a, b) =>
+          Number(b.scores?.importance || 0) -
+          Number(a.scores?.importance || 0)
+      ),
+
       cooling: rank(
         (entity) => entity.lifecycle?.status === "cooling",
-        (a, b) => Number(a.scores?.momentum || 0) - Number(b.scores?.momentum || 0)
+        (a, b) =>
+          Number(a.scores?.momentum || 0) -
+          Number(b.scores?.momentum || 0)
       ),
+
       dormant: rank(
-        (entity) => ["dormant", "historical"].includes(entity.lifecycle?.status),
-        (a, b) => String(b.last_seen_at || "").localeCompare(String(a.last_seen_at || ""))
+        (entity) =>
+          ["dormant", "historical"].includes(
+            entity.lifecycle?.status
+          ),
+        (a, b) =>
+          String(b.last_seen_at || "").localeCompare(
+            String(a.last_seen_at || "")
+          )
       )
     }
   };
@@ -449,11 +678,13 @@ function buildLifecycleSummary(entities) {
 
 function buildSnapshot(entities, lifecycleSummary) {
   return {
-    schema_version: "1.0",
+    schema_version: "1.1-cold-start-aware",
     snapshot_date_utc: TODAY,
     generated_at: NOW_ISO,
     entity_count: entities.length,
     lifecycle_totals: lifecycleSummary.by_status,
+    history_coverage_days:
+      lifecycleSummary.methodology.history_coverage_days,
     entities: entities.map((entity) => ({
       entity_id: entity.entity_id,
       slug: entity.slug,
@@ -463,15 +694,21 @@ function buildSnapshot(entities, lifecycleSummary) {
       active_view: entity.lifecycle?.active_view,
       importance_score: entity.scores?.importance,
       momentum_score: entity.scores?.momentum,
+      momentum_status: entity.scores?.momentum_status,
       relationship_count: entity.metrics?.relationship_count || 0,
       development_count: entity.metrics?.development_count || 0,
       country_count: entity.metrics?.country_count || 0,
       first_seen_at: entity.first_seen_at,
       last_seen_at: entity.last_seen_at,
-      successor_entity_id: entity.lifecycle?.successor_entity_id || null
+      successor_entity_id:
+        entity.lifecycle?.successor_entity_id || null
     }))
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Main                                                                       */
+/* -------------------------------------------------------------------------- */
 
 function main() {
   console.log("Updating PTD Today entity lifecycle...");
@@ -484,29 +721,45 @@ function main() {
     ? entitiesPayload.entities
     : [];
 
-  const indexes = buildIndexes(developmentsPayload, relationshipsPayload);
+  const indexes = buildIndexes(
+    developmentsPayload,
+    relationshipsPayload
+  );
 
   const enrichedEntities = entities
     .map((entity) => enrichEntity(entity, indexes))
     .sort((a, b) =>
-      Number(b.scores?.importance || 0) - Number(a.scores?.importance || 0)
+      Number(b.scores?.importance || 0) -
+      Number(a.scores?.importance || 0)
     );
 
-  const lifecycleSummary = buildLifecycleSummary(enrichedEntities);
-  const snapshot = buildSnapshot(enrichedEntities, lifecycleSummary);
+  const lifecycleSummary = buildLifecycleSummary(
+    enrichedEntities,
+    indexes
+  );
+
+  const snapshot = buildSnapshot(
+    enrichedEntities,
+    lifecycleSummary
+  );
 
   writeJson(ENTITIES_PATH, {
     ...entitiesPayload,
-    schema_version: "1.1-lifecycle",
+    schema_version: "1.3-lifecycle-cold-start-aware",
     generated_at: NOW_ISO,
     entity_count: enrichedEntities.length,
     entities: enrichedEntities
   });
 
   writeJson(LIFECYCLE_PATH, lifecycleSummary);
-  writeJson(path.join(SNAPSHOTS_DIR, `${TODAY}.json`), snapshot);
+
+  writeJson(
+    path.join(SNAPSHOTS_DIR, `${TODAY}.json`),
+    snapshot
+  );
 
   console.log("Entity lifecycle update complete.");
+  console.log(`- History coverage: ${indexes.historyCoverageDays} day(s)`);
   console.log(`- ${ENTITIES_PATH}`);
   console.log(`- ${LIFECYCLE_PATH}`);
   console.log(`- ${path.join(SNAPSHOTS_DIR, `${TODAY}.json`)}`);
