@@ -74,7 +74,16 @@ jobs:
         run: npm run generate:ai
 
       # ----------------------------------------------------------------------
-      # 4. Give entities automatic lifecycle behavior
+      # 4. Resolve duplicate entities and repair graph references
+      # ----------------------------------------------------------------------
+
+      - name: Resolve Entities + Repair Knowledge Graph
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/resolve_entities.js
+
+      # ----------------------------------------------------------------------
+      # 5. Calculate lifecycle after graph resolution
       # ----------------------------------------------------------------------
 
       - name: Update Entity Lifecycle + Time Machine Snapshot
@@ -83,14 +92,14 @@ jobs:
         run: node scripts/update_entity_lifecycle.js
 
       # ----------------------------------------------------------------------
-      # 5. Rebuild historical analytics from accumulated intelligence
+      # 6. Rebuild historical analytics from accumulated intelligence
       # ----------------------------------------------------------------------
 
       - name: Rebuild Historical Intelligence
         run: node scripts/backfill_history_from_articles.js
 
       # ----------------------------------------------------------------------
-      # 6. Generate Media intelligence
+      # 7. Generate Media intelligence
       # ----------------------------------------------------------------------
 
       - name: Generate Media (YouTube → AI summaries)
@@ -158,7 +167,7 @@ jobs:
         run: node scripts/generate_media.js
 
       # ----------------------------------------------------------------------
-      # 7. Validate every critical output before committing
+      # 8. Validate every critical output before committing
       # ----------------------------------------------------------------------
 
       - name: Verify Briefing and Historical Files
@@ -177,7 +186,8 @@ jobs:
           test -f knowledge/relationships.json
           test -f knowledge/timeline-events.json
           test -f knowledge/knowledge-diff.json
-          echo "Core knowledge graph files are ready."
+          test -f knowledge/entity-resolution-report.json
+          echo "Core knowledge graph and resolution report are ready."
 
       - name: Verify Entity Lifecycle and Snapshot
         run: |
@@ -190,7 +200,7 @@ jobs:
           echo "Snapshot: knowledge/snapshots/${TODAY_UTC}.json"
 
       # ----------------------------------------------------------------------
-      # 8. Commit all automatically generated knowledge
+      # 9. Commit all automatically generated knowledge
       # ----------------------------------------------------------------------
 
       - name: Commit & push if changed
