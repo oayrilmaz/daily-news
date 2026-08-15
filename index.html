@@ -412,6 +412,79 @@
     }
 
 
+    /* Country-related intelligence shown directly with the map */
+    .mapRelated{
+      margin-top:14px;
+      border:1px solid var(--rule);
+      border-radius:14px;
+      background:#fff;
+      overflow:hidden;
+    }
+    .mapRelatedHead{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      padding:14px 15px;
+      border-bottom:1px solid var(--rule);
+      background:rgba(0,0,0,.012);
+    }
+    .mapRelatedTitle{
+      margin:0 0 3px;
+      font-size:19px;
+      line-height:1.2;
+      font-weight:900;
+    }
+    .mapRelatedSub{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.4;
+    }
+    .mapRelatedList{
+      display:grid;
+      grid-template-columns:1fr;
+    }
+    .mapRelatedPost{
+      padding:15px;
+      border-bottom:1px solid var(--soft);
+    }
+    .mapRelatedPost:last-child{border-bottom:none}
+    .mapRelatedMeta{
+      margin:0 0 6px;
+      color:var(--muted);
+      font-size:11px;
+      font-weight:800;
+      letter-spacing:.1em;
+      text-transform:uppercase;
+    }
+    .mapRelatedPostTitle{
+      margin:0 0 8px;
+      font-size:22px;
+      line-height:1.18;
+      font-weight:900;
+    }
+    .mapRelatedPostText{
+      margin:0 0 11px;
+      color:rgba(0,0,0,.80);
+      font-size:15px;
+      line-height:1.55;
+    }
+    .mapRelatedActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .mapRelatedEmpty{
+      padding:16px;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.5;
+    }
+
+
     /* Market Pulse: 24h / 7d / 30d / AI Outlook */
     .marketPulse{
       margin:0 0 24px;
@@ -884,6 +957,20 @@
             </div>
           </aside>
         </div>
+
+        <section class="mapRelated" id="mapRelated" aria-live="polite">
+          <div class="mapRelatedHead">
+            <div>
+              <h3 class="mapRelatedTitle" id="mapRelatedTitle">Related Intelligence</h3>
+              <p class="mapRelatedSub" id="mapRelatedSub">
+                Select a country and matching intelligence will appear here automatically.
+              </p>
+            </div>
+          </div>
+          <div class="mapRelatedList" id="mapRelatedList">
+            <div class="mapRelatedEmpty">Choose a country to show its related intelligence.</div>
+          </div>
+        </section>
 
         <div class="intelMapStatus" id="intelMapStatus">
           Loading country boundaries…
@@ -1744,6 +1831,17 @@
       }
 
       applyMapSelectionToBriefing();
+
+      if(IntelligenceMap.selectedCountry && openAccordion){
+        requestAnimationFrame(()=>{
+          setTimeout(()=>{
+            const section = document.querySelector(".intelMapSection");
+            if(section){
+              section.scrollIntoView({behavior:"smooth",block:"start"});
+            }
+          },160);
+        });
+      }
     }
 
     function currentMapShareUrl(){
@@ -1825,6 +1923,103 @@
         : [];
 
       return filterItemsForMapSelection(allItems);
+    }
+
+    function briefingItemsForCurrentMapSelection(){
+      const allItems = Array.isArray(IntelligenceMap.briefingPayload?.items)
+        ? IntelligenceMap.briefingPayload.items
+        : [];
+
+      return filterItemsForMapSelection(allItems);
+    }
+
+    async function shareMapRelatedArticle(articleId){
+      const items = Array.isArray(IntelligenceMap.briefingPayload?.items)
+        ? IntelligenceMap.briefingPayload.items
+        : [];
+      const item = items.find(entry=>(entry.id || "").toString() === articleId) || {};
+      const url = articlePageUrl(articleId);
+      const title = item.title || `${IntelligenceMap.selectedCountry || "Global"} Intelligence | PTD Today`;
+      const body = (item.lede || item.summary || item.body || "").toString().trim();
+      const text = body.slice(0,220);
+      await shareLink(title,text,url);
+    }
+
+    function renderMapRelatedIntelligence(){
+      const container = $("mapRelatedList");
+      const title = $("mapRelatedTitle");
+      const sub = $("mapRelatedSub");
+      if(!container)return;
+
+      const country = IntelligenceMap.selectedCountry;
+      const category = IntelligenceMap.category || "All";
+      const items = briefingItemsForCurrentMapSelection();
+
+      if(title){
+        title.textContent = country
+          ? `${country} — Related Intelligence`
+          : "Global Related Intelligence";
+      }
+
+      if(sub){
+        const categoryText = category !== "All" ? ` • ${category}` : "";
+        sub.textContent = country
+          ? `${items.length} matching Daily Intelligence post${items.length === 1 ? "" : "s"}${categoryText}.`
+          : "Select a country and matching intelligence will appear here automatically.";
+      }
+
+      if(!country){
+        container.innerHTML =
+          '<div class="mapRelatedEmpty">Choose a country to show its related intelligence.</div>';
+        return;
+      }
+
+      if(!items.length){
+        container.innerHTML = `
+          <div class="mapRelatedEmpty">
+            No full Daily Intelligence post currently matches ${escapeHtml(country)}
+            ${category !== "All" ? ` in ${escapeHtml(category)}` : ""}.
+            The map may still show compact rolling signals from the 50-signal dataset.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = items.slice(0,5).map(item=>{
+        const id = (item.id || "").toString().trim();
+        const meta = [
+          item.category || "Brief",
+          item.region || "Global",
+          item.created_at ? fmtUtc(item.created_at) : ""
+        ].filter(Boolean).join(" • ");
+
+        const body = (item.lede || item.summary || item.body || "").toString().trim();
+        const preview = body.length > 520 ? `${body.slice(0,520).trim()}…` : body;
+
+        return `
+          <article class="mapRelatedPost">
+            <div class="mapRelatedMeta">${escapeHtml(meta)}</div>
+            <h4 class="mapRelatedPostTitle">${escapeHtml(item.title || "Untitled")}</h4>
+            ${preview ? `<p class="mapRelatedPostText">${escapeHtml(preview)}</p>` : ""}
+            <div class="mapRelatedActions">
+              ${id ? `
+                <a
+                  class="btnMini primary"
+                  href="${escapeHtml(articlePageUrl(id))}"
+                  target="_blank"
+                  rel="noopener"
+                >Open Full Intelligence</a>
+
+                <button
+                  class="btnMini"
+                  type="button"
+                  onclick="shareMapRelatedArticle('${escapeHtml(id)}')"
+                >Share Post</button>
+              ` : ""}
+            </div>
+          </article>
+        `;
+      }).join("");
     }
 
     function mapActivityLevel(count){
@@ -1923,6 +2118,8 @@
           ? `${IntelligenceMap.selectedCountry} selected • ${items.length} matching signal${items.length === 1 ? "" : "s"}`
           : `${items.length} signal${items.length === 1 ? "" : "s"} shown globally`;
       }
+
+      renderMapRelatedIntelligence();
     }
 
     function applyMapSelectionToBriefing(){
@@ -2077,6 +2274,17 @@
 
         syncMapFilterButtons();
         applyMapSelectionToBriefing();
+
+        if(IntelligenceMap.selectedCountry){
+          requestAnimationFrame(()=>{
+            setTimeout(()=>{
+              const section = document.querySelector(".intelMapSection");
+              if(section){
+                section.scrollIntoView({behavior:"smooth",block:"start"});
+              }
+            },180);
+          });
+        }
       }catch(error){
         console.error("Could not initialize global map:",error);
 
