@@ -1167,7 +1167,7 @@
       </div>
     </details>
 
-    <div class="ptdShareOverlay" id="ptdShareOverlay" aria-hidden="true">
+    <div class="ptdShareOverlay" id="ptdShareOverlay" aria-hidden="true" hidden>
       <div class="ptdShareSheet" role="dialog" aria-modal="true" aria-labelledby="ptdShareDialogTitle">
         <div class="ptdShareHead">
           <h3 class="ptdShareTitle" id="ptdShareDialogTitle">Share PTD Today</h3>
@@ -2724,117 +2724,42 @@
       }
     }
 
-    const PTDShare = {
-      title:"",
-      text:"",
-      url:"",
-      draft:""
-    };
-
-    function closePtdShareComposer(){
-      const overlay = $("ptdShareOverlay");
-      if(!overlay)return;
-      overlay.classList.remove("show");
-      overlay.setAttribute("aria-hidden","true");
-    }
-
-    function ensurePtdShareComposerBindings(){
-      const overlay = $("ptdShareOverlay");
-      const close = $("ptdShareClose");
-      const copy = $("ptdShareCopy");
-      const linkedIn = $("ptdShareLinkedIn");
-      const native = $("ptdShareNative");
-
-      if(!overlay || overlay.dataset.bound === "1")return;
-      overlay.dataset.bound = "1";
-
-      if(close)close.onclick = closePtdShareComposer;
-
-      overlay.addEventListener("click",(event)=>{
-        if(event.target === overlay)closePtdShareComposer();
-      });
-
-      if(copy){
-        copy.onclick = async ()=>{
-          const current = $("ptdShareText")?.value || PTDShare.draft;
-          const copied = await copyShareDraft(current);
-          copy.textContent = copied ? "Copied ✓" : "Copy Failed";
-          setTimeout(()=>{copy.textContent = "Copy Post";},1400);
-        };
-      }
-
-      if(linkedIn){
-        linkedIn.onclick = async ()=>{
-          const current = $("ptdShareText")?.value || PTDShare.draft;
-          await copyShareDraft(current);
-
-          const linkedInUrl =
-            `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(PTDShare.url)}`;
-
-          window.open(linkedInUrl,"_blank","noopener");
-        };
-      }
-
-      if(native){
-        native.onclick = async ()=>{
-          const current = $("ptdShareText")?.value || PTDShare.draft;
-
-          if(navigator.share){
-            try{
-              await navigator.share({
-                title:PTDShare.title,
-                text:current,
-                url:PTDShare.url
-              });
-              return;
-            }catch(e){
-              if(e && e.name === "AbortError")return;
-            }
-          }
-
-          const copied = await copyShareDraft(current);
-          if(copied){
-            alert("Complete PTD Today post copied to clipboard.");
-          }else{
-            prompt("Copy the PTD Today post:",current);
-          }
-        };
-      }
-    }
-
     async function shareLink(title,text,url,context={}){
       const generated = buildAutomaticSharePost(title,text,url,context);
+      const draft = generated.post;
 
-      PTDShare.title = title || "PTD Today";
-      PTDShare.text = text || "";
-      PTDShare.url = url;
-      PTDShare.draft = generated.post;
+      /*
+        IMPORTANT FOR iPhone / LinkedIn:
+        Use the native Web Share sheet exactly like the older PTD Today article sharing.
+        The URL is already inside `draft`, so we intentionally DO NOT pass `url`
+        as a separate Web Share field. On some iOS/LinkedIn flows, passing a separate
+        URL causes the destination to keep only the link preview and drop the supplied text.
+      */
 
-      ensurePtdShareComposerBindings();
+      // Keep a clipboard backup without interrupting the native share flow.
+      try{
+        await navigator.clipboard.writeText(draft);
+      }catch(e){}
 
-      const textarea = $("ptdShareText");
-      if(textarea)textarea.value = generated.post;
-
-      const overlay = $("ptdShareOverlay");
-      if(overlay){
-        overlay.classList.add("show");
-        overlay.setAttribute("aria-hidden","false");
-
-        requestAnimationFrame(()=>{
-          if(textarea){
-            textarea.focus();
-            textarea.setSelectionRange(0,0);
-          }
-        });
-        return;
+      if(navigator.share){
+        try{
+          await navigator.share({
+            title:title || "PTD Today",
+            text:draft
+          });
+          return;
+        }catch(e){
+          if(e && e.name === "AbortError")return;
+          console.warn("Native share failed:",e);
+        }
       }
 
-      // Fallback if the custom composer cannot render.
-      const copied = await copyShareDraft(generated.post);
-      if(copied){
-        alert("Complete PTD Today post copied to clipboard.");
-      }else{
-        prompt("Copy the PTD Today post:",generated.post);
+      // Desktop / unsupported-browser fallback.
+      try{
+        await navigator.clipboard.writeText(draft);
+        alert("PTD Today post and hashtags copied to your clipboard.");
+      }catch(e){
+        prompt("Copy the PTD Today post:",draft);
       }
     }
 
