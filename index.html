@@ -1,5 +1,7 @@
 
 
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -833,9 +835,14 @@
             </p>
           </div>
 
-          <button class="intelMapReset" id="resetMapFilter" type="button">
-            Show Global Briefing
-          </button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <button class="intelMapReset" id="shareMapView" type="button">
+              Share Map
+            </button>
+            <button class="intelMapReset" id="resetMapFilter" type="button">
+              Show Global Briefing
+            </button>
+          </div>
         </div>
 
         <div class="intelMapFilters" aria-label="Map category filters">
@@ -1611,6 +1618,173 @@
       return name;
     }
 
+    function mapCategoryIsValid(value){
+      const allowed = [
+        "All",
+        "Power Grid",
+        "Substations",
+        "Data Centers",
+        "Renewables",
+        "OEM/EPC",
+        "Markets",
+        "Policy"
+      ];
+      return allowed.includes(value);
+    }
+
+    function readMapStateFromUrl(){
+      const params = new URLSearchParams(window.location.search);
+      const country = normalizeCountryName(params.get("country") || "");
+      const categoryRaw = params.get("category") || "All";
+      const category = mapCategoryIsValid(categoryRaw) ? categoryRaw : "All";
+
+      IntelligenceMap.selectedCountry = country;
+      IntelligenceMap.selectedRegion =
+        MAP_REGION_BY_COUNTRY[country] || "";
+      IntelligenceMap.category = category;
+    }
+
+    function syncMapFilterButtons(){
+      document.querySelectorAll("[data-map-category]").forEach(button=>{
+        button.classList.toggle(
+          "active",
+          (button.getAttribute("data-map-category") || "All") === IntelligenceMap.category
+        );
+      });
+    }
+
+    function updateMapUrl({replace=false}={}){
+      const url = new URL(window.location.href);
+
+      if(IntelligenceMap.selectedCountry){
+        url.searchParams.set("country",IntelligenceMap.selectedCountry);
+      }else{
+        url.searchParams.delete("country");
+      }
+
+      if(IntelligenceMap.category && IntelligenceMap.category !== "All"){
+        url.searchParams.set("category",IntelligenceMap.category);
+      }else{
+        url.searchParams.delete("category");
+      }
+
+      const method = replace ? "replaceState" : "pushState";
+      window.history[method](
+        {
+          ptdMap:true,
+          country:IntelligenceMap.selectedCountry,
+          category:IntelligenceMap.category
+        },
+        "",
+        url.pathname + url.search + url.hash
+      );
+    }
+
+    function openMapAccordion(){
+      const mapAccordion = document.querySelector('details.mainAccordion[data-accordion="map"]');
+      if(!mapAccordion)return;
+
+      document.querySelectorAll("details.mainAccordion").forEach(item=>{
+        if(item !== mapAccordion)item.open = false;
+      });
+
+      mapAccordion.open = true;
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          if(IntelligenceMap.map){
+            IntelligenceMap.map.invalidateSize();
+          }
+        },100);
+      });
+    }
+
+    function findCountryLayer(countryName){
+      if(!IntelligenceMap.geoLayer || !countryName)return null;
+
+      let found = null;
+
+      IntelligenceMap.geoLayer.eachLayer(layer=>{
+        if(found)return;
+        const rawName = layer?.feature?.properties?.name || "";
+        const normalized = normalizeCountryName(rawName);
+        if(normalized === countryName){
+          found = layer;
+        }
+      });
+
+      return found;
+    }
+
+    function focusSelectedCountryOnMap(){
+      if(!IntelligenceMap.map || !IntelligenceMap.selectedCountry)return;
+
+      const layer = findCountryLayer(IntelligenceMap.selectedCountry);
+      if(!layer || typeof layer.getBounds !== "function")return;
+
+      IntelligenceMap.map.fitBounds(
+        layer.getBounds(),
+        {padding:[18,18],maxZoom:4}
+      );
+    }
+
+    function applyMapStateFromUrl({openAccordion=true}={}){
+      readMapStateFromUrl();
+      syncMapFilterButtons();
+
+      if(IntelligenceMap.geoLayer){
+        IntelligenceMap.geoLayer.setStyle(mapCountryStyle);
+      }
+
+      if(IntelligenceMap.selectedCountry){
+        focusSelectedCountryOnMap();
+        if(openAccordion)openMapAccordion();
+      }else if(IntelligenceMap.map){
+        IntelligenceMap.map.setView([20,0],2);
+      }
+
+      applyMapSelectionToBriefing();
+    }
+
+    function currentMapShareUrl(){
+      const url = new URL(window.location.href);
+      url.hash = "";
+
+      if(IntelligenceMap.selectedCountry){
+        url.searchParams.set("country",IntelligenceMap.selectedCountry);
+      }else{
+        url.searchParams.delete("country");
+      }
+
+      if(IntelligenceMap.category && IntelligenceMap.category !== "All"){
+        url.searchParams.set("category",IntelligenceMap.category);
+      }else{
+        url.searchParams.delete("category");
+      }
+
+      return url.toString();
+    }
+
+    async function shareCurrentMapView(){
+      const country = IntelligenceMap.selectedCountry || "Global";
+      const category = IntelligenceMap.category || "All";
+      const items = mapFilteredItems();
+
+      const title = IntelligenceMap.selectedCountry
+        ? `${country} Power Intelligence | PTD Today`
+        : "Global Power Intelligence Map | PTD Today";
+
+      const categoryText = category !== "All"
+        ? ` • ${category}`
+        : "";
+
+      const text = IntelligenceMap.selectedCountry
+        ? `${country}${categoryText}: ${items.length} current intelligence signal${items.length === 1 ? "" : "s"} on PTD Today's Global Power Intelligence Map.`
+        : `Explore PTD Today's Global Power Intelligence Map${categoryText}.`;
+
+      await shareLink(title,text,currentMapShareUrl());
+    }
+
     function itemMatchesMapSelection(item){
       if(
         IntelligenceMap.category !== "All" &&
@@ -1776,6 +1950,9 @@
     function resetMapSelection(){
       IntelligenceMap.selectedCountry = "";
       IntelligenceMap.selectedRegion = "";
+      IntelligenceMap.category = "All";
+
+      syncMapFilterButtons();
 
       if(IntelligenceMap.geoLayer){
         IntelligenceMap.geoLayer.setStyle(mapCountryStyle);
@@ -1785,12 +1962,18 @@
         IntelligenceMap.map.setView([20,0],2);
       }
 
+      updateMapUrl();
       applyMapSelectionToBriefing();
     }
 
     async function initGlobalIntelligenceMap(payload){
       IntelligenceMap.briefingPayload = payload;
       IntelligenceMap.payload = payload;
+
+      // Restore a shareable country/category selection such as:
+      // ?country=Poland&category=Renewables
+      readMapStateFromUrl();
+      syncMapFilterButtons();
 
       try{
         const signalResponse = await fetch(MAP_SIGNALS_URL,{cache:"no-store"});
@@ -1880,13 +2063,20 @@
                   {padding:[18,18],maxZoom:4}
                 );
 
+                updateMapUrl();
                 applyMapSelectionToBriefing();
               }
             });
           }
         }).addTo(IntelligenceMap.map);
 
-        updateMapPanel();
+        if(IntelligenceMap.selectedCountry){
+          focusSelectedCountryOnMap();
+          openMapAccordion();
+        }
+
+        syncMapFilterButtons();
+        applyMapSelectionToBriefing();
       }catch(error){
         console.error("Could not initialize global map:",error);
 
@@ -1912,9 +2102,14 @@
             IntelligenceMap.geoLayer.setStyle(mapCountryStyle);
           }
 
+          updateMapUrl();
           applyMapSelectionToBriefing();
         };
       });
+
+      if($("shareMapView")){
+        $("shareMapView").onclick = shareCurrentMapView;
+      }
 
       if($("resetMapFilter")){
         $("resetMapFilter").onclick = resetMapSelection;
@@ -3032,6 +3227,14 @@
       focusFromHash();
     });
 
+    window.addEventListener("popstate",()=>{
+      stopTts();
+
+      if(IntelligenceMap.briefingPayload){
+        applyMapStateFromUrl({openAccordion:true});
+      }
+    });
+
     if(TTS.supported){
       loadVoices();
       window.speechSynthesis.onvoiceschanged = ()=>loadVoices();
@@ -3042,3 +3245,4 @@
   </script>
 </body>
 </html>
+
