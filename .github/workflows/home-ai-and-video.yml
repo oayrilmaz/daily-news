@@ -1,3 +1,4 @@
+
 name: Home AI + Video (PTD Today)
 
 on:
@@ -357,14 +358,28 @@ jobs:
         run: node scripts/update_entity_lifecycle.js
 
       # ----------------------------------------------------------------------
-      # 6. Rebuild historical analytics from accumulated intelligence
+      # 6. Cosmos Foundation Gate
+      #
+      # Report mode first: detect integrity problems without stopping PTD Today.
+      # Change INTEGRITY_STRICT to "true" only after legacy data repair is complete.
+      # ----------------------------------------------------------------------
+
+      - name: Cosmos Intelligence Integrity Gate
+        env:
+          BRIEFS_DIR: briefs
+          KNOWLEDGE_DIR: knowledge
+          INTEGRITY_STRICT: "false"
+        run: node scripts/validate_intelligence.js
+
+      # ----------------------------------------------------------------------
+      # 7. Rebuild historical analytics from accumulated intelligence
       # ----------------------------------------------------------------------
 
       - name: Rebuild Historical Intelligence
         run: node scripts/backfill_history_from_articles.js
 
       # ----------------------------------------------------------------------
-      # 7. Generate Media intelligence
+      # 8. Generate Media intelligence
       # ----------------------------------------------------------------------
 
       - name: Generate Media (YouTube → AI summaries)
@@ -432,7 +447,7 @@ jobs:
         run: node scripts/generate_media.js
 
       # ----------------------------------------------------------------------
-      # 8. Validate every critical output before committing
+      # 9. Validate every critical output before committing
       # ----------------------------------------------------------------------
 
       - name: Verify Briefing and Historical Files
@@ -462,7 +477,8 @@ jobs:
           test -f knowledge/timeline-events.json
           test -f knowledge/knowledge-diff.json
           test -f knowledge/entity-resolution-report.json
-          echo "Core knowledge graph and resolution report are ready."
+          test -f knowledge/integrity-report.json
+          echo "Core knowledge graph, resolution report, and Cosmos integrity report are ready."
 
       - name: Verify Entity Lifecycle and Snapshot
         run: |
@@ -475,7 +491,7 @@ jobs:
           echo "Snapshot: knowledge/snapshots/${TODAY_UTC}.json"
 
       # ----------------------------------------------------------------------
-      # 9. Commit all automatically generated knowledge
+      # 10. Commit all automatically generated knowledge
       # ----------------------------------------------------------------------
 
       - name: Commit & push if changed
