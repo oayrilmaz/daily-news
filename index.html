@@ -2005,7 +2005,7 @@
         ? `What is happening in ${country} today? PTD Today's Global Power Intelligence Map is currently showing ${items.length} matching intelligence signal${items.length === 1 ? "" : "s"}${category !== "All" ? ` in ${category}` : ""}.${signalLines}`
         : `Explore today's Global Power Intelligence Map${categoryText} and see where power-grid, substation, data-center, renewable and infrastructure signals are moving.${signalLines}`;
 
-      await shareLink(title,text,currentMapShareUrl(),{
+      await shareGeneratedPost(title,text,currentMapShareUrl(),{
         type:"map",
         country:IntelligenceMap.selectedCountry,
         region:IntelligenceMap.selectedRegion,
@@ -2077,13 +2077,7 @@
       const title = item.title || `${IntelligenceMap.selectedCountry || "Global"} Intelligence | PTD Today`;
       const body = (item.lede || item.summary || item.body || "").toString().trim();
       const text = body.slice(0,320);
-      await shareLink(title,text,url,{
-        type:"article",
-        country:IntelligenceMap.selectedCountry,
-        region:item.region || IntelligenceMap.selectedRegion,
-        category:item.category || IntelligenceMap.category,
-        tags:Array.isArray(item.tags) ? item.tags : []
-      });
+      await shareArticleLink(title,text,url);
     }
 
     function renderMapRelatedIntelligence(){
@@ -2724,19 +2718,44 @@
       }
     }
 
-    async function shareLink(title,text,url,context={}){
+    async function shareArticleLink(title,text,url){
+      /*
+        Restore the original PTD Today article share behavior.
+        This is the path that worked best with iPhone -> LinkedIn app:
+        send title, text and URL as separate native Web Share fields.
+      */
+      if(navigator.share){
+        try{
+          await navigator.share({
+            title:title || "PTD Today",
+            text:(text || "").toString(),
+            url
+          });
+          return;
+        }catch(e){
+          if(e && e.name === "AbortError")return;
+          console.warn("Native article share failed:",e);
+        }
+      }
+
+      const draft = `${title || "PTD Today"}\n\n${text || ""}\n\n${url}`;
+
+      try{
+        await navigator.clipboard.writeText(draft);
+        alert("Copied share draft to clipboard.");
+      }catch(e){
+        prompt("Copy this share draft:",draft);
+      }
+    }
+
+    async function shareGeneratedPost(title,text,url,context={}){
+      /*
+        Generated PTD Today post path for map / special shares.
+        The generated body includes the URL + hashtags.
+      */
       const generated = buildAutomaticSharePost(title,text,url,context);
       const draft = generated.post;
 
-      /*
-        IMPORTANT FOR iPhone / LinkedIn:
-        Use the native Web Share sheet exactly like the older PTD Today article sharing.
-        The URL is already inside `draft`, so we intentionally DO NOT pass `url`
-        as a separate Web Share field. On some iOS/LinkedIn flows, passing a separate
-        URL causes the destination to keep only the link preview and drop the supplied text.
-      */
-
-      // Keep a clipboard backup without interrupting the native share flow.
       try{
         await navigator.clipboard.writeText(draft);
       }catch(e){}
@@ -2745,16 +2764,16 @@
         try{
           await navigator.share({
             title:title || "PTD Today",
-            text:draft
+            text:draft,
+            url
           });
           return;
         }catch(e){
           if(e && e.name === "AbortError")return;
-          console.warn("Native share failed:",e);
+          console.warn("Generated native share failed:",e);
         }
       }
 
-      // Desktop / unsupported-browser fallback.
       try{
         await navigator.clipboard.writeText(draft);
         alert("PTD Today post and hashtags copied to your clipboard.");
@@ -2767,7 +2786,7 @@
       const title = "Omega Enerji Teknolojileri | Sponsored Partner Spotlight | PTD Today";
       const text = "Omega Enerji Teknolojileri: Powering the electrical backbone behind critical infrastructure.";
       const url = `${window.location.origin}/partners/omega-enerji-teknolojileri.html`;
-      await shareLink(title,text,url,{
+      await shareGeneratedPost(title,text,url,{
         category:"OEM/EPC",
         tags:["Data Centers","Electrical Infrastructure","Power Distribution","Automation","MCC"]
       });
@@ -3541,15 +3560,7 @@
             ? `${body.slice(0,360).trim()}…`
             : body;
 
-          await shareLink(title,text,url,{
-            type:"article",
-            category:it.category || "",
-            region:it.region || "",
-            country:Array.isArray(it.countries) && it.countries.length === 1
-              ? normalizeCountryName(it.countries[0])
-              : "",
-            tags:Array.isArray(it.tags) ? it.tags : []
-          });
+          await shareArticleLink(title,text,url);
         });
       });
 
