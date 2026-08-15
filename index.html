@@ -1691,6 +1691,30 @@
       return url.toString();
     }
 
+    function mapSharePageUrl(){
+      if(!IntelligenceMap.selectedCountry){
+        return currentMapShareUrl();
+      }
+
+      const slug = IntelligenceMap.selectedCountry
+        .toLowerCase()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g,"")
+        .replace(/[^a-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"");
+
+      const url = new URL(
+        `/map-share/${encodeURIComponent(slug)}.html`,
+        window.location.origin
+      );
+
+      if(IntelligenceMap.category && IntelligenceMap.category !== "All"){
+        url.searchParams.set("category",IntelligenceMap.category);
+      }
+
+      return url.toString();
+    }
+
     function findCountryLayer(countryName){
       if(!IntelligenceMap.geoLayer || !countryName)return null;
 
@@ -1796,7 +1820,7 @@
       await shareLink(
         title,
         text,
-        currentMapShareUrl()
+        mapSharePageUrl()
       );
     }
 
