@@ -74,6 +74,271 @@ jobs:
         run: npm run generate:ai
 
       # ----------------------------------------------------------------------
+      # 3A. Generate country-specific map-share HTML pages
+      #
+      # This step reads briefs/map-signals.json and creates static pages such as:
+      #   map-share/united-states.html
+      #   map-share/germany.html
+      #   map-share/france.html
+      #
+      # LinkedIn/social crawlers can read the Open Graph tags from these static
+      # pages. Human visitors are redirected to the live PTD Today map with the
+      # selected country already applied.
+      #
+      # No separate Python file is required; the generator is embedded here.
+      # ----------------------------------------------------------------------
+
+      - name: Generate Country Map Share Pages
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          from urllib.parse import quote
+          import json
+          import re
+          import html
+
+          BASE_URL = "https://ptdtoday.com"
+          SRC = Path("briefs/map-signals.json")
+          OUT = Path("map-share")
+          OUT.mkdir(parents=True, exist_ok=True)
+
+          COUNTRY_REGION = {
+              "Algeria":"Africa",
+              "Argentina":"LATAM",
+              "Australia":"Asia",
+              "Belgium":"Europe",
+              "Brazil":"LATAM",
+              "Canada":"North America",
+              "Chile":"LATAM",
+              "China":"Asia",
+              "Colombia":"LATAM",
+              "Denmark":"Europe",
+              "Egypt":"Middle East",
+              "Finland":"Europe",
+              "France":"Europe",
+              "Germany":"Europe",
+              "Greece":"Europe",
+              "India":"Asia",
+              "Indonesia":"Asia",
+              "Israel":"Middle East",
+              "Italy":"Europe",
+              "Japan":"Asia",
+              "Kenya":"Africa",
+              "Malaysia":"Asia",
+              "Mexico":"North America",
+              "Morocco":"Africa",
+              "Netherlands":"Europe",
+              "New Zealand":"Asia",
+              "Nigeria":"Africa",
+              "Norway":"Europe",
+              "Oman":"Middle East",
+              "Peru":"LATAM",
+              "Philippines":"Asia",
+              "Poland":"Europe",
+              "Portugal":"Europe",
+              "Qatar":"Middle East",
+              "Saudi Arabia":"Middle East",
+              "Singapore":"Asia",
+              "South Africa":"Africa",
+              "South Korea":"Asia",
+              "Spain":"Europe",
+              "Sweden":"Europe",
+              "Thailand":"Asia",
+              "Turkey":"Middle East",
+              "Türkiye":"Middle East",
+              "United Arab Emirates":"Middle East",
+              "United Kingdom":"Europe",
+              "United States":"North America",
+              "Vietnam":"Asia",
+              "Democratic Republic of the Congo":"Africa"
+          }
+
+          VALID_COUNTRIES = set(COUNTRY_REGION.keys())
+
+          def slugify(value):
+              value = str(value or "").strip()
+              value = value.replace("Türkiye", "Turkey").lower()
+              value = re.sub(r"[^a-z0-9]+", "-", value)
+              return value.strip("-")
+
+          def esc(value):
+              return html.escape(str(value or ""), quote=True)
+
+          def clean_text(value):
+              return re.sub(r"\s+", " ", str(value or "")).strip()
+
+          def truncate(value, limit=290):
+              value = clean_text(value)
+              if len(value) <= limit:
+                  return value
+              return value[:limit - 1].rstrip() + "…"
+
+          if not SRC.exists():
+              raise SystemExit(f"Missing required file: {SRC}")
+
+          payload = json.loads(SRC.read_text(encoding="utf-8"))
+          signals = payload.get("signals", [])
+
+          if not isinstance(signals, list):
+              raise SystemExit("briefs/map-signals.json does not contain a valid signals[] array.")
+
+          grouped = {}
+
+          for signal in signals:
+              raw_countries = signal.get("countries", [])
+
+              if not isinstance(raw_countries, list):
+                  raw_countries = []
+
+              # IMPORTANT:
+              # Some transitional map-signals data has contained non-country tags
+              # inside countries[]. Only valid country names are allowed here.
+              countries = [
+                  country for country in raw_countries
+                  if country in VALID_COUNTRIES
+              ]
+
+              for country in countries:
+                  grouped.setdefault(country, []).append(signal)
+
+          # Remove old generated country pages so deleted countries/signals do not
+          # leave stale share pages behind.
+          for old_page in OUT.glob("*.html"):
+              old_page.unlink()
+
+          generated = 0
+
+          for country, items in sorted(grouped.items()):
+              # Deduplicate signals for each country.
+              seen = set()
+              unique_items = []
+
+              for item in items:
+                  key = (
+                      item.get("signal_id")
+                      or item.get("dedup_key")
+                      or item.get("id")
+                      or item.get("title")
+                  )
+
+                  if key in seen:
+                      continue
+
+                  seen.add(key)
+                  unique_items.append(item)
+
+              items = unique_items
+
+              slug = slugify(country)
+              if not slug:
+                  continue
+
+              share_url = f"{BASE_URL}/map-share/{slug}.html"
+              destination = f"{BASE_URL}/?country={quote(country)}"
+
+              headlines = [
+                  clean_text(item.get("title"))
+                  for item in items
+                  if clean_text(item.get("title"))
+              ][:3]
+
+              count = len(items)
+              title = f"{country} Power Intelligence | PTD Today"
+
+              if headlines:
+                  description = truncate(
+                      f"{count} current intelligence signal"
+                      f"{'' if count == 1 else 's'} for {country}: "
+                      + " • ".join(headlines)
+                  )
+              else:
+                  description = truncate(
+                      f"Explore today's power-grid, substation, data-center, "
+                      f"renewable and infrastructure intelligence associated with {country}."
+                  )
+
+              # Use the default PTD Today OG image for now.
+              # Later this can be replaced with a country-specific generated image.
+              og_image = f"{BASE_URL}/assets/og-default.png"
+
+              bullets = "\n".join(
+                  f"        <li>{esc(headline)}</li>"
+                  for headline in headlines
+              )
+
+              generated_at = payload.get("generated_at", "")
+
+              page = f"""<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+
+            <title>{esc(title)}</title>
+            <meta name="description" content="{esc(description)}">
+            <link rel="canonical" href="{esc(share_url)}">
+
+            <meta property="og:type" content="website">
+            <meta property="og:site_name" content="PTD Today">
+            <meta property="og:title" content="{esc(title)}">
+            <meta property="og:description" content="{esc(description)}">
+            <meta property="og:url" content="{esc(share_url)}">
+            <meta property="og:image" content="{esc(og_image)}">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="630">
+
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{esc(title)}">
+            <meta name="twitter:description" content="{esc(description)}">
+            <meta name="twitter:image" content="{esc(og_image)}">
+
+            <script>
+              /*
+                Human visitors go to the live PTD Today interactive map with the
+                selected country already applied.
+
+                Social crawlers normally do not execute this JavaScript, so they
+                continue to read the Open Graph metadata above.
+              */
+              window.location.replace({json.dumps(destination)});
+            </script>
+          </head>
+
+          <body>
+            <main>
+              <h1>{esc(title)}</h1>
+              <p>{esc(description)}</p>
+
+              <ul>
+          {bullets}
+              </ul>
+
+              <p>
+                <a href="{esc(destination)}">
+                  Open {esc(country)} Power Intelligence on PTD Today
+                </a>
+              </p>
+
+              <small>
+                Generated from PTD Today map intelligence:
+                {esc(generated_at)}
+              </small>
+            </main>
+          </body>
+          </html>
+          """
+
+              (OUT / f"{slug}.html").write_text(page, encoding="utf-8")
+              generated += 1
+
+          print(f"Generated {generated} country map-share page(s) in {OUT}/")
+
+          if generated == 0:
+              print("WARNING: No valid country share pages were generated.")
+          PY
+
+      # ----------------------------------------------------------------------
       # 4. Resolve duplicate entities and repair graph references
       # ----------------------------------------------------------------------
 
@@ -177,7 +442,17 @@ jobs:
           test -f briefs/trends.json
           test -f briefs/outlook.json
           test -d history
-          echo "Briefing and historical intelligence files are ready."
+          test -d map-share
+
+          MAP_SHARE_COUNT="$(find map-share -maxdepth 1 -type f -name '*.html' | wc -l)"
+          echo "Country map-share pages: ${MAP_SHARE_COUNT}"
+
+          if [ "${MAP_SHARE_COUNT}" -lt 1 ]; then
+            echo "ERROR: No country map-share HTML pages were generated."
+            exit 1
+          fi
+
+          echo "Briefing, historical intelligence, and country map-share files are ready."
 
       - name: Verify Knowledge Graph Files
         run: |
