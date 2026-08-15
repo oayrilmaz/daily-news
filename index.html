@@ -1876,11 +1876,30 @@
         ? ` • ${category}`
         : "";
 
-      const text = IntelligenceMap.selectedCountry
-        ? `${country}${categoryText}: ${items.length} current intelligence signal${items.length === 1 ? "" : "s"} on PTD Today's Global Power Intelligence Map.`
-        : `Explore PTD Today's Global Power Intelligence Map${categoryText}.`;
+      const topSignals = items
+        .slice(0,3)
+        .map(item=>(item.title || "").toString().trim())
+        .filter(Boolean);
 
-      await shareLink(title,text,currentMapShareUrl());
+      const signalLines = topSignals.length
+        ? `\n\nCurrent signals:\n${topSignals.map(signal=>`• ${signal}`).join("\n")}`
+        : "";
+
+      const text = IntelligenceMap.selectedCountry
+        ? `What is happening in ${country} today? PTD Today's Global Power Intelligence Map is currently showing ${items.length} matching intelligence signal${items.length === 1 ? "" : "s"}${category !== "All" ? ` in ${category}` : ""}.${signalLines}`
+        : `Explore today's Global Power Intelligence Map${categoryText} and see where power-grid, substation, data-center, renewable and infrastructure signals are moving.${signalLines}`;
+
+      await shareLink(title,text,currentMapShareUrl(),{
+        type:"map",
+        country:IntelligenceMap.selectedCountry,
+        region:IntelligenceMap.selectedRegion,
+        category:IntelligenceMap.category,
+        tags:[
+          "Global Power Intelligence",
+          "Power Grid",
+          "Energy Infrastructure"
+        ]
+      });
     }
 
     function itemMatchesMapSelection(item){
@@ -1941,8 +1960,14 @@
       const url = articlePageUrl(articleId);
       const title = item.title || `${IntelligenceMap.selectedCountry || "Global"} Intelligence | PTD Today`;
       const body = (item.lede || item.summary || item.body || "").toString().trim();
-      const text = body.slice(0,220);
-      await shareLink(title,text,url);
+      const text = body.slice(0,320);
+      await shareLink(title,text,url,{
+        type:"article",
+        country:IntelligenceMap.selectedCountry,
+        region:item.region || IntelligenceMap.selectedRegion,
+        category:item.category || IntelligenceMap.category,
+        tags:Array.isArray(item.tags) ? item.tags : []
+      });
     }
 
     function renderMapRelatedIntelligence(){
@@ -2469,23 +2494,149 @@
       }
     }
 
-    async function shareLink(title,text,url){
+    function hashtagToken(value){
+      return (value || "")
+        .toString()
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g,"")
+        .replace(/&/g," And ")
+        .replace(/[^A-Za-z0-9]+/g," ")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(word=>word.charAt(0).toUpperCase() + word.slice(1))
+        .join("");
+    }
+
+    function autoShareHashtags(context={},title="",text=""){
+      const tags = [];
+      const add = (value)=>{
+        const token = hashtagToken(value);
+        if(!token)return;
+        const tag = `#${token}`;
+        if(!tags.some(existing=>existing.toLowerCase() === tag.toLowerCase())){
+          tags.push(tag);
+        }
+      };
+
+      // PTD Today is always identified first.
+      add("PTD Today");
+
+      const category = (context.category || "").toString();
+      const region = (context.region || "").toString();
+      const country = (context.country || "").toString();
+
+      if(country)add(country);
+      if(region && region !== country)add(region);
+      if(category && category !== "All")add(category);
+
+      const providedTags = Array.isArray(context.tags) ? context.tags : [];
+      providedTags.slice(0,5).forEach(add);
+
+      const haystack = `${title} ${text} ${providedTags.join(" ")}`.toLowerCase();
+
+      const topicRules = [
+        ["data center","Data Centers"],
+        ["datacenter","Data Centers"],
+        ["transformer","Transformers"],
+        ["substation","Substations"],
+        ["transmission","Power Transmission"],
+        ["distribution","Power Distribution"],
+        ["power grid","Power Grid"],
+        ["grid","Grid Intelligence"],
+        ["bess","BESS"],
+        ["battery","Energy Storage"],
+        ["storage","Energy Storage"],
+        ["solar","Solar Energy"],
+        ["wind","Wind Energy"],
+        ["renewable","Renewable Energy"],
+        ["hvdc","HVDC"],
+        ["facts","FACTS"],
+        ["synchronous condenser","Synchronous Condenser"],
+        ["gas turbine","Gas Turbines"],
+        ["nuclear","Nuclear Energy"],
+        ["critical mineral","Critical Minerals"],
+        ["copper","Copper"],
+        ["ai","Artificial Intelligence"],
+        ["market","Energy Markets"],
+        ["policy","Energy Policy"],
+        ["epc","EPC"],
+        ["oem","Power Equipment"]
+      ];
+
+      topicRules.forEach(([needle,label])=>{
+        if(haystack.includes(needle))add(label);
+      });
+
+      // Generic discovery tags only if there is still room.
+      if(tags.length < 6)add("Energy");
+      if(tags.length < 7)add("Power Infrastructure");
+      if(tags.length < 8)add("Energy Intelligence");
+
+      return tags.slice(0,10);
+    }
+
+    function buildAutomaticSharePost(title,text,url,context={}){
+      const cleanTitle = (title || "PTD Today").toString().trim();
+      const cleanText = (text || "").toString().trim();
+      const hashtags = autoShareHashtags(context,cleanTitle,cleanText);
+
+      const parts = [cleanTitle];
+
+      if(cleanText){
+        parts.push(cleanText);
+      }
+
+      parts.push(`Explore on PTD Today:\n${url}`);
+
+      if(hashtags.length){
+        parts.push(hashtags.join(" "));
+      }
+
+      return {
+        post:parts.join("\n\n"),
+        hashtags
+      };
+    }
+
+    async function copyShareDraft(draft){
+      try{
+        await navigator.clipboard.writeText(draft);
+        return true;
+      }catch(e){
+        return false;
+      }
+    }
+
+    async function shareLink(title,text,url,context={}){
+      const generated = buildAutomaticSharePost(title,text,url,context);
+      const draft = generated.post;
+
+      /*
+        Always copy the COMPLETE generated post before opening the native share sheet.
+        Some destination apps (notably LinkedIn on some mobile flows) may only accept
+        the URL/link preview from the browser share sheet and may discard supplied text.
+        The generated PTD Today post + hashtags therefore remain ready on the clipboard.
+      */
+      const copied = await copyShareDraft(draft);
+
       if(navigator.share){
         try{
-          await navigator.share({title,text,url});
+          await navigator.share({
+            title,
+            text:draft,
+            url
+          });
           return;
         }catch(e){
-          return;
+          if(e && e.name === "AbortError")return;
         }
       }
 
-      const draft = `${title}\n\n${text}\n\n${url}`;
-
-      try{
-        await navigator.clipboard.writeText(draft);
-        alert("Copied draft for LinkedIn:\n\n" + draft);
-      }catch(e){
-        prompt("Copy this draft for LinkedIn:",draft);
+      if(copied){
+        alert("PTD Today generated the post and hashtags and copied them to your clipboard.");
+      }else{
+        prompt("Copy the PTD Today post:",draft);
       }
     }
 
@@ -2493,7 +2644,10 @@
       const title = "Omega Enerji Teknolojileri | Sponsored Partner Spotlight | PTD Today";
       const text = "Omega Enerji Teknolojileri: Powering the electrical backbone behind critical infrastructure.";
       const url = `${window.location.origin}/partners/omega-enerji-teknolojileri.html`;
-      await shareLink(title,text,url);
+      await shareLink(title,text,url,{
+        category:"OEM/EPC",
+        tags:["Data Centers","Electrical Infrastructure","Power Distribution","Automation","MCC"]
+      });
     }
 
     function paragraphsToHtml(text){
@@ -3259,9 +3413,20 @@
           const it = map.get(id) || {};
           const url = articlePageUrl(id);
           const title = it.title || "PTD Today";
-          const text = (it.lede || it.summary || "").toString().slice(0,220);
+          const body = (it.lede || it.summary || it.body || "").toString().trim();
+          const text = body.length > 360
+            ? `${body.slice(0,360).trim()}…`
+            : body;
 
-          await shareLink(title,text,url);
+          await shareLink(title,text,url,{
+            type:"article",
+            category:it.category || "",
+            region:it.region || "",
+            country:Array.isArray(it.countries) && it.countries.length === 1
+              ? normalizeCountryName(it.countries[0])
+              : "",
+            tags:Array.isArray(it.tags) ? it.tags : []
+          });
         });
       });
 
