@@ -238,6 +238,99 @@
       padding:18px;margin:14px;border:1px solid rgba(150,0,0,.18);
       border-radius:12px;background:rgba(255,230,230,.55);color:#7a1f1f;
     }
+    .ptdShareOverlay{
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      padding:18px;
+      background:rgba(0,0,0,.58);
+    }
+    .ptdShareOverlay.show{display:flex}
+    .ptdShareSheet{
+      width:min(720px,100%);
+      max-height:88vh;
+      overflow:auto;
+      border-radius:18px;
+      background:#fff;
+      color:#111;
+      box-shadow:0 24px 70px rgba(0,0,0,.28);
+      padding:18px;
+    }
+    .ptdShareHead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .ptdShareTitle{
+      margin:0;
+      font-size:22px;
+      font-weight:900;
+    }
+    .ptdShareClose{
+      appearance:none;
+      width:34px;
+      height:34px;
+      border-radius:999px;
+      border:1px solid var(--rule);
+      background:#fff;
+      cursor:pointer;
+      font-size:20px;
+      line-height:1;
+    }
+    .ptdShareHint{
+      margin:0 0 10px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+    }
+    .ptdShareText{
+      width:100%;
+      min-height:230px;
+      resize:vertical;
+      padding:14px;
+      border:1px solid var(--rule);
+      border-radius:12px;
+      background:#fafafa;
+      color:#111;
+      font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+      outline:none;
+    }
+    .ptdShareActions{
+      display:flex;
+      gap:9px;
+      flex-wrap:wrap;
+      margin-top:12px;
+    }
+    .ptdShareAction{
+      appearance:none;
+      border:1px solid #111;
+      border-radius:999px;
+      padding:10px 14px;
+      background:#111;
+      color:#fff;
+      cursor:pointer;
+      font-family:inherit;
+      font-size:14px;
+      font-weight:800;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .ptdShareAction.secondary{
+      background:#fff;
+      color:#111;
+      border-color:var(--rule);
+    }
+    @media (min-width:761px){
+      .ptdShareOverlay{align-items:center}
+    }
+
     .footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
     #crawlLinks{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 
@@ -1073,6 +1166,29 @@
     </section>
       </div>
     </details>
+
+    <div class="ptdShareOverlay" id="ptdShareOverlay" aria-hidden="true">
+      <div class="ptdShareSheet" role="dialog" aria-modal="true" aria-labelledby="ptdShareDialogTitle">
+        <div class="ptdShareHead">
+          <h3 class="ptdShareTitle" id="ptdShareDialogTitle">Share PTD Today</h3>
+          <button class="ptdShareClose" id="ptdShareClose" type="button" aria-label="Close share dialog">×</button>
+        </div>
+
+        <p class="ptdShareHint">
+          PTD Today generated the post and hashtags automatically. LinkedIn does not allow a normal website
+          share button to prefill custom post text, so “Open LinkedIn” copies this complete post first.
+          Paste once in LinkedIn and publish.
+        </p>
+
+        <textarea class="ptdShareText" id="ptdShareText" aria-label="Generated share post"></textarea>
+
+        <div class="ptdShareActions">
+          <button class="ptdShareAction" id="ptdShareLinkedIn" type="button">Copy &amp; Open LinkedIn</button>
+          <button class="ptdShareAction secondary" id="ptdShareCopy" type="button">Copy Post</button>
+          <button class="ptdShareAction secondary" id="ptdShareNative" type="button">More Share Options</button>
+        </div>
+      </div>
+    </div>
 
     <div class="footer">© <span id="year"></span> PTD Today</div>
     <div id="crawlLinks" aria-hidden="true"></div>
@@ -2608,35 +2724,117 @@
       }
     }
 
-    async function shareLink(title,text,url,context={}){
-      const generated = buildAutomaticSharePost(title,text,url,context);
-      const draft = generated.post;
+    const PTDShare = {
+      title:"",
+      text:"",
+      url:"",
+      draft:""
+    };
 
-      /*
-        Always copy the COMPLETE generated post before opening the native share sheet.
-        Some destination apps (notably LinkedIn on some mobile flows) may only accept
-        the URL/link preview from the browser share sheet and may discard supplied text.
-        The generated PTD Today post + hashtags therefore remain ready on the clipboard.
-      */
-      const copied = await copyShareDraft(draft);
+    function closePtdShareComposer(){
+      const overlay = $("ptdShareOverlay");
+      if(!overlay)return;
+      overlay.classList.remove("show");
+      overlay.setAttribute("aria-hidden","true");
+    }
 
-      if(navigator.share){
-        try{
-          await navigator.share({
-            title,
-            text:draft,
-            url
-          });
-          return;
-        }catch(e){
-          if(e && e.name === "AbortError")return;
-        }
+    function ensurePtdShareComposerBindings(){
+      const overlay = $("ptdShareOverlay");
+      const close = $("ptdShareClose");
+      const copy = $("ptdShareCopy");
+      const linkedIn = $("ptdShareLinkedIn");
+      const native = $("ptdShareNative");
+
+      if(!overlay || overlay.dataset.bound === "1")return;
+      overlay.dataset.bound = "1";
+
+      if(close)close.onclick = closePtdShareComposer;
+
+      overlay.addEventListener("click",(event)=>{
+        if(event.target === overlay)closePtdShareComposer();
+      });
+
+      if(copy){
+        copy.onclick = async ()=>{
+          const current = $("ptdShareText")?.value || PTDShare.draft;
+          const copied = await copyShareDraft(current);
+          copy.textContent = copied ? "Copied ✓" : "Copy Failed";
+          setTimeout(()=>{copy.textContent = "Copy Post";},1400);
+        };
       }
 
+      if(linkedIn){
+        linkedIn.onclick = async ()=>{
+          const current = $("ptdShareText")?.value || PTDShare.draft;
+          await copyShareDraft(current);
+
+          const linkedInUrl =
+            `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(PTDShare.url)}`;
+
+          window.open(linkedInUrl,"_blank","noopener");
+        };
+      }
+
+      if(native){
+        native.onclick = async ()=>{
+          const current = $("ptdShareText")?.value || PTDShare.draft;
+
+          if(navigator.share){
+            try{
+              await navigator.share({
+                title:PTDShare.title,
+                text:current,
+                url:PTDShare.url
+              });
+              return;
+            }catch(e){
+              if(e && e.name === "AbortError")return;
+            }
+          }
+
+          const copied = await copyShareDraft(current);
+          if(copied){
+            alert("Complete PTD Today post copied to clipboard.");
+          }else{
+            prompt("Copy the PTD Today post:",current);
+          }
+        };
+      }
+    }
+
+    async function shareLink(title,text,url,context={}){
+      const generated = buildAutomaticSharePost(title,text,url,context);
+
+      PTDShare.title = title || "PTD Today";
+      PTDShare.text = text || "";
+      PTDShare.url = url;
+      PTDShare.draft = generated.post;
+
+      ensurePtdShareComposerBindings();
+
+      const textarea = $("ptdShareText");
+      if(textarea)textarea.value = generated.post;
+
+      const overlay = $("ptdShareOverlay");
+      if(overlay){
+        overlay.classList.add("show");
+        overlay.setAttribute("aria-hidden","false");
+
+        requestAnimationFrame(()=>{
+          if(textarea){
+            textarea.focus();
+            textarea.setSelectionRange(0,0);
+          }
+        });
+        return;
+      }
+
+      // Fallback if the custom composer cannot render.
+      const copied = await copyShareDraft(generated.post);
       if(copied){
-        alert("PTD Today generated the post and hashtags and copied them to your clipboard.");
+        alert("Complete PTD Today post copied to clipboard.");
       }else{
-        prompt("Copy the PTD Today post:",draft);
+        prompt("Copy the PTD Today post:",generated.post);
       }
     }
 
