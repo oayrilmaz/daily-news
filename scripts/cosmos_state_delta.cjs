@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — State + Delta Engine v0.1
+ * PTD Today / Cosmos — State + Delta Engine v0.2
  *
  * Builds a deterministic daily world-state snapshot from the current knowledge
  * graph, then compares it with the previously committed Cosmos state.
@@ -80,24 +80,59 @@ function developmentId(dev) {
 
 function lifecycleLookup(lifecycle) {
   const lookup = new Map();
-  const rankings = lifecycle?.rankings;
-  if (!rankings || typeof rankings !== "object") return lookup;
 
-  for (const list of Object.values(rankings)) {
-    if (!Array.isArray(list)) continue;
-    for (const row of list) {
-      if (!row?.entity_id) continue;
-      const existing = lookup.get(row.entity_id) || {};
-      lookup.set(row.entity_id, {
-        ...existing,
-        lifecycle_status: row.lifecycle_status ?? existing.lifecycle_status ?? null,
-        importance_score: normalizeNumber(row.importance_score, existing.importance_score ?? null),
-        momentum_score: normalizeNumber(row.momentum_score, existing.momentum_score ?? null),
-        momentum_status: row.momentum_status ?? existing.momentum_status ?? null,
-        last_seen_at: row.last_seen_at ?? existing.last_seen_at ?? null
-      });
+  function absorb(row) {
+    if (!row?.entity_id) return;
+
+    const existing = lookup.get(row.entity_id) || {};
+
+    lookup.set(row.entity_id, {
+      ...existing,
+      lifecycle_status:
+        row.lifecycle_status ?? existing.lifecycle_status ?? null,
+      importance_score:
+        normalizeNumber(
+          row.importance_score,
+          existing.importance_score ?? null
+        ),
+      momentum_score:
+        normalizeNumber(
+          row.momentum_score,
+          existing.momentum_score ?? null
+        ),
+      momentum_status:
+        row.momentum_status ?? existing.momentum_status ?? null,
+      last_seen_at:
+        row.last_seen_at ?? existing.last_seen_at ?? null
+    });
+  }
+
+  /*
+   * Preferred source: the complete lifecycle registry emitted by the
+   * lifecycle engine. This gives Cosmos lifecycle metadata for every entity,
+   * not only entities appearing in ranking lists.
+   */
+  if (Array.isArray(lifecycle?.entities)) {
+    for (const row of lifecycle.entities) {
+      absorb(row);
     }
   }
+
+  /*
+   * Backward-compatible fallback/enrichment for older lifecycle files.
+   */
+  const rankings = lifecycle?.rankings;
+
+  if (rankings && typeof rankings === "object") {
+    for (const list of Object.values(rankings)) {
+      if (!Array.isArray(list)) continue;
+
+      for (const row of list) {
+        absorb(row);
+      }
+    }
+  }
+
   return lookup;
 }
 
@@ -154,7 +189,7 @@ function buildState() {
   }
 
   return {
-    schema_version: "0.1",
+    schema_version: "0.2",
     generated_at: new Date().toISOString(),
     date_utc: new Date().toISOString().slice(0, 10),
     source: "PTD Today knowledge graph",
@@ -188,7 +223,7 @@ function changedFields(before, after) {
 function buildDelta(previous, current) {
   const coldStart = !previous || !previous.entities;
   const delta = {
-    schema_version: "0.1",
+    schema_version: "0.2",
     generated_at: new Date().toISOString(),
     date_utc: current.date_utc,
     previous_state_generated_at: previous?.generated_at || null,
