@@ -1,0 +1,235 @@
+name: Cosmos Preflight (No OpenAI)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cosmos-preflight-ptdtoday
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Cosmos Source Files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REQUIRED_FILES=(
+            "scripts/generate_ai_news.js"
+            "scripts/resolve_entities.js"
+            "scripts/update_entity_lifecycle.js"
+            "scripts/normalize_map_signals.cjs"
+            "scripts/validate_intelligence.cjs"
+            "scripts/cosmos_state_delta.cjs"
+            "scripts/backfill_history_from_articles.js"
+            "package.json"
+          )
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Missing required file: $file"
+              exit 1
+            fi
+            echo "OK: $file"
+          done
+
+      - name: Check JavaScript Syntax
+        run: |
+          set -e
+          node --check scripts/generate_ai_news.js
+          node --check scripts/resolve_entities.js
+          node --check scripts/update_entity_lifecycle.js
+          node --check scripts/normalize_map_signals.cjs
+          node --check scripts/validate_intelligence.cjs
+          node --check scripts/cosmos_state_delta.cjs
+          node --check scripts/backfill_history_from_articles.js
+          echo "All Cosmos JavaScript files passed syntax validation."
+
+      - name: Verify package.json
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const pkg = JSON.parse(
+            fs.readFileSync("package.json", "utf8")
+          );
+
+          if (!pkg.scripts || !pkg.scripts["generate:ai"]) {
+            throw new Error(
+              'package.json is missing scripts["generate:ai"].'
+            );
+          }
+
+          if (!pkg.dependencies || !pkg.dependencies.openai) {
+            throw new Error(
+              'package.json is missing the "openai" dependency.'
+            );
+          }
+
+          console.log("generate:ai:", pkg.scripts["generate:ai"]);
+          console.log("OpenAI dependency:", pkg.dependencies.openai);
+          console.log("package.json validation passed.");
+          NODE
+
+      - name: Validate Existing JSON Files
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const required = [
+            "briefs/daily-ai.json",
+            "briefs/map-signals.json",
+            "briefs/trends.json",
+            "briefs/outlook.json",
+            "knowledge/developments.json",
+            "knowledge/entities.json",
+            "knowledge/relationships.json",
+            "knowledge/timeline-events.json",
+            "knowledge/entity-lifecycle.json"
+          ];
+
+          let failed = false;
+
+          for (const file of required) {
+            if (!fs.existsSync(file)) {
+              console.error(`ERROR: Missing ${file}`);
+              failed = true;
+              continue;
+            }
+
+            try {
+              JSON.parse(fs.readFileSync(file, "utf8"));
+              console.log(`OK JSON: ${file}`);
+            } catch (error) {
+              console.error(
+                `ERROR: Invalid JSON in ${file}: ${error.message}`
+              );
+              failed = true;
+            }
+          }
+
+          if (failed) process.exit(1);
+
+          console.log(
+            "All currently committed critical JSON files parse correctly."
+          );
+          NODE
+
+      - name: Verify Current Knowledge Structure
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          function read(file) {
+            return JSON.parse(fs.readFileSync(file, "utf8"));
+          }
+
+          const daily = read("briefs/daily-ai.json");
+          const map = read("briefs/map-signals.json");
+          const developments = read("knowledge/developments.json");
+          const entities = read("knowledge/entities.json");
+          const relationships = read("knowledge/relationships.json");
+          const timeline = read("knowledge/timeline-events.json");
+          const lifecycle = read("knowledge/entity-lifecycle.json");
+
+          const errors = [];
+
+          if (!Array.isArray(daily.items)) {
+            errors.push("briefs/daily-ai.json: items[] missing");
+          }
+
+          if (!Array.isArray(map.signals)) {
+            errors.push("briefs/map-signals.json: signals[] missing");
+          }
+
+          if (!Array.isArray(developments.developments)) {
+            errors.push(
+              "knowledge/developments.json: developments[] missing"
+            );
+          }
+
+          if (!Array.isArray(entities.entities)) {
+            errors.push("knowledge/entities.json: entities[] missing");
+          }
+
+          if (!Array.isArray(relationships.relationships)) {
+            errors.push(
+              "knowledge/relationships.json: relationships[] missing"
+            );
+          }
+
+          if (!Array.isArray(timeline.events)) {
+            errors.push(
+              "knowledge/timeline-events.json: events[] missing"
+            );
+          }
+
+          if (
+            !lifecycle ||
+            typeof lifecycle !== "object" ||
+            !lifecycle.rankings
+          ) {
+            errors.push(
+              "knowledge/entity-lifecycle.json: lifecycle structure missing"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCompatibility errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nCurrent committed data structure:");
+          console.log(`Daily items:      ${daily.items.length}`);
+          console.log(`Map signals:      ${map.signals.length}`);
+          console.log(`Developments:     ${developments.developments.length}`);
+          console.log(`Entities:         ${entities.entities.length}`);
+          console.log(`Relationships:    ${relationships.relationships.length}`);
+          console.log(`Timeline events:  ${timeline.events.length}`);
+
+          if (Array.isArray(lifecycle.entities)) {
+            console.log(`Lifecycle registry: ${lifecycle.entities.length}`);
+          } else {
+            console.log(
+              "Lifecycle registry: legacy format currently committed " +
+              "(File 5 will create lifecycle.entities[] on the next production run)"
+            );
+          }
+
+          console.log("\nCosmos source/data compatibility checks passed.");
+          NODE
+
+      - name: Preflight Complete
+        run: |
+          echo "======================================================"
+          echo "COSMOS PREFLIGHT PASSED"
+          echo "No OpenAI generation was executed by this workflow."
+          echo "It is safe to proceed to the paid production workflow."
+          echo "======================================================"
