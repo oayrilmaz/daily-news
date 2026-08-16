@@ -1,3 +1,4 @@
+
 // scripts/backfill_history_from_articles.js
 // PTD Today — One-time historical backfill from existing article HTML files.
 //
@@ -456,6 +457,7 @@ function parseArticleHtml(html, fileName) {
 
   return {
     id: articleId,
+    development_id: articleId,
     created_at:
       meta.created_at ||
       `${dateOnly}T00:00:00.000Z`,
@@ -469,6 +471,8 @@ function parseArticleHtml(html, fileName) {
     summary: lede || description || body,
     confidence_label: confidence.confidence_label,
     confidence_score: confidence.confidence_score,
+    evidence_mode: "historical_article_reconstruction",
+    historical_source: "ptdtoday_article_html",
     tags,
     watchlist,
     action_for_readers:
@@ -515,12 +519,14 @@ function createHistoryPayload(dateOnly, articles) {
   const regions = [...new Set(articles.map((article) => article.region))];
 
   return {
+    schema_version: "2.0-cosmos-history",
     title: "PTD Today — Historical AI Intelligence Brief",
     disclaimer:
       "Informational only — reconstructed from previously published PTD Today AI-generated intelligence articles. May contain errors. Not investment or engineering advice.",
     updated_at: updatedAt,
     date_utc: dateOnly,
     backfilled_from_articles: true,
+    evidence_mode: "historical_article_reconstruction",
     sections: [
       {
         heading: "Top Themes",
@@ -749,7 +755,9 @@ function buildTrends(historyPayloads, generatedAt) {
   const last30Days = createWindowAnalytics(historyPayloads, 30);
 
   return {
+    schema_version: "2.0-cosmos-history",
     generated_at: generatedAt,
+    evidence_mode: "historical_article_reconstruction",
     methodology: {
       summary:
         "Counts and momentum are derived from PTD Today intelligence articles reconstructed into history/*.json.",
@@ -877,7 +885,9 @@ function buildOutlookEntries(rows, horizonDays, limit = 10) {
 
 function buildOutlook(trends, generatedAt) {
   return {
+    schema_version: "2.0-cosmos-history",
     generated_at: generatedAt,
+    evidence_mode: "historical_article_reconstruction",
     disclaimer:
       "AI-generated probabilistic scenarios based on PTD Today publishing history. These are not guarantees, verified forecasts, investment advice, or engineering conclusions.",
     methodology: {
@@ -1037,7 +1047,10 @@ function main() {
   );
 
   const report = {
+    schema_version: "1.0",
     generated_at: generatedAt,
+    status: failures.length ? "completed_with_warnings" : "completed",
+    evidence_mode: "historical_article_reconstruction",
     articles_directory: articlesDir,
     history_directory: historyDir,
     briefs_directory: briefsDir,
