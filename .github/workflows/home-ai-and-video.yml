@@ -1,5 +1,6 @@
 
 
+
 name: Home AI + Video (PTD Today)
 
 on:
@@ -50,9 +51,12 @@ jobs:
       - name: Cosmos Preflight Syntax Check
         run: |
           node --check scripts/generate_ai_news.js
-          node --check scripts/validate_intelligence.cjs
+          node --check scripts/resolve_entities.js
+          node --check scripts/update_entity_lifecycle.js
           node --check scripts/normalize_map_signals.cjs
+          node --check scripts/validate_intelligence.cjs
           node --check scripts/cosmos_state_delta.cjs
+          node --check scripts/backfill_history_from_articles.js
 
       # ----------------------------------------------------------------------
       # 2. Existing PTD Today source feeds
@@ -144,24 +148,46 @@ jobs:
               "Algeria":"Africa",
               "Argentina":"LATAM",
               "Australia":"Asia",
+              "Austria":"Europe",
+              "Bahrain":"Middle East",
+              "Bangladesh":"Asia",
               "Belgium":"Europe",
+              "Bolivia":"LATAM",
               "Brazil":"LATAM",
+              "Bulgaria":"Europe",
               "Canada":"North America",
               "Chile":"LATAM",
               "China":"Asia",
               "Colombia":"LATAM",
+              "Costa Rica":"LATAM",
+              "Croatia":"Europe",
+              "Czechia":"Europe",
               "Denmark":"Europe",
-              "Egypt":"Middle East",
+              "Dominican Republic":"LATAM",
+              "Ecuador":"LATAM",
+              "Egypt":"Africa",
+              "Estonia":"Europe",
+              "Ethiopia":"Africa",
               "Finland":"Europe",
               "France":"Europe",
               "Germany":"Europe",
+              "Ghana":"Africa",
               "Greece":"Europe",
+              "Hungary":"Europe",
+              "Iceland":"Europe",
               "India":"Asia",
               "Indonesia":"Asia",
+              "Iraq":"Middle East",
+              "Ireland":"Europe",
               "Israel":"Middle East",
               "Italy":"Europe",
               "Japan":"Asia",
+              "Jordan":"Middle East",
               "Kenya":"Africa",
+              "Kuwait":"Middle East",
+              "Latvia":"Europe",
+              "Lithuania":"Europe",
+              "Luxembourg":"Europe",
               "Malaysia":"Asia",
               "Mexico":"North America",
               "Morocco":"Africa",
@@ -170,23 +196,37 @@ jobs:
               "Nigeria":"Africa",
               "Norway":"Europe",
               "Oman":"Middle East",
+              "Pakistan":"Asia",
+              "Panama":"LATAM",
+              "Paraguay":"LATAM",
               "Peru":"LATAM",
               "Philippines":"Asia",
               "Poland":"Europe",
               "Portugal":"Europe",
               "Qatar":"Middle East",
+              "Romania":"Europe",
               "Saudi Arabia":"Middle East",
+              "Senegal":"Africa",
+              "Serbia":"Europe",
               "Singapore":"Asia",
+              "Slovakia":"Europe",
+              "Slovenia":"Europe",
               "South Africa":"Africa",
               "South Korea":"Asia",
               "Spain":"Europe",
+              "Sri Lanka":"Asia",
               "Sweden":"Europe",
+              "Switzerland":"Europe",
+              "Tanzania":"Africa",
               "Thailand":"Asia",
+              "Tunisia":"Africa",
               "Turkey":"Middle East",
               "Türkiye":"Middle East",
+              "Ukraine":"Europe",
               "United Arab Emirates":"Middle East",
               "United Kingdom":"Europe",
               "United States":"North America",
+              "Uruguay":"LATAM",
               "Vietnam":"Asia",
               "Democratic Republic of the Congo":"Africa"
           }
@@ -485,6 +525,7 @@ jobs:
           test -f briefs/map-signals.json
           test -f briefs/trends.json
           test -f briefs/outlook.json
+          test -f briefs/backfill-report.json
           test -d history
           test -d map-share
 
@@ -496,7 +537,7 @@ jobs:
             exit 1
           fi
 
-          echo "Briefing, historical intelligence, and country map-share files are ready."
+          echo "Briefing, backfill, historical intelligence, and country map-share files are ready."
 
       - name: Verify Knowledge Graph Files
         run: |
