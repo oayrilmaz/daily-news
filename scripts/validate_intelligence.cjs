@@ -8,7 +8,7 @@
  *
  * Rollout:
  *   - Default: report mode (never breaks the workflow)
- *   - Strict:  INTEGRITY_STRICT=true node scripts/validate_intelligence.js
+ *   - Strict:  INTEGRITY_STRICT=true node scripts/validate_intelligence.cjs
  *
  * Output:
  *   knowledge/integrity-report.json
@@ -52,7 +52,7 @@ const ISO_DATETIME =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 
 const report = {
-  schema_version: "1.1",
+  schema_version: "1.2",
   checked_at: new Date().toISOString(),
   strict_mode: STRICT,
   status: "unknown",
@@ -195,56 +195,19 @@ function collectCountryNames(...sources) {
 
   // Conservative built-ins for common PTD Today geography.
   [
-    "United States",
-    "Canada",
-    "Mexico",
-    "Brazil",
-    "Chile",
-    "Argentina",
-    "United Kingdom",
-    "Ireland",
-    "France",
-    "Germany",
-    "Netherlands",
-    "Belgium",
-    "Spain",
-    "Portugal",
-    "Italy",
-    "Switzerland",
-    "Austria",
-    "Norway",
-    "Sweden",
-    "Finland",
-    "Denmark",
-    "Poland",
-    "Czech Republic",
-    "Romania",
-    "Greece",
-    "Turkey",
-    "Türkiye",
-    "Saudi Arabia",
-    "United Arab Emirates",
-    "Qatar",
-    "Oman",
-    "Israel",
-    "Egypt",
-    "South Africa",
-    "Morocco",
-    "Nigeria",
-    "Kenya",
-    "Democratic Republic of the Congo",
-    "China",
-    "Japan",
-    "South Korea",
-    "India",
-    "Singapore",
-    "Malaysia",
-    "Indonesia",
-    "Vietnam",
-    "Thailand",
-    "Philippines",
-    "Australia",
-    "New Zealand"
+    "Algeria","Argentina","Australia","Austria","Bahrain","Bangladesh","Belgium",
+    "Bolivia","Brazil","Bulgaria","Canada","Chile","China","Colombia","Costa Rica",
+    "Croatia","Czechia","Czech Republic","Denmark","Dominican Republic","Ecuador",
+    "Egypt","Estonia","Ethiopia","Finland","France","Germany","Ghana","Greece",
+    "Hungary","Iceland","India","Indonesia","Iraq","Ireland","Israel","Italy",
+    "Japan","Jordan","Kenya","Kuwait","Latvia","Lithuania","Luxembourg","Malaysia",
+    "Mexico","Morocco","Netherlands","New Zealand","Nigeria","Norway","Oman",
+    "Pakistan","Panama","Paraguay","Peru","Philippines","Poland","Portugal","Qatar",
+    "Romania","Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia",
+    "South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland",
+    "Tanzania","Thailand","Tunisia","Turkey","Türkiye","Ukraine",
+    "United Arab Emirates","United Kingdom","United States","Uruguay","Vietnam",
+    "Democratic Republic of the Congo"
   ].forEach((name) => names.add(normalizeName(name)));
 
   return names;
@@ -615,6 +578,7 @@ function validate() {
     const context = { file: "knowledge/timeline-events.json", event: id };
 
     const ts =
+      event?.occurred_at ||
       event?.created_at ||
       event?.event_time ||
       event?.event_at ||
@@ -720,4 +684,3 @@ function validate() {
 }
 
 validate();
-
