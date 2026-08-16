@@ -359,27 +359,17 @@ jobs:
         run: node scripts/update_entity_lifecycle.js
 
       # ----------------------------------------------------------------------
-      # 5A. ONE-TIME Cosmos legacy map repair
-      # ----------------------------------------------------------------------
-
-      - name: Repair Legacy Map Signals for Cosmos
-        env:
-          BRIEFS_DIR: briefs
-          KNOWLEDGE_DIR: knowledge
-        run: node scripts/repair_map_signals.cjs
-
-      # ----------------------------------------------------------------------
       # 6. Cosmos Foundation Gate
       #
-      # Report mode first: detect integrity problems without stopping PTD Today.
-      # Change INTEGRITY_STRICT to "true" only after legacy data repair is complete.
+      # Strict production mode: corrupted structural intelligence must not
+      # continue into historical ingestion.
       # ----------------------------------------------------------------------
 
       - name: Cosmos Intelligence Integrity Gate
         env:
           BRIEFS_DIR: briefs
           KNOWLEDGE_DIR: knowledge
-          INTEGRITY_STRICT: "false"
+          INTEGRITY_STRICT: "true"
         run: node scripts/validate_intelligence.cjs
 
       # ----------------------------------------------------------------------
