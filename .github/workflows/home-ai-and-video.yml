@@ -373,6 +373,17 @@ jobs:
         run: node scripts/validate_intelligence.cjs
 
       # ----------------------------------------------------------------------
+      # 6A. Cosmos State + Delta Engine
+      # Runs only after the strict integrity gate passes.
+      # First production run establishes a cold-start baseline.
+      # ----------------------------------------------------------------------
+
+      - name: Build Cosmos State + Delta
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/cosmos_state_delta.cjs
+
+      # ----------------------------------------------------------------------
       # 7. Rebuild historical analytics from accumulated intelligence
       # ----------------------------------------------------------------------
 
@@ -479,7 +490,11 @@ jobs:
           test -f knowledge/knowledge-diff.json
           test -f knowledge/entity-resolution-report.json
           test -f knowledge/integrity-report.json
-          echo "Core knowledge graph, resolution report, and Cosmos integrity report are ready."
+          test -f knowledge/cosmos/state-current.json
+          test -f knowledge/cosmos/delta-current.json
+          test -f "knowledge/cosmos/state-history/$(date -u +%F).json"
+          test -f "knowledge/cosmos/delta-history/$(date -u +%F).json"
+          echo "Core knowledge graph, Cosmos integrity, state, and delta outputs are ready."
 
       - name: Verify Entity Lifecycle and Snapshot
         run: |
