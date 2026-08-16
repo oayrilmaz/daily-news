@@ -52,7 +52,7 @@ const ISO_DATETIME =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
 
 const report = {
-  schema_version: "1.0",
+  schema_version: "1.1",
   checked_at: new Date().toISOString(),
   strict_mode: STRICT,
   status: "unknown",
@@ -302,6 +302,13 @@ function validate() {
   const timeline = arrayFrom(timelineRaw, ["events", "timeline_events", "items"]);
   const lifecycle = arrayFrom(lifecycleRaw, ["entities", "lifecycle", "items"]);
 
+  // entity-lifecycle.json is an aggregate intelligence document rather than a
+  // top-level entity array. Prefer totals.entity_count when available.
+  const lifecycleEntityCount = Number(lifecycleRaw?.totals?.entity_count);
+  const lifecycleRecordCount = Number.isFinite(lifecycleEntityCount)
+    ? lifecycleEntityCount
+    : lifecycle.length;
+
   report.counts = {
     daily_items: dailyItems.length,
     map_signals: mapSignals.length,
@@ -309,7 +316,7 @@ function validate() {
     entities: entities.length,
     relationships: relationships.length,
     timeline_events: timeline.length,
-    lifecycle_records: lifecycle.length
+    lifecycle_records: lifecycleRecordCount
   };
 
   const entityIds = new Set(
