@@ -76,7 +76,35 @@ jobs:
         run: npm run generate:ai
 
       # ----------------------------------------------------------------------
-      # 3A. Generate country-specific map-share HTML pages
+      # 4. Resolve duplicate entities and repair graph references
+      # ----------------------------------------------------------------------
+
+      - name: Resolve Entities + Repair Knowledge Graph
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/resolve_entities.js
+
+      # ----------------------------------------------------------------------
+      # 5. Calculate lifecycle after graph resolution
+      # ----------------------------------------------------------------------
+
+      - name: Update Entity Lifecycle + Time Machine Snapshot
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/update_entity_lifecycle.js
+
+      # ----------------------------------------------------------------------
+      # 5A. Normalize map signals after entity resolution
+      # ----------------------------------------------------------------------
+
+      - name: Normalize Map Signals for Cosmos
+        env:
+          BRIEFS_DIR: briefs
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/normalize_map_signals.cjs
+
+      # ----------------------------------------------------------------------
+      # 5B. Generate country-specific map-share HTML pages
       #
       # This step reads briefs/map-signals.json and creates static pages such as:
       #   map-share/united-states.html
@@ -341,24 +369,6 @@ jobs:
           PY
 
       # ----------------------------------------------------------------------
-      # 4. Resolve duplicate entities and repair graph references
-      # ----------------------------------------------------------------------
-
-      - name: Resolve Entities + Repair Knowledge Graph
-        env:
-          KNOWLEDGE_DIR: knowledge
-        run: node scripts/resolve_entities.js
-
-      # ----------------------------------------------------------------------
-      # 5. Calculate lifecycle after graph resolution
-      # ----------------------------------------------------------------------
-
-      - name: Update Entity Lifecycle + Time Machine Snapshot
-        env:
-          KNOWLEDGE_DIR: knowledge
-        run: node scripts/update_entity_lifecycle.js
-
-      # ----------------------------------------------------------------------
       # 6. Cosmos Foundation Gate
       #
       # Strict production mode: corrupted structural intelligence must not
@@ -490,6 +500,7 @@ jobs:
           test -f knowledge/knowledge-diff.json
           test -f knowledge/entity-resolution-report.json
           test -f knowledge/integrity-report.json
+          test -f knowledge/map-signals-normalization-report.json
           test -f knowledge/cosmos/state-current.json
           test -f knowledge/cosmos/delta-current.json
           test -f "knowledge/cosmos/state-history/$(date -u +%F).json"
