@@ -1,3 +1,4 @@
+
 // scripts/update_entity_lifecycle.js
 // PTD Today — Entity Lifecycle Engine
 //
@@ -580,15 +581,15 @@ function buildLifecycleSummary(entities, indexes) {
     last_seen_at: entity.last_seen_at
   });
 
-  const rank = (filter, sorter) =>
+  const rank = (filter, sorter, limit = 50) =>
     entities
       .filter(filter)
       .sort(sorter)
-      .slice(0, 50)
+      .slice(0, limit)
       .map(compactEntity);
 
   return {
-    schema_version: "1.1-cold-start-aware",
+    schema_version: "1.2-cold-start-aware",
     generated_at: NOW_ISO,
     date_utc: TODAY,
     methodology: {
@@ -611,7 +612,9 @@ function buildLifecycleSummary(entities, indexes) {
         "deprecated"
       ],
       preservation:
-        "No entity is deleted. Dormant, historical, merged, and deprecated entities remain available through the Time Machine."
+        "No entity is deleted. Dormant, historical, merged, and deprecated entities remain available through the Time Machine.",
+      registry:
+        "The top-level entities array contains lifecycle metadata for every entity; rankings are presentation views over the same registry."
     },
     totals: {
       entity_count: entities.length,
@@ -631,12 +634,23 @@ function buildLifecycleSummary(entities, indexes) {
     },
     by_status: byStatus,
     by_type: byType,
+
+    /*
+     * Full machine-readable lifecycle registry.
+     *
+     * This is intentionally not truncated. Cosmos State + Delta and future
+     * consumers must be able to resolve lifecycle metadata for every entity,
+     * not only the top-ranked subset.
+     */
+    entities: entities.map(compactEntity),
+
     rankings: {
       most_important: rank(
         () => true,
         (a, b) =>
           Number(b.scores?.importance || 0) -
-          Number(a.scores?.importance || 0)
+          Number(a.scores?.importance || 0),
+        entities.length
       ),
 
       fastest_accelerating: rank(
@@ -678,7 +692,7 @@ function buildLifecycleSummary(entities, indexes) {
 
 function buildSnapshot(entities, lifecycleSummary) {
   return {
-    schema_version: "1.1-cold-start-aware",
+    schema_version: "1.2-cold-start-aware",
     snapshot_date_utc: TODAY,
     generated_at: NOW_ISO,
     entity_count: entities.length,
@@ -745,7 +759,7 @@ function main() {
 
   writeJson(ENTITIES_PATH, {
     ...entitiesPayload,
-    schema_version: "1.3-lifecycle-cold-start-aware",
+    schema_version: "1.4-lifecycle-cold-start-aware",
     generated_at: NOW_ISO,
     entity_count: enrichedEntities.length,
     entities: enrichedEntities
