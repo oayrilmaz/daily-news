@@ -1,3 +1,4 @@
+
 // scripts/generate_ai_news.js
 // PTD Today — Transitional Intelligence Generator for the new PTDToday.com
 //
@@ -302,6 +303,28 @@ const COUNTRY_ALIASES = {
   "czech-republic": "Czechia"
 };
 
+const VALID_COUNTRIES = new Set([
+  "Algeria","Argentina","Australia","Austria","Bahrain","Bangladesh","Belgium",
+  "Bolivia","Brazil","Bulgaria","Canada","Chile","China","Colombia","Costa Rica",
+  "Croatia","Czechia","Denmark","Dominican Republic","Ecuador","Egypt","Estonia",
+  "Ethiopia","Finland","France","Germany","Ghana","Greece","Hungary","Iceland",
+  "India","Indonesia","Iraq","Ireland","Israel","Italy","Japan","Jordan","Kenya",
+  "Kuwait","Latvia","Lithuania","Luxembourg","Malaysia","Mexico","Morocco",
+  "Netherlands","New Zealand","Nigeria","Norway","Oman","Pakistan","Panama",
+  "Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania",
+  "Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia",
+  "South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland",
+  "Tanzania","Thailand","Tunisia","Türkiye","Ukraine",
+  "United Arab Emirates","United Kingdom","United States","Uruguay","Vietnam",
+  "Democratic Republic of the Congo"
+]);
+
+function normalizeCountries(value) {
+  return cleanStringArray(value, 8)
+    .map(normalizeCountryName)
+    .filter((country) => VALID_COUNTRIES.has(country));
+}
+
 function normalizeCountryName(value) {
   const raw = cleanString(value);
   if (!raw) return "";
@@ -411,9 +434,7 @@ function normalizeItem(item, index, dateOnly, now) {
         : "Low";
 
   const region = normalizeRegion(item?.region);
-  const countries = cleanStringArray(item?.countries, 8)
-    .map(normalizeCountryName)
-    .filter(Boolean);
+  const countries = normalizeCountries(item?.countries);
 
   const entities = (Array.isArray(item?.entities) ? item.entities : [])
     .map(normalizeEntity)
@@ -729,8 +750,7 @@ function buildKnowledgeDiff(previousEntities, currentEntities, previousRelations
 /* -------------------------------------------------------------------------- */
 
 function signalDedupKey(item) {
-  const countries = cleanStringArray(item?.countries, 8)
-    .map(normalizeCountryName)
+  const countries = normalizeCountries(item?.countries)
     .sort()
     .join("|");
 
@@ -742,9 +762,7 @@ function signalDedupKey(item) {
 }
 
 function toMapSignal(item, generatedAt) {
-  const countries = cleanStringArray(item?.countries, 8)
-    .map(normalizeCountryName)
-    .filter(Boolean);
+  const countries = normalizeCountries(item?.countries);
 
   return {
     signal_id: stableId(
@@ -1526,6 +1544,8 @@ REQUIREMENTS:
 - Do not invent named companies, projects, regulations, standards, awards,
   incidents, prices, or primary-source claims.
 - Use [] for countries when a specific assignment is not justified.
+- countries[] may contain country names only; never place technologies, topics,
+  markets, equipment, tags, sectors, or procurement terms in countries[].
 - Include geographic and category variety.
 `.trim();
 }
