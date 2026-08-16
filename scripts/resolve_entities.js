@@ -1,3 +1,4 @@
+
 // scripts/resolve_entities.js
 // PTD Today — Entity Resolution and Graph Repair Engine
 //
@@ -169,16 +170,26 @@ function entityMatchKey(entity) {
     : grammatical;
 }
 
+const VALID_ENTITY_TYPES = new Set([
+  "Technology",
+  "Company",
+  "Country",
+  "Organization",
+  "Material",
+  "Project",
+  "Standard",
+  "Policy",
+  "Infrastructure",
+  "Market",
+  "Concept"
+]);
+
 const TYPE_PRIORITY = [
   "Country",
   "Company",
-  "Utility",
-  "ISO/RTO",
   "Organization",
   "Project",
-  "Facility",
   "Infrastructure",
-  "Equipment",
   "Technology",
   "Material",
   "Standard",
@@ -187,17 +198,29 @@ const TYPE_PRIORITY = [
   "Concept"
 ];
 
+function normalizeResolvedType(value) {
+  const type = clean(value);
+
+  // Repair legacy types that are outside the generator's controlled taxonomy.
+  if (type === "Utility" || type === "ISO/RTO") return "Organization";
+  if (type === "Facility" || type === "Equipment") return "Infrastructure";
+
+  return VALID_ENTITY_TYPES.has(type) ? type : "Concept";
+}
+
 function chooseType(entities, canonical) {
   const override = TYPE_OVERRIDES.get(normalize(canonical));
   if (override) return override;
 
-  const types = entities.map((entity) => clean(entity.type)).filter(Boolean);
+  const types = entities
+    .map((entity) => normalizeResolvedType(entity.type))
+    .filter(Boolean);
 
   for (const preferred of TYPE_PRIORITY) {
     if (types.includes(preferred)) return preferred;
   }
 
-  return types[0] || "Concept";
+  return "Concept";
 }
 
 function chooseCanonicalEntity(group) {
@@ -284,9 +307,13 @@ function buildResolution(entities) {
 
   for (const entity of entities) {
     const key = entityMatchKey(entity);
-    const group = groups.get(key) || [];
+
+    // Never merge malformed/unnamed records together under an empty key.
+    const safeKey = key || `__entity_id__:${clean(entity.entity_id)}`;
+
+    const group = groups.get(safeKey) || [];
     group.push(entity);
-    groups.set(key, group);
+    groups.set(safeKey, group);
   }
 
   const redirects = new Map();
@@ -333,8 +360,8 @@ function rewriteDevelopment(development, redirects, entityById) {
     });
   }
 
-  const rewrittenRelationships = (development.relationships || []).map(
-    (relationship) => ({
+  const rewrittenRelationships = (development.relationships || [])
+    .map((relationship) => ({
       ...relationship,
       from_entity_id:
         redirects.get(relationship.from_entity_id) ||
@@ -342,8 +369,13 @@ function rewriteDevelopment(development, redirects, entityById) {
       to_entity_id:
         redirects.get(relationship.to_entity_id) ||
         relationship.to_entity_id
-    })
-  );
+    }))
+    .filter(
+      (relationship) =>
+        !relationship.from_entity_id ||
+        !relationship.to_entity_id ||
+        relationship.from_entity_id !== relationship.to_entity_id
+    );
 
   return {
     ...development,
