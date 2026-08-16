@@ -46,6 +46,12 @@ jobs:
           git fetch origin main
           git checkout main
           git reset --hard origin/main
+      - name: Cosmos Preflight Syntax Check
+        run: |
+          node --check scripts/generate_ai_news.js
+          node --check scripts/validate_intelligence.cjs
+          node --check scripts/normalize_map_signals.cjs
+          node --check scripts/cosmos_state_delta.cjs
 
       # ----------------------------------------------------------------------
       # 2. Existing PTD Today source feeds
