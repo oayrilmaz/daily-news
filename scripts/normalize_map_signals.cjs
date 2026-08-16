@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Permanent Map Signal Normalizer
+ * PTD Today / Cosmos — Permanent Map Signal Normalizer v1.1
  *
  * Runs after entity resolution and lifecycle generation, before the strict
  * Cosmos integrity gate.
@@ -37,15 +37,19 @@ const REPORT_FILE = path.join(
 );
 
 const VALID_COUNTRIES = new Set([
-  "Algeria","Argentina","Australia","Belgium","Brazil","Canada","Chile","China",
-  "Colombia","Denmark","Egypt","Finland","France","Germany","Greece","India",
-  "Indonesia","Israel","Italy","Japan","Kenya","Malaysia","Mexico","Morocco",
-  "Netherlands","New Zealand","Nigeria","Norway","Oman","Peru","Philippines",
-  "Poland","Portugal","Qatar","Saudi Arabia","Singapore","South Africa",
-  "South Korea","Spain","Sweden","Thailand","Turkey","Türkiye",
-  "United Arab Emirates","United Kingdom","United States","Vietnam",
-  "Democratic Republic of the Congo","Czechia","Austria","Switzerland",
-  "Ireland"
+  "Algeria","Argentina","Australia","Austria","Bahrain","Bangladesh","Belgium",
+  "Bolivia","Brazil","Bulgaria","Canada","Chile","China","Colombia","Costa Rica",
+  "Croatia","Czechia","Denmark","Dominican Republic","Ecuador","Egypt","Estonia",
+  "Ethiopia","Finland","France","Germany","Ghana","Greece","Hungary","Iceland",
+  "India","Indonesia","Iraq","Ireland","Israel","Italy","Japan","Jordan","Kenya",
+  "Kuwait","Latvia","Lithuania","Luxembourg","Malaysia","Mexico","Morocco",
+  "Netherlands","New Zealand","Nigeria","Norway","Oman","Pakistan","Panama",
+  "Paraguay","Peru","Philippines","Poland","Portugal","Qatar","Romania",
+  "Saudi Arabia","Senegal","Serbia","Singapore","Slovakia","Slovenia",
+  "South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland",
+  "Tanzania","Thailand","Tunisia","Turkey","Türkiye","Ukraine",
+  "United Arab Emirates","United Kingdom","United States","Uruguay","Vietnam",
+  "Democratic Republic of the Congo"
 ]);
 
 function readJson(file, required = true) {
@@ -127,7 +131,7 @@ function main() {
   );
 
   const report = {
-    schema_version: "1.0",
+    schema_version: "1.1",
     normalized_at: new Date().toISOString(),
     signals_before: payload.signals.length,
     signals_after: 0,
