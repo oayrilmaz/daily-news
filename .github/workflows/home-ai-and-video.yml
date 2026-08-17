@@ -1,6 +1,7 @@
 
 
 
+
 name: Home AI + Video (PTD Today)
 
 on:
@@ -56,6 +57,7 @@ jobs:
           node --check scripts/normalize_map_signals.cjs
           node --check scripts/validate_intelligence.cjs
           node --check scripts/cosmos_state_delta.cjs
+          node --check scripts/cosmos_impact_engine.cjs
           node --check scripts/backfill_history_from_articles.js
 
       # ----------------------------------------------------------------------
@@ -441,6 +443,19 @@ jobs:
         run: node scripts/cosmos_state_delta.cjs
 
       # ----------------------------------------------------------------------
+      # 6B. Cosmos Impact / Propagation Engine
+      #
+      # Deterministic and zero-OpenAI-credit.
+      # Runs after State + Delta so the persistent impact graph reflects the
+      # newly generated current Cosmos state.
+      # ----------------------------------------------------------------------
+
+      - name: Build Cosmos Impact Graph
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/cosmos_impact_engine.cjs
+
+      # ----------------------------------------------------------------------
       # 7. Rebuild historical analytics from accumulated intelligence
       # ----------------------------------------------------------------------
 
@@ -551,9 +566,11 @@ jobs:
           test -f knowledge/map-signals-normalization-report.json
           test -f knowledge/cosmos/state-current.json
           test -f knowledge/cosmos/delta-current.json
+          test -f knowledge/cosmos/impact-current.json
           test -f "knowledge/cosmos/state-history/$(date -u +%F).json"
           test -f "knowledge/cosmos/delta-history/$(date -u +%F).json"
-          echo "Core knowledge graph, Cosmos integrity, state, and delta outputs are ready."
+          test -f "knowledge/cosmos/impact-history/$(date -u +%F).json"
+          echo "Core knowledge graph, Cosmos integrity, state, delta, and impact outputs are ready."
 
       - name: Verify Entity Lifecycle and Snapshot
         run: |
