@@ -1,3 +1,4 @@
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -42,6 +43,7 @@ jobs:
             "scripts/normalize_map_signals.cjs"
             "scripts/validate_intelligence.cjs"
             "scripts/cosmos_state_delta.cjs"
+            "scripts/cosmos_impact_engine.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -63,6 +65,7 @@ jobs:
           node --check scripts/normalize_map_signals.cjs
           node --check scripts/validate_intelligence.cjs
           node --check scripts/cosmos_state_delta.cjs
+          node --check scripts/cosmos_impact_engine.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -224,6 +227,215 @@ jobs:
           }
 
           console.log("\nCosmos source/data compatibility checks passed.");
+          NODE
+
+      - name: Test Cosmos Impact Engine In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_impact_engine.cjs "$TEST_DIR/scripts/"
+          cp knowledge/relationships.json "$TEST_DIR/knowledge/"
+          cp knowledge/developments.json "$TEST_DIR/knowledge/"
+
+          if [ -f "knowledge/cosmos/state-current.json" ] && \
+             [ -f "knowledge/cosmos/delta-current.json" ]; then
+            cp knowledge/cosmos/state-current.json \
+              "$TEST_DIR/knowledge/cosmos/state-current.json"
+            cp knowledge/cosmos/delta-current.json \
+              "$TEST_DIR/knowledge/cosmos/delta-current.json"
+          else
+            echo "Committed Cosmos state/delta not found."
+            echo "Creating a minimal deterministic fixture for the impact-engine test."
+
+            node - "$TEST_DIR" <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.argv[2];
+          const relationships = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/relationships.json"),
+              "utf8"
+            )
+          );
+
+          const usable = (relationships.relationships || []).find((rel) => {
+            const type = String(rel.relationship_type || "").toUpperCase();
+            return (
+              rel.from_entity_id &&
+              rel.to_entity_id &&
+              rel.from_entity_id !== rel.to_entity_id &&
+              type !== "LOCATED_IN" &&
+              Number(rel.strength || 0) >= 65 &&
+              Number(rel.confidence || 0) >= 0.65
+            );
+          });
+
+          if (!usable) {
+            throw new Error(
+              "No relationship is strong enough to build the preflight fixture."
+            );
+          }
+
+          const ids = [usable.from_entity_id, usable.to_entity_id];
+
+          const state = {
+            schema_version: "preflight-fixture",
+            generated_at: new Date().toISOString(),
+            date_utc: "2099-01-01",
+            entities: Object.fromEntries(
+              ids.map((id, index) => [
+                id,
+                {
+                  entity_id: id,
+                  name: `Preflight Entity ${index + 1}`,
+                  type: "Concept",
+                  lifecycle_status: "active",
+                  importance_score: 80,
+                  momentum_score: null,
+                  momentum_status: "insufficient_history",
+                  last_seen_at: new Date().toISOString(),
+                  relationship_degree: 1,
+                  linked_development_count: 1
+                }
+              ])
+            )
+          };
+
+          const delta = {
+            schema_version: "preflight-fixture",
+            generated_at: new Date().toISOString(),
+            date_utc: "2099-01-01",
+            cold_start: false,
+            added_entities: [
+              {
+                entity_id: usable.from_entity_id,
+                name: "Preflight Entity 1",
+                type: "Concept"
+              }
+            ],
+            removed_entities: [],
+            changed_entities: []
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge/cosmos/state-current.json"),
+            JSON.stringify(state, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "knowledge/cosmos/delta-current.json"),
+            JSON.stringify(delta, null, 2)
+          );
+          NODE
+          fi
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_impact_engine.cjs
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const outputPath = path.join(
+            root,
+            "knowledge/cosmos/impact-current.json"
+          );
+
+          if (!fs.existsSync(outputPath)) {
+            throw new Error(
+              "Impact engine did not create knowledge/cosmos/impact-current.json"
+            );
+          }
+
+          const impact = JSON.parse(
+            fs.readFileSync(outputPath, "utf8")
+          );
+
+          const errors = [];
+
+          if (impact.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected impact schema_version: ${impact.schema_version}`
+            );
+          }
+
+          if (!impact.seeds || !Array.isArray(impact.seeds.items)) {
+            errors.push("impact-current.json: seeds.items[] missing");
+          }
+
+          if (!impact.summary || typeof impact.summary !== "object") {
+            errors.push("impact-current.json: summary missing");
+          }
+
+          if (!Array.isArray(impact.impacts)) {
+            errors.push("impact-current.json: impacts[] missing");
+          }
+
+          if (
+            !["ready", "no_seed", "no_paths_above_threshold"].includes(
+              impact.status
+            )
+          ) {
+            errors.push(
+              `impact-current.json: invalid status "${impact.status}"`
+            );
+          }
+
+          for (const row of impact.impacts || []) {
+            if (row.reasoning_mode !== "graph_propagation") {
+              errors.push(
+                `Impact ${row.impact_id || "(unknown)"} has invalid reasoning_mode`
+              );
+            }
+
+            if (
+              !row.path ||
+              !Array.isArray(row.path.entity_ids) ||
+              !Array.isArray(row.path.steps) ||
+              row.path.steps.length !== row.propagation_depth
+            ) {
+              errors.push(
+                `Impact ${row.impact_id || "(unknown)"} has an invalid path`
+              );
+            }
+
+            if (
+              !Number.isInteger(row.propagation_depth) ||
+              row.propagation_depth < 1 ||
+              row.propagation_depth > 3
+            ) {
+              errors.push(
+                `Impact ${row.impact_id || "(unknown)"} has invalid propagation depth`
+              );
+            }
+          }
+
+          if (errors.length) {
+            console.error("\nImpact Engine preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nImpact Engine isolated test passed.");
+          console.log(`Status:  ${impact.status}`);
+          console.log(`Seeds:   ${impact.seeds.count}`);
+          console.log(`Impacts: ${impact.summary.impact_count}`);
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
           NODE
 
       - name: Preflight Complete
