@@ -1,4 +1,5 @@
 
+
 // scripts/generate_ai_news.js
 // PTD Today — Transitional Intelligence Generator for the new PTDToday.com
 //
@@ -821,6 +822,60 @@ function mapToRankedArray(counts, limit = 20) {
     .slice(0, limit);
 }
 
+function evidenceDevelopmentId(item) {
+  return cleanString(item?.development_id || item?.id);
+}
+
+function rankWithEvidence(items, getter, limit = 20, labeler = null) {
+  const groups = new Map();
+
+  for (const item of items) {
+    const values = getter(item);
+    const list = Array.isArray(values) ? values : [values];
+    const developmentId = evidenceDevelopmentId(item);
+
+    for (const raw of list) {
+      const name = cleanString(raw);
+      if (!name) continue;
+
+      const existing = groups.get(name) || {
+        name,
+        count: 0,
+        evidence_development_ids: []
+      };
+
+      existing.count += 1;
+
+      if (
+        developmentId &&
+        !existing.evidence_development_ids.includes(developmentId)
+      ) {
+        existing.evidence_development_ids.push(developmentId);
+      }
+
+      groups.set(name, existing);
+    }
+  }
+
+  return [...groups.values()]
+    .map((entry) => ({
+      ...entry,
+      ...(labeler ? { label: labeler(entry.name) } : {})
+    }))
+    .sort((a, b) =>
+      b.count - a.count ||
+      a.name.localeCompare(b.name)
+    )
+    .slice(0, limit);
+}
+
+function uniqueEvidenceIds(...lists) {
+  return cleanStringArray(
+    lists.flatMap((list) => Array.isArray(list) ? list : []),
+    5000
+  );
+}
+
 function flattenHistoryItems(payloads) {
   return payloads.flatMap((payload) =>
     (Array.isArray(payload.items) ? payload.items : []).map((item) => ({
@@ -963,10 +1018,30 @@ function createWindowAnalytics(payloads, days) {
   const windowPayloads = selectHistoryWindow(payloads, days);
   const items = flattenHistoryItems(windowPayloads);
 
-  const categoryCounts = countBy(items, (item) => item.category);
-  const regionCounts = countBy(items, (item) => item.region);
-  const countryCounts = countBy(items, (item) => item.countries || []);
-  const tagCounts = countBy(items, (item) => item.tags || []);
+  const categories = rankWithEvidence(
+    items,
+    (item) => item.category,
+    12
+  );
+
+  const regions = rankWithEvidence(
+    items,
+    (item) => item.region,
+    12
+  );
+
+  const countries = rankWithEvidence(
+    items,
+    (item) => item.countries || [],
+    30
+  );
+
+  const topics = rankWithEvidence(
+    items,
+    (item) => item.tags || [],
+    30,
+    topicLabelFromTag
+  );
 
   const averageConfidence = items.length
     ? round(
@@ -985,13 +1060,10 @@ function createWindowAnalytics(payloads, days) {
     briefing_count: windowPayloads.length,
     signal_count: items.length,
     average_confidence: averageConfidence,
-    categories: mapToRankedArray(categoryCounts, 12),
-    regions: mapToRankedArray(regionCounts, 12),
-    countries: mapToRankedArray(countryCounts, 30),
-    topics: mapToRankedArray(tagCounts, 30).map((entry) => ({
-      ...entry,
-      label: topicLabelFromTag(entry.name)
-    }))
+    categories,
+    regions,
+    countries,
+    topics
   };
 }
 
@@ -1005,14 +1077,29 @@ function rankedCountMap(rankedArray) {
 }
 
 function calculateMomentum(shortWindow, longWindow, key) {
-  const shortMap = rankedCountMap(shortWindow[key]);
-  const longMap = rankedCountMap(longWindow[key]);
-  const names = new Set([...shortMap.keys(), ...longMap.keys()]);
+  const shortRows = new Map(
+    (Array.isArray(shortWindow[key]) ? shortWindow[key] : []).map((entry) => [
+      entry.name,
+      entry
+    ])
+  );
+
+  const longRows = new Map(
+    (Array.isArray(longWindow[key]) ? longWindow[key] : []).map((entry) => [
+      entry.name,
+      entry
+    ])
+  );
+
+  const names = new Set([...shortRows.keys(), ...longRows.keys()]);
   const rows = [];
 
   for (const name of names) {
-    const shortCount = shortMap.get(name) || 0;
-    const longCount = longMap.get(name) || 0;
+    const shortRow = shortRows.get(name) || {};
+    const longRow = longRows.get(name) || {};
+
+    const shortCount = Number(shortRow.count) || 0;
+    const longCount = Number(longRow.count) || 0;
     const shortDaily = shortCount / Math.max(1, shortWindow.days);
     const longDaily = longCount / Math.max(1, longWindow.days);
 
@@ -1022,6 +1109,19 @@ function calculateMomentum(shortWindow, longWindow, key) {
     } else if (shortDaily > 0) {
       momentumPercent = 100;
     }
+
+    const shortEvidenceIds = cleanStringArray(
+      shortRow.evidence_development_ids,
+      5000
+    );
+    const longEvidenceIds = cleanStringArray(
+      longRow.evidence_development_ids,
+      5000
+    );
+    const evidenceDevelopmentIds = uniqueEvidenceIds(
+      shortEvidenceIds,
+      longEvidenceIds
+    );
 
     rows.push({
       name,
@@ -1036,7 +1136,11 @@ function calculateMomentum(shortWindow, longWindow, key) {
           ? "Rising"
           : momentumPercent <= -12
             ? "Cooling"
-            : "Stable"
+            : "Stable",
+      short_evidence_development_ids: shortEvidenceIds,
+      long_evidence_development_ids: longEvidenceIds,
+      evidence_development_ids: evidenceDevelopmentIds,
+      evidence_signal_count: evidenceDevelopmentIds.length
     });
   }
 
@@ -1114,7 +1218,23 @@ function buildOutlookEntries(momentumRows, horizonDays, limit = 8) {
     .filter((row) => row.short_count > 0 || row.long_count > 0)
     .slice(0, limit)
     .map((row) => {
-      const evidenceCount = row.short_count + row.long_count;
+      const evidenceDevelopmentIds = cleanStringArray(
+        row.evidence_development_ids,
+        5000
+      );
+
+      /*
+       * The 7-day window is contained inside the 30-day window, so
+       * short_count + long_count can double-count recent signals.
+       * Outlook evidence is therefore based on UNIQUE contributing
+       * development IDs.
+       */
+      const evidenceCount = evidenceDevelopmentIds.length ||
+        Math.max(
+          Number(row.short_count || 0),
+          Number(row.long_count || 0)
+        );
+
       const evidenceConfidence = clamp(
         0.55 + Math.min(evidenceCount, 14) * 0.025,
         0.55,
@@ -1135,6 +1255,15 @@ function buildOutlookEntries(momentumRows, horizonDays, limit = 8) {
         probability,
         confidence: outlookConfidence(probability, evidenceCount),
         evidence_signal_count: evidenceCount,
+        evidence_development_ids: evidenceDevelopmentIds,
+        short_evidence_development_ids: cleanStringArray(
+          row.short_evidence_development_ids,
+          5000
+        ),
+        long_evidence_development_ids: cleanStringArray(
+          row.long_evidence_development_ids,
+          5000
+        ),
         evidence_mode: "ai_scenario_history",
         statement: createOutlookStatement(
           row.label || row.name,
@@ -1153,12 +1282,13 @@ function buildOutlook(trends, generatedAt) {
       "AI-generated probabilistic scenarios based only on PTD Today scenario-signal history. These are not guarantees, investment advice, operational instructions, verified forecasts, or engineering conclusions.",
     methodology: {
       summary:
-        "Probabilities are a transparent heuristic based on recent scenario-signal frequency, evidence volume, and confidence metadata.",
+        "Probabilities are a transparent heuristic based on recent scenario-signal frequency, unique contributing development evidence, and confidence metadata.",
       limitations: [
         "Current source intelligence is AI-generated scenario content.",
         "Signal frequency is not the same as real-world event probability.",
         "Outlooks require validation against authoritative primary sources.",
-        "Low historical coverage reduces confidence."
+        "Low historical coverage reduces confidence.",
+        "Evidence counts represent unique contributing development IDs; the 7-day subset is not added again to the 30-day evidence set."
       ]
     },
     horizons: {
