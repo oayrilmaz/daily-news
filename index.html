@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -622,6 +623,114 @@
       font-size:11px;
       font-weight:700;
     }
+
+    .outlookEvidenceButton{
+      appearance:none;
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 8px;
+      border:1px solid rgba(0,0,0,.22);
+      border-radius:999px;
+      background:#111;
+      color:#fff;
+      font-family:inherit;
+      font-size:11px;
+      font-weight:800;
+      cursor:pointer;
+      line-height:1.2;
+    }
+    .outlookEvidenceButton:hover{opacity:.86}
+    .outlookEvidenceButton[aria-expanded="true"]{
+      background:#fff;
+      color:#111;
+    }
+    .outlookEvidencePanel{
+      margin-top:12px;
+      padding:12px;
+      border:1px solid var(--rule);
+      border-radius:12px;
+      background:rgba(0,0,0,.018);
+    }
+    .outlookEvidencePanel[hidden]{display:none}
+    .outlookEvidenceHead{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      margin-bottom:9px;
+    }
+    .outlookEvidenceTitle{
+      margin:0;
+      font-size:14px;
+      line-height:1.25;
+      font-weight:900;
+    }
+    .outlookEvidenceNote{
+      margin:3px 0 0;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.4;
+    }
+    .outlookEvidenceList{
+      margin:0;
+      padding:0;
+      list-style:none;
+    }
+    .outlookEvidenceItem{
+      padding:9px 0;
+      border-top:1px solid var(--soft);
+    }
+    .outlookEvidenceItem:first-child{
+      border-top:none;
+      padding-top:0;
+    }
+    .outlookEvidenceItemTitle{
+      margin:0 0 4px;
+      font-size:13px;
+      line-height:1.35;
+      font-weight:800;
+    }
+    .outlookEvidenceItemMeta{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      align-items:center;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.35;
+    }
+    .outlookEvidenceLink{
+      color:#111;
+      font-weight:800;
+      text-decoration:underline;
+      text-underline-offset:2px;
+    }
+    .outlookEvidenceRole{
+      display:inline-flex;
+      align-items:center;
+      padding:3px 6px;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:#fff;
+      color:rgba(0,0,0,.68);
+      font-size:10px;
+      font-weight:800;
+    }
+    .outlookEvidenceMore{
+      appearance:none;
+      margin-top:9px;
+      padding:6px 9px;
+      border:1px solid var(--rule);
+      border-radius:999px;
+      background:#fff;
+      color:#111;
+      font-family:inherit;
+      font-size:11px;
+      font-weight:800;
+      cursor:pointer;
+    }
     .pulseEmpty{
       padding:16px;
       border:1px dashed var(--rule);
@@ -1002,6 +1111,7 @@
     const MAP_SIGNALS_URL = "/briefs/map-signals.json";
     const TRENDS_URL = "/briefs/trends.json";
     const OUTLOOK_URL = "/briefs/outlook.json";
+    const DEVELOPMENTS_URL = "/knowledge/developments.json";
     const VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/view";
     const SITE_VIEW_API = "https://ptdtoday-view-counter.ozgurayrilmaz.workers.dev/site";
     const SITE_VIEW_SESSION_KEY = "ptdtoday_site_view_counted";
@@ -1019,6 +1129,7 @@
       outlook:null,
       payload:null,
       mapSignals:[],
+      developments:new Map(),
       activeTab:"24h"
     };
 
@@ -1379,6 +1490,171 @@
         });
     }
 
+
+    function evidenceDateFromId(id){
+      const match = String(id || "").match(/ai-(\d{4})(\d{2})(\d{2})-/i);
+      if(!match)return "";
+      return `${match[1]}-${match[2]}-${match[3]}`;
+    }
+
+    function evidenceDevelopmentRecord(id){
+      return MarketPulse.developments.get(String(id || "")) || null;
+    }
+
+    function evidenceArticleUrl(id){
+      return `${window.location.origin}/articles/${encodeURIComponent(id)}.html`;
+    }
+
+    function evidenceRole(id,entry){
+      const recent = new Set(
+        Array.isArray(entry?.short_evidence_development_ids)
+          ? entry.short_evidence_development_ids
+          : []
+      );
+
+      if(recent.has(id)){
+        return "Recent 7-day signal";
+      }
+
+      return "30-day baseline signal";
+    }
+
+    function evidenceItemHtml(id,entry,index,initialLimit){
+      const development = evidenceDevelopmentRecord(id);
+      const title =
+        development?.title ||
+        development?.summary ||
+        `PTD Today intelligence ${id}`;
+
+      const date =
+        development?.date_utc ||
+        String(development?.created_at || "").slice(0,10) ||
+        evidenceDateFromId(id);
+
+      const geography = [
+        ...(Array.isArray(development?.countries) ? development.countries.slice(0,2) : []),
+        development?.region || ""
+      ].filter(Boolean);
+
+      const confidence =
+        typeof development?.confidence_score === "number"
+          ? `${Math.round(development.confidence_score * 100)}% confidence`
+          : (
+              development?.confidence_label
+                ? `${development.confidence_label} confidence`
+                : ""
+            );
+
+      const hiddenAttr = index >= initialLimit ? ` data-evidence-extra="1" hidden` : "";
+
+      return `
+        <li class="outlookEvidenceItem"${hiddenAttr}>
+          <p class="outlookEvidenceItemTitle">${escapeHtml(title)}</p>
+          <div class="outlookEvidenceItemMeta">
+            <span class="outlookEvidenceRole">${escapeHtml(evidenceRole(id,entry))}</span>
+            ${date ? `<span>${escapeHtml(date)}</span>` : ""}
+            ${geography.length ? `<span>${escapeHtml(geography.join(" • "))}</span>` : ""}
+            ${confidence ? `<span>${escapeHtml(confidence)}</span>` : ""}
+            <a
+              class="outlookEvidenceLink"
+              href="${escapeHtml(evidenceArticleUrl(id))}"
+              target="_blank"
+              rel="noopener"
+            >Open intelligence →</a>
+          </div>
+        </li>
+      `;
+    }
+
+    function renderEvidencePanel(entry,index){
+      const ids = Array.isArray(entry?.evidence_development_ids)
+        ? [...new Set(entry.evidence_development_ids.filter(Boolean))]
+        : [];
+
+      if(!ids.length)return "";
+
+      const initialLimit = 6;
+      const probability = Math.round(Number(entry.probability || 0) * 100);
+
+      return `
+        <div
+          class="outlookEvidencePanel"
+          id="outlook-evidence-${index}"
+          data-outlook-evidence-panel="${index}"
+          hidden
+        >
+          <div class="outlookEvidenceHead">
+            <div>
+              <h4 class="outlookEvidenceTitle">Why ${escapeHtml(probability)}%?</h4>
+              <p class="outlookEvidenceNote">
+                ${escapeHtml(ids.length)} unique PTD Today development${ids.length === 1 ? "" : "s"}
+                contribute to this outlook. Recent 7-day evidence is compared with the broader
+                30-day baseline; the same development is counted only once.
+              </p>
+            </div>
+          </div>
+
+          <ul class="outlookEvidenceList">
+            ${ids.map((id,evidenceIndex)=>
+              evidenceItemHtml(id,entry,evidenceIndex,initialLimit)
+            ).join("")}
+          </ul>
+
+          ${
+            ids.length > initialLimit
+              ? `<button
+                   class="outlookEvidenceMore"
+                   type="button"
+                   data-evidence-more="${index}"
+                   aria-expanded="false"
+                 >Show all ${escapeHtml(ids.length)} signals</button>`
+              : ""
+          }
+        </div>
+      `;
+    }
+
+    function bindOutlookEvidence(){
+      document.querySelectorAll("[data-outlook-evidence]").forEach(button=>{
+        button.addEventListener("click",()=>{
+          const index = button.getAttribute("data-outlook-evidence");
+          const panel = document.querySelector(
+            `[data-outlook-evidence-panel="${CSS.escape(index)}"]`
+          );
+
+          if(!panel)return;
+
+          const willOpen = panel.hidden;
+          panel.hidden = !willOpen;
+          button.setAttribute("aria-expanded",willOpen ? "true" : "false");
+        });
+      });
+
+      document.querySelectorAll("[data-evidence-more]").forEach(button=>{
+        button.addEventListener("click",()=>{
+          const index = button.getAttribute("data-evidence-more");
+          const panel = document.querySelector(
+            `[data-outlook-evidence-panel="${CSS.escape(index)}"]`
+          );
+
+          if(!panel)return;
+
+          const extras = [...panel.querySelectorAll("[data-evidence-extra='1']")];
+          const isExpanded = button.getAttribute("aria-expanded") === "true";
+          const nextExpanded = !isExpanded;
+
+          extras.forEach(item=>{
+            item.hidden = !nextExpanded;
+          });
+
+          button.setAttribute("aria-expanded",nextExpanded ? "true" : "false");
+          button.textContent = nextExpanded
+            ? "Show fewer signals"
+            : `Show all ${panel.querySelectorAll(".outlookEvidenceItem").length} signals`;
+        });
+      });
+    }
+
     function renderOutlook(horizon){
       const outlook = MarketPulse.outlook;
       const key = horizon === 7 ? "next_7_days" : "next_30_days";
@@ -1403,7 +1679,7 @@
 
       $("marketPulseContent").innerHTML = `
         <div class="outlookGrid">
-          ${entries.slice(0,8).map(entry=>`
+          ${entries.slice(0,8).map((entry,index)=>`
             <article class="outlookCard">
               <div class="outlookCardTop">
                 <h3 class="outlookName">${escapeHtml(entry.label || entry.key || "Outlook")}</h3>
@@ -1421,10 +1697,23 @@
                 <span class="outlookBadge">
                   Confidence: ${escapeHtml(entry.confidence || "Low")}
                 </span>
-                <span class="outlookBadge">
-                  Evidence: ${escapeHtml(numberFormat(entry.evidence_signal_count))}
-                </span>
+                ${
+                  Array.isArray(entry.evidence_development_ids) &&
+                  entry.evidence_development_ids.length
+                    ? `<button
+                         class="outlookEvidenceButton"
+                         type="button"
+                         data-outlook-evidence="${index}"
+                         aria-expanded="false"
+                         aria-controls="outlook-evidence-${index}"
+                       >Why ${escapeHtml(Math.round(Number(entry.probability || 0) * 100))}%? · ${escapeHtml(numberFormat(entry.evidence_signal_count))} signals →</button>`
+                    : `<span class="outlookBadge">
+                         Evidence: ${escapeHtml(numberFormat(entry.evidence_signal_count))}
+                       </span>`
+                }
               </div>
+
+              ${renderEvidencePanel(entry,index)}
             </article>
           `).join("")}
         </div>
@@ -1440,6 +1729,8 @@
           }
         </div>
       `;
+
+      bindOutlookEvidence();
     }
 
     function setPulseTab(tab){
@@ -1499,7 +1790,7 @@
     async function initMarketPulse(payload){
       MarketPulse.payload = payload;
 
-      const [trendsResult,outlookResult,mapSignalsResult] = await Promise.allSettled([
+      const [trendsResult,outlookResult,mapSignalsResult,developmentsResult] = await Promise.allSettled([
         fetch(TRENDS_URL,{cache:"no-store"}).then(response=>{
           if(!response.ok)throw new Error(`Trends request failed (${response.status})`);
           return response.json();
@@ -1510,6 +1801,10 @@
         }),
         fetch(MAP_SIGNALS_URL,{cache:"no-store"}).then(response=>{
           if(!response.ok)throw new Error(`Map signals request failed (${response.status})`);
+          return response.json();
+        }),
+        fetch(DEVELOPMENTS_URL,{cache:"no-store"}).then(response=>{
+          if(!response.ok)throw new Error(`Developments request failed (${response.status})`);
           return response.json();
         })
       ]);
@@ -1526,6 +1821,18 @@
           ? mapSignalsResult.value.signals
           : [];
 
+      MarketPulse.developments = new Map(
+        developmentsResult.status === "fulfilled" &&
+        Array.isArray(developmentsResult.value?.developments)
+          ? developmentsResult.value.developments
+              .filter(item=>item?.development_id || item?.id)
+              .map(item=>[
+                String(item.development_id || item.id),
+                item
+              ])
+          : []
+      );
+
       if(trendsResult.status === "rejected"){
         console.warn("Could not load trends.json:",trendsResult.reason);
       }
@@ -1536,6 +1843,13 @@
 
       if(mapSignalsResult.status === "rejected"){
         console.warn("Could not load map-signals.json:",mapSignalsResult.reason);
+      }
+
+      if(developmentsResult.status === "rejected"){
+        console.warn(
+          "Could not load knowledge/developments.json:",
+          developmentsResult.reason
+        );
       }
 
       document.querySelectorAll("[data-pulse-tab]").forEach(button=>{
