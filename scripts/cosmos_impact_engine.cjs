@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Impact / Propagation Engine v0.1
+ * PTD Today / Cosmos — Impact / Propagation Engine v0.2
  *
  * Deterministic, explainable graph propagation. No OpenAI calls.
  *
@@ -44,6 +44,12 @@ const MIN_REL_CONFIDENCE = num(process.env.COSMOS_IMPACT_MIN_REL_CONFIDENCE, 0.6
 const MIN_PATH_SCORE = num(process.env.COSMOS_IMPACT_MIN_PATH_SCORE, 20, 0, 100);
 const MAX_RESULTS = Math.round(num(process.env.COSMOS_IMPACT_MAX_RESULTS, 250, 10, 2000));
 const DEPTH_DECAY = { 1: 1.00, 2: 0.70, 3: 0.45 };
+const MIN_IMPORTANCE_DELTA = num(
+  process.env.COSMOS_IMPACT_MIN_IMPORTANCE_DELTA,
+  1.0,
+  0,
+  100
+);
 
 /*
  * Propagation semantics:
@@ -151,27 +157,216 @@ function isOnDate(dev, dateUtc) {
   return created.startsWith(dateUtc);
 }
 
-function deltaSeeds(delta, lookup) {
-  const out = [];
+
+function developmentTimestamp(dev) {
+  const raw = clean(
+    dev?.created_at ||
+    dev?.occurred_at ||
+    dev?.updated_at ||
+    dev?.date_utc
+  );
+  if (!raw) return null;
+
+  const time = Date.parse(
+    /^\d{4}-\d{2}-\d{2}$/.test(raw)
+      ? `${raw}T00:00:00Z`
+      : raw
+  );
+
+  return Number.isFinite(time) ? time : null;
+}
+
+function buildEntityDevelopmentIndex(developments, delta) {
+  const byEntity = new Map();
+  const dateUtc = clean(delta?.date_utc);
+  const previousTime = Date.parse(clean(delta?.previous_state_generated_at));
+  const currentTime = Date.parse(clean(delta?.current_state_generated_at));
+
+  for (const dev of developments) {
+    const devId = developmentId(dev);
+    if (!devId) continue;
+
+    const ts = developmentTimestamp(dev);
+
+    const inStateInterval =
+      Number.isFinite(previousTime) &&
+      Number.isFinite(currentTime) &&
+      Number.isFinite(ts) &&
+      ts > previousTime &&
+      ts <= currentTime;
+
+    const onCurrentDate = isOnDate(dev, dateUtc);
+
+    if (!inStateInterval && !onCurrentDate) continue;
+
+    for (const id of developmentEntityIds(dev)) {
+      if (!id) continue;
+
+      const rows = byEntity.get(id) || [];
+      rows.push({
+        development_id: devId,
+        timestamp: ts,
+        evidence_mode: clean(dev?.evidence_mode) || null
+      });
+      byEntity.set(id, rows);
+    }
+  }
+
+  return byEntity;
+}
+
+function evidenceForEntity(id, evidenceIndex) {
+  return unique(
+    (evidenceIndex.get(id) || []).map((row) => row.development_id)
+  );
+}
+
+function numericChange(changes, key) {
+  const row = changes?.[key];
+  if (!row || typeof row !== "object") return null;
+
+  const from = Number(row.from);
+  const to = Number(row.to);
+
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return { from, to, delta: to - from };
+}
+
+function classifySeed(kind, row, evidenceIds) {
+  if (kind === "added_entity") {
+    return {
+      propagation_eligible: true,
+      significance: evidenceIds.length ? "strong" : "medium",
+      significance_score: evidenceIds.length ? 100 : 75,
+      significance_reasons: [
+        evidenceIds.length
+          ? "New entity is linked to a development in the current state interval."
+          : "New entity entered the current Cosmos graph."
+      ]
+    };
+  }
+
+  if (kind === "removed_entity") {
+    return {
+      propagation_eligible: true,
+      significance: "strong",
+      significance_score: 100,
+      significance_reasons: [
+        "Entity was removed from the active current Cosmos graph."
+      ]
+    };
+  }
+
+  const changes = row?.changes || {};
+  const reasons = [];
+  let score = 0;
+
+  if (changes.lifecycle_status) {
+    score += 45;
+    reasons.push("Lifecycle status changed.");
+  }
+
+  if (changes.relationship_degree) {
+    const rel = numericChange(changes, "relationship_degree");
+    const magnitude = Math.abs(rel?.delta || 0);
+    if (magnitude > 0) {
+      score += Math.min(35, 18 + magnitude * 4);
+      reasons.push(`Relationship degree changed by ${round(rel.delta, 2)}.`);
+    }
+  }
+
+  if (changes.linked_development_count) {
+    const dev = numericChange(changes, "linked_development_count");
+    const magnitude = Math.abs(dev?.delta || 0);
+    if (magnitude > 0) {
+      score += Math.min(40, 20 + magnitude * 5);
+      reasons.push(`Linked development count changed by ${round(dev.delta, 2)}.`);
+    }
+  }
+
+  if (changes.type) {
+    score += 22;
+    reasons.push("Entity type changed.");
+  }
+
+  if (changes.name) {
+    score += 12;
+    reasons.push("Entity name changed.");
+  }
+
+  const importance = numericChange(changes, "importance_score");
+  if (importance && Math.abs(importance.delta) >= MIN_IMPORTANCE_DELTA) {
+    score += Math.min(35, 15 + Math.abs(importance.delta) * 4);
+    reasons.push(
+      `Importance score changed materially by ${round(importance.delta, 2)}.`
+    );
+  }
+
+  if (evidenceIds.length) {
+    score += Math.min(30, 12 + evidenceIds.length * 3);
+    reasons.push(
+      `${evidenceIds.length} current development${evidenceIds.length === 1 ? "" : "s"} linked to this entity.`
+    );
+  }
+
+  return {
+    propagation_eligible: score >= 20,
+    significance:
+      score >= 60 ? "strong" :
+      score >= 20 ? "medium" :
+      "contextual",
+    significance_score: round(Math.min(100, score), 1),
+    significance_reasons:
+      reasons.length
+        ? reasons
+        : ["Only low-significance metadata/timestamp drift was observed."]
+  };
+}
+
+function deltaSeeds(delta, lookup, evidenceIndex) {
+  const propagating = [];
+  const observed = [];
   const seen = new Set();
+
   const push = (id, kind, row, reason) => {
     if (!id || seen.has(id)) return;
     seen.add(id);
+
     const e = lookup.get(id);
-    out.push({
+    const evidenceIds = evidenceForEntity(id, evidenceIndex);
+    const classification = classifySeed(kind, row, evidenceIds);
+
+    const seed = {
       entity_id: id,
       name: e?.name || row?.name || id,
       type: e?.type || row?.type || null,
       seed_kind: kind,
       seed_reason: reason,
       changes: row?.changes || null,
-      evidence_development_ids: []
-    });
+      evidence_development_ids: evidenceIds,
+      propagation_eligible: classification.propagation_eligible,
+      significance: classification.significance,
+      significance_score: classification.significance_score,
+      significance_reasons: classification.significance_reasons
+    };
+
+    if (classification.propagation_eligible) propagating.push(seed);
+    else observed.push(seed);
   };
-  for (const row of delta?.added_entities || []) push(entityId(row), "added_entity", row, "Entity was added in the current Cosmos delta.");
-  for (const row of delta?.changed_entities || []) push(entityId(row), "changed_entity", row, "Entity changed in the current Cosmos delta.");
-  for (const row of delta?.removed_entities || []) push(entityId(row), "removed_entity", row, "Entity was removed from the active current Cosmos state.");
-  return out;
+
+  for (const row of delta?.added_entities || []) {
+    push(entityId(row), "added_entity", row, "Entity was added in the current Cosmos delta.");
+  }
+
+  for (const row of delta?.changed_entities || []) {
+    push(entityId(row), "changed_entity", row, "Entity changed in the current Cosmos delta.");
+  }
+
+  for (const row of delta?.removed_entities || []) {
+    push(entityId(row), "removed_entity", row, "Entity was removed from the active current Cosmos state.");
+  }
+
+  return { propagating, observed };
 }
 
 function coldStartSeeds(delta, developments, lookup) {
@@ -201,11 +396,43 @@ function coldStartSeeds(delta, developments, lookup) {
 }
 
 function buildSeeds(delta, developments, lookup) {
-  const normal = deltaSeeds(delta, lookup);
-  if (!delta?.cold_start && normal.length) return { strategy: "delta_entities", seeds: normal };
+  const evidenceIndex = buildEntityDevelopmentIndex(developments, delta);
+  const normal = deltaSeeds(delta, lookup, evidenceIndex);
+
+  if (!delta?.cold_start && (normal.propagating.length || normal.observed.length)) {
+    return {
+      strategy: "evidence_grounded_delta_entities",
+      seeds: normal.propagating,
+      observed_deltas: normal.observed,
+      evidence_indexed_entities: evidenceIndex.size
+    };
+  }
+
   const baseline = coldStartSeeds(delta, developments, lookup);
-  if (baseline.length) return { strategy: "cold_start_today_developments", seeds: baseline };
-  return { strategy: "no_seed", seeds: [] };
+
+  if (baseline.length) {
+    return {
+      strategy: "cold_start_today_developments",
+      seeds: baseline.map((seed) => ({
+        ...seed,
+        propagation_eligible: true,
+        significance: "baseline",
+        significance_score: 100,
+        significance_reasons: [
+          "Cold-start entity is explicitly linked to a current-date development."
+        ]
+      })),
+      observed_deltas: [],
+      evidence_indexed_entities: evidenceIndex.size
+    };
+  }
+
+  return {
+    strategy: "no_seed",
+    seeds: [],
+    observed_deltas: normal.observed || [],
+    evidence_indexed_entities: evidenceIndex.size
+  };
 }
 
 function ruleFor(rel) {
@@ -327,6 +554,13 @@ function propagate(seed, adjacency, lookup) {
         affected: compactEntity(nextId, lookup),
         seed_kind: seed.seed_kind,
         seed_reason: seed.seed_reason,
+        seed_significance: seed.significance || null,
+        seed_significance_score: Number.isFinite(Number(seed.significance_score))
+          ? Number(seed.significance_score)
+          : null,
+        seed_evidence_development_ids: unique(
+          seed.evidence_development_ids || []
+        ),
         propagation_depth: nextEdges.length,
         direct: nextEdges.length === 1,
         reasoning_mode: "graph_propagation",
@@ -393,11 +627,11 @@ function main() {
   const dateUtc = clean(delta?.date_utc) || clean(state?.date_utc) || generatedAt.slice(0, 10);
 
   const output = {
-    schema_version: "0.1",
+    schema_version: "0.2",
     generated_at: generatedAt,
     date_utc: dateUtc,
     cold_start: Boolean(delta?.cold_start),
-    status: seeds.seeds.length === 0 ? "no_seed" : impacts.length === 0 ? "no_paths_above_threshold" : "ready",
+    status: seeds.seeds.length === 0 ? "no_significant_seed" : impacts.length === 0 ? "no_paths_above_threshold" : "ready",
     source: {
       state_schema_version: state?.schema_version || null,
       delta_schema_version: delta?.schema_version || null,
@@ -409,7 +643,7 @@ function main() {
       developments_generated_at: developmentsPayload?.generated_at || null
     },
     methodology: {
-      summary: "Deterministic graph propagation from Cosmos change seeds. Every inferred impact exposes the exact relationship path used to derive it.",
+      summary: "Evidence-grounded deterministic graph propagation from significant Cosmos change seeds. Every inferred impact exposes both seed evidence and the exact relationship path used to derive it.",
       reasoning_mode: "graph_propagation",
       max_depth: MAX_DEPTH,
       depth_decay: DEPTH_DECAY,
@@ -417,11 +651,14 @@ function main() {
       minimum_relationship_confidence: MIN_REL_CONFIDENCE,
       minimum_path_score: MIN_PATH_SCORE,
       maximum_results: MAX_RESULTS,
+      minimum_material_importance_delta: MIN_IMPORTANCE_DELTA,
+      seed_significance: "Lifecycle changes, relationship-degree changes, linked-development changes, material importance changes, entity additions/removals, and current development evidence may launch propagation. Timestamp-only changes and tiny score drift remain observed context.",
+      seed_evidence_linkage: "Normal daily seeds are linked to developments in the previous-state to current-state interval when timestamps are available, with current UTC date as a fallback for reconstructed history.",
       cold_start_behavior: "When delta-current.json is a cold start, seeds come only from entities explicitly linked to developments on the current UTC date. This establishes a baseline without claiming those entities changed.",
       dependency_direction: "DEPENDS_ON, REQUIRES and USES propagate from the dependency/resource toward the dependent entity. INCREASES, REDUCES, AFFECTS, SUPPLIES, ENABLES and REGULATES propagate source to target.",
       contextual_edges: "CONNECTED_TO and COMPETES_WITH are allowed with a penalty. LOCATED_IN does not create an impact path by itself.",
       direction_limit: "effect_polarity is reported only when an explicit INCREASES/REDUCES relation exists in the path; otherwise it remains uncertain.",
-      evidence_limit: "The engine preserves evidence_mode and development IDs. AI-scenario evidence is not upgraded into verified fact."
+      evidence_limit: "The engine preserves seed and relationship development IDs plus evidence_mode. AI-scenario evidence is not upgraded into verified fact."
     },
     graph: {
       relationships_available: relationships.length,
@@ -430,10 +667,19 @@ function main() {
     seeds: {
       strategy: seeds.strategy,
       count: seeds.seeds.length,
-      items: seeds.seeds
+      observed_delta_count: seeds.observed_deltas.length,
+      evidence_indexed_entities: seeds.evidence_indexed_entities,
+      items: seeds.seeds,
+      observed_deltas: seeds.observed_deltas
     },
     summary: {
       impact_count: impacts.length,
+      propagating_seed_count: seeds.seeds.length,
+      contextual_delta_count: seeds.observed_deltas.length,
+      seeds_with_direct_development_evidence: seeds.seeds.filter(
+        (seed) => Array.isArray(seed.evidence_development_ids) &&
+          seed.evidence_development_ids.length > 0
+      ).length,
       by_depth: countBy(impacts, (x) => x.propagation_depth),
       by_inference_class: countBy(impacts, (x) => x.inference_class),
       by_effect_polarity: countBy(impacts, (x) => x.effect_polarity)
@@ -448,7 +694,9 @@ function main() {
   console.log(`Date:                 ${dateUtc}`);
   console.log(`Cold start:           ${output.cold_start}`);
   console.log(`Seed strategy:        ${output.seeds.strategy}`);
-  console.log(`Seeds:                ${output.seeds.count}`);
+  console.log(`Propagating seeds:    ${output.seeds.count}`);
+  console.log(`Contextual deltas:    ${output.seeds.observed_delta_count}`);
+  console.log(`Seeds with evidence:  ${output.summary.seeds_with_direct_development_evidence}`);
   console.log(`Relationships:        ${output.graph.relationships_available}`);
   console.log(`Impact arcs accepted: ${output.graph.impact_arcs_accepted}`);
   console.log(`Impacts retained:     ${output.summary.impact_count}`);
