@@ -1,4 +1,5 @@
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -364,7 +365,7 @@ jobs:
 
           const errors = [];
 
-          if (impact.schema_version !== "0.1") {
+          if (impact.schema_version !== "0.2") {
             errors.push(
               `Unexpected impact schema_version: ${impact.schema_version}`
             );
@@ -372,6 +373,41 @@ jobs:
 
           if (!impact.seeds || !Array.isArray(impact.seeds.items)) {
             errors.push("impact-current.json: seeds.items[] missing");
+          }
+
+          if (!Array.isArray(impact.seeds?.observed_deltas)) {
+            errors.push("impact-current.json: seeds.observed_deltas[] missing");
+          }
+
+          if (!Number.isInteger(impact.seeds?.observed_delta_count) ||
+              impact.seeds.observed_delta_count < 0) {
+            errors.push("impact-current.json: invalid seeds.observed_delta_count");
+          }
+
+          if (!Number.isInteger(impact.seeds?.evidence_indexed_entities) ||
+              impact.seeds.evidence_indexed_entities < 0) {
+            errors.push("impact-current.json: invalid seeds.evidence_indexed_entities");
+          }
+
+          for (const seed of impact.seeds?.items || []) {
+            if (seed.propagation_eligible !== true) {
+              errors.push(`Seed ${seed.entity_id || "(unknown)"} is not propagation eligible`);
+            }
+            if (!Array.isArray(seed.evidence_development_ids)) {
+              errors.push(`Seed ${seed.entity_id || "(unknown)"} is missing evidence_development_ids[]`);
+            }
+            if (!["strong", "medium", "baseline"].includes(seed.significance)) {
+              errors.push(`Seed ${seed.entity_id || "(unknown)"} has invalid significance`);
+            }
+          }
+
+          for (const seed of impact.seeds?.observed_deltas || []) {
+            if (seed.propagation_eligible !== false) {
+              errors.push(`Observed delta ${seed.entity_id || "(unknown)"} should not propagate`);
+            }
+            if (seed.significance !== "contextual") {
+              errors.push(`Observed delta ${seed.entity_id || "(unknown)"} should be contextual`);
+            }
           }
 
           if (!impact.summary || typeof impact.summary !== "object") {
@@ -383,7 +419,7 @@ jobs:
           }
 
           if (
-            !["ready", "no_seed", "no_paths_above_threshold"].includes(
+            !["ready", "no_significant_seed", "no_paths_above_threshold"].includes(
               impact.status
             )
           ) {
@@ -396,6 +432,18 @@ jobs:
             if (row.reasoning_mode !== "graph_propagation") {
               errors.push(
                 `Impact ${row.impact_id || "(unknown)"} has invalid reasoning_mode`
+              );
+            }
+
+            if (!Array.isArray(row.seed_evidence_development_ids)) {
+              errors.push(
+                `Impact ${row.impact_id || "(unknown)"} is missing seed evidence lineage`
+              );
+            }
+
+            if (!["strong", "medium", "baseline"].includes(row.seed_significance)) {
+              errors.push(
+                `Impact ${row.impact_id || "(unknown)"} has invalid seed significance`
               );
             }
 
@@ -431,7 +479,11 @@ jobs:
 
           console.log("\nImpact Engine isolated test passed.");
           console.log(`Status:  ${impact.status}`);
-          console.log(`Seeds:   ${impact.seeds.count}`);
+          console.log(`Propagating seeds: ${impact.seeds.count}`);
+          console.log(`Contextual deltas: ${impact.seeds.observed_delta_count}`);
+          console.log(
+            `Seeds with direct evidence: ${impact.summary.seeds_with_direct_development_evidence}`
+          );
           console.log(`Impacts: ${impact.summary.impact_count}`);
           console.log(
             "Repository files were not modified by the isolated test."
