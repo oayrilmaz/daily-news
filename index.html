@@ -3,6 +3,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -644,6 +645,28 @@
     .outlookEvidenceButton[aria-expanded="true"]{
       background:#fff;
       color:#111;
+    }
+
+    .outlookShareButton{
+      appearance:none;
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      padding:5px 8px;
+      border:1px solid rgba(0,0,0,.22);
+      border-radius:999px;
+      background:#fff;
+      color:#111;
+      font-family:inherit;
+      font-size:11px;
+      font-weight:800;
+      cursor:pointer;
+      line-height:1.2;
+    }
+    .outlookShareButton:hover{background:rgba(0,0,0,.04)}
+    .outlookCard.outlookFocus{
+      outline:2px solid #111;
+      outline-offset:2px;
     }
     .outlookEvidencePanel{
       margin-top:12px;
@@ -1655,6 +1678,169 @@
       });
     }
 
+    function outlookSlug(entry){
+      const raw = (entry?.key || entry?.label || "outlook").toString().trim().toLowerCase();
+      return raw
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g,"")
+        .replace(/[^a-z0-9]+/g,"-")
+        .replace(/^-+|-+$/g,"") || "outlook";
+    }
+
+    function conciseEvidenceTitle(value,limit=105){
+      const text = String(value || "").replace(/\s+/g," ").trim();
+      if(text.length <= limit)return text;
+      return text.slice(0,limit - 1).replace(/\s+\S*$/,"").trim() + "…";
+    }
+
+    function evidenceDrivenOutlookStatement(entry,horizon){
+      const label = (entry?.label || entry?.key || "This outlook").toString().trim();
+
+      const ids = Array.isArray(entry?.evidence_development_ids)
+        ? [...new Set(entry.evidence_development_ids.filter(Boolean))]
+        : [];
+
+      const recent = new Set(
+        Array.isArray(entry?.short_evidence_development_ids)
+          ? entry.short_evidence_development_ids.filter(Boolean)
+          : []
+      );
+
+      const rows = ids
+        .map(id=>({
+          id,
+          recent:recent.has(id),
+          development:evidenceDevelopmentRecord(id)
+        }))
+        .filter(row=>row.development)
+        .map(row=>({
+          ...row,
+          title:conciseEvidenceTitle(
+            row.development?.title ||
+            row.development?.summary ||
+            ""
+          ),
+          date:
+            row.development?.date_utc ||
+            String(row.development?.created_at || "").slice(0,10) ||
+            evidenceDateFromId(row.id)
+        }))
+        .filter(row=>row.title);
+
+      rows.sort((a,b)=>{
+        if(a.recent !== b.recent)return a.recent ? -1 : 1;
+        return String(b.date || "").localeCompare(String(a.date || ""));
+      });
+
+      const uniqueTitles = [];
+      const seen = new Set();
+
+      for(const row of rows){
+        const key = row.title.toLowerCase();
+        if(seen.has(key))continue;
+        seen.add(key);
+        uniqueTitles.push(row.title);
+        if(uniqueTitles.length >= 2)break;
+      }
+
+      if(uniqueTitles.length === 1){
+        return `${label}: the current ${horizon}-day outlook is being driven by ${uniqueTitles[0]}.`;
+      }
+
+      if(uniqueTitles.length >= 2){
+        return `${label}: the current ${horizon}-day outlook is being driven by ${uniqueTitles[0]}, together with ${uniqueTitles[1]}.`;
+      }
+
+      return entry?.statement ||
+        `Current PTD Today evidence keeps ${label} active in the ${horizon}-day outlook.`;
+    }
+
+    function outlookShareUrl(entry,horizon){
+      const url = new URL(window.location.href);
+      url.searchParams.set("outlook",String(horizon));
+      url.searchParams.set("focus",outlookSlug(entry));
+      url.searchParams.delete("country");
+      url.searchParams.delete("category");
+      url.hash = `market-outlook-${horizon}-${outlookSlug(entry)}`;
+      return url.toString();
+    }
+
+    function outlookShareText(entry,horizon){
+      const probability = Math.round(Number(entry?.probability || 0) * 100);
+      const label = entry?.label || entry?.key || "PTD Today Outlook";
+      const evidenceCount = Number(entry?.evidence_signal_count || 0);
+      const direction = entry?.direction || "Stable";
+      const statement = evidenceDrivenOutlookStatement(entry,horizon);
+
+      return `${label} — ${probability}% ${direction}\n\n${statement}` +
+        (evidenceCount ? `\n\n${evidenceCount} intelligence signal${evidenceCount === 1 ? "" : "s"} behind this outlook.` : "") +
+        `\n\n#PTDToday #PowerIntelligence #Energy`;
+    }
+
+    async function shareOutlook(entry,horizon){
+      const probability = Math.round(Number(entry?.probability || 0) * 100);
+      const label = entry?.label || entry?.key || "PTD Today Outlook";
+      const title = `${label} — ${probability}% | ${horizon}-Day AI Outlook | PTD Today`;
+      await shareLink(
+        title,
+        outlookShareText(entry,horizon),
+        outlookShareUrl(entry,horizon)
+      );
+    }
+
+    function bindOutlookShare(entries,horizon){
+      document.querySelectorAll("[data-outlook-share]").forEach(button=>{
+        button.addEventListener("click",async ()=>{
+          const index = Number(button.getAttribute("data-outlook-share"));
+          const entry = entries[index];
+          if(!entry)return;
+          await shareOutlook(entry,horizon);
+        });
+      });
+    }
+
+    function requestedOutlookState(){
+      const params = new URLSearchParams(window.location.search);
+      const horizon = Number(params.get("outlook"));
+      const focus = (params.get("focus") || "").trim();
+
+      return {
+        horizon:(horizon === 7 || horizon === 30) ? horizon : null,
+        focus
+      };
+    }
+
+    function focusRequestedOutlook(){
+      const requested = requestedOutlookState();
+      if(!requested.horizon || !requested.focus)return;
+
+      const id = `market-outlook-${requested.horizon}-${requested.focus}`;
+      const card = document.getElementById(id);
+      if(!card)return;
+
+      document.querySelectorAll(".outlookCard.outlookFocus").forEach(item=>{
+        item.classList.remove("outlookFocus");
+      });
+
+      card.classList.add("outlookFocus");
+
+      const pulseAccordion =
+        document.querySelector('details.mainAccordion[data-accordion="pulse"]');
+
+      if(pulseAccordion){
+        document.querySelectorAll("details.mainAccordion").forEach(item=>{
+          if(item !== pulseAccordion)item.open = false;
+        });
+        pulseAccordion.open = true;
+      }
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          card.scrollIntoView({behavior:"smooth",block:"center"});
+        },120);
+      });
+    }
+
     function renderOutlook(horizon){
       const outlook = MarketPulse.outlook;
       const key = horizon === 7 ? "next_7_days" : "next_30_days";
@@ -1680,7 +1866,11 @@
       $("marketPulseContent").innerHTML = `
         <div class="outlookGrid">
           ${entries.slice(0,8).map((entry,index)=>`
-            <article class="outlookCard">
+            <article
+              class="outlookCard"
+              id="market-outlook-${horizon}-${escapeHtml(outlookSlug(entry))}"
+              data-outlook-focus="${escapeHtml(outlookSlug(entry))}"
+            >
               <div class="outlookCardTop">
                 <h3 class="outlookName">${escapeHtml(entry.label || entry.key || "Outlook")}</h3>
                 <div class="outlookProbability">
@@ -1688,7 +1878,7 @@
                 </div>
               </div>
 
-              <p class="outlookStatement">${escapeHtml(entry.statement || "")}</p>
+              <p class="outlookStatement">${escapeHtml(evidenceDrivenOutlookStatement(entry,horizon))}</p>
 
               <div class="outlookMeta">
                 <span class="outlookBadge">
@@ -1711,6 +1901,13 @@
                          Evidence: ${escapeHtml(numberFormat(entry.evidence_signal_count))}
                        </span>`
                 }
+
+                <button
+                  class="outlookShareButton"
+                  type="button"
+                  data-outlook-share="${index}"
+                  aria-label="Share ${escapeHtml(entry.label || entry.key || "outlook")}"
+                >Share ↗</button>
               </div>
 
               ${renderEvidencePanel(entry,index)}
@@ -1731,6 +1928,8 @@
       `;
 
       bindOutlookEvidence();
+      bindOutlookShare(entries.slice(0,8),horizon);
+      focusRequestedOutlook();
     }
 
     function setPulseTab(tab){
@@ -1857,6 +2056,14 @@
           setPulseTab(button.getAttribute("data-pulse-tab") || "24h");
         };
       });
+
+      const requested = requestedOutlookState();
+
+      if(requested.horizon === 7){
+        MarketPulse.activeTab = "outlook7";
+      }else if(requested.horizon === 30){
+        MarketPulse.activeTab = "outlook30";
+      }
 
       setPulseTab(MarketPulse.activeTab);
     }
