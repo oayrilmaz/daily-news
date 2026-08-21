@@ -45,6 +45,7 @@ jobs:
             "scripts/validate_intelligence.cjs"
             "scripts/cosmos_state_delta.cjs"
             "scripts/cosmos_impact_engine.cjs"
+            "scripts/cosmos_pattern_engine.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -67,6 +68,7 @@ jobs:
           node --check scripts/validate_intelligence.cjs
           node --check scripts/cosmos_state_delta.cjs
           node --check scripts/cosmos_impact_engine.cjs
+          node --check scripts/cosmos_pattern_engine.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -242,6 +244,7 @@ jobs:
           mkdir -p "$TEST_DIR/knowledge/cosmos"
 
           cp scripts/cosmos_impact_engine.cjs "$TEST_DIR/scripts/"
+          cp scripts/cosmos_pattern_engine.cjs "$TEST_DIR/scripts/"
           cp knowledge/relationships.json "$TEST_DIR/knowledge/"
           cp knowledge/developments.json "$TEST_DIR/knowledge/"
 
@@ -485,6 +488,184 @@ jobs:
             `Seeds with direct evidence: ${impact.summary.seeds_with_direct_development_evidence}`
           );
           console.log(`Impacts: ${impact.summary.impact_count}`);
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_pattern_engine.cjs
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const outputPath = path.join(
+            root,
+            "knowledge/cosmos/patterns-current.json"
+          );
+
+          if (!fs.existsSync(outputPath)) {
+            throw new Error(
+              "Pattern engine did not create knowledge/cosmos/patterns-current.json"
+            );
+          }
+
+          const patterns = JSON.parse(
+            fs.readFileSync(outputPath, "utf8")
+          );
+
+          const errors = [];
+
+          if (patterns.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected pattern schema_version: ${patterns.schema_version}`
+            );
+          }
+
+          if (
+            !["ready", "no_patterns_above_threshold"].includes(
+              patterns.status
+            )
+          ) {
+            errors.push(
+              `patterns-current.json: invalid status "${patterns.status}"`
+            );
+          }
+
+          if (!patterns.methodology ||
+              patterns.methodology.reasoning_mode !== "deterministic_pattern_detection") {
+            errors.push(
+              "patterns-current.json: deterministic_pattern_detection methodology missing"
+            );
+          }
+
+          if (!patterns.summary || typeof patterns.summary !== "object") {
+            errors.push("patterns-current.json: summary missing");
+          }
+
+          if (!Array.isArray(patterns.patterns)) {
+            errors.push("patterns-current.json: patterns[] missing");
+          }
+
+          if (!patterns.diagnostics || typeof patterns.diagnostics !== "object") {
+            errors.push("patterns-current.json: diagnostics missing");
+          }
+
+          const allowedFamilies = new Set([
+            "impact_convergence",
+            "evidence_reinforcement",
+            "structural_acceleration",
+            "cross_domain_coupling"
+          ]);
+
+          const allowedEvidenceQuality = new Set([
+            "strong",
+            "moderate",
+            "weak",
+            "unknown"
+          ]);
+
+          const allowedPersistence = new Set([
+            "insufficient_history",
+            "new",
+            "recurring",
+            "persistent"
+          ]);
+
+          for (const row of patterns.patterns || []) {
+            if (!row.pattern_id) {
+              errors.push("Pattern missing pattern_id");
+            }
+
+            if (!allowedFamilies.has(row.pattern_family)) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid pattern_family`
+              );
+            }
+
+            if (!Number.isFinite(Number(row.pattern_score)) ||
+                Number(row.pattern_score) < 0 ||
+                Number(row.pattern_score) > 100) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid pattern_score`
+              );
+            }
+
+            if (!Number.isFinite(Number(row.structural_strength_score)) ||
+                Number(row.structural_strength_score) < 0 ||
+                Number(row.structural_strength_score) > 100) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid structural_strength_score`
+              );
+            }
+
+            if (!Number.isFinite(Number(row.evidence_quality_score)) ||
+                Number(row.evidence_quality_score) < 0 ||
+                Number(row.evidence_quality_score) > 100) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid evidence_quality_score`
+              );
+            }
+
+            if (!allowedEvidenceQuality.has(row.evidence_quality_label)) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid evidence_quality_label`
+              );
+            }
+
+            if (!row.evidence ||
+                !Array.isArray(row.evidence.development_ids)) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} is missing evidence lineage`
+              );
+            }
+
+            if (!row.persistence ||
+                !allowedPersistence.has(row.persistence.status)) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid persistence status`
+              );
+            }
+
+            if (!Array.isArray(row.supporting_entities) ||
+                !Array.isArray(row.supporting_impact_ids) ||
+                !Array.isArray(row.supporting_relationship_ids)) {
+              errors.push(
+                `Pattern ${row.pattern_id || "(unknown)"} has invalid support lineage`
+              );
+            }
+          }
+
+          if (errors.length) {
+            console.error("\nPattern Engine preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nPattern Engine isolated test passed.");
+          console.log(`Status:   ${patterns.status}`);
+          console.log(`Patterns: ${patterns.summary.pattern_count}`);
+          console.log(
+            `Convergence: ${patterns.summary.by_family?.impact_convergence || 0}`
+          );
+          console.log(
+            `Reinforcement: ${patterns.summary.by_family?.evidence_reinforcement || 0}`
+          );
+          console.log(
+            `Acceleration: ${patterns.summary.by_family?.structural_acceleration || 0}`
+          );
+          console.log(
+            `Cross-domain: ${patterns.summary.by_family?.cross_domain_coupling || 0}`
+          );
+          console.log(
+            "Pattern structural strength and evidence quality remain independently validated."
+          );
           console.log(
             "Repository files were not modified by the isolated test."
           );
