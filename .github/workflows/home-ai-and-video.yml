@@ -2,6 +2,7 @@
 
 
 
+
 name: Home AI + Video (PTD Today)
 
 on:
@@ -58,6 +59,7 @@ jobs:
           node --check scripts/validate_intelligence.cjs
           node --check scripts/cosmos_state_delta.cjs
           node --check scripts/cosmos_impact_engine.cjs
+          node --check scripts/cosmos_pattern_engine.cjs
           node --check scripts/backfill_history_from_articles.js
 
       # ----------------------------------------------------------------------
@@ -456,6 +458,19 @@ jobs:
         run: node scripts/cosmos_impact_engine.cjs
 
       # ----------------------------------------------------------------------
+      # 6C. Cosmos Pattern Engine
+      #
+      # Deterministic and zero-OpenAI-credit.
+      # Detects convergence, reinforcement, structural acceleration, and
+      # cross-domain coupling after State + Delta + Impact are available.
+      # ----------------------------------------------------------------------
+
+      - name: Build Cosmos Patterns
+        env:
+          KNOWLEDGE_DIR: knowledge
+        run: node scripts/cosmos_pattern_engine.cjs
+
+      # ----------------------------------------------------------------------
       # 7. Rebuild historical analytics from accumulated intelligence
       # ----------------------------------------------------------------------
 
@@ -567,10 +582,12 @@ jobs:
           test -f knowledge/cosmos/state-current.json
           test -f knowledge/cosmos/delta-current.json
           test -f knowledge/cosmos/impact-current.json
+          test -f knowledge/cosmos/patterns-current.json
           test -f "knowledge/cosmos/state-history/$(date -u +%F).json"
           test -f "knowledge/cosmos/delta-history/$(date -u +%F).json"
           test -f "knowledge/cosmos/impact-history/$(date -u +%F).json"
-          echo "Core knowledge graph, Cosmos integrity, state, delta, and impact outputs are ready."
+          test -f "knowledge/cosmos/pattern-history/$(date -u +%F).json"
+          echo "Core knowledge graph, Cosmos integrity, state, delta, impact, and pattern outputs are ready."
 
       - name: Verify Entity Lifecycle and Snapshot
         run: |
