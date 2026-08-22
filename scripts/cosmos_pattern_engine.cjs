@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Pattern Engine v0.1
+ * PTD Today / Cosmos — Pattern Engine v0.2
  * Deterministic, explainable pattern detection. No OpenAI calls.
  */
 const fs = require('fs');
@@ -32,6 +32,15 @@ const MIN_REINFORCEMENT_EVIDENCE = Math.round(num(process.env.COSMOS_PATTERN_MIN
 const MIN_REL_STRENGTH = num(process.env.COSMOS_PATTERN_MIN_REL_STRENGTH, 65, 0, 100);
 const MIN_REL_CONFIDENCE = num(process.env.COSMOS_PATTERN_MIN_REL_CONFIDENCE, 0.65, 0, 1);
 const PERSISTENCE_MIN_HISTORY_DAYS = Math.round(num(process.env.COSMOS_PATTERN_PERSISTENCE_MIN_DAYS, 3, 2, 30));
+const CROSS_DOMAIN_MAX_RESULTS = Math.round(num(process.env.COSMOS_PATTERN_CROSS_DOMAIN_MAX_RESULTS, 30, 5, 100));
+const CROSS_DOMAIN_MIN_DEVELOPMENTS = Math.round(num(process.env.COSMOS_PATTERN_CROSS_DOMAIN_MIN_DEVELOPMENTS, 3, 2, 50));
+const CROSS_DOMAIN_MIN_TYPES = Math.round(num(process.env.COSMOS_PATTERN_CROSS_DOMAIN_MIN_TYPES, 4, 3, 20));
+const CROSS_DOMAIN_MIN_STRONG_RELATIONSHIPS = Math.round(num(process.env.COSMOS_PATTERN_CROSS_DOMAIN_MIN_STRONG_RELATIONSHIPS, 1, 0, 20));
+const CROSS_DOMAIN_MAX_SCORE = num(process.env.COSMOS_PATTERN_CROSS_DOMAIN_MAX_SCORE, 96, 70, 99);
+const GENERIC_FOCUS_NAMES = new Set([
+  'market','policy','renewables','supply chains','utilities','investors',
+  'governments','regulators','manufacturing','logistics'
+]);
 
 function readJson(file, required = true) {
   if (!fs.existsSync(file)) {
@@ -174,7 +183,7 @@ function makePattern(args) {
     structural_strength_score: round(structuralScore, 2),
     evidence_quality_score: evidence.evidence_quality_score,
     evidence_quality_label: evidence.evidence_quality_label,
-    confidence_class: score >= 75 && evidence.evidence_quality_score >= 50 ? 'high' : score >= 55 ? 'medium' : 'low',
+    confidence_class: score >= 82 && evidence.evidence_quality_score >= 50 ? 'high' : score >= 65 && evidence.evidence_quality_score >= 35 ? 'medium' : 'low',
     supporting_entities: supportIds.map(id => compactEntity(id, lookup)),
     supporting_impact_ids: unique(impactIds),
     supporting_relationship_ids: unique(relationshipIds),
@@ -281,39 +290,204 @@ function detectStructuralAcceleration(delta, impact, lookup, devIndex, churnPair
   return patterns;
 }
 
-function detectCrossDomainCoupling(developments, lookup, devIndex) {
+function detectCrossDomainCoupling(developments, relationships, delta, impact, lookup, devIndex) {
   const groups=new Map();
+
+  const meaningfulChangedIds=new Set();
+  for(const row of delta?.changed_entities||[]){
+    const id=entityId(row);
+    if(id && meaningfulDeltaSignals(row).length) meaningfulChangedIds.add(id);
+  }
+
+  const impactsByOrigin=new Map();
+  const impactsByAffected=new Map();
+  for(const row of impact?.impacts||[]){
+    const origin=row?.origin?.entity_id;
+    const affected=row?.affected?.entity_id;
+    if(origin){
+      const arr=impactsByOrigin.get(origin)||[];
+      arr.push(row);
+      impactsByOrigin.set(origin,arr);
+    }
+    if(affected){
+      const arr=impactsByAffected.get(affected)||[];
+      arr.push(row);
+      impactsByAffected.set(affected,arr);
+    }
+  }
+
+  const strongRelationshipsByEntity=new Map();
+  for(const rel of relationships||[]){
+    if(clean(rel?.status||'active').toLowerCase()!=='active') continue;
+    const strength=num(rel?.strength,0);
+    const confidence=num(rel?.confidence,0);
+    if(strength<MIN_REL_STRENGTH || confidence<MIN_REL_CONFIDENCE) continue;
+
+    for(const id of [rel?.from_entity_id,rel?.to_entity_id]){
+      if(!id) continue;
+      const arr=strongRelationshipsByEntity.get(id)||[];
+      arr.push(rel);
+      strongRelationshipsByEntity.set(id,arr);
+    }
+  }
+
   for(const dev of developments){
-    const ids=developmentEntityIds(dev); if(ids.length<2) continue;
-    const types=unique(ids.map(id=>lookup.get(id)?.type).filter(Boolean)); if(types.length<2) continue;
+    const ids=developmentEntityIds(dev);
+    if(ids.length<2) continue;
+    const types=unique(ids.map(id=>lookup.get(id)?.type).filter(Boolean));
+    if(types.length<2) continue;
+
     for(const id of ids){
-      const g=groups.get(id)||{focusId:id,developments:[],entityIds:new Set(),types:new Set(),countries:new Set(),categories:new Set()};
+      const g=groups.get(id)||{
+        focusId:id,
+        developments:[],
+        entityIds:new Set(),
+        types:new Set(),
+        countries:new Set(),
+        categories:new Set()
+      };
+
       g.developments.push(dev);
-      for(const eid of ids){ g.entityIds.add(eid); const t=lookup.get(eid)?.type; if(t) g.types.add(t); }
+      for(const eid of ids){
+        g.entityIds.add(eid);
+        const t=lookup.get(eid)?.type;
+        if(t) g.types.add(t);
+      }
       for(const c of dev?.countries||[]) g.countries.add(c);
       if(dev?.category) g.categories.add(dev.category);
       groups.set(id,g);
     }
   }
+
   const patterns=[];
+
   for(const g of groups.values()){
     const devIds=unique(g.developments.map(developmentId));
-    const typeCount=g.types.size, entityCount=g.entityIds.size, categoryCount=g.categories.size, countryCount=g.countries.size;
-    if(devIds.length<2||typeCount<3) continue;
-    const structural=Math.min(100,25+Math.min(30,typeCount*7)+Math.min(20,devIds.length*3)+Math.min(15,entityCount*1.5)+Math.min(10,categoryCount*3+countryCount));
+    const devSet=new Set(devIds);
+    const typeCount=g.types.size;
+    const entityCount=g.entityIds.size;
+    const categoryCount=g.categories.size;
+    const countryCount=g.countries.size;
+    const focus=lookup.get(g.focusId);
+    const focusName=clean(focus?.name||g.focusId);
+    const focusType=clean(focus?.type);
+
+    if(devIds.length<CROSS_DOMAIN_MIN_DEVELOPMENTS || typeCount<CROSS_DOMAIN_MIN_TYPES) continue;
+
+    const originImpacts=impactsByOrigin.get(g.focusId)||[];
+    const affectedImpacts=impactsByAffected.get(g.focusId)||[];
+    const distinctIncomingOrigins=new Set(
+      affectedImpacts.map(x=>x?.origin?.entity_id).filter(Boolean)
+    );
+
+    const strongRelationships=(strongRelationshipsByEntity.get(g.focusId)||[])
+      .filter(rel=>{
+        const evidenceIds=unique(rel?.evidence_development_ids||[]);
+        return !evidenceIds.length || evidenceIds.some(id=>devSet.has(id));
+      });
+
+    const hasMeaningfulDelta=meaningfulChangedIds.has(g.focusId);
+    const hasImpactActivity=
+      originImpacts.some(x=>num(x?.impact_score,0)>=40) ||
+      affectedImpacts.some(x=>num(x?.impact_score,0)>=40);
+
+    if(!hasMeaningfulDelta && !hasImpactActivity) continue;
+    if(strongRelationships.length<CROSS_DOMAIN_MIN_STRONG_RELATIONSHIPS) continue;
+
+    const broadFocus=
+      focusType==='Country' ||
+      focusType==='Market' ||
+      GENERIC_FOCUS_NAMES.has(focusName.toLowerCase());
+
+    if(broadFocus){
+      if(devIds.length<5) continue;
+      if(categoryCount<2) continue;
+      if(strongRelationships.length<2) continue;
+    }
+
+    const dynamicScore=Math.min(
+      18,
+      (hasMeaningfulDelta?8:0) +
+      Math.min(6,originImpacts.filter(x=>num(x?.impact_score,0)>=40).length*1.5) +
+      Math.min(6,distinctIncomingOrigins.size*1.5)
+    );
+
+    const domainScore=Math.min(18,Math.max(0,(typeCount-CROSS_DOMAIN_MIN_TYPES+1))*3);
+    const developmentScore=Math.min(18,Math.log2(devIds.length+1)*4.5);
+    const relationshipScore=Math.min(18,Math.log2(strongRelationships.length+1)*5);
+    const breadthScore=Math.min(8,categoryCount*2+Math.min(4,countryCount*0.5));
+    const concentrationPenalty=Math.min(
+      10,
+      Math.max(0,entityCount-(devIds.length*8))*0.08
+    );
+    const broadPenalty=broadFocus?6:0;
+
+    let structural=
+      24 +
+      domainScore +
+      developmentScore +
+      relationshipScore +
+      dynamicScore +
+      breadthScore -
+      concentrationPenalty -
+      broadPenalty;
+
+    structural=Math.min(CROSS_DOMAIN_MAX_SCORE,Math.max(0,structural));
     if(structural<MIN_PATTERN_SCORE) continue;
-    const name=lookup.get(g.focusId)?.name||g.focusId;
+
+    const relatedImpactIds=unique([
+      ...originImpacts.map(x=>x?.impact_id),
+      ...affectedImpacts.map(x=>x?.impact_id)
+    ]);
+    const relationshipIds=unique(strongRelationships.map(x=>x?.relationship_id));
+
     patterns.push(makePattern({
-      family:'cross_domain_coupling', focusEntityId:g.focusId,
-      title:`${name} is coupling multiple domains`,
-      description:`${typeCount} entity types across ${devIds.length} developments are repeatedly connected around the same focus entity. This indicates cross-domain coupling, not causal certainty.`,
-      score:structural, structuralScore:structural, evidenceIds:devIds, supportingEntityIds:[...g.entityIds], impactIds:[], relationshipIds:[],
-      signalDetails:[{entity_type_count:typeCount,entity_types:[...g.types].sort(),development_count:devIds.length,category_count:categoryCount,categories:[...g.categories].sort(),country_count:countryCount,countries:[...g.countries].sort()}],
-      lookup,devIndex,
-      metadata:{entity_type_count:typeCount,supporting_entity_count:entityCount,development_count:devIds.length,category_count:categoryCount,country_count:countryCount}
+      family:'cross_domain_coupling',
+      focusEntityId:g.focusId,
+      title:`${focusName} shows qualified cross-domain coupling`,
+      description:
+        `${typeCount} entity types across ${devIds.length} developments are connected around the same focus entity, `+
+        `with recent change/impact activity and ${strongRelationships.length} strong resolved relationship${strongRelationships.length===1?'':'s'}. `+
+        `This is a qualified structural coupling signal, not causal certainty.`,
+      score:structural,
+      structuralScore:structural,
+      evidenceIds:devIds,
+      supportingEntityIds:[...g.entityIds],
+      impactIds:relatedImpactIds,
+      relationshipIds,
+      signalDetails:[{
+        entity_type_count:typeCount,
+        entity_types:[...g.types].sort(),
+        development_count:devIds.length,
+        category_count:categoryCount,
+        categories:[...g.categories].sort(),
+        country_count:countryCount,
+        countries:[...g.countries].sort(),
+        strong_relationship_count:strongRelationships.length,
+        meaningful_delta_support:hasMeaningfulDelta,
+        origin_impact_count:originImpacts.length,
+        affected_impact_count:affectedImpacts.length,
+        distinct_incoming_origin_count:distinctIncomingOrigins.size,
+        broad_focus_penalty_applied:broadFocus
+      }],
+      lookup,
+      devIndex,
+      metadata:{
+        entity_type_count:typeCount,
+        supporting_entity_count:entityCount,
+        development_count:devIds.length,
+        category_count:categoryCount,
+        country_count:countryCount,
+        strong_relationship_count:strongRelationships.length,
+        dynamic_support_score:round(dynamicScore,2),
+        broad_focus_penalty_applied:broadFocus
+      }
     }));
   }
-  return patterns;
+
+  return patterns
+    .sort((a,b)=>b.pattern_score-a.pattern_score||a.pattern_id.localeCompare(b.pattern_id))
+    .slice(0,CROSS_DOMAIN_MAX_RESULTS);
 }
 
 function loadPatternHistory(currentDateUtc){
@@ -338,17 +512,47 @@ function applyPersistence(patterns,history){
   for(const p of patterns){
     const priorDates=unique(priorById.get(p.pattern_id)||[]), daysObserved=priorDates.length+1;
     p.persistence={status:daysObserved>=7?'persistent':daysObserved>=3?'recurring':'new',days_observed:daysObserved,history_days_available:history.length,prior_dates:priorDates};
-    if(daysObserved>=3) p.pattern_score=round(Math.min(100,p.pattern_score+Math.min(10,(daysObserved-2)*2)),2);
+    if(daysObserved>=3) p.pattern_score=round(Math.min(98,p.pattern_score+Math.min(8,(daysObserved-2)*1.5)),2);
   }
 }
 function dedupePatterns(patterns){
   const best=new Map();
   for(const p of patterns){
     const key=`${p.pattern_family}::${p.focus_entity?.entity_id||'none'}::${(p.supporting_relationship_ids||[]).slice().sort().join(',')}`;
-    const old=best.get(key); if(!old||p.pattern_score>old.pattern_score) best.set(key,p);
+    const old=best.get(key);
+    if(!old||p.pattern_score>old.pattern_score) best.set(key,p);
   }
-  return [...best.values()].filter(p=>p.pattern_score>=MIN_PATTERN_SCORE).sort((a,b)=>b.pattern_score-a.pattern_score||b.structural_strength_score-a.structural_strength_score||a.pattern_id.localeCompare(b.pattern_id)).slice(0,MAX_PATTERNS);
+
+  const rows=[...best.values()]
+    .filter(p=>p.pattern_score>=MIN_PATTERN_SCORE)
+    .sort((a,b)=>
+      b.pattern_score-a.pattern_score ||
+      b.structural_strength_score-a.structural_strength_score ||
+      a.pattern_id.localeCompare(b.pattern_id)
+    );
+
+  const familyCaps={
+    impact_convergence:25,
+    evidence_reinforcement:25,
+    structural_acceleration:25,
+    cross_domain_coupling:CROSS_DOMAIN_MAX_RESULTS
+  };
+
+  const selected=[];
+  const usedByFamily=new Map();
+
+  for(const p of rows){
+    const cap=familyCaps[p.pattern_family]??MAX_PATTERNS;
+    const used=usedByFamily.get(p.pattern_family)||0;
+    if(used>=cap) continue;
+    selected.push(p);
+    usedByFamily.set(p.pattern_family,used+1);
+    if(selected.length>=MAX_PATTERNS) break;
+  }
+
+  return selected;
 }
+
 function countBy(items,getter){
   const map=new Map(); for(const item of items){const key=String(getter(item)??'unknown');map.set(key,(map.get(key)||0)+1);} return Object.fromEntries([...map.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])));
 }
@@ -363,7 +567,7 @@ function main(){
     ...detectImpactConvergence(impact,lookup,devIndex),
     ...detectEvidenceReinforcement(relationships,lookup,devIndex),
     ...detectStructuralAcceleration(delta,impact,lookup,devIndex,churnPairs),
-    ...detectCrossDomainCoupling(developments,lookup,devIndex)
+    ...detectCrossDomainCoupling(developments,relationships,delta,impact,lookup,devIndex)
   ];
   let patterns=dedupePatterns(detected);
   const generatedAt=new Date().toISOString();
@@ -371,14 +575,14 @@ function main(){
   const history=loadPatternHistory(dateUtc); applyPersistence(patterns,history);
   patterns=patterns.sort((a,b)=>b.pattern_score-a.pattern_score).slice(0,MAX_PATTERNS);
   const output={
-    schema_version:'0.1', generated_at:generatedAt, date_utc:dateUtc,
+    schema_version:'0.2', generated_at:generatedAt, date_utc:dateUtc,
     status:patterns.length?'ready':'no_patterns_above_threshold',
     source:{state_schema_version:state?.schema_version||null,delta_schema_version:delta?.schema_version||null,impact_schema_version:impact?.schema_version||null,developments_schema_version:developmentsPayload?.schema_version||null,relationships_schema_version:relationshipsPayload?.schema_version||null,state_generated_at:state?.generated_at||null,delta_generated_at:delta?.generated_at||null,impact_generated_at:impact?.generated_at||null,developments_generated_at:developmentsPayload?.generated_at||null,relationships_generated_at:relationshipsPayload?.generated_at||null},
     methodology:{
-      summary:'Deterministic pattern detection above Cosmos State, Delta and Impact. Patterns represent repeated or converging graph structure; they are not forecasts or verified real-world conclusions.',
+      summary:'Deterministic pattern detection above Cosmos State, Delta and Impact. v0.2 calibrates cross-domain coupling so broad/static hubs cannot qualify on co-occurrence alone. Patterns are structural signals, not forecasts or verified real-world conclusions.',
       reasoning_mode:'deterministic_pattern_detection', minimum_pattern_score:MIN_PATTERN_SCORE, maximum_results:MAX_PATTERNS,
       minimum_converging_seeds:MIN_CONVERGING_SEEDS, minimum_reinforcement_evidence:MIN_REINFORCEMENT_EVIDENCE,
-      minimum_relationship_strength:MIN_REL_STRENGTH, minimum_relationship_confidence:MIN_REL_CONFIDENCE,
+      minimum_relationship_strength:MIN_REL_STRENGTH, minimum_relationship_confidence:MIN_REL_CONFIDENCE,cross_domain_calibration:{minimum_developments:CROSS_DOMAIN_MIN_DEVELOPMENTS,minimum_entity_types:CROSS_DOMAIN_MIN_TYPES,minimum_strong_relationships:CROSS_DOMAIN_MIN_STRONG_RELATIONSHIPS,max_results:CROSS_DOMAIN_MAX_RESULTS,max_score:CROSS_DOMAIN_MAX_SCORE,dynamic_gate:'meaningful delta OR material impact activity',broad_focus_rule:'Countries, Markets, and generic hubs require >=5 developments, >=2 categories, and >=2 strong relationships'}, 
       pattern_families:['impact_convergence','evidence_reinforcement','structural_acceleration','cross_domain_coupling'],
       evidence_rule:'Structural strength and evidence quality are scored separately. AI-scenario evidence is preserved as scenario evidence and is never promoted to verified fact.',
       temporal_rule:'Timestamp-only changes and tiny importance drift do not create structural acceleration. Persistence is reported only after sufficient pattern-history coverage.',
