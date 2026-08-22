@@ -948,7 +948,7 @@
         <div class="tiny" id="modelHint">AI-generated briefing</div>
       </div>
 
-      <details class="mainAccordion" data-accordion="summary" open>
+      <details class="mainAccordion" data-accordion="summary">
         <summary>Today’s Intelligence Summary</summary>
         <div class="accordionContent">
           <div class="sections" id="sections"></div>
@@ -3704,31 +3704,12 @@
         });
       });
 
-      const isDesktop = window.matchMedia("(min-width: 761px)");
-      if(!isDesktop.matches || !("IntersectionObserver" in window))return;
-
-      let autoOpening = false;
-      const observer = new IntersectionObserver((entries)=>{
-        if(autoOpening)return;
-
-        const candidate = entries
-          .filter(entry=>entry.isIntersecting && entry.intersectionRatio >= 0.55)
-          .sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
-
-        if(!candidate)return;
-        const item = candidate.target;
-        if(item.open)return;
-
-        autoOpening = true;
-        item.open = true;
-        openOnly(item);
-        setTimeout(()=>{autoOpening=false;},180);
-      },{
-        threshold:[0.55,0.7],
-        rootMargin:"-12% 0px -20% 0px"
-      });
-
-      accordions.forEach(item=>observer.observe(item));
+      /*
+        Main sections stay collapsed until the user explicitly opens them.
+        No scroll-triggered / viewport-triggered auto-expansion on desktop.
+        Deep links may still intentionally open the relevant section elsewhere
+        in the page logic.
+      */
     }
 
     async function load(){
