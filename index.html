@@ -4,6 +4,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -176,6 +177,48 @@
       margin-bottom:10px;
     }
     .secBlock:last-child{margin-bottom:0}
+    .summaryActions{
+      display:flex;
+      justify-content:flex-end;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:12px 14px 0;
+      background:#fff;
+    }
+    .summaryShareButton{
+      appearance:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:8px 12px;
+      border:1px solid rgba(0,0,0,.20);
+      border-radius:999px;
+      background:#111;
+      color:#fff;
+      font-family:inherit;
+      font-size:13px;
+      font-weight:800;
+      line-height:1;
+      cursor:pointer;
+    }
+    .summaryShareButton:hover{opacity:.86}
+    .summaryReasoningNote{
+      margin:10px 0 0;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+      font-style:italic;
+    }
+    .secBlock[data-summary-kind="reasoning"]{
+      background:linear-gradient(180deg,rgba(0,0,0,.025),rgba(0,0,0,.008));
+      border-color:rgba(0,0,0,.20);
+    }
+    .secBlock[data-summary-kind="ripple"] li{
+      list-style:none;
+      margin-left:-18px;
+      padding-left:0;
+    }
     .secH{margin:0 0 8px;font-size:18px;font-weight:800;letter-spacing:.1px}
     .secBlock ul{margin:0;padding-left:20px;color:rgba(0,0,0,.84)}
     .secBlock li{margin:6px 0;line-height:1.35}
@@ -951,6 +994,13 @@
       <details class="mainAccordion" data-accordion="summary">
         <summary>Today’s Intelligence Summary</summary>
         <div class="accordionContent">
+          <div class="summaryActions">
+            <button
+              class="summaryShareButton"
+              id="shareDailySummary"
+              type="button"
+            >Share Summary ↗</button>
+          </div>
           <div class="sections" id="sections"></div>
         </div>
       </details>
@@ -2839,6 +2889,98 @@
       }
     }
 
+    function summarySection(payload,heading){
+      return (Array.isArray(payload?.sections) ? payload.sections : [])
+        .find(section=>
+          String(section?.heading || "").trim().toLowerCase() ===
+          String(heading || "").trim().toLowerCase()
+        ) || null;
+    }
+
+    function summarySharePageUrl(payload){
+      const date =
+        String(payload?.date_utc || "").trim() ||
+        new Date().toISOString().slice(0,10);
+
+      return new URL(
+        `/summary-share/${encodeURIComponent(date)}.html`,
+        window.location.origin
+      ).toString();
+    }
+
+    function summaryShareText(payload){
+      const topThemes = summarySection(payload,"Top Themes");
+      const why = summarySection(payload,"Why It Matters");
+      const ripple =
+        summarySection(payload,"Ripple Effects & Connections") ||
+        summarySection(payload,"Connections & Ripple Effects");
+
+      const lines = [
+        `PTD Today — Intelligence Summary`,
+        payload?.date_utc ? `Date: ${payload.date_utc}` : ""
+      ].filter(Boolean);
+
+      const addSection = (label,section,limit)=>{
+        const bullets = Array.isArray(section?.bullets)
+          ? section.bullets.filter(Boolean).slice(0,limit)
+          : [];
+
+        if(!bullets.length)return;
+
+        lines.push("");
+        lines.push(label);
+        for(const bullet of bullets){
+          lines.push(`• ${String(bullet).trim()}`);
+        }
+      };
+
+      addSection("Top Themes",topThemes,3);
+      addSection("Why It Matters",why,2);
+      addSection("Ripple Effects",ripple,2);
+
+      lines.push("");
+      lines.push("#PTDToday #PowerIntelligence #Energy");
+
+      return lines.join("\n");
+    }
+
+    async function shareDailySummary(){
+      const payload = MarketPulse.payload;
+      if(!payload){
+        alert("Today’s intelligence summary is still loading.");
+        return;
+      }
+
+      const date = payload.date_utc || "Today";
+      await shareLink(
+        `PTD Today — Intelligence Summary | ${date}`,
+        summaryShareText(payload),
+        summarySharePageUrl(payload)
+      );
+    }
+
+    function openSummaryFromUrl(){
+      const params = new URLSearchParams(window.location.search);
+      if(!params.get("summary"))return;
+
+      const target =
+        document.querySelector('details.mainAccordion[data-accordion="summary"]');
+
+      if(!target)return;
+
+      document.querySelectorAll("details.mainAccordion").forEach(item=>{
+        if(item !== target)item.open = false;
+      });
+
+      target.open = true;
+
+      requestAnimationFrame(()=>{
+        setTimeout(()=>{
+          target.scrollIntoView({behavior:"smooth",block:"start"});
+        },100);
+      });
+    }
+
     async function shareOmegaSpotlight(){
       const title = "Omega Enerji Teknolojileri | Sponsored Partner Spotlight | PTD Today";
       const text = "Omega Enerji Teknolojileri: Powering the electrical backbone behind critical infrastructure.";
@@ -3499,10 +3641,35 @@
 
       $("sections").innerHTML = secs.map(s=>{
         const bullets = Array.isArray(s.bullets) ? s.bullets : [];
+        const heading = String(s.heading || "Section").trim();
+        const normalizedHeading = heading.toLowerCase();
+
+        const kind =
+          normalizedHeading === "why it matters"
+            ? "reasoning"
+            : (
+                normalizedHeading.includes("ripple") ||
+                normalizedHeading.includes("connection")
+                  ? "ripple"
+                  : "standard"
+              );
+
+        const reasoningNote =
+          kind === "reasoning"
+            ? `<p class="summaryReasoningNote">
+                 Cross-signal synthesis: explains why today’s signals matter together.
+               </p>`
+            : (
+                kind === "ripple"
+                  ? `<p class="summaryReasoningNote">
+                       Scenario propagation: plausible second- and third-order effects, not guaranteed outcomes.
+                     </p>`
+                  : ""
+              );
 
         return `
-          <div class="secBlock">
-            <h3 class="secH">${escapeHtml(s.heading || "Section")}</h3>
+          <div class="secBlock" data-summary-kind="${escapeHtml(kind)}">
+            <h3 class="secH">${escapeHtml(heading)}</h3>
 
             ${bullets.length
               ? `<ul>${bullets.slice(0,10).map(
@@ -3510,6 +3677,8 @@
                 ).join("")}</ul>`
               : ""
             }
+
+            ${reasoningNote}
           </div>
         `;
       }).join("");
@@ -3729,6 +3898,12 @@
         render(payload,$("q").value);
         initGlobalIntelligenceMap(payload);
         initMarketPulse(payload);
+
+        if($("shareDailySummary")){
+          $("shareDailySummary").onclick = shareDailySummary;
+        }
+
+        openSummaryFromUrl();
 
         $("q").addEventListener("input",()=>{
           stopTts();
