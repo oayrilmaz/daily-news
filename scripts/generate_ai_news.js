@@ -1,5 +1,6 @@
 
 
+
 // scripts/generate_ai_news.js
 // PTD Today — Transitional Intelligence Generator for the new PTDToday.com
 //
@@ -15,6 +16,7 @@
 //   - briefs/map-signals.json
 //   - history/YYYY-MM-DD.json
 //   - articles/<development-id>.html
+//   - summary-share/YYYY-MM-DD.html
 //
 // New architecture outputs:
 //   - knowledge/developments.json
@@ -1309,6 +1311,167 @@ function buildOutlook(trends, generatedAt) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Daily intelligence summary share page                                      */
+/* -------------------------------------------------------------------------- */
+
+function renderSummaryShareHtml({ siteOrigin, payload }) {
+  const date = cleanString(payload?.date_utc) || utcDateOnly();
+  const base = String(siteOrigin || "https://ptdtoday.com").replace(/\/$/, "");
+  const shareUrl = `${base}/summary-share/${encodeURIComponent(date)}.html`;
+  const liveUrl = `${base}/?summary=${encodeURIComponent(date)}#todays-intelligence-summary`;
+
+  const sections = Array.isArray(payload?.sections) ? payload.sections : [];
+  const findSection = (heading) =>
+    sections.find(
+      (section) =>
+        cleanString(section?.heading).toLowerCase() === heading.toLowerCase()
+    );
+
+  const topThemes = findSection("Top Themes");
+  const whyItMatters = findSection("Why It Matters");
+  const rippleEffects = findSection("Ripple Effects & Connections");
+  const watch = findSection("What to Watch (24–72h)");
+
+  const topBullets = Array.isArray(topThemes?.bullets)
+    ? topThemes.bullets.filter(Boolean).slice(0, 3)
+    : [];
+
+  const description = cleanString(
+    topBullets.length
+      ? `PTD Today intelligence summary for ${date}: ${topBullets.join(" • ")}`
+      : `PTD Today intelligence summary for ${date}.`
+  ).slice(0, 300);
+
+  const esc = escapeHtml;
+
+  const sectionHtml = (section, note = "") => {
+    const bullets = Array.isArray(section?.bullets)
+      ? section.bullets.filter(Boolean)
+      : [];
+
+    if (!bullets.length) return "";
+
+    return `
+      <section class="summaryBlock">
+        <h2>${esc(section.heading)}</h2>
+        <ul>
+          ${bullets.map((bullet) => `<li>${esc(bullet)}</li>`).join("")}
+        </ul>
+        ${note ? `<p class="note">${esc(note)}</p>` : ""}
+      </section>
+    `;
+  };
+
+  const title = `PTD Today — Intelligence Summary | ${date}`;
+  const ogImage = `${base}/assets/og-default.png`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(description)}">
+  <link rel="canonical" href="${esc(shareUrl)}">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PTD Today">
+  <meta property="og:title" content="${esc(title)}">
+  <meta property="og:description" content="${esc(description)}">
+  <meta property="og:url" content="${esc(shareUrl)}">
+  <meta property="og:image" content="${esc(ogImage)}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(title)}">
+  <meta name="twitter:description" content="${esc(description)}">
+  <meta name="twitter:image" content="${esc(ogImage)}">
+
+  <style>
+    :root{--ink:#111;--muted:#5c5c5c;--line:rgba(0,0,0,.15);--soft:rgba(0,0,0,.025)}
+    *{box-sizing:border-box}
+    body{margin:0;background:#fff;color:var(--ink);font-family:Georgia,"Times New Roman",serif}
+    .wrap{max-width:820px;margin:0 auto;padding:34px 18px 60px}
+    .brand{font-size:18px;font-weight:800;margin-bottom:22px}
+    h1{font-size:42px;line-height:1.04;margin:0 0 8px}
+    .date{color:var(--muted);margin-bottom:24px}
+    .summaryBlock{border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0;background:var(--soft)}
+    .summaryBlock h2{font-size:24px;margin:0 0 10px}
+    .summaryBlock ul{margin:0;padding-left:22px}
+    .summaryBlock li{font-size:17px;line-height:1.5;margin:9px 0}
+    .note{color:var(--muted);font-size:13px;font-style:italic;line-height:1.45}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+    .btn{appearance:none;border:1px solid #111;border-radius:999px;background:#111;color:#fff;
+      padding:10px 15px;font:700 14px Georgia,"Times New Roman",serif;text-decoration:none;cursor:pointer}
+    .btn.secondary{background:#fff;color:#111}
+    .disclaimer{margin-top:24px;color:var(--muted);font-size:12px;line-height:1.5}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">PTD Today</div>
+    <h1>Today’s Intelligence Summary</h1>
+    <div class="date">${esc(date)}</div>
+
+    ${sectionHtml(topThemes)}
+    ${sectionHtml(
+      whyItMatters,
+      "Cross-signal synthesis explaining why today’s signals matter together."
+    )}
+    ${sectionHtml(
+      rippleEffects,
+      "Scenario propagation describes plausible second- and third-order effects, not guaranteed outcomes."
+    )}
+    ${sectionHtml(watch)}
+
+    <div class="actions">
+      <a class="btn" href="${esc(liveUrl)}">Explore on PTD Today →</a>
+      <button class="btn secondary" id="shareSummary" type="button">Share ↗</button>
+    </div>
+
+    <p class="disclaimer">${esc(
+      payload?.disclaimer ||
+      "Informational only — AI-generated scenario intelligence; may contain errors. Not investment or engineering advice."
+    )}</p>
+  </main>
+
+  <script>
+    (function(){
+      var title = ${JSON.stringify(title)};
+      var text = ${JSON.stringify(description)};
+      var url = ${JSON.stringify(shareUrl)};
+      var button = document.getElementById("shareSummary");
+
+      if(!button)return;
+
+      button.addEventListener("click",async function(){
+        if(navigator.share){
+          try{
+            await navigator.share({title:title,text:text,url:url});
+            return;
+          }catch(error){
+            return;
+          }
+        }
+
+        var draft = title + "\\n\\n" + text + "\\n\\n" + url;
+
+        try{
+          await navigator.clipboard.writeText(draft);
+          alert("Summary share draft copied.");
+        }catch(error){
+          prompt("Copy this summary share draft:",draft);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Backward-compatible article rendering                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -1552,6 +1715,23 @@ SUBJECT AREA:
 - Markets and policy
 - AI in energy
 
+DAILY SUMMARY REASONING:
+- The daily summary must synthesize across the 10 generated intelligence items.
+- It must contain exactly four sections in this order:
+  1. Top Themes
+  2. Why It Matters
+  3. Ripple Effects & Connections
+  4. What to Watch (24–72h)
+- "Why It Matters" must explain connections among multiple signals, not restate headlines.
+- "Ripple Effects & Connections" must express plausible second- and third-order
+  scenario propagation using arrow-style chains such as:
+  "Data-center load growth → substation pressure → transformer demand → procurement risk."
+- Never convert correlation into certainty. Use "may", "could", "if sustained",
+  "would increase pressure", and similar scenario framing where causality is uncertain.
+- Do not introduce named facts, companies, projects, prices, statistics, policies,
+  or events that are not represented in the generated intelligence items.
+- The summary should be useful to an executive deciding what deserves attention next.
+
 NEW STRUCTURED KNOWLEDGE REQUIREMENTS:
 Every item must include:
 - why_it_matters
@@ -1600,11 +1780,27 @@ Return exactly this JSON structure:
   "sections": [
     {
       "heading": "Top Themes",
-      "bullets": ["...", "..."]
+      "bullets": [
+        "Three concise cross-signal themes grounded in the 10 generated items."
+      ]
+    },
+    {
+      "heading": "Why It Matters",
+      "bullets": [
+        "Two or three synthesis statements explaining why multiple themes matter together and what system-level pressure or opportunity they may create."
+      ]
+    },
+    {
+      "heading": "Ripple Effects & Connections",
+      "bullets": [
+        "Three or four scenario chains using arrows, for example: Load growth → substation pressure → transformer demand → procurement lead-time risk."
+      ]
     },
     {
       "heading": "What to Watch (24–72h)",
-      "bullets": ["...", "..."]
+      "bullets": [
+        "Three specific observable triggers or indicators that would strengthen, weaken, or redirect the scenario."
+      ]
     }
   ],
   "items": [
@@ -1665,6 +1861,14 @@ Return exactly this JSON structure:
 
 REQUIREMENTS:
 - Exactly 10 items.
+- sections must contain exactly 4 sections in this exact order:
+  Top Themes; Why It Matters; Ripple Effects & Connections; What to Watch (24–72h).
+- Top Themes: 3 bullets.
+- Why It Matters: 2 to 3 bullets; each must synthesize at least two generated signals or domains.
+- Ripple Effects & Connections: 3 to 4 bullets; each must contain at least one "→"
+  and describe a plausible multi-step propagation chain.
+- What to Watch (24–72h): 3 bullets; use observable indicators/triggers rather than generic advice.
+- Summary reasoning must remain scenario-framed and must not add unsupported named facts.
 - No item IDs are required; the generator creates stable IDs.
 - confidence_score: 0.55 to 0.90.
 - importance_score: integer 40 to 100.
@@ -1724,6 +1928,7 @@ async function main() {
   const historyDir = optEnv("HISTORY_DIR", "history");
   const briefsDir = optEnv("BRIEFS_DIR", "briefs");
   const articlesDir = optEnv("ARTICLES_DIR", "articles");
+  const summaryShareDir = optEnv("SUMMARY_SHARE_DIR", "summary-share");
   const knowledgeDir = optEnv("KNOWLEDGE_DIR", "knowledge");
 
   const now = isoNow();
@@ -1736,6 +1941,14 @@ async function main() {
 
   // 1. Preserve the current homepage-compatible briefing.
   writeJson(path.join(briefsDir, "daily-ai.json"), payload);
+
+  // 1A. Generate a crawler-friendly, date-specific social-share page for
+  //     Today's Intelligence Summary. This uses the same generated payload
+  //     and does not trigger any additional OpenAI request.
+  writeFile(
+    path.join(summaryShareDir, `${today}.html`),
+    renderSummaryShareHtml({ siteOrigin, payload })
+  );
 
   // 2. Merge today's signals into the historical daily archive.
   const todayHistoryPath = path.join(historyDir, `${today}.json`);
@@ -1822,6 +2035,7 @@ async function main() {
 
   console.log("PTD Today generation complete.");
   console.log(`- ${path.join(briefsDir, "daily-ai.json")}`);
+  console.log(`- ${path.join(summaryShareDir, `${today}.html`)}`);
   console.log(`- ${path.join(briefsDir, "map-signals.json")}`);
   console.log(`- ${path.join(briefsDir, "trends.json")}`);
   console.log(`- ${path.join(briefsDir, "outlook.json")}`);
