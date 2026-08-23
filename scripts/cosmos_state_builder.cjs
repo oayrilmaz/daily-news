@@ -294,12 +294,24 @@ function main() {
       relationships.generated_at
     ) || generatedAt.slice(0, 10);
 
-  const stateEntities = state.entities || [];
-  const deltaRows =
-    delta.entities ||
-    delta.entity_changes ||
-    delta.changes?.entities ||
-    [];
+  // state-current.json stores entities as an object keyed by entity_id.
+  // Also accept an array for forward/backward compatibility.
+  const stateEntities = Array.isArray(state.entities)
+    ? state.entities
+    : state.entities && typeof state.entities === "object"
+      ? Object.values(state.entities)
+      : [];
+
+  // Delta files can expose changes in several compatible shapes.
+  // Normalize all supported shapes into one array before indexing.
+  const deltaRows = [
+    ...(Array.isArray(delta.entities) ? delta.entities : []),
+    ...(Array.isArray(delta.entity_changes) ? delta.entity_changes : []),
+    ...(Array.isArray(delta.changes?.entities) ? delta.changes.entities : []),
+    ...(Array.isArray(delta.added_entities) ? delta.added_entities : []),
+    ...(Array.isArray(delta.changed_entities) ? delta.changed_entities : []),
+    ...(Array.isArray(delta.removed_entities) ? delta.removed_entities : [])
+  ];
 
   const deltaByEntity = new Map();
   for (const row of deltaRows) {
