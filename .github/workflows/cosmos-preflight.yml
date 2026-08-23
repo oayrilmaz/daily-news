@@ -1,13 +1,20 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
   workflow_dispatch:
+    inputs:
+      write_emergence:
+        description: "Generate and commit real emergence-current.json from current committed Cosmos data"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: cosmos-preflight-ptdtoday
@@ -1023,10 +1030,92 @@ jobs:
           );
           NODE
 
+      - name: Generate Real Emergence Output
+        if: ${{ inputs.write_emergence == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating real Emergence output from the current committed Cosmos data."
+          echo "No OpenAI/API generation is executed by this step."
+
+          node scripts/cosmos_emergence_engine.cjs
+
+          test -f knowledge/cosmos/emergence-current.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/emergence-current.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected emergence schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (
+            !["ready", "no_emergence_above_threshold"].includes(payload.status)
+          ) {
+            throw new Error(
+              `Invalid emergence status: ${payload.status}`
+            );
+          }
+
+          if (!Array.isArray(payload.emergences)) {
+            throw new Error("emergence-current.json: emergences[] missing");
+          }
+
+          console.log("");
+          console.log("Real Emergence output created.");
+          console.log(`Date:       ${payload.date_utc}`);
+          console.log(`Status:     ${payload.status}`);
+          console.log(`Emergences: ${payload.summary?.emergence_count ?? payload.emergences.length}`);
+          console.log(`Output:     ${file}`);
+          NODE
+
+      - name: Commit Real Emergence Output
+        if: ${{ inputs.write_emergence == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DATE_UTC="$(node -p "require('./knowledge/cosmos/emergence-current.json').date_utc")"
+          HISTORY_FILE="knowledge/cosmos/emergence-history/${DATE_UTC}.json"
+
+          if [ ! -f "$HISTORY_FILE" ]; then
+            echo "ERROR: Expected emergence history file was not generated: $HISTORY_FILE"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/emergence-current.json \
+            "$HISTORY_FILE"
+
+          if git diff --cached --quiet; then
+            echo "No Emergence changes to commit."
+          else
+            git commit -m "Update Cosmos emergence ${DATE_UTC}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Real Emergence output is now committed to the repository."
+          echo "No OpenAI generation was executed."
+
       - name: Preflight Complete
         run: |
           echo "======================================================"
           echo "COSMOS PREFLIGHT PASSED"
           echo "No OpenAI generation was executed by this workflow."
-          echo "It is safe to proceed to the paid production workflow."
+          if [ "${{ inputs.write_emergence }}" = "true" ]; then
+            echo "Real emergence-current.json was generated and committed."
+            echo "Upload that file to ChatGPT for inspection before production integration."
+          else
+            echo "Isolated validation only; repository intelligence files were not changed."
+          fi
           echo "======================================================"
