@@ -3,6 +3,7 @@
 
 
 
+
 name: Home AI + Video (PTD Today)
 
 on:
@@ -420,6 +421,352 @@ jobs:
           PY
 
       # ----------------------------------------------------------------------
+      # 5C. Generate dedicated social-preview pages for every share surface
+      #
+      # LinkedIn and other social crawlers do not use JavaScript-generated share
+      # text to build the preview card. They crawl the URL and read static Open
+      # Graph metadata. These pages therefore provide dedicated preview cards for:
+      #
+      #   • Today's Intelligence Summary
+      #   • Global Power Intelligence Map
+      #   • Every 7-Day AI Outlook card
+      #   • Every 30-Day AI Outlook card
+      #
+      # Article share buttons already point to dedicated /articles/*.html pages.
+      # Sponsored Partner Spotlight already points to its dedicated partner page.
+      # Country map-share pages are generated in Step 5B above.
+      # ----------------------------------------------------------------------
+
+      - name: Generate Summary + Global Map + Outlook Share Pages
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          from urllib.parse import quote
+          import json
+          import re
+          import html
+
+          BASE_URL = "https://ptdtoday.com"
+          DAILY = Path("briefs/daily-ai.json")
+          MAP = Path("briefs/map-signals.json")
+          OUTLOOK = Path("briefs/outlook.json")
+          DEVELOPMENTS = Path("knowledge/developments.json")
+
+          SUMMARY_OUT = Path("summary-share")
+          MAP_OUT = Path("map-share")
+          OUTLOOK_OUT = Path("outlook-share")
+
+          SUMMARY_OUT.mkdir(parents=True, exist_ok=True)
+          MAP_OUT.mkdir(parents=True, exist_ok=True)
+          (OUTLOOK_OUT / "7-day").mkdir(parents=True, exist_ok=True)
+          (OUTLOOK_OUT / "30-day").mkdir(parents=True, exist_ok=True)
+
+          def esc(value):
+              return html.escape(str(value or ""), quote=True)
+
+          def clean_text(value):
+              return re.sub(r"\s+", " ", str(value or "")).strip()
+
+          def truncate(value, limit=290):
+              value = clean_text(value)
+              if len(value) <= limit:
+                  return value
+              return value[:limit - 1].rstrip() + "…"
+
+          def slugify(value):
+              value = clean_text(value).lower()
+              value = re.sub(r"[^a-z0-9]+", "-", value)
+              return value.strip("-") or "outlook"
+
+          def page_html(title, description, share_url, destination, heading=None, bullets=None):
+              og_image = f"{BASE_URL}/assets/og-default.png"
+              bullets = bullets or []
+              bullet_html = "\n".join(
+                  f"        <li>{esc(item)}</li>"
+                  for item in bullets if clean_text(item)
+              )
+
+              return f"""<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+
+            <title>{esc(title)}</title>
+            <meta name="description" content="{esc(description)}">
+            <link rel="canonical" href="{esc(share_url)}">
+
+            <meta property="og:type" content="website">
+            <meta property="og:site_name" content="PTD Today">
+            <meta property="og:title" content="{esc(title)}">
+            <meta property="og:description" content="{esc(description)}">
+            <meta property="og:url" content="{esc(share_url)}">
+            <meta property="og:image" content="{esc(og_image)}">
+            <meta property="og:image:width" content="1200">
+            <meta property="og:image:height" content="630">
+
+            <meta name="twitter:card" content="summary_large_image">
+            <meta name="twitter:title" content="{esc(title)}">
+            <meta name="twitter:description" content="{esc(description)}">
+            <meta name="twitter:image" content="{esc(og_image)}">
+
+            <script>
+              /*
+                Human visitors are redirected to the live PTD Today interface.
+                Social crawlers normally do not execute this JavaScript, so they
+                retain the dedicated Open Graph preview above.
+              */
+              window.location.replace({json.dumps(destination)});
+            </script>
+          </head>
+          <body>
+            <main>
+              <h1>{esc(heading or title)}</h1>
+              <p>{esc(description)}</p>
+              <ul>
+          {bullet_html}
+              </ul>
+              <p><a href="{esc(destination)}">Open on PTD Today</a></p>
+            </main>
+          </body>
+          </html>
+          """
+
+          # --------------------------------------------------------------
+          # A. Today's Intelligence Summary
+          # --------------------------------------------------------------
+          if DAILY.exists():
+              payload = json.loads(DAILY.read_text(encoding="utf-8"))
+              date_utc = clean_text(payload.get("date_utc")) or clean_text(payload.get("date")) or "today"
+              sections = payload.get("sections", [])
+              if not isinstance(sections, list):
+                  sections = []
+
+              def section_bullets(name):
+                  for section in sections:
+                      if clean_text(section.get("heading")).lower() == name.lower():
+                          rows = section.get("bullets", [])
+                          return rows if isinstance(rows, list) else []
+                  return []
+
+              top = section_bullets("Top Themes")[:3]
+              why = section_bullets("Why It Matters")[:2]
+              ripple = (
+                  section_bullets("Ripple Effects & Connections")
+                  or section_bullets("Connections & Ripple Effects")
+              )[:2]
+
+              summary_bits = [clean_text(x) for x in (top + why) if clean_text(x)]
+              description = truncate(
+                  " • ".join(summary_bits)
+                  if summary_bits
+                  else "Today's PTD Today intelligence summary: the leading themes, why they matter, and plausible ripple effects across the power and energy ecosystem."
+              )
+
+              share_url = f"{BASE_URL}/summary-share/{quote(date_utc)}.html"
+              destination = f"{BASE_URL}/?summary=1"
+              title = f"PTD Today — Intelligence Summary | {date_utc}"
+
+              (SUMMARY_OUT / f"{date_utc}.html").write_text(
+                  page_html(
+                      title,
+                      description,
+                      share_url,
+                      destination,
+                      heading="Today's Intelligence Summary",
+                      bullets=(top + why + ripple)[:7],
+                  ),
+                  encoding="utf-8",
+              )
+              print(f"Generated summary share page: {SUMMARY_OUT / f'{date_utc}.html'}")
+          else:
+              print("WARNING: briefs/daily-ai.json missing; summary share page skipped.")
+
+          # --------------------------------------------------------------
+          # B. Global Power Intelligence Map
+          # --------------------------------------------------------------
+          if MAP.exists():
+              payload = json.loads(MAP.read_text(encoding="utf-8"))
+              signals = payload.get("signals", [])
+              if not isinstance(signals, list):
+                  signals = []
+
+              headlines = [
+                  clean_text(item.get("title"))
+                  for item in signals
+                  if clean_text(item.get("title"))
+              ][:3]
+
+              description = truncate(
+                  (
+                      f"{len(signals)} current global intelligence signals: "
+                      + " • ".join(headlines)
+                  )
+                  if headlines
+                  else "Explore today's global power-grid, substation, data-center, renewable, infrastructure and market intelligence."
+              )
+
+              share_url = f"{BASE_URL}/map-share/global.html"
+              destination = f"{BASE_URL}/?map=global"
+              title = "Global Power Intelligence Map | PTD Today"
+
+              (MAP_OUT / "global.html").write_text(
+                  page_html(
+                      title,
+                      description,
+                      share_url,
+                      destination,
+                      heading="Global Power Intelligence Map",
+                      bullets=headlines,
+                  ),
+                  encoding="utf-8",
+              )
+              print("Generated global map share page: map-share/global.html")
+          else:
+              print("WARNING: briefs/map-signals.json missing; global map share page skipped.")
+
+          # --------------------------------------------------------------
+          # C. 7-Day + 30-Day AI Outlook share pages
+          # --------------------------------------------------------------
+          developments_by_id = {}
+
+          if DEVELOPMENTS.exists():
+              development_payload = json.loads(DEVELOPMENTS.read_text(encoding="utf-8"))
+              development_rows = development_payload.get("developments", [])
+              if isinstance(development_rows, list):
+                  for row in development_rows:
+                      key = row.get("development_id") or row.get("id")
+                      if key:
+                          developments_by_id[str(key)] = row
+
+          def evidence_title(dev_id):
+              row = developments_by_id.get(str(dev_id), {})
+              return clean_text(
+                  row.get("title")
+                  or row.get("summary")
+                  or ""
+              )
+
+          def evidence_driven_description(entry, horizon):
+              label = clean_text(entry.get("label") or entry.get("key") or "This outlook")
+              ids = entry.get("evidence_development_ids", [])
+              if not isinstance(ids, list):
+                  ids = []
+
+              recent_ids = entry.get("short_evidence_development_ids", [])
+              if not isinstance(recent_ids, list):
+                  recent_ids = []
+              recent_ids = set(str(x) for x in recent_ids if x)
+
+              ordered = []
+              seen = set()
+
+              # Recent evidence first.
+              for dev_id in list(ids):
+                  key = str(dev_id)
+                  title = evidence_title(key)
+                  if not title:
+                      continue
+                  normalized = title.lower()
+                  if normalized in seen:
+                      continue
+                  ordered.append((0 if key in recent_ids else 1, title))
+                  seen.add(normalized)
+
+              ordered.sort(key=lambda row: row[0])
+              titles = [row[1] for row in ordered[:2]]
+
+              if len(titles) >= 2:
+                  return truncate(
+                      f"{label}: the current {horizon}-day outlook is being driven by "
+                      f"{titles[0]}, together with {titles[1]}."
+                  )
+              if len(titles) == 1:
+                  return truncate(
+                      f"{label}: the current {horizon}-day outlook is being driven by {titles[0]}."
+                  )
+
+              statement = clean_text(entry.get("statement"))
+              if statement:
+                  return truncate(statement)
+
+              return truncate(
+                  f"Current PTD Today evidence keeps {label} active in the {horizon}-day AI outlook."
+              )
+
+          generated_outlooks = 0
+
+          if OUTLOOK.exists():
+              payload = json.loads(OUTLOOK.read_text(encoding="utf-8"))
+              horizons = payload.get("horizons", {})
+              if not isinstance(horizons, dict):
+                  horizons = {}
+
+              configs = [
+                  (7, "next_7_days", "7-day"),
+                  (30, "next_30_days", "30-day"),
+              ]
+
+              for horizon, key, folder in configs:
+                  rows = horizons.get(key, {}).get("topics", [])
+                  if not isinstance(rows, list):
+                      rows = []
+
+                  out_dir = OUTLOOK_OUT / folder
+
+                  # Remove stale generated outlook pages in this horizon.
+                  for old_page in out_dir.glob("*.html"):
+                      old_page.unlink()
+
+                  for entry in rows:
+                      label = clean_text(entry.get("label") or entry.get("key") or "PTD Today Outlook")
+                      slug = slugify(entry.get("key") or label)
+                      probability = round(float(entry.get("probability") or 0) * 100)
+                      direction = clean_text(entry.get("direction")) or "Stable"
+                      confidence = clean_text(entry.get("confidence")) or "Low"
+                      evidence_count = int(entry.get("evidence_signal_count") or 0)
+
+                      title = f"{label} — {probability}% | {horizon}-Day AI Outlook | PTD Today"
+                      description = evidence_driven_description(entry, horizon)
+
+                      share_url = f"{BASE_URL}/outlook-share/{folder}/{slug}.html"
+                      destination = (
+                          f"{BASE_URL}/?outlook={horizon}&focus={quote(slug)}"
+                          f"#market-outlook-{horizon}-{quote(slug)}"
+                      )
+
+                      bullets = [
+                          f"Direction: {direction}",
+                          f"Confidence: {confidence}",
+                          f"{evidence_count} intelligence signal{'s' if evidence_count != 1 else ''} behind this outlook.",
+                      ]
+
+                      (out_dir / f"{slug}.html").write_text(
+                          page_html(
+                              title,
+                              description,
+                              share_url,
+                              destination,
+                              heading=f"{label} — {probability}%",
+                              bullets=bullets,
+                          ),
+                          encoding="utf-8",
+                      )
+                      generated_outlooks += 1
+
+              print(
+                  f"Generated {generated_outlooks} outlook share page(s) "
+                  f"in {OUTLOOK_OUT}/7-day and {OUTLOOK_OUT}/30-day"
+              )
+          else:
+              print("WARNING: briefs/outlook.json missing; outlook share pages skipped.")
+
+          if generated_outlooks == 0:
+              print("WARNING: No outlook share pages were generated.")
+          PY
+
+      # ----------------------------------------------------------------------
       # 6. Cosmos Foundation Gate
       #
       # Strict production mode: corrupted structural intelligence must not
@@ -558,16 +905,42 @@ jobs:
           test -f briefs/backfill-report.json
           test -d history
           test -d map-share
+          test -d summary-share
+          test -d outlook-share/7-day
+          test -d outlook-share/30-day
+          test -f map-share/global.html
 
           MAP_SHARE_COUNT="$(find map-share -maxdepth 1 -type f -name '*.html' | wc -l)"
-          echo "Country map-share pages: ${MAP_SHARE_COUNT}"
+          SUMMARY_SHARE_COUNT="$(find summary-share -maxdepth 1 -type f -name '*.html' | wc -l)"
+          OUTLOOK_7_COUNT="$(find outlook-share/7-day -maxdepth 1 -type f -name '*.html' | wc -l)"
+          OUTLOOK_30_COUNT="$(find outlook-share/30-day -maxdepth 1 -type f -name '*.html' | wc -l)"
 
-          if [ "${MAP_SHARE_COUNT}" -lt 1 ]; then
-            echo "ERROR: No country map-share HTML pages were generated."
+          echo "Map share pages: ${MAP_SHARE_COUNT}"
+          echo "Summary share pages: ${SUMMARY_SHARE_COUNT}"
+          echo "7-day outlook share pages: ${OUTLOOK_7_COUNT}"
+          echo "30-day outlook share pages: ${OUTLOOK_30_COUNT}"
+
+          if [ "${MAP_SHARE_COUNT}" -lt 2 ]; then
+            echo "ERROR: Expected global + country map-share HTML pages."
             exit 1
           fi
 
-          echo "Briefing, backfill, historical intelligence, and country map-share files are ready."
+          if [ "${SUMMARY_SHARE_COUNT}" -lt 1 ]; then
+            echo "ERROR: No summary-share HTML page was generated."
+            exit 1
+          fi
+
+          if [ "${OUTLOOK_7_COUNT}" -lt 1 ]; then
+            echo "ERROR: No 7-day outlook-share HTML pages were generated."
+            exit 1
+          fi
+
+          if [ "${OUTLOOK_30_COUNT}" -lt 1 ]; then
+            echo "ERROR: No 30-day outlook-share HTML pages were generated."
+            exit 1
+          fi
+
+          echo "Briefing, historical intelligence, and all static social-preview share pages are ready."
 
       - name: Verify Knowledge Graph Files
         run: |
