@@ -1091,7 +1091,7 @@ jobs:
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
           const errors = [];
 
-          if (payload.schema_version !== "0.4") {
+          if (payload.schema_version !== "0.5") {
             errors.push(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1204,15 +1204,21 @@ jobs:
               );
             }
 
-            if (cluster.member_attention_ids.length > 8) {
+            if (cluster.member_attention_ids.length > 7) {
               errors.push(
-                `Attention cluster ${cluster.cluster_id} exceeds bounded member cap: ${cluster.member_attention_ids.length}`
+                `Attention cluster ${cluster.cluster_id} exceeds v0.5 member cap: ${cluster.member_attention_ids.length}`
               );
             }
 
-            if (!cluster.anchor_attention_id || !cluster.anchor_type || !cluster.anchor_ref_id) {
+            if (
+              !cluster.anchor_attention_id ||
+              !cluster.anchor_type ||
+              !cluster.anchor_ref_id ||
+              !Array.isArray(cluster.anchor_entity_ids) ||
+              cluster.anchor_entity_ids.length < 1
+            ) {
               errors.push(
-                `Attention cluster ${cluster.cluster_id} missing v0.4 anchor fields`
+                `Attention cluster ${cluster.cluster_id} missing v0.5 anchor identity fields`
               );
             }
 
@@ -1239,6 +1245,7 @@ jobs:
             if (
               !interpretation.includes("qualifies directly against the original anchor") ||
               !interpretation.includes("membership is not transitive") ||
+              !interpretation.includes("anchor identity is preserved") ||
               !interpretation.includes("does not establish new causality") ||
               !interpretation.includes("verification") ||
               !interpretation.includes("forecast")
@@ -1249,17 +1256,25 @@ jobs:
             }
           }
 
-          if ((payload.attention?.clusters || []).length > 6) {
+          if ((payload.attention?.clusters || []).length > 5) {
             errors.push(
-              `Cosmos State must retain at most 6 bounded system clusters; found ${(payload.attention?.clusters || []).length}`
+              `Cosmos State must retain at most 5 distinct bounded systems; found ${(payload.attention?.clusters || []).length}`
             );
           }
 
           if (
-            Number(payload.counts?.attention_cluster_members_max || 0) > 8
+            Number(payload.counts?.attention_cluster_members_max || 0) > 7
           ) {
             errors.push(
-              `Cosmos State attention_cluster_members_max exceeds 8: ${payload.counts?.attention_cluster_members_max}`
+              `Cosmos State attention_cluster_members_max exceeds 7: ${payload.counts?.attention_cluster_members_max}`
+            );
+          }
+
+          if (
+            Number(payload.counts?.attention_distinct_system_target_max || 0) !== 5
+          ) {
+            errors.push(
+              `Cosmos State distinct-system target max must be 5; found ${payload.counts?.attention_distinct_system_target_max}`
             );
           }
 
@@ -1401,7 +1416,7 @@ jobs:
           console.log(`  Impacts:     ${payload.counts.attention_impacts ?? 0}`);
           console.log(`Clusters:      ${payload.counts.attention_clusters ?? 0}`);
           console.log(
-            "Freshness, Impact lineage, attention diversity/bounded-system clustering, evidence and no-new-claims safeguards passed."
+            "Freshness, Impact lineage, anchor-preserving system diversity, evidence and no-new-claims safeguards passed."
           );
           console.log(
             "Repository files were not modified by the isolated test."
@@ -1427,7 +1442,7 @@ jobs:
           const file = "knowledge/cosmos/cosmos-state-current.json";
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
 
-          if (payload.schema_version !== "0.4") {
+          if (payload.schema_version !== "0.5") {
             throw new Error(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1455,9 +1470,9 @@ jobs:
             throw new Error("Cosmos State attention.clusters[] missing");
           }
 
-          if (payload.attention.clusters.length > 6) {
+          if (payload.attention.clusters.length > 5) {
             throw new Error(
-              `Cosmos State must retain at most 6 bounded system clusters; found ${payload.attention.clusters.length}`
+              `Cosmos State must retain at most 5 distinct bounded systems; found ${payload.attention.clusters.length}`
             );
           }
 
@@ -1468,15 +1483,20 @@ jobs:
               );
             }
 
-            if (cluster.member_attention_ids.length > 8) {
+            if (cluster.member_attention_ids.length > 7) {
               throw new Error(
-                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds 8-member bound`
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.5 7-member bound`
               );
             }
 
-            if (!cluster.anchor_attention_id || !["emergence", "pattern"].includes(cluster.anchor_type)) {
+            if (
+              !cluster.anchor_attention_id ||
+              !["emergence", "pattern"].includes(cluster.anchor_type) ||
+              !Array.isArray(cluster.anchor_entity_ids) ||
+              cluster.anchor_entity_ids.length < 1
+            ) {
               throw new Error(
-                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing valid v0.4 anchor`
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing valid v0.5 anchor identity`
               );
             }
 
@@ -1490,6 +1510,7 @@ jobs:
             if (
               !interpretation.includes("qualifies directly against the original anchor") ||
               !interpretation.includes("membership is not transitive") ||
+              !interpretation.includes("anchor identity is preserved") ||
               !interpretation.includes("does not establish new causality") ||
               !interpretation.includes("verification") ||
               !interpretation.includes("forecast")
@@ -1502,8 +1523,12 @@ jobs:
 
           const counts = payload.counts || {};
 
-          if (Number(counts.attention_cluster_members_max || 0) > 8) {
-            throw new Error("Cosmos State attention_cluster_members_max exceeds 8");
+          if (Number(counts.attention_cluster_members_max || 0) > 7) {
+            throw new Error("Cosmos State attention_cluster_members_max exceeds 7");
+          }
+
+          if (Number(counts.attention_distinct_system_target_max || 0) !== 5) {
+            throw new Error("Cosmos State attention_distinct_system_target_max must equal 5");
           }
 
           if (
