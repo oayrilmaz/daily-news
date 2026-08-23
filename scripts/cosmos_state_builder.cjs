@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Cosmos State Builder v0.4
+ * PTD Today / Cosmos — Cosmos State Builder v0.5
  *
  * Deterministic, read-only synthesis layer above:
  *   State → Delta → Impact → Pattern → Emergence → Developments/Relationships
@@ -728,18 +728,12 @@ function main() {
     const overlap = jaccard(anchorIds, candidateIds);
     const adjacencyScore = graphAdjacencyScore(anchorIds, candidateIds, adjacency);
 
-    // v0.4 is deliberately NON-TRANSITIVE:
-    // every member must qualify directly against the original anchor.
-    //
-    // Same-family members need meaningful direct overlap.
+    // v0.5 preserves v0.4's NON-TRANSITIVE rule:
+    // every member still qualifies directly against the original anchor.
     if (anchor.attention_type === candidate.attention_type) {
       return shared >= 2 && overlap >= 0.30;
     }
 
-    // Cross-family members may join through:
-    //   1) at least two shared anchor entities, or
-    //   2) one shared anchor entity + strong graph adjacency, or
-    //   3) very strong direct graph adjacency to the anchor.
     if (shared >= 2) return true;
     if (shared >= 1 && adjacencyScore >= 0.25) return true;
     if (adjacencyScore >= 0.60) return true;
@@ -761,12 +755,29 @@ function main() {
     );
   }
 
-  // v0.4 bounded systems:
-  // - anchors are selected from the strongest Emergence/Pattern signals
-  // - candidates qualify ONLY against that anchor, never transitively
-  // - overlapping systems are allowed
-  // - each system is capped to a compact member set
-  // - single-member systems are discarded
+  function anchorCoreEntityIds(anchor) {
+    return uniq(anchor.entity_ids || []).slice(0, 4);
+  }
+
+  function anchorFit(anchor, candidate) {
+    const anchorIds = anchor.entity_ids || [];
+    const candidateIds = candidate.entity_ids || [];
+    const shared = sharedCount(anchorIds, candidateIds);
+    const overlap = jaccard(anchorIds, candidateIds);
+    const adjacencyScore = graphAdjacencyScore(anchorIds, candidateIds, adjacency);
+    const crossFamilyBonus =
+      candidate.attention_type !== anchor.attention_type ? 12 : 0;
+
+    // Reward direct overlap with the ANCHOR itself much more heavily than generic graph proximity.
+    return (
+      shared * 28 +
+      overlap * 40 +
+      adjacencyScore * 16 +
+      crossFamilyBonus +
+      n(candidate.attention_score) * 0.10
+    );
+  }
+
   const anchors = attentionTop
     .filter(x => x.attention_type === "emergence" || x.attention_type === "pattern")
     .sort((a, b) =>
@@ -781,39 +792,23 @@ function main() {
   const proposed = [];
 
   for (const anchor of anchors) {
+    const anchorCore = anchorCoreEntityIds(anchor);
+
     const candidates = attentionTop
       .filter(x => x.attention_id !== anchor.attention_id)
       .filter(x => candidateMatchesAnchor(anchor, x))
-      .map(x => {
-        const shared = sharedCount(anchor.entity_ids || [], x.entity_ids || []);
-        const overlap = jaccard(anchor.entity_ids || [], x.entity_ids || []);
-        const adjacencyScore = graphAdjacencyScore(
-          anchor.entity_ids || [],
-          x.entity_ids || [],
-          adjacency
-        );
-
-        const crossFamilyBonus =
-          x.attention_type !== anchor.attention_type ? 12 : 0;
-
-        const fitScore =
-          shared * 18 +
-          overlap * 30 +
-          adjacencyScore * 25 +
-          crossFamilyBonus +
-          n(x.attention_score) * 0.15;
-
-        return { row: x, fitScore };
-      })
+      .map(x => ({
+        row: x,
+        fitScore: anchorFit(anchor, x)
+      }))
       .sort((a, b) =>
         b.fitScore - a.fitScore ||
         b.row.attention_score - a.row.attention_score
       )
-      .slice(0, 7)
+      .slice(0, 6)
       .map(x => x.row);
 
     const members = [anchor, ...candidates];
-
     if (members.length < 2) continue;
 
     const memberTypes = uniq(members.map(x => x.attention_type));
@@ -825,23 +820,34 @@ function main() {
       }
     }
 
-    const topEntityIds = [...entityFrequency.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 5)
-      .map(([id]) => id);
+    // Preserve anchor identity in labeling:
+    // start with anchor entities, then add the most frequent non-anchor entities.
+    const labelEntityIds = [];
+    for (const id of anchorCore) {
+      if (!labelEntityIds.includes(id)) labelEntityIds.push(id);
+      if (labelEntityIds.length >= 3) break;
+    }
 
-    const topEntityNames = topEntityIds
+    for (const [id] of [...entityFrequency.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))) {
+      if (!labelEntityIds.includes(id)) {
+        labelEntityIds.push(id);
+      }
+      if (labelEntityIds.length >= 5) break;
+    }
+
+    const labelEntityNames = labelEntityIds
       .map(id => entityNameById.get(id))
       .filter(Boolean);
 
     const labelCore =
-      topEntityNames.length > 0
-        ? topEntityNames.join(" · ")
+      labelEntityNames.length > 0
+        ? labelEntityNames.join(" · ")
         : anchor.title || "Connected intelligence";
 
     const systemScore = round(
-      n(anchor.attention_score) * 0.70 +
-      Math.min(100, members.length * 12) * 0.15 +
+      n(anchor.attention_score) * 0.72 +
+      Math.min(100, members.length * 12) * 0.13 +
       (memberTypes.length > 1 ? 100 : 60) * 0.15,
       2
     );
@@ -855,12 +861,13 @@ function main() {
       anchor_type: anchor.attention_type,
       anchor_ref_id: anchor.ref_id,
       anchor_title: anchor.title,
+      anchor_entity_ids: anchorCore,
       label: `${labelCore} — bounded system`,
       member_count: members.length,
       member_attention_ids: members.map(x => x.attention_id),
       member_types: memberTypes,
       cross_family: memberTypes.length > 1,
-      entity_ids: topEntityIds,
+      entity_ids: labelEntityIds,
       attention_score: systemScore,
       evidence_quality_score: round(
         members.reduce((sum, x) => sum + n(x.evidence_quality_score), 0) /
@@ -872,12 +879,13 @@ function main() {
           Math.max(1, members.length)
       ),
       interpretation:
-        "Bounded system for navigation and synthesis only. Every member qualifies directly against the original anchor through shared entities and/or strong graph adjacency; membership is not transitive. This system does not establish new causality, verification, or forecast."
+        "Bounded system for navigation and synthesis only. Every member qualifies directly against the original anchor through shared entities and/or strong graph adjacency; membership is not transitive. Anchor identity is preserved in system labeling and member selection. This system does not establish new causality, verification, or forecast."
     });
   }
 
-  // Deduplicate near-identical systems while allowing legitimate overlap.
-  // Two systems are considered duplicates only when their member sets overlap heavily.
+  // Diversity-aware selection:
+  // suppress systems that are too similar in BOTH member composition and entity focus,
+  // while allowing overlap when the anchor domain is genuinely distinct.
   const clusters = [];
 
   for (const candidate of proposed.sort((a, b) =>
@@ -885,23 +893,39 @@ function main() {
     b.attention_score - a.attention_score ||
     b.member_count - a.member_count
   )) {
-    const isDuplicate = clusters.some(existing => {
-      const overlap = jaccard(
+    const isTooSimilar = clusters.some(existing => {
+      const memberOverlap = jaccard(
         existing.member_attention_ids,
         candidate.member_attention_ids
       );
-      return overlap >= 0.75;
+      const entityOverlap = jaccard(
+        existing.entity_ids,
+        candidate.entity_ids
+      );
+      const anchorEntityOverlap = jaccard(
+        existing.anchor_entity_ids,
+        candidate.anchor_entity_ids
+      );
+
+      // Strong duplicate suppression when both visible system shape and
+      // underlying member composition are highly similar.
+      if (memberOverlap >= 0.58 && entityOverlap >= 0.60) {
+        // Distinct anchor domains may survive if their anchor cores are meaningfully different.
+        return anchorEntityOverlap >= 0.50;
+      }
+
+      return false;
     });
 
-    if (!isDuplicate) {
+    if (!isTooSimilar) {
       clusters.push(candidate);
     }
 
-    if (clusters.length >= 6) break;
+    if (clusters.length >= 5) break;
   }
 
   const output = {
-    schema_version: "0.4",
+    schema_version: "0.5",
     generated_at: generatedAt,
     date_utc: dateUtc,
     status: "ready",
@@ -920,7 +944,7 @@ function main() {
       attention_diversity_rule:
         "The retained attention surface is quota-balanced across Pattern, Emergence and Impact so one upstream family cannot consume every visible slot.",
       overlap_cluster_rule:
-        "Attention signals may be grouped into bounded system clusters anchored on strong Emergence or Pattern signals. Every member must qualify directly against the original anchor through shared entities and/or strong graph adjacency; clustering is non-transitive. Cross-family Pattern/Emergence/Impact grouping is preferred, overlapping systems are allowed, single-member systems are discarded, and near-duplicate systems are suppressed. A bounded system is not a new causal, verification or forecasting claim.",
+        "Attention signals may be grouped into bounded system clusters anchored on strong Emergence or Pattern signals. Every member must qualify directly against the original anchor through shared entities and/or strong graph adjacency; clustering is non-transitive. Anchor identity is preserved in system labels and member selection. Cross-family Pattern/Emergence/Impact grouping is preferred, overlapping systems are allowed when anchors are genuinely distinct, single-member systems are discarded, and systems with highly similar member/entity composition are suppressed. A bounded system is not a new causal, verification or forecasting claim.",
       stale_input_rule:
         "Input dates are exposed in source_freshness so consumers can avoid blending snapshots as though they were contemporaneous."
     },
@@ -1011,6 +1035,7 @@ function main() {
       attention_emergences: attentionTop.filter(x => x.attention_type === "emergence").length,
       attention_impacts: attentionTop.filter(x => x.attention_type === "impact").length,
       attention_clusters: clusters.length,
+      attention_distinct_system_target_max: 5,
       attention_cross_family_clusters: clusters.filter(x => x.cross_family).length,
       attention_cluster_members_max: clusters.length
         ? Math.max(...clusters.map(x => x.member_count))
@@ -1034,6 +1059,7 @@ function main() {
   console.log(`  Emergences:    ${output.counts.attention_emergences}`);
   console.log(`  Impacts:       ${output.counts.attention_impacts}`);
   console.log(`Clusters:        ${output.counts.attention_clusters}`);
+  console.log(`  Target max:    ${output.counts.attention_distinct_system_target_max}`);
   console.log(`  Cross-family:  ${output.counts.attention_cross_family_clusters}`);
   console.log(`  Max members:   ${output.counts.attention_cluster_members_max}`);
   console.log(`Output:          ${path.relative(ROOT, FILES.output)}`);
