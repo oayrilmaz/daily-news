@@ -2278,7 +2278,16 @@
 
     function mapSharePageUrl(){
       if(!IntelligenceMap.selectedCountry){
-        return currentMapShareUrl();
+        const url = new URL(
+          "/map-share/global.html",
+          window.location.origin
+        );
+
+        if(IntelligenceMap.category && IntelligenceMap.category !== "All"){
+          url.searchParams.set("category",IntelligenceMap.category);
+        }
+
+        return url.toString();
       }
 
       const slug = IntelligenceMap.selectedCountry
@@ -2695,6 +2704,11 @@
         if(IntelligenceMap.selectedCountry){
           focusSelectedCountryOnMap();
           openMapAccordion();
+        }else{
+          const mapMode = new URLSearchParams(window.location.search).get("map");
+          if(mapMode === "global"){
+            openMapAccordion();
+          }
         }
 
         syncMapFilterButtons();
