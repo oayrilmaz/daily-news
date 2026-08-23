@@ -1,5 +1,6 @@
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -46,6 +47,7 @@ jobs:
             "scripts/cosmos_state_delta.cjs"
             "scripts/cosmos_impact_engine.cjs"
             "scripts/cosmos_pattern_engine.cjs"
+            "scripts/cosmos_emergence_engine.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -69,6 +71,7 @@ jobs:
           node --check scripts/cosmos_state_delta.cjs
           node --check scripts/cosmos_impact_engine.cjs
           node --check scripts/cosmos_pattern_engine.cjs
+          node --check scripts/cosmos_emergence_engine.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -245,6 +248,7 @@ jobs:
 
           cp scripts/cosmos_impact_engine.cjs "$TEST_DIR/scripts/"
           cp scripts/cosmos_pattern_engine.cjs "$TEST_DIR/scripts/"
+          cp scripts/cosmos_emergence_engine.cjs "$TEST_DIR/scripts/"
           cp knowledge/relationships.json "$TEST_DIR/knowledge/"
           cp knowledge/developments.json "$TEST_DIR/knowledge/"
 
@@ -520,7 +524,7 @@ jobs:
 
           const errors = [];
 
-          if (patterns.schema_version !== "0.1") {
+          if (patterns.schema_version !== "0.2") {
             errors.push(
               `Unexpected pattern schema_version: ${patterns.schema_version}`
             );
@@ -541,6 +545,32 @@ jobs:
             errors.push(
               "patterns-current.json: deterministic_pattern_detection methodology missing"
             );
+          }
+
+          const calibration = patterns.methodology?.cross_domain_calibration;
+
+          if (!calibration || typeof calibration !== "object") {
+            errors.push(
+              "patterns-current.json: cross_domain_calibration methodology missing"
+            );
+          } else {
+            if (Number(calibration.max_results) !== 30) {
+              errors.push(
+                `patterns-current.json: expected cross-domain max_results 30, got ${calibration.max_results}`
+              );
+            }
+
+            if (Number(calibration.max_score) !== 96) {
+              errors.push(
+                `patterns-current.json: expected cross-domain max_score 96, got ${calibration.max_score}`
+              );
+            }
+
+            if (!String(calibration.dynamic_gate || "").includes("meaningful delta")) {
+              errors.push(
+                "patterns-current.json: calibrated dynamic gate missing"
+              );
+            }
           }
 
           if (!patterns.summary || typeof patterns.summary !== "object") {
@@ -575,6 +605,8 @@ jobs:
             "recurring",
             "persistent"
           ]);
+
+          let crossDomainCount = 0;
 
           for (const row of patterns.patterns || []) {
             if (!row.pattern_id) {
@@ -638,6 +670,45 @@ jobs:
                 `Pattern ${row.pattern_id || "(unknown)"} has invalid support lineage`
               );
             }
+
+            if (row.pattern_family === "cross_domain_coupling") {
+              crossDomainCount += 1;
+
+              if (Number(row.pattern_score) > 96) {
+                errors.push(
+                  `Pattern ${row.pattern_id || "(unknown)"} exceeds calibrated cross-domain score ceiling`
+                );
+              }
+
+              const details = Array.isArray(row.signal_details)
+                ? row.signal_details[0]
+                : null;
+
+              if (!details ||
+                  !Number.isFinite(Number(details.strong_relationship_count)) ||
+                  Number(details.strong_relationship_count) < 1) {
+                errors.push(
+                  `Pattern ${row.pattern_id || "(unknown)"} lacks strong resolved relationship support`
+                );
+              }
+
+              const hasDynamicSupport =
+                details?.meaningful_delta_support === true ||
+                Number(details?.origin_impact_count || 0) > 0 ||
+                Number(details?.affected_impact_count || 0) > 0;
+
+              if (!hasDynamicSupport) {
+                errors.push(
+                  `Pattern ${row.pattern_id || "(unknown)"} lacks calibrated dynamic support`
+                );
+              }
+            }
+          }
+
+          if (crossDomainCount > 30) {
+            errors.push(
+              `patterns-current.json: cross-domain pattern count ${crossDomainCount} exceeds calibrated cap 30`
+            );
           }
 
           if (errors.length) {
@@ -665,6 +736,287 @@ jobs:
           );
           console.log(
             "Pattern structural strength and evidence quality remain independently validated."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Test Cosmos Emergence Engine In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_emergence_engine.cjs "$TEST_DIR/scripts/"
+          cp knowledge/cosmos/patterns-current.json \
+            "$TEST_DIR/knowledge/cosmos/patterns-current.json"
+
+          if [ -f "knowledge/cosmos/impact-current.json" ]; then
+            cp knowledge/cosmos/impact-current.json \
+              "$TEST_DIR/knowledge/cosmos/impact-current.json"
+          fi
+
+          if [ -f "knowledge/cosmos/delta-current.json" ]; then
+            cp knowledge/cosmos/delta-current.json \
+              "$TEST_DIR/knowledge/cosmos/delta-current.json"
+          fi
+
+          if [ -f "knowledge/cosmos/state-current.json" ]; then
+            cp knowledge/cosmos/state-current.json \
+              "$TEST_DIR/knowledge/cosmos/state-current.json"
+          fi
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_emergence_engine.cjs
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const outputPath = path.join(
+            root,
+            "knowledge/cosmos/emergence-current.json"
+          );
+          const patternPath = path.join(
+            root,
+            "knowledge/cosmos/patterns-current.json"
+          );
+
+          if (!fs.existsSync(outputPath)) {
+            throw new Error(
+              "Emergence engine did not create knowledge/cosmos/emergence-current.json"
+            );
+          }
+
+          const emergence = JSON.parse(
+            fs.readFileSync(outputPath, "utf8")
+          );
+          const patterns = JSON.parse(
+            fs.readFileSync(patternPath, "utf8")
+          );
+
+          const patternById = new Map(
+            (patterns.patterns || []).map(row => [row.pattern_id, row])
+          );
+
+          const errors = [];
+
+          if (emergence.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected emergence schema_version: ${emergence.schema_version}`
+            );
+          }
+
+          if (
+            !["ready", "no_emergence_above_threshold"].includes(
+              emergence.status
+            )
+          ) {
+            errors.push(
+              `emergence-current.json: invalid status "${emergence.status}"`
+            );
+          }
+
+          if (!emergence.methodology ||
+              emergence.methodology.reasoning_mode !==
+                "deterministic_higher_order_pattern_synthesis") {
+            errors.push(
+              "emergence-current.json: deterministic higher-order methodology missing"
+            );
+          }
+
+          if (!emergence.summary || typeof emergence.summary !== "object") {
+            errors.push("emergence-current.json: summary missing");
+          }
+
+          if (!emergence.diagnostics ||
+              typeof emergence.diagnostics !== "object") {
+            errors.push("emergence-current.json: diagnostics missing");
+          }
+
+          if (!Array.isArray(emergence.emergences)) {
+            errors.push("emergence-current.json: emergences[] missing");
+          }
+
+          const allowedFamilies = new Set([
+            "acceleration_convergence",
+            "reinforced_coupling",
+            "multi_family_emergence",
+            "systemic_emergence",
+            "multi_pattern_convergence"
+          ]);
+
+          const allowedEvidenceQuality = new Set([
+            "strong",
+            "moderate",
+            "weak",
+            "unknown"
+          ]);
+
+          const allowedPersistence = new Set([
+            "insufficient_history",
+            "new",
+            "recurring",
+            "persistent"
+          ]);
+
+          for (const row of emergence.emergences || []) {
+            if (!row.emergence_id) {
+              errors.push("Emergence missing emergence_id");
+            }
+
+            if (!allowedFamilies.has(row.emergence_family)) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid emergence_family`
+              );
+            }
+
+            if (!Number.isFinite(Number(row.emergence_score)) ||
+                Number(row.emergence_score) < 0 ||
+                Number(row.emergence_score) > 98) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid emergence_score`
+              );
+            }
+
+            if (!Array.isArray(row.supporting_pattern_ids) ||
+                row.supporting_pattern_ids.length < 3) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} must have at least 3 supporting patterns`
+              );
+            }
+
+            if (!Array.isArray(row.pattern_families) ||
+                row.pattern_families.length < 2) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} must have at least 2 pattern families`
+              );
+            }
+
+            const distinctFamilies = new Set(row.pattern_families || []);
+            if (distinctFamilies.size !== (row.pattern_families || []).length) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has duplicate pattern families`
+              );
+            }
+
+            for (const patternId of row.supporting_pattern_ids || []) {
+              if (!patternById.has(patternId)) {
+                errors.push(
+                  `Emergence ${row.emergence_id || "(unknown)"} references unknown pattern ${patternId}`
+                );
+              }
+            }
+
+            const underlyingEvidenceScores =
+              (row.supporting_pattern_ids || [])
+                .map(id => patternById.get(id))
+                .filter(Boolean)
+                .map(p => Number(p.evidence_quality_score))
+                .filter(Number.isFinite);
+
+            const strongestUnderlyingEvidence = underlyingEvidenceScores.length
+              ? Math.max(...underlyingEvidenceScores)
+              : 0;
+
+            if (Number(row.evidence_quality_score) >
+                strongestUnderlyingEvidence + 1e-9) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} improperly upgrades evidence quality`
+              );
+            }
+
+            if (!allowedEvidenceQuality.has(row.evidence_quality_label)) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid evidence_quality_label`
+              );
+            }
+
+            if (!Array.isArray(row.shared_entities) ||
+                row.shared_entities.length < 1) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} lacks shared entity support`
+              );
+            }
+
+            if (!Array.isArray(row.supporting_impact_ids) ||
+                !Array.isArray(row.supporting_relationship_ids) ||
+                !Array.isArray(row.supporting_development_ids)) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid lineage arrays`
+              );
+            }
+
+            if (!row.persistence ||
+                !allowedPersistence.has(row.persistence.status)) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid persistence status`
+              );
+            }
+
+            if (!row.interpretation ||
+                row.interpretation.claim_class !==
+                  "higher_order_structural_signal" ||
+                row.interpretation.causality !== "not_established" ||
+                row.interpretation.forecast !== false) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid interpretation safeguards`
+              );
+            }
+
+            if (!row.signal_details ||
+                Number(row.signal_details.pattern_count) < 3 ||
+                Number(row.signal_details.family_count) < 2 ||
+                Number(row.signal_details.shared_entity_count) < 1) {
+              errors.push(
+                `Emergence ${row.emergence_id || "(unknown)"} has invalid cluster diagnostics`
+              );
+            }
+          }
+
+          if (errors.length) {
+            console.error("\nEmergence Engine preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nEmergence Engine isolated test passed.");
+          console.log(`Status:      ${emergence.status}`);
+          console.log(`Emergences: ${emergence.summary.emergence_count}`);
+          console.log(
+            `Systemic: ${emergence.summary.by_family?.systemic_emergence || 0}`
+          );
+          console.log(
+            `Multi-family: ${emergence.summary.by_family?.multi_family_emergence || 0}`
+          );
+          console.log(
+            `Acceleration + convergence: ${emergence.summary.by_family?.acceleration_convergence || 0}`
+          );
+          console.log(
+            `Reinforced coupling: ${emergence.summary.by_family?.reinforced_coupling || 0}`
+          );
+          console.log(
+            `Multi-pattern convergence: ${emergence.summary.by_family?.multi_pattern_convergence || 0}`
+          );
+          console.log(
+            `Pattern graph edges: ${emergence.diagnostics.pattern_graph_edge_count}`
+          );
+          console.log(
+            `Raw emergences: ${emergence.diagnostics.raw_emergence_count}`
+          );
+          console.log(
+            "Evidence inheritance and higher-order safeguards passed."
           );
           console.log(
             "Repository files were not modified by the isolated test."
