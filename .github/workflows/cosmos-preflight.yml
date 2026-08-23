@@ -2,6 +2,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -9,6 +10,11 @@ on:
     inputs:
       write_emergence:
         description: "Generate and commit real emergence-current.json from current committed Cosmos data"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_state:
+        description: "Generate and commit real cosmos-state-current.json from current committed Cosmos data"
         required: false
         default: false
         type: boolean
@@ -55,6 +61,7 @@ jobs:
             "scripts/cosmos_impact_engine.cjs"
             "scripts/cosmos_pattern_engine.cjs"
             "scripts/cosmos_emergence_engine.cjs"
+            "scripts/cosmos_state_builder.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -79,6 +86,7 @@ jobs:
           node --check scripts/cosmos_impact_engine.cjs
           node --check scripts/cosmos_pattern_engine.cjs
           node --check scripts/cosmos_emergence_engine.cjs
+          node --check scripts/cosmos_state_builder.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -1030,6 +1038,303 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos State Builder In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_state_builder.cjs "$TEST_DIR/scripts/"
+          cp knowledge/developments.json "$TEST_DIR/knowledge/"
+          cp knowledge/relationships.json "$TEST_DIR/knowledge/"
+
+          for file in \
+            state-current.json \
+            delta-current.json \
+            impact-current.json \
+            patterns-current.json \
+            emergence-current.json
+          do
+            if [ ! -f "knowledge/cosmos/$file" ]; then
+              echo "ERROR: Missing committed Cosmos input: knowledge/cosmos/$file"
+              exit 1
+            fi
+            cp "knowledge/cosmos/$file" "$TEST_DIR/knowledge/cosmos/$file"
+          done
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_state_builder.cjs
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/cosmos-state-current.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos State Builder did not create knowledge/cosmos/cosmos-state-current.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos State schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "ready") {
+            errors.push(`Invalid Cosmos State status: ${payload.status}`);
+          }
+
+          if (
+            payload.methodology?.reasoning_mode !==
+            "deterministic_cosmos_state_synthesis"
+          ) {
+            errors.push(
+              "Cosmos State deterministic synthesis methodology missing"
+            );
+          }
+
+          if (payload.methodology?.no_new_claims !== true) {
+            errors.push("Cosmos State must enforce no_new_claims=true");
+          }
+
+          const freshnessKeys = [
+            "state",
+            "delta",
+            "impact",
+            "patterns",
+            "emergence",
+            "developments",
+            "relationships"
+          ];
+
+          for (const key of freshnessKeys) {
+            if (!payload.source_freshness?.[key]) {
+              errors.push(`Cosmos State source_freshness.${key} missing`);
+            }
+          }
+
+          if (!Array.isArray(payload.now?.entities)) {
+            errors.push("Cosmos State now.entities[] missing");
+          }
+
+          if (!Array.isArray(payload.now?.developments)) {
+            errors.push("Cosmos State now.developments[] missing");
+          }
+
+          if (!Array.isArray(payload.graph?.relationships)) {
+            errors.push("Cosmos State graph.relationships[] missing");
+          }
+
+          if (!Array.isArray(payload.impact?.signals)) {
+            errors.push("Cosmos State impact.signals[] missing");
+          }
+
+          if (!Array.isArray(payload.patterns?.signals)) {
+            errors.push("Cosmos State patterns.signals[] missing");
+          }
+
+          if (!Array.isArray(payload.emergence?.signals)) {
+            errors.push("Cosmos State emergence.signals[] missing");
+          }
+
+          if (!Array.isArray(payload.attention?.signals)) {
+            errors.push("Cosmos State attention.signals[] missing");
+          }
+
+          if (payload.safeguards?.forecast !== false) {
+            errors.push("Cosmos State must keep forecast=false");
+          }
+
+          if (payload.safeguards?.evidence_quality_upgraded !== false) {
+            errors.push(
+              "Cosmos State must keep evidence_quality_upgraded=false"
+            );
+          }
+
+          const impactIds = new Set(
+            (payload.impact?.signals || []).map(x => x.impact_id)
+          );
+          const patternIds = new Set(
+            (payload.patterns?.signals || []).map(x => x.pattern_id)
+          );
+          const emergenceIds = new Set(
+            (payload.emergence?.signals || []).map(x => x.emergence_id)
+          );
+
+          for (const row of payload.attention?.signals || []) {
+            if (!row.attention_id || !row.attention_type || !row.ref_id) {
+              errors.push("Attention signal missing identity fields");
+              continue;
+            }
+
+            let exists = false;
+
+            if (row.attention_type === "impact") {
+              exists = impactIds.has(row.ref_id);
+            } else if (row.attention_type === "pattern") {
+              exists = patternIds.has(row.ref_id);
+            } else if (row.attention_type === "emergence") {
+              exists = emergenceIds.has(row.ref_id);
+            } else {
+              errors.push(
+                `Attention ${row.attention_id} has invalid type ${row.attention_type}`
+              );
+              continue;
+            }
+
+            if (!exists) {
+              errors.push(
+                `Attention ${row.attention_id} references missing upstream ${row.attention_type} ${row.ref_id}`
+              );
+            }
+
+            if (
+              !Number.isFinite(Number(row.evidence_quality_score)) ||
+              Number(row.evidence_quality_score) < 0 ||
+              Number(row.evidence_quality_score) > 100
+            ) {
+              errors.push(
+                `Attention ${row.attention_id} has invalid evidence quality`
+              );
+            }
+          }
+
+          const expectedHistory = path.join(
+            root,
+            "knowledge/cosmos/cosmos-state-history",
+            `${payload.date_utc}.json`
+          );
+
+          if (!fs.existsSync(expectedHistory)) {
+            errors.push(
+              `Cosmos State history snapshot missing for ${payload.date_utc}`
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos State preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nCosmos State isolated test passed.");
+          console.log(`Date:          ${payload.date_utc}`);
+          console.log(`Entities:      ${payload.counts.entities_available}`);
+          console.log(`Relationships: ${payload.counts.relationships_available}`);
+          console.log(`Developments:  ${payload.counts.developments_available}`);
+          console.log(`Impacts:       ${payload.counts.impacts_available}`);
+          console.log(`Patterns:      ${payload.counts.patterns_available}`);
+          console.log(`Emergences:    ${payload.counts.emergences_available}`);
+          console.log(`Attention:     ${payload.counts.attention_retained}`);
+          console.log(
+            "Freshness, lineage, evidence and no-new-claims safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Generate Real Cosmos State Output
+        if: ${{ inputs.write_cosmos_state == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating real Cosmos State from current committed Cosmos data."
+          echo "No OpenAI/API generation is executed by this step."
+
+          node scripts/cosmos_state_builder.cjs
+
+          test -f knowledge/cosmos/cosmos-state-current.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/cosmos-state-current.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos State schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "ready") {
+            throw new Error(`Invalid Cosmos State status: ${payload.status}`);
+          }
+
+          if (
+            payload.methodology?.reasoning_mode !==
+            "deterministic_cosmos_state_synthesis"
+          ) {
+            throw new Error("Cosmos State methodology missing");
+          }
+
+          if (
+            payload.safeguards?.forecast !== false ||
+            payload.safeguards?.evidence_quality_upgraded !== false
+          ) {
+            throw new Error("Cosmos State safeguards invalid");
+          }
+
+          console.log("");
+          console.log("Real Cosmos State output created.");
+          console.log(`Date:       ${payload.date_utc}`);
+          console.log(`Attention:  ${payload.counts?.attention_retained ?? 0}`);
+          console.log(`Output:     ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos State Output
+        if: ${{ inputs.write_cosmos_state == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DATE_UTC="$(node -p "require('./knowledge/cosmos/cosmos-state-current.json').date_utc")"
+          HISTORY_FILE="knowledge/cosmos/cosmos-state-history/${DATE_UTC}.json"
+
+          if [ ! -f "$HISTORY_FILE" ]; then
+            echo "ERROR: Expected Cosmos State history file was not generated: $HISTORY_FILE"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/cosmos-state-current.json \
+            "$HISTORY_FILE"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos State changes to commit."
+          else
+            git commit -m "Update Cosmos state ${DATE_UTC}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Real Cosmos State output is now committed to the repository."
+          echo "No OpenAI generation was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -1114,8 +1419,13 @@ jobs:
           echo "No OpenAI generation was executed by this workflow."
           if [ "${{ inputs.write_emergence }}" = "true" ]; then
             echo "Real emergence-current.json was generated and committed."
-            echo "Upload that file to ChatGPT for inspection before production integration."
-          else
+          fi
+          if [ "${{ inputs.write_cosmos_state }}" = "true" ]; then
+            echo "Real cosmos-state-current.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_emergence }}" != "true" ] &&              [ "${{ inputs.write_cosmos_state }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
+          else
+            echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
           fi
           echo "======================================================"
