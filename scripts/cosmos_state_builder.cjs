@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Cosmos State Builder v0.2
+ * PTD Today / Cosmos — Cosmos State Builder v0.3
  *
  * Deterministic, read-only synthesis layer above:
  *   State → Delta → Impact → Pattern → Emergence → Developments/Relationships
@@ -300,6 +300,42 @@ function compactDevelopment(d) {
       (d.relationships || []).map(x => x?.relationship_id).filter(Boolean)
     )
   };
+}
+
+function buildAdjacency(relationships) {
+  const adjacency = new Map();
+
+  function add(a, b) {
+    if (!a || !b || a === b) return;
+    if (!adjacency.has(a)) adjacency.set(a, new Set());
+    adjacency.get(a).add(b);
+  }
+
+  for (const r of relationships || []) {
+    if (!r || r.status === "inactive") continue;
+    if (n(r.strength) < 60 || n(r.confidence) < 0.60) continue;
+    add(r.from_entity_id, r.to_entity_id);
+    add(r.to_entity_id, r.from_entity_id);
+  }
+
+  return adjacency;
+}
+
+function graphAdjacencyScore(aIds, bIds, adjacency) {
+  const A = uniq(aIds || []);
+  const B = uniq(bIds || []);
+  if (!A.length || !B.length) return 0;
+
+  let links = 0;
+  for (const a of A) {
+    const neighbors = adjacency.get(a);
+    if (!neighbors) continue;
+    for (const b of B) {
+      if (neighbors.has(b)) links += 1;
+    }
+  }
+
+  return links / Math.max(1, Math.min(A.length, B.length));
 }
 
 function compactRelationship(r) {
@@ -677,35 +713,87 @@ function main() {
     return intersection / (A.size + B.size - intersection);
   }
 
-  // Build overlap clusters only as a navigation/synthesis aid.
-  // Clustering does not change upstream scores or create a causal claim.
+  const adjacency = buildAdjacency(relationships.relationships || []);
+
+  function clusterCompatibility(a, b) {
+    const aIds = a.entity_ids || [];
+    const bIds = b.entity_ids || [];
+
+    const shared = bIds.filter(id => aIds.includes(id)).length;
+    const overlap = jaccard(aIds, bIds);
+    const adjacencyScore = graphAdjacencyScore(aIds, bIds, adjacency);
+    const crossFamily = a.attention_type !== b.attention_type;
+
+    // Direct overlap can cluster same-family signals.
+    if (shared >= 2 && overlap >= 0.25) return true;
+
+    // Cross-family synthesis can also use one shared entity plus graph proximity.
+    if (crossFamily && shared >= 1 && adjacencyScore >= 0.20) return true;
+
+    // Or pure graph adjacency when the two signals come from different upstream families.
+    if (crossFamily && adjacencyScore >= 0.50) return true;
+
+    return false;
+  }
+
+  // v0.3 system clusters:
+  // - only real multi-member clusters are retained
+  // - cross-family grouping is preferred
+  // - graph adjacency may connect signals that do not share the exact same entity
   const clusters = [];
   const assigned = new Set();
 
-  for (let i = 0; i < attentionTop.length; i++) {
-    const seed = attentionTop[i];
+  const seedOrder = [...attentionTop].sort((a, b) => {
+    const typePriority = {
+      emergence: 3,
+      pattern: 2,
+      impact: 1
+    };
+    return (
+      (typePriority[b.attention_type] || 0) -
+        (typePriority[a.attention_type] || 0) ||
+      b.attention_score - a.attention_score
+    );
+  });
+
+  for (const seed of seedOrder) {
     if (assigned.has(seed.attention_id)) continue;
 
     const members = [seed];
-    assigned.add(seed.attention_id);
 
-    for (let j = i + 1; j < attentionTop.length; j++) {
-      const candidate = attentionTop[j];
-      if (assigned.has(candidate.attention_id)) continue;
+    let changed = true;
+    while (changed) {
+      changed = false;
 
-      const shared = (candidate.entity_ids || []).filter(
-        id => (seed.entity_ids || []).includes(id)
-      ).length;
-      const overlap = jaccard(seed.entity_ids, candidate.entity_ids);
+      for (const candidate of attentionTop) {
+        if (
+          candidate.attention_id === seed.attention_id ||
+          assigned.has(candidate.attention_id) ||
+          members.some(m => m.attention_id === candidate.attention_id)
+        ) {
+          continue;
+        }
 
-      if (shared >= 2 && overlap >= 0.30) {
-        members.push(candidate);
-        assigned.add(candidate.attention_id);
+        if (members.some(member => clusterCompatibility(member, candidate))) {
+          members.push(candidate);
+          changed = true;
+        }
       }
     }
 
-    const entityFrequency = new Map();
+    if (members.length < 2) {
+      continue;
+    }
+
     for (const member of members) {
+      assigned.add(member.attention_id);
+    }
+
+    const entityFrequency = new Map();
+    const typeSet = new Set();
+
+    for (const member of members) {
+      typeSet.add(member.attention_type);
       for (const entityId of member.entity_ids || []) {
         entityFrequency.set(entityId, (entityFrequency.get(entityId) || 0) + 1);
       }
@@ -713,7 +801,7 @@ function main() {
 
     const topEntityIds = [...entityFrequency.entries()]
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 4)
+      .slice(0, 5)
       .map(([id]) => id);
 
     const entityNameById = new Map(
@@ -724,18 +812,23 @@ function main() {
       .map(id => entityNameById.get(id))
       .filter(Boolean);
 
+    const memberTypes = uniq(members.map(x => x.attention_type));
+
+    const labelCore =
+      topEntityNames.length > 0
+        ? topEntityNames.join(" · ")
+        : members[0].title || "Connected intelligence";
+
     clusters.push({
       cluster_id: stableId(
-        "acl",
+        "sys",
         members.map(x => x.attention_id).sort()
       ),
-      label:
-        topEntityNames.length > 0
-          ? `${topEntityNames.join(" · ")} — connected attention cluster`
-          : `${members[0].title || "Connected intelligence"} — attention cluster`,
+      label: `${labelCore} — connected system`,
       member_count: members.length,
       member_attention_ids: members.map(x => x.attention_id),
-      member_types: uniq(members.map(x => x.attention_type)),
+      member_types: memberTypes,
+      cross_family: memberTypes.length > 1,
       entity_ids: topEntityIds,
       attention_score: round(
         Math.max(...members.map(x => n(x.attention_score))),
@@ -751,18 +844,23 @@ function main() {
           Math.max(1, members.length)
       ),
       interpretation:
-        "Navigation cluster only. Shared entities indicate overlap among already-derived intelligence; this cluster does not establish causality or forecast."
+        "System cluster for navigation and synthesis only. Members are connected by shared entities and/or strong graph adjacency. This cluster does not establish new causality, verification, or forecast."
     });
   }
 
+  // Prefer cross-family systems, then stronger/larger systems.
   clusters.sort((a, b) =>
-    b.attention_score - a.attention_score ||
+    Number(b.cross_family) - Number(a.cross_family) ||
     b.member_count - a.member_count ||
+    b.attention_score - a.attention_score ||
     a.cluster_id.localeCompare(b.cluster_id)
   );
 
+  // Keep the Cosmos attention surface compact.
+  clusters.splice(7);
+
   const output = {
-    schema_version: "0.2",
+    schema_version: "0.3",
     generated_at: generatedAt,
     date_utc: dateUtc,
     status: "ready",
@@ -781,7 +879,7 @@ function main() {
       attention_diversity_rule:
         "The retained attention surface is quota-balanced across Pattern, Emergence and Impact so one upstream family cannot consume every visible slot.",
       overlap_cluster_rule:
-        "Overlapping attention signals may be grouped by shared entities for navigation. A cluster is not a new causal or forecasting claim.",
+        "Attention signals may be grouped into compact system clusters when they overlap through shared entities and/or strong graph adjacency. Cross-family Pattern/Emergence/Impact grouping is preferred. Single-member clusters are not retained. A system cluster is not a new causal, verification or forecasting claim.",
       stale_input_rule:
         "Input dates are exposed in source_freshness so consumers can avoid blending snapshots as though they were contemporaneous."
     },
