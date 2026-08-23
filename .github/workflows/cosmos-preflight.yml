@@ -1091,7 +1091,7 @@ jobs:
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
           const errors = [];
 
-          if (payload.schema_version !== "0.1") {
+          if (payload.schema_version !== "0.2") {
             errors.push(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1158,6 +1158,56 @@ jobs:
             errors.push("Cosmos State attention.signals[] missing");
           }
 
+          if (!Array.isArray(payload.attention?.clusters)) {
+            errors.push("Cosmos State attention.clusters[] missing");
+          }
+
+          const attentionTypeCounts = {
+            pattern: 0,
+            emergence: 0,
+            impact: 0
+          };
+
+          for (const row of payload.attention?.signals || []) {
+            if (Object.prototype.hasOwnProperty.call(attentionTypeCounts, row.attention_type)) {
+              attentionTypeCounts[row.attention_type] += 1;
+            }
+          }
+
+          if ((payload.attention?.signals || []).length >= 20) {
+            if (attentionTypeCounts.pattern > 8) {
+              errors.push(
+                `Cosmos State attention pattern quota exceeded: ${attentionTypeCounts.pattern}`
+              );
+            }
+            if (attentionTypeCounts.emergence > 6) {
+              errors.push(
+                `Cosmos State attention emergence quota exceeded: ${attentionTypeCounts.emergence}`
+              );
+            }
+            if (attentionTypeCounts.impact > 6) {
+              errors.push(
+                `Cosmos State attention impact quota exceeded: ${attentionTypeCounts.impact}`
+              );
+            }
+          }
+
+          for (const cluster of payload.attention?.clusters || []) {
+            if (!cluster.cluster_id || !Array.isArray(cluster.member_attention_ids)) {
+              errors.push("Cosmos State attention cluster missing identity/member references");
+              continue;
+            }
+
+            if (
+              !cluster.interpretation ||
+              !String(cluster.interpretation).includes("does not establish causality")
+            ) {
+              errors.push(
+                `Attention cluster ${cluster.cluster_id} missing non-causality safeguard`
+              );
+            }
+          }
+
           if (payload.safeguards?.forecast !== false) {
             errors.push("Cosmos State must keep forecast=false");
           }
@@ -1166,6 +1216,43 @@ jobs:
             errors.push(
               "Cosmos State must keep evidence_quality_upgraded=false"
             );
+          }
+
+          for (const row of payload.impact?.signals || []) {
+            if (!row.impact_id) {
+              errors.push("Cosmos State impact signal missing impact_id");
+              continue;
+            }
+
+            if (!Array.isArray(row.entity_ids) || row.entity_ids.length < 2) {
+              errors.push(
+                `Cosmos State impact ${row.impact_id} missing propagated entity lineage`
+              );
+            }
+
+            if (!row.path || !Array.isArray(row.path.entity_ids)) {
+              errors.push(
+                `Cosmos State impact ${row.impact_id} missing preserved path`
+              );
+            }
+
+            if (!Array.isArray(row.supporting_development_ids)) {
+              errors.push(
+                `Cosmos State impact ${row.impact_id} missing development lineage`
+              );
+            }
+
+            if (!Array.isArray(row.supporting_relationship_ids)) {
+              errors.push(
+                `Cosmos State impact ${row.impact_id} missing relationship lineage`
+              );
+            }
+
+            if (!Array.isArray(row.evidence_modes)) {
+              errors.push(
+                `Cosmos State impact ${row.impact_id} missing evidence_modes[]`
+              );
+            }
           }
 
           const impactIds = new Set(
@@ -1245,8 +1332,12 @@ jobs:
           console.log(`Patterns:      ${payload.counts.patterns_available}`);
           console.log(`Emergences:    ${payload.counts.emergences_available}`);
           console.log(`Attention:     ${payload.counts.attention_retained}`);
+          console.log(`  Patterns:    ${payload.counts.attention_patterns ?? 0}`);
+          console.log(`  Emergences:  ${payload.counts.attention_emergences ?? 0}`);
+          console.log(`  Impacts:     ${payload.counts.attention_impacts ?? 0}`);
+          console.log(`Clusters:      ${payload.counts.attention_clusters ?? 0}`);
           console.log(
-            "Freshness, lineage, evidence and no-new-claims safeguards passed."
+            "Freshness, Impact lineage, attention diversity/clustering, evidence and no-new-claims safeguards passed."
           );
           console.log(
             "Repository files were not modified by the isolated test."
@@ -1272,7 +1363,7 @@ jobs:
           const file = "knowledge/cosmos/cosmos-state-current.json";
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
 
-          if (payload.schema_version !== "0.1") {
+          if (payload.schema_version !== "0.2") {
             throw new Error(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1294,6 +1385,19 @@ jobs:
             payload.safeguards?.evidence_quality_upgraded !== false
           ) {
             throw new Error("Cosmos State safeguards invalid");
+          }
+
+          if (!Array.isArray(payload.attention?.clusters)) {
+            throw new Error("Cosmos State attention.clusters[] missing");
+          }
+
+          const counts = payload.counts || {};
+          if (
+            Number(counts.attention_patterns || 0) > 8 ||
+            Number(counts.attention_emergences || 0) > 6 ||
+            Number(counts.attention_impacts || 0) > 6
+          ) {
+            throw new Error("Cosmos State attention diversity quota invalid");
           }
 
           console.log("");
