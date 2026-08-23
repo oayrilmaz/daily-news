@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Cosmos State Builder v0.1
+ * PTD Today / Cosmos — Cosmos State Builder v0.2
  *
  * Deterministic, read-only synthesis layer above:
  *   State → Delta → Impact → Pattern → Emergence → Developments/Relationships
@@ -178,15 +178,71 @@ function impactScore(row) {
 
 function impactEntityIds(row) {
   return uniq([
+    row.origin?.entity_id,
     row.origin_entity_id,
     row.source_entity_id,
     row.focus_entity?.entity_id,
+    row.affected?.entity_id,
     row.affected_entity_id,
     row.target_entity_id,
     row.affected_entity?.entity_id,
     ...(row.path?.entity_ids || []),
     ...(row.entity_ids || [])
   ]);
+}
+
+function impactRelationshipIds(row) {
+  return uniq([
+    ...(row.supporting_relationship_ids || []),
+    ...(row.relationship_ids || []),
+    ...((row.path?.steps || []).map(step => step?.relationship_id))
+  ]);
+}
+
+function impactDevelopmentIds(row) {
+  return uniq([
+    ...(row.evidence_development_ids || []),
+    ...(row.seed_evidence_development_ids || []),
+    ...(row.supporting_development_ids || []),
+    ...(row.evidence?.development_ids || [])
+  ]);
+}
+
+function impactEvidence(row) {
+  const modes = uniq(row.evidence_modes || []);
+  const hasAiScenario = modes.includes("ai_scenario");
+  const hasNonScenario = modes.some(mode => mode && mode !== "ai_scenario");
+
+  // Preserve upstream epistemic status. We do not upgrade scenario-only
+  // evidence merely because a graph path is structurally strong.
+  let score = 0;
+  let label = "unknown";
+
+  if (hasNonScenario) {
+    score = 60;
+    label = "moderate";
+  } else if (hasAiScenario) {
+    score = 35;
+    label = "weak";
+  }
+
+  return {
+    evidence_modes: modes,
+    evidence_quality_score: score,
+    evidence_quality_label: label
+  };
+}
+
+function impactTitle(row) {
+  const origin = clean(row.origin?.name || row.origin_name);
+  const affected = clean(row.affected?.name || row.affected_name);
+  if (origin && affected) {
+    return `${origin} → ${affected} propagated impact`;
+  }
+  if (Array.isArray(row.path?.entity_names) && row.path.entity_names.length >= 2) {
+    return `${row.path.entity_names[0]} → ${row.path.entity_names[row.path.entity_names.length - 1]} propagated impact`;
+  }
+  return row.title || row.description || null;
 }
 
 function developmentEvidence(d) {
@@ -374,44 +430,59 @@ function main() {
     .slice(0, LIMITS.developments);
 
   const rankedImpacts = getImpactRows(impact)
-    .map(row => ({
-      impact_id:
-        row.impact_id ||
-        row.id ||
-        stableId("impact", [
-          row.origin_entity_id,
-          row.affected_entity_id,
-          row.title
-        ]),
-      title: row.title || row.description || null,
-      impact_score: round(impactScore(row), 2),
-      confidence_class: row.confidence_class || null,
-      evidence_quality_score: n(row.evidence_quality_score),
-      evidence_quality_label:
-        row.evidence_quality_label ||
-        evidenceLabel(row.evidence_quality_score),
-      polarity: row.polarity || row.direction || null,
-      origin_entity_id:
-        row.origin_entity_id ||
-        row.source_entity_id ||
-        row.focus_entity?.entity_id ||
-        null,
-      affected_entity_id:
-        row.affected_entity_id ||
-        row.target_entity_id ||
-        row.affected_entity?.entity_id ||
-        null,
-      entity_ids: impactEntityIds(row),
-      supporting_relationship_ids:
-        row.supporting_relationship_ids ||
-        row.relationship_ids ||
-        [],
-      supporting_development_ids:
-        row.supporting_development_ids ||
-        row.evidence?.development_ids ||
-        [],
-      raw_ref: row.impact_id || row.id || null
-    }))
+    .map(row => {
+      const ev = impactEvidence(row);
+      return {
+        impact_id:
+          row.impact_id ||
+          row.id ||
+          stableId("impact", [
+            row.origin?.entity_id || row.origin_entity_id,
+            row.affected?.entity_id || row.affected_entity_id,
+            row.path?.entity_ids?.join(">")
+          ]),
+        title: impactTitle(row),
+        impact_score: round(impactScore(row), 2),
+        reasoning_mode: row.reasoning_mode || null,
+        inference_class: row.inference_class || null,
+        propagation_depth: Number.isInteger(row.propagation_depth)
+          ? row.propagation_depth
+          : null,
+        direct: typeof row.direct === "boolean" ? row.direct : null,
+        seed_kind: row.seed_kind || null,
+        seed_reason: row.seed_reason || null,
+        seed_significance: row.seed_significance || null,
+        seed_significance_score: n(row.seed_significance_score),
+        average_relationship_confidence: n(row.average_relationship_confidence),
+        cumulative_path_strength: n(row.cumulative_path_strength),
+        evidence_count: n(row.evidence_count),
+        evidence_modes: ev.evidence_modes,
+        evidence_quality_score: ev.evidence_quality_score,
+        evidence_quality_label: ev.evidence_quality_label,
+        effect_polarity: row.effect_polarity || row.polarity || row.direction || null,
+        origin: row.origin || null,
+        affected: row.affected || null,
+        origin_entity_id:
+          row.origin?.entity_id ||
+          row.origin_entity_id ||
+          row.source_entity_id ||
+          row.focus_entity?.entity_id ||
+          null,
+        affected_entity_id:
+          row.affected?.entity_id ||
+          row.affected_entity_id ||
+          row.target_entity_id ||
+          row.affected_entity?.entity_id ||
+          null,
+        entity_ids: impactEntityIds(row),
+        entity_names: row.path?.entity_names || [],
+        supporting_relationship_ids: impactRelationshipIds(row),
+        supporting_development_ids: impactDevelopmentIds(row),
+        seed_evidence_development_ids: row.seed_evidence_development_ids || [],
+        path: row.path || null,
+        raw_ref: row.impact_id || row.id || null
+      };
+    })
     .sort((a, b) => b.impact_score - a.impact_score)
     .slice(0, LIMITS.impacts);
 
@@ -550,16 +621,148 @@ function main() {
     });
   }
 
-  const attentionTop = attention
+  const attentionSorted = attention
     .sort((a, b) =>
       b.attention_score - a.attention_score ||
       evidenceRank(b.evidence_quality_label) - evidenceRank(a.evidence_quality_label) ||
       clean(a.ref_id).localeCompare(clean(b.ref_id))
-    )
-    .slice(0, LIMITS.attention);
+    );
+
+  // v0.2 attention calibration:
+  // prevent one upstream family from consuming the whole attention surface.
+  // The quota is a presentation/diversity rule, not a truth or confidence rule.
+  const quota = {
+    pattern: Math.min(8, LIMITS.attention),
+    emergence: Math.min(6, Math.max(0, LIMITS.attention - 8)),
+    impact: Math.max(0, LIMITS.attention - 14)
+  };
+
+  const byType = {
+    pattern: attentionSorted.filter(x => x.attention_type === "pattern"),
+    emergence: attentionSorted.filter(x => x.attention_type === "emergence"),
+    impact: attentionSorted.filter(x => x.attention_type === "impact")
+  };
+
+  const attentionTop = [];
+  for (const type of ["pattern", "emergence", "impact"]) {
+    attentionTop.push(...byType[type].slice(0, quota[type]));
+  }
+
+  // Backfill if one type has fewer available items than its quota.
+  if (attentionTop.length < LIMITS.attention) {
+    const selectedIds = new Set(attentionTop.map(x => x.attention_id));
+    for (const row of attentionSorted) {
+      if (attentionTop.length >= LIMITS.attention) break;
+      if (!selectedIds.has(row.attention_id)) {
+        attentionTop.push(row);
+        selectedIds.add(row.attention_id);
+      }
+    }
+  }
+
+  attentionTop.sort((a, b) =>
+    b.attention_score - a.attention_score ||
+    evidenceRank(b.evidence_quality_label) - evidenceRank(a.evidence_quality_label) ||
+    clean(a.ref_id).localeCompare(clean(b.ref_id))
+  );
+
+  function jaccard(a, b) {
+    const A = new Set(a || []);
+    const B = new Set(b || []);
+    if (!A.size || !B.size) return 0;
+    let intersection = 0;
+    for (const value of A) {
+      if (B.has(value)) intersection += 1;
+    }
+    return intersection / (A.size + B.size - intersection);
+  }
+
+  // Build overlap clusters only as a navigation/synthesis aid.
+  // Clustering does not change upstream scores or create a causal claim.
+  const clusters = [];
+  const assigned = new Set();
+
+  for (let i = 0; i < attentionTop.length; i++) {
+    const seed = attentionTop[i];
+    if (assigned.has(seed.attention_id)) continue;
+
+    const members = [seed];
+    assigned.add(seed.attention_id);
+
+    for (let j = i + 1; j < attentionTop.length; j++) {
+      const candidate = attentionTop[j];
+      if (assigned.has(candidate.attention_id)) continue;
+
+      const shared = (candidate.entity_ids || []).filter(
+        id => (seed.entity_ids || []).includes(id)
+      ).length;
+      const overlap = jaccard(seed.entity_ids, candidate.entity_ids);
+
+      if (shared >= 2 && overlap >= 0.30) {
+        members.push(candidate);
+        assigned.add(candidate.attention_id);
+      }
+    }
+
+    const entityFrequency = new Map();
+    for (const member of members) {
+      for (const entityId of member.entity_ids || []) {
+        entityFrequency.set(entityId, (entityFrequency.get(entityId) || 0) + 1);
+      }
+    }
+
+    const topEntityIds = [...entityFrequency.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 4)
+      .map(([id]) => id);
+
+    const entityNameById = new Map(
+      stateEntities.map(entity => [entity.entity_id, entity.name])
+    );
+
+    const topEntityNames = topEntityIds
+      .map(id => entityNameById.get(id))
+      .filter(Boolean);
+
+    clusters.push({
+      cluster_id: stableId(
+        "acl",
+        members.map(x => x.attention_id).sort()
+      ),
+      label:
+        topEntityNames.length > 0
+          ? `${topEntityNames.join(" · ")} — connected attention cluster`
+          : `${members[0].title || "Connected intelligence"} — attention cluster`,
+      member_count: members.length,
+      member_attention_ids: members.map(x => x.attention_id),
+      member_types: uniq(members.map(x => x.attention_type)),
+      entity_ids: topEntityIds,
+      attention_score: round(
+        Math.max(...members.map(x => n(x.attention_score))),
+        2
+      ),
+      evidence_quality_score: round(
+        members.reduce((sum, x) => sum + n(x.evidence_quality_score), 0) /
+          Math.max(1, members.length),
+        2
+      ),
+      evidence_quality_label: evidenceLabel(
+        members.reduce((sum, x) => sum + n(x.evidence_quality_score), 0) /
+          Math.max(1, members.length)
+      ),
+      interpretation:
+        "Navigation cluster only. Shared entities indicate overlap among already-derived intelligence; this cluster does not establish causality or forecast."
+    });
+  }
+
+  clusters.sort((a, b) =>
+    b.attention_score - a.attention_score ||
+    b.member_count - a.member_count ||
+    a.cluster_id.localeCompare(b.cluster_id)
+  );
 
   const output = {
-    schema_version: "0.1",
+    schema_version: "0.2",
     generated_at: generatedAt,
     date_utc: dateUtc,
     status: "ready",
@@ -575,6 +778,10 @@ function main() {
         "Evidence quality is preserved from upstream intelligence. Structural strength and evidence quality remain separate.",
       attention_rule:
         "Attention score prioritizes structurally important signals while retaining evidence-quality visibility. High attention does not imply verified truth.",
+      attention_diversity_rule:
+        "The retained attention surface is quota-balanced across Pattern, Emergence and Impact so one upstream family cannot consume every visible slot.",
+      overlap_cluster_rule:
+        "Overlapping attention signals may be grouped by shared entities for navigation. A cluster is not a new causal or forecasting claim.",
       stale_input_rule:
         "Input dates are exposed in source_freshness so consumers can avoid blending snapshots as though they were contemporaneous."
     },
@@ -639,7 +846,8 @@ function main() {
     },
 
     attention: {
-      signals: attentionTop
+      signals: attentionTop,
+      clusters
     },
 
     safeguards: {
@@ -659,7 +867,11 @@ function main() {
       impacts_available: getImpactRows(impact).length,
       patterns_available: (patterns.patterns || []).length,
       emergences_available: (emergence.emergences || []).length,
-      attention_retained: attentionTop.length
+      attention_retained: attentionTop.length,
+      attention_patterns: attentionTop.filter(x => x.attention_type === "pattern").length,
+      attention_emergences: attentionTop.filter(x => x.attention_type === "emergence").length,
+      attention_impacts: attentionTop.filter(x => x.attention_type === "impact").length,
+      attention_clusters: clusters.length
     }
   };
 
@@ -675,6 +887,10 @@ function main() {
   console.log(`Patterns:        ${output.counts.patterns_available}`);
   console.log(`Emergences:      ${output.counts.emergences_available}`);
   console.log(`Attention:       ${output.counts.attention_retained}`);
+  console.log(`  Patterns:      ${output.counts.attention_patterns}`);
+  console.log(`  Emergences:    ${output.counts.attention_emergences}`);
+  console.log(`  Impacts:       ${output.counts.attention_impacts}`);
+  console.log(`Clusters:        ${output.counts.attention_clusters}`);
   console.log(`Output:          ${path.relative(ROOT, FILES.output)}`);
 }
 
