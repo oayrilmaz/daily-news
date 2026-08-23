@@ -5,6 +5,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1806,13 +1807,26 @@
     }
 
     function outlookShareUrl(entry,horizon){
-      const url = new URL(window.location.href);
-      url.searchParams.set("outlook",String(horizon));
-      url.searchParams.set("focus",outlookSlug(entry));
-      url.searchParams.delete("country");
-      url.searchParams.delete("category");
-      url.hash = `market-outlook-${horizon}-${outlookSlug(entry)}`;
-      return url.toString();
+      /*
+        Social platforms such as LinkedIn build the preview from the URL's
+        server-rendered Open Graph metadata. A query/hash deep link back to
+        index.html still exposes the homepage OG title, so each outlook uses
+        its own generated static share page instead.
+
+        Example:
+          /outlook-share/7-day/resilience.html
+          /outlook-share/30-day/batteries.html
+
+        The static share page redirects human visitors back to the live
+        Market Pulse card with the correct horizon/card already focused.
+      */
+      const slug = outlookSlug(entry);
+      const horizonFolder = horizon === 30 ? "30-day" : "7-day";
+
+      return new URL(
+        `/outlook-share/${horizonFolder}/${encodeURIComponent(slug)}.html`,
+        window.location.origin
+      ).toString();
     }
 
     function outlookShareText(entry,horizon){
