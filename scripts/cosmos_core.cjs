@@ -2,7 +2,7 @@
 "use strict";
 
 /**
- * PTD Today / Cosmos — Cosmos Core v0.1
+ * PTD Today / Cosmos — Cosmos Core v0.1.1
  *
  * First executable Infinite State navigation core.
  * No OpenAI/API calls. No sector whitelist. No new causal claims.
@@ -278,20 +278,57 @@ function traverseGraph(starts, idx, options = {}) {
   };
 }
 
+function signalEntityIds(row, family) {
+  if (!row || typeof row !== "object") return [];
+
+  if (family === "impact") {
+    return uniq(row.entity_ids || []);
+  }
+
+  if (family === "pattern") {
+    return uniq([
+      ...(row.supporting_entity_ids || []),
+      row.focus_entity?.entity_id
+    ]);
+  }
+
+  if (family === "emergence") {
+    return uniq([
+      ...(row.focus_entities || []).map(x => x?.entity_id),
+      ...(row.shared_entities || []).map(x => x?.entity_id)
+    ]);
+  }
+
+  return uniq(row.entity_ids || []);
+}
+
 function selectDerived(starts, traversal, idx) {
-  const wanted = new Set(uniq([...starts.map(x => x.entity_id), ...traversal.nodes.map(x => x.entity_id)]));
-  function pick(rows, scoreField) {
+  const wanted = new Set(
+    uniq([
+      ...starts.map(x => x.entity_id),
+      ...traversal.nodes.map(x => x.entity_id)
+    ])
+  );
+
+  function pick(rows, scoreField, family) {
     return rows
-      .map(row => ({ row, overlap: (row.entity_ids || []).filter(id => wanted.has(id)).length }))
+      .map(row => ({
+        row,
+        overlap: signalEntityIds(row, family).filter(id => wanted.has(id)).length
+      }))
       .filter(x => x.overlap > 0)
-      .sort((a, b) => b.overlap - a.overlap || n(b.row[scoreField]) - n(a.row[scoreField]))
+      .sort((a, b) =>
+        b.overlap - a.overlap ||
+        n(b.row[scoreField]) - n(a.row[scoreField])
+      )
       .slice(0, MAX_CONTEXT)
       .map(x => x.row);
   }
+
   return {
-    impacts: pick(idx.impacts, "impact_score"),
-    patterns: pick(idx.patterns, "pattern_score"),
-    emergences: pick(idx.emergences, "emergence_score")
+    impacts: pick(idx.impacts, "impact_score", "impact"),
+    patterns: pick(idx.patterns, "pattern_score", "pattern"),
+    emergences: pick(idx.emergences, "emergence_score", "emergence")
   };
 }
 
