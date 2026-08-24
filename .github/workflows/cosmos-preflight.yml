@@ -4,6 +4,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -16,6 +17,11 @@ on:
         type: boolean
       write_cosmos_state:
         description: "Generate and commit real cosmos-state-current.json from current committed Cosmos data"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_core_test:
+        description: "Generate and commit controlled Cosmos Core v0.1 test output"
         required: false
         default: false
         type: boolean
@@ -63,6 +69,7 @@ jobs:
             "scripts/cosmos_pattern_engine.cjs"
             "scripts/cosmos_emergence_engine.cjs"
             "scripts/cosmos_state_builder.cjs"
+            "scripts/cosmos_core.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -88,6 +95,7 @@ jobs:
           node --check scripts/cosmos_pattern_engine.cjs
           node --check scripts/cosmos_emergence_engine.cjs
           node --check scripts/cosmos_state_builder.cjs
+          node --check scripts/cosmos_core.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -1469,6 +1477,241 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Core v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_core.cjs "$TEST_DIR/scripts/cosmos_core.cjs"
+          cp knowledge/cosmos/cosmos-state-current.json \
+            "$TEST_DIR/knowledge/cosmos/cosmos-state-current.json"
+
+          cat > "$TEST_DIR/core-input.json" <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "cosmos_core_v0.1_preflight"
+            }
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_core.cjs \
+              --input core-input.json \
+              --out knowledge/cosmos/core-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/core-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Core did not create knowledge/cosmos/core-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Core schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "context_resolved") {
+            errors.push(
+              `Cosmos Core failed to resolve controlled context: ${payload.status}`
+            );
+          }
+
+          if (payload.knowledge_state?.cosmos_state_schema_version !== "0.6") {
+            errors.push(
+              `Cosmos Core must consume frozen Cosmos State v0.6; got ${payload.knowledge_state?.cosmos_state_schema_version}`
+            );
+          }
+
+          const starts = payload.resolution?.starting_points || [];
+          const startNames = new Set(
+            starts.map(row => String(row.name || "").toLowerCase())
+          );
+
+          if (starts.length < 2) {
+            errors.push(
+              `Cosmos Core controlled test expected at least 2 starting points; got ${starts.length}`
+            );
+          }
+
+          if (!startNames.has("artificial intelligence")) {
+            errors.push(
+              "Cosmos Core did not resolve Artificial Intelligence starting point"
+            );
+          }
+
+          if (!startNames.has("data centers")) {
+            errors.push(
+              "Cosmos Core did not resolve Data Centers starting point"
+            );
+          }
+
+          const context = payload.selected_context || {};
+
+          for (const key of [
+            "systems",
+            "attention",
+            "patterns",
+            "emergences",
+            "impacts",
+            "developments",
+            "relationships",
+            "entities"
+          ]) {
+            if (!Array.isArray(context[key])) {
+              errors.push(`Cosmos Core selected_context.${key}[] missing`);
+            }
+          }
+
+          if ((context.relationships || []).length < 1) {
+            errors.push(
+              "Cosmos Core controlled test produced no graph relationships"
+            );
+          }
+
+          if ((context.impacts || []).length < 1) {
+            errors.push(
+              "Cosmos Core controlled test produced no relevant Impact context"
+            );
+          }
+
+          if ((context.patterns || []).length < 1) {
+            errors.push(
+              "Cosmos Core controlled test produced no relevant Pattern context"
+            );
+          }
+
+          if ((context.emergences || []).length < 1) {
+            errors.push(
+              "Cosmos Core controlled test produced no relevant Emergence context"
+            );
+          }
+
+          if (
+            Number(payload.navigation?.max_depth || 0) < 1 ||
+            Number(payload.navigation?.max_depth || 0) > 3
+          ) {
+            errors.push(
+              `Cosmos Core max_depth outside v0.1 bound: ${payload.navigation?.max_depth}`
+            );
+          }
+
+          if (
+            Number(payload.navigation?.max_branches || 0) < 1 ||
+            Number(payload.navigation?.max_branches || 0) > 5
+          ) {
+            errors.push(
+              `Cosmos Core max_branches outside v0.1 bound: ${payload.navigation?.max_branches}`
+            );
+          }
+
+          if (payload.infinite_state?.terminal !== false) {
+            errors.push(
+              "Cosmos Core Infinite State must remain non-terminal"
+            );
+          }
+
+          if (payload.infinite_state?.continuation_allowed !== true) {
+            errors.push(
+              "Cosmos Core must allow continuation"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.creates_new_causal_claims !== false) {
+            errors.push(
+              "Cosmos Core must not create new causal claims"
+            );
+          }
+
+          if (safeguards.upgrades_evidence_quality !== false) {
+            errors.push(
+              "Cosmos Core must not upgrade evidence quality"
+            );
+          }
+
+          if (safeguards.forecast_generated !== false) {
+            errors.push(
+              "Cosmos Core v0.1 must not generate forecasts"
+            );
+          }
+
+          if (safeguards.sector_whitelist_present !== false) {
+            errors.push(
+              "Cosmos Core must remain domain-neutral with no sector whitelist"
+            );
+          }
+
+          if (safeguards.traversal_bounded_for_response !== true) {
+            errors.push(
+              "Cosmos Core response traversal must remain bounded"
+            );
+          }
+
+          if (safeguards.source_lineage_preserved !== true) {
+            errors.push(
+              "Cosmos Core must preserve source lineage"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Core v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Core v0.1 isolated test passed.");
+          console.log(`Status:          ${payload.status}`);
+          console.log(`Starting points: ${starts.length}`);
+          console.log(`Systems:         ${(context.systems || []).length}`);
+          console.log(`Attention:       ${(context.attention || []).length}`);
+          console.log(`Patterns:        ${(context.patterns || []).length}`);
+          console.log(`Emergences:      ${(context.emergences || []).length}`);
+          console.log(`Impacts:         ${(context.impacts || []).length}`);
+          console.log(`Relationships:   ${(context.relationships || []).length}`);
+          console.log(`Expanded nodes:  ${(context.entities || []).length}`);
+          console.log(`Max depth:       ${payload.navigation.max_depth}`);
+          console.log(`Max branches:    ${payload.navigation.max_branches}`);
+          console.log(
+            "Universal/domain-neutral navigation, Infinite State continuation, lineage and no-new-claims safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -1673,6 +1916,113 @@ jobs:
           echo "Real Cosmos State output is now committed to the repository."
           echo "No OpenAI generation was executed."
 
+      - name: Generate Real Cosmos Core v0.1 Test Output
+        if: ${{ inputs.write_cosmos_core_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Core v0.1 output from frozen Cosmos State."
+          echo "No OpenAI/API generation is executed by this step."
+
+          cat > /tmp/cosmos-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-core-input-v0.1.json \
+            --out knowledge/cosmos/core-test-v0.1.json
+
+          test -f knowledge/cosmos/core-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/core-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Core schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "context_resolved") {
+            throw new Error(
+              `Cosmos Core failed to resolve controlled context: ${payload.status}`
+            );
+          }
+
+          if (payload.knowledge_state?.cosmos_state_schema_version !== "0.6") {
+            throw new Error(
+              "Cosmos Core did not consume frozen Cosmos State v0.6"
+            );
+          }
+
+          if (payload.infinite_state?.terminal !== false ||
+              payload.infinite_state?.continuation_allowed !== true) {
+            throw new Error(
+              "Cosmos Core Infinite State continuation safeguards invalid"
+            );
+          }
+
+          if (payload.safeguards?.creates_new_causal_claims !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.forecast_generated !== false ||
+              payload.safeguards?.sector_whitelist_present !== false) {
+            throw new Error(
+              "Cosmos Core safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Core v0.1 output created.");
+          console.log(`Status:        ${payload.status}`);
+          console.log(
+            `Starting:      ${(payload.resolution?.starting_points || []).map(x => x.name).join(" | ")}`
+          );
+          console.log(
+            `Systems:       ${(payload.selected_context?.systems || []).length}`
+          );
+          console.log(
+            `Relationships: ${(payload.selected_context?.relationships || []).length}`
+          );
+          console.log(`Output:        ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Core v0.1 Test Output
+        if: ${{ inputs.write_cosmos_core_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/core-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Core test changes to commit."
+          else
+            git commit -m "Add Cosmos Core v0.1 controlled test output"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Core v0.1 output is now committed."
+          echo "No OpenAI generation was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -1761,7 +2111,10 @@ jobs:
           if [ "${{ inputs.write_cosmos_state }}" = "true" ]; then
             echo "Real cosmos-state-current.json was generated and committed."
           fi
-          if [ "${{ inputs.write_emergence }}" != "true" ] &&              [ "${{ inputs.write_cosmos_state }}" != "true" ]; then
+          if [ "${{ inputs.write_cosmos_core_test }}" = "true" ]; then
+            echo "Controlled core-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_emergence }}" != "true" ] &&              [ "${{ inputs.write_cosmos_state }}" != "true" ] &&              [ "${{ inputs.write_cosmos_core_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
