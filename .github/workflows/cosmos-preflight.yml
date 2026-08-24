@@ -3,6 +3,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -1091,7 +1092,7 @@ jobs:
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
           const errors = [];
 
-          if (payload.schema_version !== "0.5") {
+          if (payload.schema_version !== "0.6") {
             errors.push(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1206,7 +1207,7 @@ jobs:
 
             if (cluster.member_attention_ids.length > 7) {
               errors.push(
-                `Attention cluster ${cluster.cluster_id} exceeds v0.5 member cap: ${cluster.member_attention_ids.length}`
+                `Attention cluster ${cluster.cluster_id} exceeds v0.6 member cap: ${cluster.member_attention_ids.length}`
               );
             }
 
@@ -1218,7 +1219,7 @@ jobs:
               cluster.anchor_entity_ids.length < 1
             ) {
               errors.push(
-                `Attention cluster ${cluster.cluster_id} missing v0.5 anchor identity fields`
+                `Attention cluster ${cluster.cluster_id} missing v0.6 anchor identity fields`
               );
             }
 
@@ -1240,18 +1241,41 @@ jobs:
               );
             }
 
+            if (
+              !cluster.member_type_counts ||
+              typeof cluster.member_type_counts !== "object"
+            ) {
+              errors.push(
+                `Attention cluster ${cluster.cluster_id} missing member_type_counts`
+              );
+            } else {
+              if (Number(cluster.member_type_counts.impact || 0) < 1) {
+                errors.push(
+                  `Attention cluster ${cluster.cluster_id} must contain at least 1 Impact member in v0.6`
+                );
+              }
+
+              if (Number(cluster.member_type_counts.emergence || 0) > 3) {
+                errors.push(
+                  `Attention cluster ${cluster.cluster_id} exceeds v0.6 Emergence cap`
+                );
+              }
+            }
+
             const interpretation = String(cluster.interpretation || "").toLowerCase();
 
             if (
               !interpretation.includes("qualifies directly against the original anchor") ||
               !interpretation.includes("membership is not transitive") ||
               !interpretation.includes("anchor identity is preserved") ||
+              !interpretation.includes("relevant impact signals are explicitly admitted") ||
+              !interpretation.includes("near-duplicate emergence signals are suppressed") ||
               !interpretation.includes("does not establish new causality") ||
               !interpretation.includes("verification") ||
               !interpretation.includes("forecast")
             ) {
               errors.push(
-                `Attention cluster ${cluster.cluster_id} missing v0.4 bounded-system safeguard`
+                `Attention cluster ${cluster.cluster_id} missing v0.6 bounded-system safeguard`
               );
             }
           }
@@ -1284,6 +1308,26 @@ jobs:
           ) {
             errors.push(
               "Cosmos State cross-family cluster count exceeds total cluster count"
+            );
+          }
+
+          if (
+            Number(payload.counts?.attention_clusters_with_impact || 0) !==
+            Number(payload.counts?.attention_clusters || 0)
+          ) {
+            errors.push(
+              `Cosmos State v0.6 requires every retained system to contain Impact; ` +
+              `with-impact=${payload.counts?.attention_clusters_with_impact}, ` +
+              `clusters=${payload.counts?.attention_clusters}`
+            );
+          }
+
+          if (
+            Number(payload.counts?.attention_cluster_emergence_members_max || 0) > 3
+          ) {
+            errors.push(
+              `Cosmos State v0.6 emergence-member max exceeds 3: ` +
+              `${payload.counts?.attention_cluster_emergence_members_max}`
             );
           }
 
@@ -1415,8 +1459,10 @@ jobs:
           console.log(`  Emergences:  ${payload.counts.attention_emergences ?? 0}`);
           console.log(`  Impacts:     ${payload.counts.attention_impacts ?? 0}`);
           console.log(`Clusters:      ${payload.counts.attention_clusters ?? 0}`);
+          console.log(`  With Impact: ${payload.counts.attention_clusters_with_impact ?? 0}`);
+          console.log(`  Max Emergence: ${payload.counts.attention_cluster_emergence_members_max ?? 0}`);
           console.log(
-            "Freshness, Impact lineage, anchor-preserving system diversity, evidence and no-new-claims safeguards passed."
+            "Freshness, Impact-aware composition, Emergence deduplication, anchor-preserving system diversity, evidence and no-new-claims safeguards passed."
           );
           console.log(
             "Repository files were not modified by the isolated test."
@@ -1442,7 +1488,7 @@ jobs:
           const file = "knowledge/cosmos/cosmos-state-current.json";
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
 
-          if (payload.schema_version !== "0.5") {
+          if (payload.schema_version !== "0.6") {
             throw new Error(
               `Unexpected Cosmos State schema_version: ${payload.schema_version}`
             );
@@ -1485,7 +1531,7 @@ jobs:
 
             if (cluster.member_attention_ids.length > 7) {
               throw new Error(
-                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.5 7-member bound`
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.6 7-member bound`
               );
             }
 
@@ -1496,7 +1542,7 @@ jobs:
               cluster.anchor_entity_ids.length < 1
             ) {
               throw new Error(
-                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing valid v0.5 anchor identity`
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing valid v0.6 anchor identity`
               );
             }
 
@@ -1506,17 +1552,37 @@ jobs:
               );
             }
 
+            if (!cluster.member_type_counts || typeof cluster.member_type_counts !== "object") {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing member_type_counts`
+              );
+            }
+
+            if (Number(cluster.member_type_counts.impact || 0) < 1) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} must contain at least 1 Impact member in v0.6`
+              );
+            }
+
+            if (Number(cluster.member_type_counts.emergence || 0) > 3) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.6 Emergence cap`
+              );
+            }
+
             const interpretation = String(cluster.interpretation || "").toLowerCase();
             if (
               !interpretation.includes("qualifies directly against the original anchor") ||
               !interpretation.includes("membership is not transitive") ||
               !interpretation.includes("anchor identity is preserved") ||
+              !interpretation.includes("relevant impact signals are explicitly admitted") ||
+              !interpretation.includes("near-duplicate emergence signals are suppressed") ||
               !interpretation.includes("does not establish new causality") ||
               !interpretation.includes("verification") ||
               !interpretation.includes("forecast")
             ) {
               throw new Error(
-                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing v0.4 bounded-system safeguard`
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing v0.6 bounded-system safeguard`
               );
             }
           }
@@ -1537,6 +1603,26 @@ jobs:
           ) {
             throw new Error("Cosmos State cross-family cluster count invalid");
           }
+
+          if (
+            Number(counts.attention_clusters_with_impact || 0) !==
+            Number(counts.attention_clusters || 0)
+          ) {
+            throw new Error(
+              `Cosmos State v0.6 requires every retained system to contain Impact; ` +
+              `with-impact=${counts.attention_clusters_with_impact}, ` +
+              `clusters=${counts.attention_clusters}`
+            );
+          }
+
+          if (
+            Number(counts.attention_cluster_emergence_members_max || 0) > 3
+          ) {
+            throw new Error(
+              "Cosmos State v0.6 attention_cluster_emergence_members_max exceeds 3"
+            );
+          }
+
           if (
             Number(counts.attention_patterns || 0) > 8 ||
             Number(counts.attention_emergences || 0) > 6 ||
@@ -1549,6 +1635,9 @@ jobs:
           console.log("Real Cosmos State output created.");
           console.log(`Date:       ${payload.date_utc}`);
           console.log(`Attention:  ${payload.counts?.attention_retained ?? 0}`);
+          console.log(`Clusters:   ${payload.counts?.attention_clusters ?? 0}`);
+          console.log(`With Impact:${payload.counts?.attention_clusters_with_impact ?? 0}`);
+          console.log(`Max Emerg.: ${payload.counts?.attention_cluster_emergence_members_max ?? 0}`);
           console.log(`Output:     ${file}`);
           NODE
 
