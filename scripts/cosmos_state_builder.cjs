@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PTD Today / Cosmos — Cosmos State Builder v0.5
+ * PTD Today / Cosmos — Cosmos State Builder v0.6
  *
  * Deterministic, read-only synthesis layer above:
  *   State → Delta → Impact → Pattern → Emergence → Developments/Relationships
@@ -759,6 +759,68 @@ function main() {
     return uniq(anchor.entity_ids || []).slice(0, 4);
   }
 
+  function emergenceSimilarity(a, b) {
+    if (!a || !b) return 0;
+    if (a.attention_type !== "emergence" || b.attention_type !== "emergence") return 0;
+
+    const entityOverlap = jaccard(a.entity_ids || [], b.entity_ids || []);
+    const developmentOverlap = jaccard(
+      a.supporting_development_ids || [],
+      b.supporting_development_ids || []
+    );
+    const relationshipOverlap = jaccard(
+      a.supporting_relationship_ids || [],
+      b.supporting_relationship_ids || []
+    );
+
+    return Math.max(
+      entityOverlap,
+      entityOverlap * 0.70 + developmentOverlap * 0.20 + relationshipOverlap * 0.10
+    );
+  }
+
+  function selectSystemMembers(anchor, eligibleRows) {
+    const MAX_TOTAL_MEMBERS = 7;
+    const MAX_EMERGENCES = 3;
+
+    const ranked = eligibleRows
+      .map(row => ({ row, fitScore: anchorFit(anchor, row) }))
+      .sort((a, b) =>
+        b.fitScore - a.fitScore ||
+        b.row.attention_score - a.row.attention_score
+      );
+
+    const selected = [anchor];
+
+    // Reserve one slot for the strongest directly relevant Impact, when available.
+    const bestImpact = ranked.find(x => x.row.attention_type === "impact");
+    if (bestImpact && selected.length < MAX_TOTAL_MEMBERS) {
+      selected.push(bestImpact.row);
+    }
+
+    // Fill remaining slots, suppressing near-duplicate Emergence variants.
+    for (const item of ranked) {
+      if (selected.length >= MAX_TOTAL_MEMBERS) break;
+      const row = item.row;
+
+      if (selected.some(x => x.attention_id === row.attention_id)) continue;
+
+      if (row.attention_type === "emergence") {
+        const selectedEmergences = selected.filter(x => x.attention_type === "emergence");
+        if (selectedEmergences.length >= MAX_EMERGENCES) continue;
+
+        const tooSimilar = selectedEmergences.some(existing =>
+          emergenceSimilarity(existing, row) >= 0.72
+        );
+        if (tooSimilar) continue;
+      }
+
+      selected.push(row);
+    }
+
+    return selected;
+  }
+
   function anchorFit(anchor, candidate) {
     const anchorIds = anchor.entity_ids || [];
     const candidateIds = candidate.entity_ids || [];
@@ -794,21 +856,11 @@ function main() {
   for (const anchor of anchors) {
     const anchorCore = anchorCoreEntityIds(anchor);
 
-    const candidates = attentionTop
+    const eligibleRows = attentionTop
       .filter(x => x.attention_id !== anchor.attention_id)
-      .filter(x => candidateMatchesAnchor(anchor, x))
-      .map(x => ({
-        row: x,
-        fitScore: anchorFit(anchor, x)
-      }))
-      .sort((a, b) =>
-        b.fitScore - a.fitScore ||
-        b.row.attention_score - a.row.attention_score
-      )
-      .slice(0, 6)
-      .map(x => x.row);
+      .filter(x => candidateMatchesAnchor(anchor, x));
 
-    const members = [anchor, ...candidates];
+    const members = selectSystemMembers(anchor, eligibleRows);
     if (members.length < 2) continue;
 
     const memberTypes = uniq(members.map(x => x.attention_type));
@@ -866,6 +918,11 @@ function main() {
       member_count: members.length,
       member_attention_ids: members.map(x => x.attention_id),
       member_types: memberTypes,
+      member_type_counts: {
+        pattern: members.filter(x => x.attention_type === "pattern").length,
+        emergence: members.filter(x => x.attention_type === "emergence").length,
+        impact: members.filter(x => x.attention_type === "impact").length
+      },
       cross_family: memberTypes.length > 1,
       entity_ids: labelEntityIds,
       attention_score: systemScore,
@@ -879,7 +936,7 @@ function main() {
           Math.max(1, members.length)
       ),
       interpretation:
-        "Bounded system for navigation and synthesis only. Every member qualifies directly against the original anchor through shared entities and/or strong graph adjacency; membership is not transitive. Anchor identity is preserved in system labeling and member selection. This system does not establish new causality, verification, or forecast."
+        "Bounded system for navigation and synthesis only. Every member qualifies directly against the original anchor through shared entities and/or strong graph adjacency; membership is not transitive. Anchor identity is preserved in system labeling and member selection. Relevant Impact signals are explicitly admitted when they qualify, while near-duplicate Emergence signals are suppressed within a system. This system does not establish new causality, verification, or forecast."
     });
   }
 
@@ -925,7 +982,7 @@ function main() {
   }
 
   const output = {
-    schema_version: "0.5",
+    schema_version: "0.6",
     generated_at: generatedAt,
     date_utc: dateUtc,
     status: "ready",
@@ -944,7 +1001,7 @@ function main() {
       attention_diversity_rule:
         "The retained attention surface is quota-balanced across Pattern, Emergence and Impact so one upstream family cannot consume every visible slot.",
       overlap_cluster_rule:
-        "Attention signals may be grouped into bounded system clusters anchored on strong Emergence or Pattern signals. Every member must qualify directly against the original anchor through shared entities and/or strong graph adjacency; clustering is non-transitive. Anchor identity is preserved in system labels and member selection. Cross-family Pattern/Emergence/Impact grouping is preferred, overlapping systems are allowed when anchors are genuinely distinct, single-member systems are discarded, and systems with highly similar member/entity composition are suppressed. A bounded system is not a new causal, verification or forecasting claim.",
+        "Attention signals may be grouped into bounded system clusters anchored on strong Emergence or Pattern signals. Every member must qualify directly against the original anchor through shared entities and/or strong graph adjacency; clustering is non-transitive. Anchor identity is preserved in system labels and member selection. When a directly relevant Impact signal qualifies, system composition reserves room for Impact; near-duplicate Emergence signals are suppressed so one structural phenomenon cannot consume the member surface. Cross-family Pattern/Emergence/Impact grouping is preferred, overlapping systems are allowed when anchors are genuinely distinct, single-member systems are discarded, and systems with highly similar member/entity composition are suppressed. A bounded system is not a new causal, verification or forecasting claim.",
       stale_input_rule:
         "Input dates are exposed in source_freshness so consumers can avoid blending snapshots as though they were contemporaneous."
     },
@@ -1037,6 +1094,12 @@ function main() {
       attention_clusters: clusters.length,
       attention_distinct_system_target_max: 5,
       attention_cross_family_clusters: clusters.filter(x => x.cross_family).length,
+      attention_clusters_with_impact: clusters.filter(
+        x => n(x.member_type_counts?.impact) > 0
+      ).length,
+      attention_cluster_emergence_members_max: clusters.length
+        ? Math.max(...clusters.map(x => n(x.member_type_counts?.emergence)))
+        : 0,
       attention_cluster_members_max: clusters.length
         ? Math.max(...clusters.map(x => x.member_count))
         : 0
@@ -1061,6 +1124,8 @@ function main() {
   console.log(`Clusters:        ${output.counts.attention_clusters}`);
   console.log(`  Target max:    ${output.counts.attention_distinct_system_target_max}`);
   console.log(`  Cross-family:  ${output.counts.attention_cross_family_clusters}`);
+  console.log(`  With Impact:   ${output.counts.attention_clusters_with_impact}`);
+  console.log(`  Max Emergence: ${output.counts.attention_cluster_emergence_members_max}`);
   console.log(`  Max members:   ${output.counts.attention_cluster_members_max}`);
   console.log(`Output:          ${path.relative(ROOT, FILES.output)}`);
 }
