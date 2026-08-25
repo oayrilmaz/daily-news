@@ -6,6 +6,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -27,7 +28,7 @@ on:
         default: false
         type: boolean
       write_cosmos_attention_test:
-        description: "Generate and commit controlled Cosmos Attention v0.1 test output"
+        description: "Generate and commit controlled Cosmos Attention v0.2 test output"
         required: false
         default: false
         type: boolean
@@ -1720,7 +1721,7 @@ jobs:
           );
           NODE
 
-      - name: Test Cosmos Attention v0.1 In Isolated Workspace
+      - name: Test Cosmos Attention v0.2 In Isolated Workspace
         shell: bash
         run: |
           set -euo pipefail
@@ -1746,7 +1747,7 @@ jobs:
             ],
             "mode": "open",
             "metadata": {
-              "purpose": "cosmos_attention_v0.1_preflight"
+              "purpose": "cosmos_attention_v0.2_preflight"
             }
           }
           JSON
@@ -1759,7 +1760,7 @@ jobs:
 
             node scripts/cosmos_attention.cjs \
               --input knowledge/cosmos/core-test-v0.1.json \
-              --out knowledge/cosmos/attention-test-v0.1.json
+              --out knowledge/cosmos/attention-test-v0.2.json
           )
 
           TEST_DIR="$TEST_DIR" node <<'NODE'
@@ -1768,7 +1769,7 @@ jobs:
 
           const root = process.env.TEST_DIR;
           const coreFile = path.join(root, "knowledge/cosmos/core-test-v0.1.json");
-          const attentionFile = path.join(root, "knowledge/cosmos/attention-test-v0.1.json");
+          const attentionFile = path.join(root, "knowledge/cosmos/attention-test-v0.2.json");
 
           if (!fs.existsSync(coreFile)) {
             throw new Error("Cosmos Core did not create the controlled core test output.");
@@ -1776,7 +1777,7 @@ jobs:
 
           if (!fs.existsSync(attentionFile)) {
             throw new Error(
-              "Cosmos Attention did not create knowledge/cosmos/attention-test-v0.1.json"
+              "Cosmos Attention did not create knowledge/cosmos/attention-test-v0.2.json"
             );
           }
 
@@ -1784,7 +1785,7 @@ jobs:
           const payload = JSON.parse(fs.readFileSync(attentionFile, "utf8"));
           const errors = [];
 
-          if (payload.schema_version !== "0.1") {
+          if (payload.schema_version !== "0.2") {
             errors.push(
               `Unexpected Cosmos Attention schema_version: ${payload.schema_version}`
             );
@@ -1877,7 +1878,8 @@ jobs:
           const expectedDimensions = [
             "question_relevance", "directness", "structural_strength",
             "confidence", "temporal_relevance", "emergence_novelty",
-            "evidence_factor", "diversity"
+            "evidence_factor", "diversity", "relationship_semantics",
+            "pathway_resolvability", "pathway_coverage"
           ];
 
           for (const dimension of expectedDimensions) {
@@ -1886,6 +1888,32 @@ jobs:
                 `Cosmos Attention ranking dimension missing: ${dimension}`
               );
             }
+          }
+
+          const pathwayIntel = state.pathway_intelligence || {};
+
+          if (pathwayIntel.intent_sensitive !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 pathway intelligence must be intent-sensitive"
+            );
+          }
+
+          if (pathwayIntel.unresolved_entities_excluded_from_primary_pathways !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 must exclude unresolved entities from primary pathways"
+            );
+          }
+
+          if (pathwayIntel.descriptive_relationships_downranked_for_impact_intent !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 must down-rank descriptive relationships for impact intent"
+            );
+          }
+
+          if (pathwayIntel.diversity_coverage_applied !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 pathway diversity/coverage safeguard missing"
+            );
           }
 
           for (const key of [
@@ -1906,7 +1934,10 @@ jobs:
             }
           }
 
-          for (const pathway of active.primary_pathways || []) {
+          const primaryPathways = active.primary_pathways || [];
+          const rawEntityPattern = /^ent_[a-z0-9]+$/i;
+
+          for (const pathway of primaryPathways) {
             if (!pathway.pathway_id ||
                 !pathway.from?.entity_id ||
                 !pathway.to?.entity_id ||
@@ -1916,11 +1947,58 @@ jobs:
               );
             }
 
+            const fromName = String(pathway.from?.name || "").trim();
+            const toName = String(pathway.to?.name || "").trim();
+
+            if (!fromName || !toName ||
+                rawEntityPattern.test(fromName) ||
+                rawEntityPattern.test(toName) ||
+                fromName === pathway.from?.entity_id ||
+                toName === pathway.to?.entity_id) {
+              errors.push(
+                `Cosmos Attention pathway ${pathway.pathway_id || "(unknown)"} exposes an unresolved entity`
+              );
+            }
+
+            if (!Number.isFinite(Number(pathway.relationship?.semantic_adjustment))) {
+              errors.push(
+                `Cosmos Attention pathway ${pathway.pathway_id || "(unknown)"} missing semantic adjustment`
+              );
+            }
+
             if (!String(pathway.claim_rule || "").toLowerCase().includes(
               "does not establish new causality"
             )) {
               errors.push(
                 `Cosmos Attention pathway ${pathway.pathway_id || "(unknown)"} missing no-new-causality safeguard`
+              );
+            }
+          }
+
+          const locatedInPrimary = primaryPathways.filter(
+            pathway =>
+              String(pathway.relationship?.type || "").toUpperCase() === "LOCATED_IN"
+          );
+
+          const consequencePrimary = primaryPathways.filter(pathway =>
+            ["AFFECTS", "IMPACTS", "DRIVES", "REQUIRES", "DEPENDS_ON",
+             "CONSTRAINS", "ENABLES", "CAUSES", "INCREASES", "DECREASES",
+             "SUPPLIES", "SUPPORTS"].includes(
+              String(pathway.relationship?.type || "").toUpperCase()
+            )
+          );
+
+          if (locatedInPrimary.length > 0 && consequencePrimary.length > 0) {
+            const bestLocated = Math.max(
+              ...locatedInPrimary.map(x => Number(x.score || 0))
+            );
+            const bestConsequence = Math.max(
+              ...consequencePrimary.map(x => Number(x.score || 0))
+            );
+
+            if (bestLocated >= bestConsequence) {
+              errors.push(
+                "Cosmos Attention v0.2 allows LOCATED_IN to outrank consequence pathways for an impact question"
               );
             }
           }
@@ -1947,7 +2025,7 @@ jobs:
             errors.push("Cosmos Attention must not upgrade evidence quality");
           }
           if (safeguards.forecast_generated !== false) {
-            errors.push("Cosmos Attention v0.1 must not generate forecasts");
+            errors.push("Cosmos Attention v0.2 must not generate forecasts");
           }
           if (safeguards.sector_whitelist_present !== false) {
             errors.push("Cosmos Attention must remain domain-neutral");
@@ -1958,18 +2036,28 @@ jobs:
               "Cosmos Attention must suppress visibility only while preserving existence"
             );
           }
+          if (safeguards.primary_pathways_require_resolved_entities !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 resolved-entity pathway safeguard missing"
+            );
+          }
+          if (safeguards.descriptive_relationships_are_intent_weighted !== true) {
+            errors.push(
+              "Cosmos Attention v0.2 intent-weighted relationship safeguard missing"
+            );
+          }
           if (safeguards.source_lineage_preserved !== true) {
             errors.push("Cosmos Attention must preserve source lineage");
           }
 
           if (errors.length) {
-            console.error("\nCosmos Attention v0.1 preflight errors:");
+            console.error("\nCosmos Attention v0.2 preflight errors:");
             for (const error of errors) console.error(`- ${error}`);
             process.exit(1);
           }
 
           console.log("");
-          console.log("Cosmos Attention v0.1 isolated test passed.");
+          console.log("Cosmos Attention v0.2 isolated test passed.");
           console.log(`Status:             ${payload.status}`);
           console.log(`Primary pathways:   ${(active.primary_pathways || []).length}`);
           console.log(
@@ -2306,16 +2394,16 @@ jobs:
           echo "Controlled Cosmos Core v0.1 output is now committed."
           echo "No OpenAI generation was executed."
 
-      - name: Generate Real Cosmos Attention v0.1 Test Output
+      - name: Generate Real Cosmos Attention v0.2 Test Output
         if: ${{ inputs.write_cosmos_attention_test == true }}
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Generating controlled Cosmos Attention v0.1 output."
+          echo "Generating controlled Cosmos Attention v0.2 output."
           echo "No OpenAI/API generation is executed by this step."
 
-          cat > /tmp/cosmos-attention-core-input-v0.1.json <<'JSON'
+          cat > /tmp/cosmos-attention-core-input-v0.2.json <<'JSON'
           {
             "text": "What could AI data-center growth affect?",
             "language": "en",
@@ -2331,21 +2419,21 @@ jobs:
           JSON
 
           node scripts/cosmos_core.cjs \
-            --input /tmp/cosmos-attention-core-input-v0.1.json \
-            --out /tmp/core-for-attention-v0.1.json
+            --input /tmp/cosmos-attention-core-input-v0.2.json \
+            --out /tmp/core-for-attention-v0.2.json
 
           node scripts/cosmos_attention.cjs \
-            --input /tmp/core-for-attention-v0.1.json \
-            --out knowledge/cosmos/attention-test-v0.1.json
+            --input /tmp/core-for-attention-v0.2.json \
+            --out knowledge/cosmos/attention-test-v0.2.json
 
-          test -f knowledge/cosmos/attention-test-v0.1.json
+          test -f knowledge/cosmos/attention-test-v0.2.json
 
           node <<'NODE'
           const fs = require("fs");
-          const file = "knowledge/cosmos/attention-test-v0.1.json";
+          const file = "knowledge/cosmos/attention-test-v0.2.json";
           const payload = JSON.parse(fs.readFileSync(file, "utf8"));
 
-          if (payload.schema_version !== "0.1") {
+          if (payload.schema_version !== "0.2") {
             throw new Error(
               `Unexpected Cosmos Attention schema_version: ${payload.schema_version}`
             );
@@ -2365,6 +2453,58 @@ jobs:
               (active.primary_pathways || []).length >
                 Number(budget.primary_pathways || 0)) {
             throw new Error("Cosmos Attention primary pathway count invalid");
+          }
+
+          const primaryPathways = active.primary_pathways || [];
+          const rawEntityPattern = /^ent_[a-z0-9]+$/i;
+
+          for (const pathway of primaryPathways) {
+            const fromName = String(pathway.from?.name || "").trim();
+            const toName = String(pathway.to?.name || "").trim();
+
+            if (!fromName || !toName ||
+                rawEntityPattern.test(fromName) ||
+                rawEntityPattern.test(toName) ||
+                fromName === pathway.from?.entity_id ||
+                toName === pathway.to?.entity_id) {
+              throw new Error(
+                `Cosmos Attention v0.2 primary pathway exposes unresolved entity: ${pathway.pathway_id || "unknown"}`
+              );
+            }
+
+            if (!Number.isFinite(Number(pathway.relationship?.semantic_adjustment))) {
+              throw new Error(
+                `Cosmos Attention v0.2 pathway missing semantic adjustment: ${pathway.pathway_id || "unknown"}`
+              );
+            }
+          }
+
+          const locatedInPrimary = primaryPathways.filter(
+            pathway =>
+              String(pathway.relationship?.type || "").toUpperCase() === "LOCATED_IN"
+          );
+
+          const consequencePrimary = primaryPathways.filter(pathway =>
+            ["AFFECTS", "IMPACTS", "DRIVES", "REQUIRES", "DEPENDS_ON",
+             "CONSTRAINS", "ENABLES", "CAUSES", "INCREASES", "DECREASES",
+             "SUPPLIES", "SUPPORTS"].includes(
+              String(pathway.relationship?.type || "").toUpperCase()
+            )
+          );
+
+          if (locatedInPrimary.length > 0 && consequencePrimary.length > 0) {
+            const bestLocated = Math.max(
+              ...locatedInPrimary.map(x => Number(x.score || 0))
+            );
+            const bestConsequence = Math.max(
+              ...consequencePrimary.map(x => Number(x.score || 0))
+            );
+
+            if (bestLocated >= bestConsequence) {
+              throw new Error(
+                "Cosmos Attention v0.2 LOCATED_IN pathway outranks consequence pathway for impact question"
+              );
+            }
           }
 
           if ((active.patterns || []).length > Number(budget.patterns || 0) ||
@@ -2402,12 +2542,14 @@ jobs:
               payload.safeguards?.sector_whitelist_present !== false ||
               payload.safeguards?.visibility_suppression_only !== true ||
               payload.safeguards?.existence_preserved !== true ||
+              payload.safeguards?.primary_pathways_require_resolved_entities !== true ||
+              payload.safeguards?.descriptive_relationships_are_intent_weighted !== true ||
               payload.safeguards?.source_lineage_preserved !== true) {
             throw new Error("Cosmos Attention safeguards invalid");
           }
 
           console.log("");
-          console.log("Real controlled Cosmos Attention v0.1 output created.");
+          console.log("Real controlled Cosmos Attention v0.2 output created.");
           console.log(`Status:           ${payload.status}`);
           console.log(`Primary paths:    ${(active.primary_pathways || []).length}`);
           console.log(
@@ -2425,7 +2567,7 @@ jobs:
           console.log(`Output:           ${file}`);
           NODE
 
-      - name: Commit Real Cosmos Attention v0.1 Test Output
+      - name: Commit Real Cosmos Attention v0.2 Test Output
         if: ${{ inputs.write_cosmos_attention_test == true }}
         shell: bash
         run: |
@@ -2434,17 +2576,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add knowledge/cosmos/attention-test-v0.1.json
+          git add knowledge/cosmos/attention-test-v0.2.json
 
           if git diff --cached --quiet; then
             echo "No Cosmos Attention test changes to commit."
           else
-            git commit -m "Add Cosmos Attention v0.1 controlled test output"
+            git commit -m "Add Cosmos Attention v0.2 controlled test output"
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
 
           echo ""
-          echo "Controlled Cosmos Attention v0.1 output is now committed."
+          echo "Controlled Cosmos Attention v0.2 output is now committed."
           echo "No OpenAI generation was executed."
 
       - name: Generate Real Emergence Output
@@ -2539,7 +2681,7 @@ jobs:
             echo "Controlled core-test-v0.1.json was generated and committed."
           fi
           if [ "${{ inputs.write_cosmos_attention_test }}" = "true" ]; then
-            echo "Controlled attention-test-v0.1.json was generated and committed."
+            echo "Controlled attention-test-v0.2.json was generated and committed."
           fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
