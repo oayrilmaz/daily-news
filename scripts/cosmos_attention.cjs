@@ -2,11 +2,11 @@
 "use strict";
 
 /**
- * PTD Today / Cosmos — Cosmos Attention v0.1
+ * PTD Today / Cosmos — Cosmos Attention v0.2
  *
  * Purpose
  * -------
- * Deterministic "Infinite Attention" layer for Cosmos Core outputs.
+ * Deterministic "Infinite Attention" + intent-sensitive pathway layer for Cosmos Core outputs.
  *
  * Core principle:
  *   Attention may suppress visibility.
@@ -418,23 +418,114 @@ function diversitySelect(scoredItems, budget) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Intent-sensitive pathway intelligence                                      */
+/* -------------------------------------------------------------------------- */
+
+function isImpactIntent(query) {
+  const q = lower(query?.query_text);
+  return /\baffect|impact|effect|consequence|ripple|result|lead to|depend|require|constraint|what could\b/.test(q);
+}
+
+function relationshipSemanticAdjustment(rel, query) {
+  const type = clean(rel?.relationship_type).toUpperCase();
+  const label = lower(rel?.label);
+  const impactIntent = isImpactIntent(query);
+
+  if (!impactIntent) return 0;
+
+  let adjustment = 0;
+
+  const positiveByType = {
+    AFFECTS: 20,
+    IMPACTS: 20,
+    DRIVES: 18,
+    REQUIRES: 18,
+    DEPENDS_ON: 17,
+    CONSTRAINS: 17,
+    ENABLES: 15,
+    CAUSES: 15,
+    INCREASES: 14,
+    DECREASES: 14,
+    SUPPLIES: 12,
+    SUPPORTS: 9
+  };
+
+  const negativeByType = {
+    LOCATED_IN: -34,
+    PART_OF: -16,
+    MEMBER_OF: -16,
+    ASSOCIATED_WITH: -10,
+    RELATED_TO: -8
+  };
+
+  adjustment += positiveByType[type] || 0;
+  adjustment += negativeByType[type] || 0;
+
+  if (/\brequire|depend|constraint|bottleneck|capacity|resilience|enable|impact|affect|drive|supply\b/.test(label)) {
+    adjustment += 8;
+  }
+
+  if (/\blocated in|headquartered|based in|member of|part of\b/.test(label)) {
+    adjustment -= 18;
+  }
+
+  return adjustment;
+}
+
+function humanReadableEntityName(entityId, name) {
+  const value = clean(name);
+  if (!value) return null;
+  if (value === entityId) return null;
+  if (/^ent_[a-z0-9]+$/i.test(value)) return null;
+  return value;
+}
+
+function entityInfoMap(core) {
+  const map = new Map();
+
+  function put(row) {
+    if (!row?.entity_id) return;
+    const previous = map.get(row.entity_id) || {};
+    map.set(row.entity_id, {
+      entity_id: row.entity_id,
+      name: humanReadableEntityName(row.entity_id, row.name) || previous.name || null,
+      type: row.type || previous.type || null
+    });
+  }
+
+  for (const row of core?.resolution?.starting_points || []) put(row);
+  for (const row of core?.selected_context?.entities || []) put(row);
+
+  for (const row of core?.selected_context?.patterns || []) {
+    if (row?.focus_entity) put(row.focus_entity);
+    for (const x of row?.supporting_entities || []) put(x);
+  }
+
+  for (const row of core?.selected_context?.emergences || []) {
+    for (const x of row?.focus_entities || []) put(x);
+    for (const x of row?.shared_entities || []) put(x);
+  }
+
+  return map;
+}
+
+function pathwayCoverageKey(pathway, infoMap) {
+  const toInfo = infoMap.get(pathway.to.entity_id) || {};
+  const type = clean(toInfo.type) || "Unknown";
+  const relType = clean(pathway.relationship.type).toUpperCase() || "UNKNOWN";
+  return `${type}|${relType}`;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Pathway construction                                                       */
 /* -------------------------------------------------------------------------- */
 
 function entityNameMap(core) {
+  const info = entityInfoMap(core);
   const map = new Map();
 
-  for (const row of core?.resolution?.starting_points || []) {
-    if (row?.entity_id) map.set(row.entity_id, row.name);
-  }
-
-  for (const row of core?.selected_context?.entities || []) {
-    if (row?.entity_id) map.set(row.entity_id, row.name);
-  }
-
-  for (const row of core?.selected_context?.relationships || []) {
-    if (row?.from?.entity_id && row?.from?.name) map.set(row.from.entity_id, row.from.name);
-    if (row?.to?.entity_id && row?.to?.name) map.set(row.to.entity_id, row.to.name);
+  for (const [entityId, row] of info.entries()) {
+    if (row?.name) map.set(entityId, row.name);
   }
 
   return map;
@@ -444,46 +535,76 @@ function pathwayKey(rel) {
   return `${rel.from_entity_id || ""}|${rel.to_entity_id || ""}|${rel.relationship_id || ""}`;
 }
 
-function buildPrimaryPathways(core, active, query, budget) {
-  const rels = active.relationships || [];
+function buildPrimaryPathways(core, relationshipRanking, active, query, budget) {
+  const rankedRelationships = [
+    ...((relationshipRanking?.selected) || []),
+    ...((relationshipRanking?.suppressed) || [])
+  ];
+
   const impacts = active.impacts || [];
+  const infoMap = entityInfoMap(core);
   const nameMap = entityNameMap(core);
+  const startingIds = query.starting_entity_ids || new Set();
 
   const pathways = [];
 
-  for (const rel of rels) {
+  for (const rel of rankedRelationships) {
     const fromId = rel.from_entity_id;
     const toId = rel.to_entity_id;
     if (!fromId || !toId) continue;
+
+    const fromName = humanReadableEntityName(fromId, nameMap.get(fromId));
+    const toName = humanReadableEntityName(toId, nameMap.get(toId));
+
+    if (!fromName || !toName) continue;
 
     const relatedImpacts = impacts.filter(imp => {
       const ids = new Set(itemEntityIds(imp));
       return ids.has(fromId) || ids.has(toId);
     });
 
-    const score =
-      n(rel?._attention?.score) * 0.65 +
-      (relatedImpacts.length
-        ? Math.max(...relatedImpacts.map(x => n(x?._attention?.score))) * 0.35
-        : 0);
+    const relAttention = n(rel?._attention?.score);
+    const strongestImpact = relatedImpacts.length
+      ? Math.max(...relatedImpacts.map(x => n(x?._attention?.score)))
+      : 0;
+
+    const semanticAdjustment = relationshipSemanticAdjustment(rel, query);
+    const touchesAttentionCenter =
+      startingIds.has(fromId) || startingIds.has(toId);
+
+    const directionBonus = startingIds.has(fromId) ? 8 : 0;
+    const centerBonus = touchesAttentionCenter ? 5 : 0;
+
+    const rawScore =
+      relAttention * 0.58 +
+      strongestImpact * 0.24 +
+      itemStructuralScore(rel) * 0.18 +
+      semanticAdjustment +
+      directionBonus +
+      centerBonus;
+
+    const score = clamp(rawScore, 0, 100);
 
     pathways.push({
       pathway_id: stableId("pathway", pathwayKey(rel)),
       score: Math.round(score * 100) / 100,
       from: {
         entity_id: fromId,
-        name: nameMap.get(fromId) || fromId
+        name: fromName,
+        type: infoMap.get(fromId)?.type || null
       },
       relationship: {
         relationship_id: rel.relationship_id,
         type: rel.relationship_type,
         label: rel.label,
         strength: rel.strength,
-        confidence: rel.confidence
+        confidence: rel.confidence,
+        semantic_adjustment: semanticAdjustment
       },
       to: {
         entity_id: toId,
-        name: nameMap.get(toId) || toId
+        name: toName,
+        type: infoMap.get(toId)?.type || null
       },
       related_impact_ids: relatedImpacts
         .slice(0, 3)
@@ -492,23 +613,70 @@ function buildPrimaryPathways(core, active, query, budget) {
       evidence_development_ids: rel.evidence_development_ids || [],
       attention_reasons: uniq([
         ...(rel?._attention?.reasons || []),
+        ...(semanticAdjustment > 0
+          ? ["relationship semantics are relevant to the current intent"]
+          : []),
+        ...(semanticAdjustment < 0
+          ? ["descriptive relationship is down-ranked for the current intent"]
+          : []),
         ...(relatedImpacts.flatMap(x => x?._attention?.reasons || []))
-      ]).slice(0, 6),
+      ]).slice(0, 7),
       claim_rule:
         "Pathway organizes existing graph/impact context only; it does not establish new causality."
     });
   }
 
-  // Diversity by destination/entity pair.
-  const seenPairs = new Set();
+  const sorted = pathways.sort((a, b) => b.score - a.score);
   const selected = [];
+  const seenPairs = new Set();
+  const coverageCounts = new Map();
 
-  for (const pathway of pathways.sort((a, b) => b.score - a.score)) {
-    const pair = [pathway.from.entity_id, pathway.to.entity_id].sort().join("|");
-    if (seenPairs.has(pair)) continue;
+  while (sorted.length && selected.length < budget) {
+    let bestIndex = -1;
+    let bestAdjusted = -Infinity;
+
+    for (let i = 0; i < sorted.length; i += 1) {
+      const pathway = sorted[i];
+      const pair = [pathway.from.entity_id, pathway.to.entity_id].sort().join("|");
+      if (seenPairs.has(pair)) continue;
+
+      const coverageKey = pathwayCoverageKey(pathway, infoMap);
+      const coveragePenalty = n(coverageCounts.get(coverageKey), 0) * 7;
+
+      const sameDestinationPenalty = selected.some(
+        x => x.to.entity_id === pathway.to.entity_id
+      ) ? 10 : 0;
+
+      const sameRelationshipTypePenalty = selected.filter(
+        x => clean(x.relationship.type).toUpperCase() ===
+             clean(pathway.relationship.type).toUpperCase()
+      ).length * 3;
+
+      const adjusted =
+        pathway.score -
+        coveragePenalty -
+        sameDestinationPenalty -
+        sameRelationshipTypePenalty;
+
+      if (adjusted > bestAdjusted) {
+        bestAdjusted = adjusted;
+        bestIndex = i;
+      }
+    }
+
+    if (bestIndex < 0) break;
+
+    const [winner] = sorted.splice(bestIndex, 1);
+    const pair = [winner.from.entity_id, winner.to.entity_id].sort().join("|");
+    const coverageKey = pathwayCoverageKey(winner, infoMap);
+
     seenPairs.add(pair);
-    selected.push(pathway);
-    if (selected.length >= budget) break;
+    coverageCounts.set(coverageKey, n(coverageCounts.get(coverageKey), 0) + 1);
+
+    selected.push({
+      ...winner,
+      diversity_adjusted_score: Math.round(bestAdjusted * 100) / 100
+    });
   }
 
   return selected;
@@ -577,6 +745,7 @@ function runCosmosAttention(core, options = {}) {
 
   const primaryPathways = buildPrimaryPathways(
     core,
+    ranked.relationships,
     activeContext,
     query,
     budget.primary_pathways
@@ -600,7 +769,7 @@ function runCosmosAttention(core, options = {}) {
   }
 
   return {
-    schema_version: "0.1",
+    schema_version: "0.2",
     generated_at: nowIso(),
     status: "attention_resolved",
 
@@ -634,8 +803,17 @@ function runCosmosAttention(core, options = {}) {
         "temporal_relevance",
         "emergence_novelty",
         "evidence_factor",
-        "diversity"
-      ]
+        "diversity",
+        "relationship_semantics",
+        "pathway_resolvability",
+        "pathway_coverage"
+      ],
+      pathway_intelligence: {
+        intent_sensitive: true,
+        unresolved_entities_excluded_from_primary_pathways: true,
+        descriptive_relationships_downranked_for_impact_intent: true,
+        diversity_coverage_applied: true
+      }
     },
 
     infinite_state: {
@@ -656,6 +834,8 @@ function runCosmosAttention(core, options = {}) {
       sector_whitelist_present: false,
       visibility_suppression_only: true,
       existence_preserved: true,
+      primary_pathways_require_resolved_entities: true,
+      descriptive_relationships_are_intent_weighted: true,
       source_lineage_preserved: true
     }
   };
