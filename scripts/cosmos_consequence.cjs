@@ -12,6 +12,7 @@
  * - no evidence upgrades
  * - no numeric forecasts
  * - no assumption of unidentified materials/minerals
+ * - reverse relationships remain contextual and do not propagate consequences
  *
  * Butterfly distance is metadata, not a conceptual stopping rule.
  */
@@ -259,8 +260,10 @@ function propagate(ctx,world,options={}){
           horizon:horizon(d),
           consequence_score:Math.round(cumulative*100)/100,
           relationship_score:Math.round(score*100)/100,
-          claim_class:CONSEQUENCE_TYPES.has(relationshipType(rel))
-            ?"graph_supported_consequence":"contextual_relationship",
+          claim_class:
+            dir==="forward" && CONSEQUENCE_TYPES.has(relationshipType(rel))
+              ?"graph_supported_consequence"
+              :"contextual_relationship",
           evidence_quality_score:evidenceScore(rel),
           confidence:rel.confidence??null,
           evidence_development_ids:rel.evidence_development_ids||[],
@@ -271,7 +274,7 @@ function propagate(ctx,world,options={}){
         };
         consequences.push(row);
 
-        if(!CONSEQUENCE_TYPES.has(relationshipType(rel))) continue;
+        if(dir!=="forward" || !CONSEQUENCE_TYPES.has(relationshipType(rel))) continue;
 
         const prev=best.get(target);
         if(prev!=null && prev>=cumulative) continue;
@@ -491,6 +494,7 @@ function runCosmosConsequence(raw,options={}){
       numeric_forecast_generated:false,
       unidentified_material_is_not_assumed:true,
       reverse_relationships_are_not_treated_as_forward_causality:true,
+      reverse_relationships_do_not_extend_consequence_frontier:true,
       alternatives_require_validation:true,
       runtime_budget_is_not_conceptual_limit:true,
       source_lineage_preserved:true
