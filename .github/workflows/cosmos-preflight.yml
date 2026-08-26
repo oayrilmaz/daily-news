@@ -18,6 +18,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -5970,6 +5971,313 @@ jobs:
             "Repository files were not modified by the isolated test."
           );
           NODE
+
+      - name: Test Cosmos Graph Writer v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_qualified",
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const rejected = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_rejected",
+            evidence_validation_id: "evidence_validation_rejected_fixture",
+            evidence_task_id: "evidence_task_rejected_fixture",
+            validation_target_id: "validation_rejected_fixture",
+            admitted_claim_class: null,
+            validation_disposition: "insufficient_evidence",
+            decision: "reject_for_now",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            persistence_level: "none",
+            evidence_record_ids: [],
+            qualification: {
+              contradiction_present: false,
+              must_preserve_contradiction: false
+            },
+            graph_write_eligibility: false,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              validation_count: 2,
+              reviewed_count: 2,
+              graph_write_eligible_count: 1,
+              graph_write_count: 0,
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified, rejected],
+            graph_write_queue: [
+              {
+                ...qualified,
+                graph_write_rank: 1
+              },
+              {
+                ...rejected,
+                graph_write_rank: 2
+              }
+            ]
+          };
+
+          const emptyGraph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-graph-writer-fixture-v0.1.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "graph-before-v0.1.json"),
+            JSON.stringify(emptyGraph, null, 2)
+          );
+          NODE
+
+          BEFORE_HASH="$(sha256sum "$TEST_DIR/graph-before-v0.1.json" | awk '{print $1}')"
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-graph-writer-fixture-v0.1.json \
+              --graph graph-before-v0.1.json \
+              --out knowledge/cosmos/graph-after-first-v0.1.json \
+              --report knowledge/cosmos/graph-write-first-report-v0.1.json
+          )
+
+          AFTER_INPUT_HASH="$(sha256sum "$TEST_DIR/graph-before-v0.1.json" | awk '{print $1}')"
+
+          if [ "$BEFORE_HASH" != "$AFTER_INPUT_HASH" ]; then
+            echo "ERROR: Cosmos Graph Writer mutated the input graph in place."
+            exit 1
+          fi
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-graph-writer-fixture-v0.1.json \
+              --graph knowledge/cosmos/graph-after-first-v0.1.json \
+              --out knowledge/cosmos/graph-after-second-v0.1.json \
+              --report knowledge/cosmos/graph-write-second-report-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const read = (name) => JSON.parse(
+            fs.readFileSync(path.join(root, "knowledge/cosmos", name), "utf8")
+          );
+
+          const firstGraph = read("graph-after-first-v0.1.json");
+          const secondGraph = read("graph-after-second-v0.1.json");
+          const firstReport = read("graph-write-first-report-v0.1.json");
+          const secondReport = read("graph-write-second-report-v0.1.json");
+          const errors = [];
+
+          if (firstGraph.status !== "cosmos_graph_snapshot" ||
+              secondGraph.status !== "cosmos_graph_snapshot") {
+            errors.push("Graph Writer did not produce Cosmos graph snapshots");
+          }
+
+          if (firstReport.status !== "graph_write_resolved" ||
+              secondReport.status !== "graph_write_resolved") {
+            errors.push("Graph Writer reports did not resolve successfully");
+          }
+
+          const firstState = firstReport.graph_write_state || {};
+          const secondState = secondReport.graph_write_state || {};
+
+          if (Number(firstState.written_count) !== 1 ||
+              Number(firstState.idempotent_skip_count) !== 0 ||
+              Number(firstState.error_count) !== 1) {
+            errors.push(
+              `First graph write invalid: written=${firstState.written_count}, skipped=${firstState.idempotent_skip_count}, errors=${firstState.error_count}`
+            );
+          }
+
+          if (Number(secondState.written_count) !== 0 ||
+              Number(secondState.idempotent_skip_count) !== 1 ||
+              Number(secondState.error_count) !== 1) {
+            errors.push(
+              `Second graph write failed idempotency: written=${secondState.written_count}, skipped=${secondState.idempotent_skip_count}, errors=${secondState.error_count}`
+            );
+          }
+
+          if (firstGraph.knowledge_records.length !== 1 ||
+              secondGraph.knowledge_records.length !== 1) {
+            errors.push(
+              `Idempotency failed: first_records=${firstGraph.knowledge_records.length}, second_records=${secondGraph.knowledge_records.length}`
+            );
+          }
+
+          if (firstGraph.audit_log.length !== 1 ||
+              secondGraph.audit_log.length !== 1) {
+            errors.push(
+              `Idempotency failed for audit log: first=${firstGraph.audit_log.length}, second=${secondGraph.audit_log.length}`
+            );
+          }
+
+          const firstRecord = firstGraph.knowledge_records[0];
+          const secondRecord = secondGraph.knowledge_records[0];
+
+          if (!firstRecord || !secondRecord ||
+              firstRecord.graph_record_id !== secondRecord.graph_record_id ||
+              firstRecord.knowledge_admission_id !== secondRecord.knowledge_admission_id) {
+            errors.push("Second run did not preserve the original graph record identity");
+          }
+
+          if (firstRecord?.claim_class !== "validated_qualified_relationship" ||
+              firstRecord?.validation_disposition !== "partially_supported" ||
+              Number(firstRecord?.confidence_score) !== 76 ||
+              firstRecord?.confidence_band !== "high") {
+            errors.push("Graph record lost claim class, disposition or confidence");
+          }
+
+          if (firstRecord?.qualification?.contradiction_present !== true ||
+              firstRecord?.qualification?.must_preserve_contradiction !== true ||
+              firstRecord?.qualification?.confidence_preserved !== true ||
+              firstRecord?.qualification?.source_lineage_preserved !== true ||
+              firstRecord?.qualification?.temporal_scope_preserved !== true ||
+              firstRecord?.qualification?.geography_scope_preserved !== true) {
+            errors.push("Graph record lost qualification or preservation metadata");
+          }
+
+          if (!Array.isArray(firstRecord?.evidence_record_ids) ||
+              firstRecord.evidence_record_ids.length !== 3) {
+            errors.push("Graph record did not preserve complete evidence lineage");
+          }
+
+          if (firstRecord?.reversibility?.reversible !== true ||
+              firstRecord?.reversibility?.reversal_operation !== "deactivate_graph_record" ||
+              firstRecord?.reversibility?.reversal_key !== firstRecord?.knowledge_admission_id) {
+            errors.push("Graph record reversibility contract invalid");
+          }
+
+          const rejectedId = "knowledge_admission_graph_writer_fixture_rejected";
+          if (firstGraph.knowledge_records.some(
+                row => row.knowledge_admission_id === rejectedId
+              ) ||
+              secondGraph.knowledge_records.some(
+                row => row.knowledge_admission_id === rejectedId
+              )) {
+            errors.push("Non-eligible admission was materialized into the graph");
+          }
+
+          if (!firstReport.errors.some(
+                row => row.knowledge_admission_id === rejectedId &&
+                       row.reason === "admission_not_graph_write_eligible"
+              ) ||
+              !secondReport.errors.some(
+                row => row.knowledge_admission_id === rejectedId &&
+                       row.reason === "admission_not_graph_write_eligible"
+              )) {
+            errors.push("Graph Writer did not explicitly refuse the non-eligible admission");
+          }
+
+          if (!secondReport.skipped.some(
+                row => row.knowledge_admission_id === firstRecord?.knowledge_admission_id &&
+                       row.reason === "already_materialized_idempotent_skip"
+              )) {
+            errors.push("Second run did not record the expected idempotent skip");
+          }
+
+          const safeguards = firstReport.safeguards || {};
+          if (safeguards.mutates_input_graph_in_place !== false ||
+              safeguards.writes_only_explicit_output_snapshot !== true ||
+              safeguards.requires_graph_write_eligibility !== true ||
+              safeguards.preserves_qualification !== true ||
+              safeguards.preserves_contradiction !== true ||
+              safeguards.preserves_confidence !== true ||
+              safeguards.preserves_evidence_lineage !== true ||
+              safeguards.idempotent_by_knowledge_admission_id !== true ||
+              safeguards.audit_log_required !== true ||
+              safeguards.graph_records_reversible !== true ||
+              safeguards.rejected_admissions_not_written !== true ||
+              safeguards.unlimited_conceptual_continuation_preserved !== true) {
+            errors.push("Cosmos Graph Writer safeguards invalid");
+          }
+
+          if (firstState.conceptual_distance_limit !== null ||
+              firstState.continuation_possible !== true ||
+              secondState.conceptual_distance_limit !== null ||
+              secondState.continuation_possible !== true) {
+            errors.push("Graph Writer did not preserve unlimited conceptual continuation");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Writer v0.1 preflight errors:");
+            for (const error of errors) console.error(`- ${error}`);
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Writer v0.1 isolated test passed.");
+          console.log(`First run writes:          ${firstState.written_count}`);
+          console.log(`First run refused:         ${firstState.error_count}`);
+          console.log(`Second run writes:         ${secondState.written_count}`);
+          console.log(`Second run idempotent skip:${secondState.idempotent_skip_count}`);
+          console.log(`Stable graph records:      ${secondGraph.knowledge_records.length}`);
+          console.log(`Stable audit records:      ${secondGraph.audit_log.length}`);
+          console.log(
+            "Eligibility enforcement, qualification/confidence/lineage preservation, reversibility, snapshot isolation and second-run idempotency safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
 
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
