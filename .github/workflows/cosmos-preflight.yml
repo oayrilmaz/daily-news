@@ -94,6 +94,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_graph_writer_test:
+        description: "Generate and commit controlled Cosmos Graph Writer v0.1 snapshot and report"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -159,6 +164,7 @@ jobs:
             "scripts/cosmos_evidence_executor.cjs"
             "scripts/cosmos_evidence_validator.cjs"
             "scripts/cosmos_knowledge_admission.cjs"
+            "scripts/cosmos_graph_writer.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -196,6 +202,7 @@ jobs:
           node --check scripts/cosmos_evidence_executor.cjs
           node --check scripts/cosmos_evidence_validator.cjs
           node --check scripts/cosmos_knowledge_admission.cjs
+          node --check scripts/cosmos_graph_writer.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -9039,6 +9046,267 @@ jobs:
           echo "Controlled Cosmos Knowledge Admission v0.1 output is now committed."
           echo "No public web/API search or direct knowledge-graph mutation was executed."
 
+      - name: Generate Real Cosmos Graph Writer v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_writer_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Writer v0.1 snapshot."
+          echo "This does NOT mutate the production Cosmos graph in place."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_qualified",
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const rejected = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_rejected",
+            evidence_validation_id: "evidence_validation_rejected_fixture",
+            evidence_task_id: "evidence_task_rejected_fixture",
+            validation_target_id: "validation_rejected_fixture",
+            admitted_claim_class: null,
+            validation_disposition: "insufficient_evidence",
+            decision: "reject_for_now",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            persistence_level: "none",
+            evidence_record_ids: [],
+            qualification: {
+              contradiction_present: false,
+              must_preserve_contradiction: false
+            },
+            graph_write_eligibility: false,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              validation_count: 2,
+              reviewed_count: 2,
+              graph_write_eligible_count: 1,
+              graph_write_count: 0,
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified, rejected],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 },
+              { ...rejected, graph_write_rank: 2 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-writer-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-writer-before-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          BEFORE_HASH="$(sha256sum /tmp/cosmos-graph-writer-before-v0.1.json | awk '{print $1}')"
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-graph-writer-admission-v0.1.json \
+            --graph /tmp/cosmos-graph-writer-before-v0.1.json \
+            --out knowledge/cosmos/graph-writer-test-v0.1.json \
+            --report knowledge/cosmos/graph-writer-report-v0.1.json
+
+          AFTER_HASH="$(sha256sum /tmp/cosmos-graph-writer-before-v0.1.json | awk '{print $1}')"
+
+          if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
+            echo "ERROR: Graph Writer mutated its input graph."
+            exit 1
+          fi
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-graph-writer-admission-v0.1.json \
+            --graph knowledge/cosmos/graph-writer-test-v0.1.json \
+            --out /tmp/cosmos-graph-writer-second-v0.1.json \
+            --report /tmp/cosmos-graph-writer-second-report-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graph = JSON.parse(
+            fs.readFileSync(
+              "knowledge/cosmos/graph-writer-test-v0.1.json",
+              "utf8"
+            )
+          );
+          const report = JSON.parse(
+            fs.readFileSync(
+              "knowledge/cosmos/graph-writer-report-v0.1.json",
+              "utf8"
+            )
+          );
+          const graph2 = JSON.parse(
+            fs.readFileSync(
+              "/tmp/cosmos-graph-writer-second-v0.1.json",
+              "utf8"
+            )
+          );
+          const report2 = JSON.parse(
+            fs.readFileSync(
+              "/tmp/cosmos-graph-writer-second-report-v0.1.json",
+              "utf8"
+            )
+          );
+
+          if (report.status !== "graph_write_resolved") {
+            throw new Error(`Graph Writer report status invalid: ${report.status}`);
+          }
+
+          if (report.graph_write_state?.written_count !== 1 ||
+              report.graph_write_state?.error_count !== 1) {
+            throw new Error(
+              "First Graph Writer run must write exactly 1 eligible record and refuse exactly 1 non-eligible record."
+            );
+          }
+
+          if (!Array.isArray(graph.knowledge_records) ||
+              graph.knowledge_records.length !== 1 ||
+              !Array.isArray(graph.audit_log) ||
+              graph.audit_log.length !== 1) {
+            throw new Error(
+              "Controlled graph snapshot must contain exactly 1 knowledge record and 1 audit record."
+            );
+          }
+
+          const record = graph.knowledge_records[0];
+
+          if (record.validation_disposition !== "partially_supported" ||
+              Number(record.confidence_score) !== 76 ||
+              record.qualification?.contradiction_present !== true ||
+              record.qualification?.must_preserve_contradiction !== true ||
+              !Array.isArray(record.evidence_record_ids) ||
+              record.evidence_record_ids.length !== 3 ||
+              record.reversibility?.reversible !== true) {
+            throw new Error(
+              "Graph Writer failed to preserve qualification, contradiction, confidence, evidence lineage or reversibility."
+            );
+          }
+
+          if (report2.graph_write_state?.written_count !== 0 ||
+              report2.graph_write_state?.idempotent_skip_count !== 1 ||
+              graph2.knowledge_records?.length !== 1 ||
+              graph2.audit_log?.length !== 1) {
+            throw new Error(
+              "Graph Writer idempotency test failed on second execution."
+            );
+          }
+
+          if (report.safeguards?.mutates_input_graph_in_place !== false ||
+              report.safeguards?.writes_only_explicit_output_snapshot !== true ||
+              report.safeguards?.requires_graph_write_eligibility !== true ||
+              report.safeguards?.preserves_qualification !== true ||
+              report.safeguards?.preserves_contradiction !== true ||
+              report.safeguards?.preserves_confidence !== true ||
+              report.safeguards?.preserves_evidence_lineage !== true ||
+              report.safeguards?.idempotent_by_knowledge_admission_id !== true ||
+              report.safeguards?.audit_log_required !== true ||
+              report.safeguards?.graph_records_reversible !== true ||
+              report.safeguards?.rejected_admissions_not_written !== true) {
+            throw new Error("Graph Writer safeguards invalid.");
+          }
+
+          console.log("");
+          console.log("Controlled Cosmos Graph Writer v0.1 output created.");
+          console.log(`Graph records:       ${graph.knowledge_records.length}`);
+          console.log(`Audit records:       ${graph.audit_log.length}`);
+          console.log(`First-run writes:    ${report.graph_write_state.written_count}`);
+          console.log(`Second-run writes:   ${report2.graph_write_state.written_count}`);
+          console.log(`Idempotent skips:    ${report2.graph_write_state.idempotent_skip_count}`);
+          console.log("Production graph mutation: NONE");
+          NODE
+
+      - name: Commit Real Cosmos Graph Writer v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_writer_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/graph-writer-test-v0.1.json \
+            knowledge/cosmos/graph-writer-report-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Writer controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Writer v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Writer v0.1 snapshot/report committed."
+          echo "Production Cosmos graph was not mutated."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -9188,6 +9456,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_knowledge_admission_test }}" = "true" ]; then
             echo "Controlled knowledge-admission-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_graph_writer_test }}" = "true" ]; then
+            echo "Controlled graph-writer-test-v0.1.json and graph-writer-report-v0.1.json were generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -9201,10 +9472,10 @@ jobs:
              [ "${{ inputs.write_cosmos_evidence_strategy_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_evidence_executor_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_evidence_validator_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
           fi
           echo "======================================================"
-
