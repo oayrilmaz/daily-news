@@ -9,6 +9,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -41,6 +42,11 @@ on:
         type: boolean
       write_cosmos_discovery_test:
         description: "Generate and commit controlled Cosmos Discovery v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_acquisition_test:
+        description: "Generate and commit controlled Cosmos Acquisition v0.1 test output"
         required: false
         default: false
         type: boolean
@@ -92,6 +98,7 @@ jobs:
             "scripts/cosmos_attention.cjs"
             "scripts/cosmos_consequence.cjs"
             "scripts/cosmos_discovery.cjs"
+            "scripts/cosmos_acquisition.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -121,6 +128,7 @@ jobs:
           node --check scripts/cosmos_attention.cjs
           node --check scripts/cosmos_consequence.cjs
           node --check scripts/cosmos_discovery.cjs
+          node --check scripts/cosmos_acquisition.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -2653,6 +2661,352 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Acquisition v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_core.cjs "$TEST_DIR/scripts/cosmos_core.cjs"
+          cp scripts/cosmos_attention.cjs "$TEST_DIR/scripts/cosmos_attention.cjs"
+          cp scripts/cosmos_consequence.cjs "$TEST_DIR/scripts/cosmos_consequence.cjs"
+          cp scripts/cosmos_discovery.cjs "$TEST_DIR/scripts/cosmos_discovery.cjs"
+          cp scripts/cosmos_acquisition.cjs "$TEST_DIR/scripts/cosmos_acquisition.cjs"
+          cp knowledge/cosmos/cosmos-state-current.json \
+            "$TEST_DIR/knowledge/cosmos/cosmos-state-current.json"
+
+          cat > "$TEST_DIR/core-input.json" <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "cosmos_acquisition_v0.1_preflight"
+            }
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_core.cjs \
+              --input core-input.json \
+              --out knowledge/cosmos/core-test-v0.1.json
+
+            node scripts/cosmos_attention.cjs \
+              --input knowledge/cosmos/core-test-v0.1.json \
+              --out knowledge/cosmos/attention-test-v0.2.json
+
+            node scripts/cosmos_consequence.cjs \
+              --input knowledge/cosmos/attention-test-v0.2.json \
+              --out knowledge/cosmos/consequence-test-v0.1.json
+
+            node scripts/cosmos_discovery.cjs \
+              --input knowledge/cosmos/consequence-test-v0.1.json \
+              --out knowledge/cosmos/discovery-test-v0.1.json
+
+            node scripts/cosmos_acquisition.cjs \
+              --input knowledge/cosmos/discovery-test-v0.1.json \
+              --out knowledge/cosmos/acquisition-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/acquisition-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Acquisition did not create knowledge/cosmos/acquisition-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Acquisition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "acquisition_plans_resolved") {
+            errors.push(
+              `Cosmos Acquisition failed to resolve plans: ${payload.status}`
+            );
+          }
+
+          if (payload.source_discovery?.schema_version !== "0.1") {
+            errors.push(
+              `Cosmos Acquisition must consume Discovery v0.1; got ${payload.source_discovery?.schema_version}`
+            );
+          }
+
+          const plans = payload.acquisition_plans || [];
+          const executorQueue = payload.future_executor_queue || [];
+
+          if (!Array.isArray(plans) || plans.length < 1) {
+            errors.push("Cosmos Acquisition produced no acquisition_plans[]");
+          }
+
+          if (!Array.isArray(executorQueue) || executorQueue.length < 1) {
+            errors.push("Cosmos Acquisition future_executor_queue[] missing or empty");
+          }
+
+          if (plans.length !== executorQueue.length) {
+            errors.push(
+              `Cosmos Acquisition plan/executor queue mismatch: ${plans.length} vs ${executorQueue.length}`
+            );
+          }
+
+          const planIds = new Set();
+
+          for (const plan of plans) {
+            if (!plan.acquisition_plan_id) {
+              errors.push("Acquisition plan missing acquisition_plan_id");
+              continue;
+            }
+
+            if (planIds.has(plan.acquisition_plan_id)) {
+              errors.push(
+                `Duplicate acquisition_plan_id ${plan.acquisition_plan_id}`
+              );
+            }
+            planIds.add(plan.acquisition_plan_id);
+
+            if (!plan.discovery_target_id) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} missing discovery_target_id`
+              );
+            }
+
+            if (!plan.target_type || !plan.statement) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} missing target_type/statement`
+              );
+            }
+
+            if (!plan.lineage || typeof plan.lineage !== "object") {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} missing lineage`
+              );
+            } else {
+              for (const key of [
+                "entity_ids",
+                "consequence_ids",
+                "relationship_ids",
+                "originating_gap_ids"
+              ]) {
+                if (!Array.isArray(plan.lineage[key])) {
+                  errors.push(
+                    `Acquisition plan ${plan.acquisition_plan_id} lineage.${key}[] missing`
+                  );
+                }
+              }
+            }
+
+            if (!Array.isArray(plan.query_templates) ||
+                plan.query_templates.length < 1) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} has no query_templates`
+              );
+            }
+
+            if (!Array.isArray(plan.source_strategy) ||
+                plan.source_strategy.length < 1) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} has no source_strategy`
+              );
+            } else {
+              let previousAuthority = Infinity;
+
+              for (const source of plan.source_strategy) {
+                if (!source.source_type ||
+                    !Number.isFinite(Number(source.authority_score))) {
+                  errors.push(
+                    `Acquisition plan ${plan.acquisition_plan_id} has invalid source strategy`
+                  );
+                  continue;
+                }
+
+                const score = Number(source.authority_score);
+
+                if (score > previousAuthority + 1e-9) {
+                  errors.push(
+                    `Acquisition plan ${plan.acquisition_plan_id} source strategy is not authority-ranked`
+                  );
+                }
+
+                previousAuthority = score;
+
+                if (source.acquisition_status !== "planned" ||
+                    source.execution_adapter !== "unassigned") {
+                  errors.push(
+                    `Acquisition plan ${plan.acquisition_plan_id} prematurely executes a source`
+                  );
+                }
+              }
+            }
+
+            const contract = plan.evidence_contract || {};
+
+            if (!contract.objective ||
+                !Array.isArray(contract.required_fields) ||
+                !Array.isArray(contract.validation_rules) ||
+                !Array.isArray(contract.accepted_dispositions)) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} evidence contract invalid`
+              );
+            }
+
+            if (contract.evidence_is_not_knowledge_until_validated !== true ||
+                contract.knowledge_admission_status !== "not_evaluated") {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} bypasses evidence validation`
+              );
+            }
+
+            if (!plan.frontier_effect ||
+                typeof plan.frontier_effect.reopens_frontier_if_resolved !== "boolean") {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} frontier effect invalid`
+              );
+            }
+
+            if (plan.frontier_effect?.reopens_frontier_if_resolved === true &&
+                plan.frontier_effect?.consequence_frontier_action !==
+                  "eligible_for_repropagation_after_validation") {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} may reopen frontier before validation`
+              );
+            }
+
+            if (plan.execution?.mode !== "planned_only" ||
+                plan.execution?.network_execution_performed !== false ||
+                plan.execution?.executor_status !== "not_connected" ||
+                Number(plan.execution?.result_count) !== 0) {
+              errors.push(
+                `Acquisition plan ${plan.acquisition_plan_id} execution boundary invalid`
+              );
+            }
+          }
+
+          for (let i = 0; i < executorQueue.length; i += 1) {
+            const row = executorQueue[i];
+
+            if (Number(row.execution_rank) !== i + 1) {
+              errors.push(
+                `Future executor queue rank invalid at index ${i}`
+              );
+            }
+
+            if (!planIds.has(row.acquisition_plan_id)) {
+              errors.push(
+                `Future executor queue references unknown plan ${row.acquisition_plan_id}`
+              );
+            }
+
+            if (row.execution_status !== "not_connected") {
+              errors.push(
+                `Future executor queue ${row.acquisition_plan_id} must remain not_connected`
+              );
+            }
+
+            if (!Array.isArray(row.query_templates) ||
+                !Array.isArray(row.source_strategy)) {
+              errors.push(
+                `Future executor queue ${row.acquisition_plan_id} missing planned query/source strategy`
+              );
+            }
+          }
+
+          const state = payload.acquisition_state || {};
+
+          if (Number(state.plan_count) !== plans.length) {
+            errors.push(
+              `Cosmos Acquisition state.plan_count mismatch: ${state.plan_count} vs ${plans.length}`
+            );
+          }
+
+          if (state.execution_mode !== "planned_only" ||
+              state.external_execution_connected !== false) {
+            errors.push(
+              "Cosmos Acquisition v0.1 must remain planning-only"
+            );
+          }
+
+          if (state.evidence_validation_required_before_graph_admission !== true) {
+            errors.push(
+              "Cosmos Acquisition must require validation before graph admission"
+            );
+          }
+
+          if (state.conceptual_distance_limit !== null) {
+            errors.push(
+              "Cosmos Acquisition conceptual distance must remain unlimited/null"
+            );
+          }
+
+          if (state.continuation_possible !== true) {
+            errors.push(
+              "Cosmos Acquisition must preserve Cosmos continuation"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.invents_evidence !== false ||
+              safeguards.invents_entities !== false ||
+              safeguards.upgrades_evidence_quality !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.converts_acquisition_plan_to_fact !== false ||
+              safeguards.evidence_requires_validation !== true ||
+              safeguards.source_lineage_preserved !== true ||
+              safeguards.discovery_lineage_preserved !== true ||
+              safeguards.frontier_reopens_only_after_validation !== true) {
+            errors.push("Cosmos Acquisition safeguards invalid");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Acquisition v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Acquisition v0.1 isolated test passed.");
+          console.log(`Status:             ${payload.status}`);
+          console.log(`Acquisition plans:  ${plans.length}`);
+          console.log(`Executor queue:      ${executorQueue.length}`);
+          console.log(
+            `Reopening plans:     ${plans.filter(x => x.frontier_effect?.reopens_frontier_if_resolved === true).length}`
+          );
+          console.log(
+            "Planning-only execution boundary, ranked source strategy, evidence contracts, lineage and validation-before-knowledge safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -3439,6 +3793,168 @@ jobs:
           echo "Controlled Cosmos Discovery v0.1 output is now committed."
           echo "No OpenAI generation or external search was executed."
 
+      - name: Generate Real Cosmos Acquisition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_acquisition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Acquisition v0.1 output."
+          echo "No OpenAI/API generation, external search, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-acquisition-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_acquisition_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-acquisition-core-input-v0.1.json \
+            --out /tmp/core-for-acquisition-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-acquisition-v0.1.json \
+            --out /tmp/attention-for-acquisition-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-acquisition-v0.2.json \
+            --out /tmp/consequence-for-acquisition-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-acquisition-v0.1.json \
+            --out /tmp/discovery-for-acquisition-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-acquisition-v0.1.json \
+            --out knowledge/cosmos/acquisition-test-v0.1.json
+
+          test -f knowledge/cosmos/acquisition-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/acquisition-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Acquisition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "acquisition_plans_resolved") {
+            throw new Error(
+              `Cosmos Acquisition failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_discovery?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Acquisition did not consume Discovery v0.1"
+            );
+          }
+
+          const plans = payload.acquisition_plans || [];
+          const executorQueue = payload.future_executor_queue || [];
+
+          if (!Array.isArray(plans) || plans.length < 1) {
+            throw new Error(
+              "Controlled Acquisition output produced no acquisition plans"
+            );
+          }
+
+          if (!Array.isArray(executorQueue) ||
+              executorQueue.length !== plans.length) {
+            throw new Error(
+              "Controlled Acquisition output executor queue invalid"
+            );
+          }
+
+          if (payload.acquisition_state?.execution_mode !== "planned_only" ||
+              payload.acquisition_state?.external_execution_connected !== false ||
+              payload.acquisition_state?.evidence_validation_required_before_graph_admission !== true ||
+              payload.acquisition_state?.conceptual_distance_limit !== null ||
+              payload.acquisition_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Acquisition state invariants invalid"
+            );
+          }
+
+          for (const plan of plans) {
+            if (!plan.discovery_target_id ||
+                !Array.isArray(plan.query_templates) ||
+                plan.query_templates.length < 1 ||
+                !Array.isArray(plan.source_strategy) ||
+                plan.source_strategy.length < 1 ||
+                plan.evidence_contract?.evidence_is_not_knowledge_until_validated !== true ||
+                plan.evidence_contract?.knowledge_admission_status !== "not_evaluated" ||
+                plan.execution?.mode !== "planned_only" ||
+                plan.execution?.network_execution_performed !== false ||
+                plan.execution?.executor_status !== "not_connected" ||
+                Number(plan.execution?.result_count) !== 0) {
+              throw new Error(
+                `Cosmos Acquisition plan invalid: ${plan.acquisition_plan_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.invents_entities !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.converts_acquisition_plan_to_fact !== false ||
+              payload.safeguards?.evidence_requires_validation !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.discovery_lineage_preserved !== true ||
+              payload.safeguards?.frontier_reopens_only_after_validation !== true) {
+            throw new Error(
+              "Cosmos Acquisition safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Acquisition v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Plans:             ${plans.length}`);
+          console.log(`Executor queue:    ${executorQueue.length}`);
+          console.log(
+            `Reopening plans:   ${plans.filter(x => x.frontier_effect?.reopens_frontier_if_resolved === true).length}`
+          );
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Acquisition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_acquisition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/acquisition-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Acquisition test changes to commit."
+          else
+            git commit -m "Add Cosmos Acquisition v0.1 controlled test output"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Acquisition v0.1 output is now committed."
+          echo "No OpenAI generation, external search, or knowledge-graph write was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -3539,12 +4055,16 @@ jobs:
           if [ "${{ inputs.write_cosmos_discovery_test }}" = "true" ]; then
             echo "Controlled discovery-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_acquisition_test }}" = "true" ]; then
+            echo "Controlled acquisition-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_attention_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_consequence_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_discovery_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_discovery_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_acquisition_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
