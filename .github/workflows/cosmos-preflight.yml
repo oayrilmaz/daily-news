@@ -7,6 +7,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -29,6 +30,11 @@ on:
         type: boolean
       write_cosmos_attention_test:
         description: "Generate and commit controlled Cosmos Attention v0.2 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_consequence_test:
+        description: "Generate and commit controlled Cosmos Consequence v0.1 test output"
         required: false
         default: false
         type: boolean
@@ -78,6 +84,7 @@ jobs:
             "scripts/cosmos_state_builder.cjs"
             "scripts/cosmos_core.cjs"
             "scripts/cosmos_attention.cjs"
+            "scripts/cosmos_consequence.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -105,6 +112,7 @@ jobs:
           node --check scripts/cosmos_state_builder.cjs
           node --check scripts/cosmos_core.cjs
           node --check scripts/cosmos_attention.cjs
+          node --check scripts/cosmos_consequence.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -2083,6 +2091,290 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Consequence v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_core.cjs "$TEST_DIR/scripts/cosmos_core.cjs"
+          cp scripts/cosmos_attention.cjs "$TEST_DIR/scripts/cosmos_attention.cjs"
+          cp scripts/cosmos_consequence.cjs "$TEST_DIR/scripts/cosmos_consequence.cjs"
+          cp knowledge/cosmos/cosmos-state-current.json \
+            "$TEST_DIR/knowledge/cosmos/cosmos-state-current.json"
+
+          cat > "$TEST_DIR/core-input.json" <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "cosmos_consequence_v0.1_preflight"
+            }
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_core.cjs \
+              --input core-input.json \
+              --out knowledge/cosmos/core-test-v0.1.json
+
+            node scripts/cosmos_attention.cjs \
+              --input knowledge/cosmos/core-test-v0.1.json \
+              --out knowledge/cosmos/attention-test-v0.2.json
+
+            node scripts/cosmos_consequence.cjs \
+              --input knowledge/cosmos/attention-test-v0.2.json \
+              --out knowledge/cosmos/consequence-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/consequence-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Consequence did not create consequence-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Consequence schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "consequence_frontier_resolved") {
+            errors.push(
+              `Cosmos Consequence failed to resolve frontier: ${payload.status}`
+            );
+          }
+
+          if (payload.source_attention?.schema_version !== "0.2") {
+            errors.push(
+              `Cosmos Consequence must consume Attention v0.2; got ${payload.source_attention?.schema_version}`
+            );
+          }
+
+          if (!payload.origin_event ||
+              Number(payload.origin_event.butterfly_distance) !== 0 ||
+              !Array.isArray(payload.origin_event.entity_ids) ||
+              payload.origin_event.entity_ids.length < 1) {
+            errors.push("Cosmos Consequence origin event invalid");
+          }
+
+          const field = payload.consequence_field || {};
+          const rows = field.consequences || [];
+
+          if (!Array.isArray(rows)) {
+            errors.push("consequence_field.consequences[] missing");
+          }
+
+          if (!Array.isArray(field.frontier_snapshots)) {
+            errors.push("consequence_field.frontier_snapshots[] missing");
+          }
+
+          if (!Array.isArray(field.remaining_frontier_entity_ids)) {
+            errors.push("remaining_frontier_entity_ids[] missing");
+          }
+
+          if (rows.length < 2) {
+            errors.push(
+              `Expected multiple controlled consequences; got ${rows.length}`
+            );
+          }
+
+          const distances = rows
+            .map(x => Number(x.butterfly_distance))
+            .filter(Number.isFinite);
+
+          if (!distances.includes(1)) {
+            errors.push("No butterfly-distance-1 direct consequence found");
+          }
+
+          if (!distances.some(x => x >= 2)) {
+            errors.push("No deeper butterfly ripple beyond distance 1 found");
+          }
+
+          for (const row of rows) {
+            if (!row.consequence_id ||
+                !row.from_entity_id ||
+                !row.to_entity_id ||
+                !row.relationship_id) {
+              errors.push("Consequence missing identity/relationship fields");
+            }
+
+            if (!Number.isInteger(Number(row.butterfly_distance)) ||
+                Number(row.butterfly_distance) < 1) {
+              errors.push(
+                `Invalid butterfly distance on ${row.consequence_id || "(unknown)"}`
+              );
+            }
+
+            if (!Array.isArray(row.lineage_relationship_ids) ||
+                row.lineage_relationship_ids.length < 1) {
+              errors.push(
+                `Missing relationship lineage on ${row.consequence_id || "(unknown)"}`
+              );
+            }
+
+            if (!Array.isArray(row.lineage_entity_ids) ||
+                row.lineage_entity_ids.length < 2) {
+              errors.push(
+                `Missing entity lineage on ${row.consequence_id || "(unknown)"}`
+              );
+            }
+
+            if (!Array.isArray(row.evidence_development_ids)) {
+              errors.push(
+                `Missing evidence lineage on ${row.consequence_id || "(unknown)"}`
+              );
+            }
+
+            if (row.propagation_direction === "reverse_context" &&
+                row.claim_class === "graph_supported_consequence") {
+              errors.push(
+                `Reverse traversal improperly treated as consequence on ${row.consequence_id || "(unknown)"}`
+              );
+            }
+
+            if (row.continuation_possible !== true) {
+              errors.push(
+                `Consequence ${row.consequence_id || "(unknown)"} is not continuable`
+              );
+            }
+          }
+
+          if (!Array.isArray(payload.affected_actors)) {
+            errors.push("affected_actors[] missing");
+          }
+
+          if (!payload.alternatives ||
+              !Array.isArray(payload.alternatives.items)) {
+            errors.push("alternatives.items[] missing");
+          }
+
+          for (const alt of payload.alternatives?.items || []) {
+            if (alt.qualification_status !== "requires_validation") {
+              errors.push(
+                `Alternative ${alt.alternative_id || "(unknown)"} improperly validated`
+              );
+            }
+          }
+
+          if (!payload.knowledge_gaps ||
+              !Array.isArray(payload.knowledge_gaps.items)) {
+            errors.push("knowledge_gaps.items[] missing");
+          }
+
+          const horizonKeys = [
+            "immediate_or_short",
+            "short_to_mid",
+            "mid",
+            "mid_to_long",
+            "long_to_far"
+          ];
+
+          for (const key of horizonKeys) {
+            if (!payload.horizon_map?.[key] ||
+                !Array.isArray(payload.horizon_map[key].consequence_ids)) {
+              errors.push(`horizon_map.${key} invalid`);
+            }
+          }
+
+          if (!payload.evidence_lineage ||
+              !Array.isArray(payload.evidence_lineage.development_ids) ||
+              !Array.isArray(payload.evidence_lineage.relationship_ids) ||
+              payload.evidence_lineage.source_lineage_preserved !== true) {
+            errors.push("Cosmos Consequence evidence lineage invalid");
+          }
+
+          const butterfly = payload.butterfly_state || {};
+
+          if (Number(butterfly.origin_distance) !== 0) {
+            errors.push("Butterfly origin distance must equal 0");
+          }
+
+          if (butterfly.runtime_distance_is_computational_budget_only !== true) {
+            errors.push("Runtime distance must be computational-budget-only");
+          }
+
+          if (butterfly.conceptual_distance_limit !== null) {
+            errors.push("Conceptual butterfly-distance limit must remain null");
+          }
+
+          if (butterfly.continuation_possible !== true ||
+              butterfly.frontier_is_terminal !== false ||
+              butterfly.consequence_can_become_new_origin !== true) {
+            errors.push("Butterfly continuation/new-origin invariants invalid");
+          }
+
+          if (butterfly.convergence_allowed !== true ||
+              butterfly.divergence_allowed !== true ||
+              butterfly.feedback_loops_allowed !== true) {
+            errors.push(
+              "Convergence/divergence/feedback-loop capability missing"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.creates_new_causal_claims !== false ||
+              safeguards.upgrades_evidence_quality !== false ||
+              safeguards.numeric_forecast_generated !== false ||
+              safeguards.unidentified_material_is_not_assumed !== true ||
+              safeguards.reverse_relationships_are_not_treated_as_forward_causality !== true ||
+              safeguards.alternatives_require_validation !== true ||
+              safeguards.runtime_budget_is_not_conceptual_limit !== true ||
+              safeguards.source_lineage_preserved !== true) {
+            errors.push("Cosmos Consequence safeguards invalid");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Consequence v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Consequence v0.1 isolated test passed.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Origin:            ${payload.origin_event.statement}`);
+          console.log(`Consequences:      ${rows.length}`);
+          console.log(`Max distance seen: ${distances.length ? Math.max(...distances) : 0}`);
+          console.log(`Affected actors:   ${(payload.affected_actors || []).length}`);
+          console.log(`Alternatives:      ${(payload.alternatives?.items || []).length}`);
+          console.log(`Knowledge gaps:    ${(payload.knowledge_gaps?.items || []).length}`);
+          console.log(
+            "Butterfly distance, lineage, continuation and non-terminal frontier safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -2589,6 +2881,140 @@ jobs:
           echo "Controlled Cosmos Attention v0.2 output is now committed."
           echo "No OpenAI generation was executed."
 
+      - name: Generate Real Cosmos Consequence v0.1 Test Output
+        if: ${{ inputs.write_cosmos_consequence_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Consequence v0.1 output."
+          echo "No OpenAI/API generation is executed by this step."
+
+          cat > /tmp/cosmos-consequence-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_consequence_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-consequence-core-input-v0.1.json \
+            --out /tmp/core-for-consequence-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-consequence-v0.1.json \
+            --out /tmp/attention-for-consequence-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-consequence-v0.2.json \
+            --out knowledge/cosmos/consequence-test-v0.1.json
+
+          test -f knowledge/cosmos/consequence-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/consequence-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Consequence schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "consequence_frontier_resolved") {
+            throw new Error(
+              `Cosmos Consequence failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_attention?.schema_version !== "0.2") {
+            throw new Error(
+              "Cosmos Consequence did not consume Attention v0.2"
+            );
+          }
+
+          const rows = payload.consequence_field?.consequences || [];
+          if (rows.length < 2) {
+            throw new Error(
+              "Controlled consequence output did not produce multiple consequences"
+            );
+          }
+
+          const distances = rows
+            .map(x => Number(x.butterfly_distance))
+            .filter(Number.isFinite);
+
+          if (!distances.includes(1) || !distances.some(x => x >= 2)) {
+            throw new Error(
+              "Controlled consequence output lacks direct and deeper ripple layers"
+            );
+          }
+
+          if (payload.butterfly_state?.conceptual_distance_limit !== null ||
+              payload.butterfly_state?.runtime_distance_is_computational_budget_only !== true ||
+              payload.butterfly_state?.continuation_possible !== true ||
+              payload.butterfly_state?.frontier_is_terminal !== false ||
+              payload.butterfly_state?.consequence_can_become_new_origin !== true) {
+            throw new Error(
+              "Cosmos Consequence butterfly-state invariants invalid"
+            );
+          }
+
+          if (payload.safeguards?.creates_new_causal_claims !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.numeric_forecast_generated !== false ||
+              payload.safeguards?.unidentified_material_is_not_assumed !== true ||
+              payload.safeguards?.reverse_relationships_are_not_treated_as_forward_causality !== true ||
+              payload.safeguards?.alternatives_require_validation !== true ||
+              payload.safeguards?.runtime_budget_is_not_conceptual_limit !== true ||
+              payload.safeguards?.source_lineage_preserved !== true) {
+            throw new Error(
+              "Cosmos Consequence safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Consequence v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Consequences:      ${rows.length}`);
+          console.log(`Max distance seen: ${Math.max(...distances)}`);
+          console.log(`Actors:            ${(payload.affected_actors || []).length}`);
+          console.log(`Alternatives:      ${(payload.alternatives?.items || []).length}`);
+          console.log(`Knowledge gaps:    ${(payload.knowledge_gaps?.items || []).length}`);
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Consequence v0.1 Test Output
+        if: ${{ inputs.write_cosmos_consequence_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/consequence-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Consequence test changes to commit."
+          else
+            git commit -m "Add Cosmos Consequence v0.1 controlled test output"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Consequence v0.1 output is now committed."
+          echo "No OpenAI generation was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -2682,6 +3108,9 @@ jobs:
           fi
           if [ "${{ inputs.write_cosmos_attention_test }}" = "true" ]; then
             echo "Controlled attention-test-v0.2.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_consequence_test }}" = "true" ]; then
+            echo "Controlled consequence-test-v0.1.json was generated and committed."
           fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
