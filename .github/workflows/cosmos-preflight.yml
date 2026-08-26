@@ -13,6 +13,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -60,6 +61,11 @@ on:
         type: boolean
       write_cosmos_decomposition_test:
         description: "Generate and commit controlled Cosmos Decomposition v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_candidate_validation_test:
+        description: "Generate and commit controlled Cosmos Candidate Validation Planner v0.1 test output"
         required: false
         default: false
         type: boolean
@@ -123,6 +129,7 @@ jobs:
             "scripts/cosmos_acquisition.cjs"
             "scripts/cosmos_acquisition_applicability.cjs"
             "scripts/cosmos_decomposition.cjs"
+            "scripts/cosmos_candidate_validation.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -155,6 +162,7 @@ jobs:
           node --check scripts/cosmos_acquisition.cjs
           node --check scripts/cosmos_acquisition_applicability.cjs
           node --check scripts/cosmos_decomposition.cjs
+          node --check scripts/cosmos_candidate_validation.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -3731,6 +3739,400 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Candidate Validation Planner v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_core.cjs "$TEST_DIR/scripts/cosmos_core.cjs"
+          cp scripts/cosmos_attention.cjs "$TEST_DIR/scripts/cosmos_attention.cjs"
+          cp scripts/cosmos_consequence.cjs "$TEST_DIR/scripts/cosmos_consequence.cjs"
+          cp scripts/cosmos_discovery.cjs "$TEST_DIR/scripts/cosmos_discovery.cjs"
+          cp scripts/cosmos_acquisition.cjs "$TEST_DIR/scripts/cosmos_acquisition.cjs"
+          cp scripts/cosmos_acquisition_applicability.cjs \
+            "$TEST_DIR/scripts/cosmos_acquisition_applicability.cjs"
+          cp scripts/cosmos_decomposition.cjs \
+            "$TEST_DIR/scripts/cosmos_decomposition.cjs"
+          cp scripts/cosmos_candidate_validation.cjs \
+            "$TEST_DIR/scripts/cosmos_candidate_validation.cjs"
+          cp knowledge/cosmos/cosmos-state-current.json \
+            "$TEST_DIR/knowledge/cosmos/cosmos-state-current.json"
+
+          cat > "$TEST_DIR/core-input.json" <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "cosmos_candidate_validation_v0.1_preflight"
+            }
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_core.cjs \
+              --input core-input.json \
+              --out knowledge/cosmos/core-test-v0.1.json
+
+            node scripts/cosmos_attention.cjs \
+              --input knowledge/cosmos/core-test-v0.1.json \
+              --out knowledge/cosmos/attention-test-v0.2.json
+
+            node scripts/cosmos_consequence.cjs \
+              --input knowledge/cosmos/attention-test-v0.2.json \
+              --out knowledge/cosmos/consequence-test-v0.1.json
+
+            node scripts/cosmos_discovery.cjs \
+              --input knowledge/cosmos/consequence-test-v0.1.json \
+              --out knowledge/cosmos/discovery-test-v0.1.json
+
+            node scripts/cosmos_acquisition.cjs \
+              --input knowledge/cosmos/discovery-test-v0.1.json \
+              --out knowledge/cosmos/acquisition-test-v0.1.json
+
+            node scripts/cosmos_acquisition_applicability.cjs \
+              --input knowledge/cosmos/acquisition-test-v0.1.json \
+              --out knowledge/cosmos/applicability-test-v0.1.json
+
+            node scripts/cosmos_decomposition.cjs \
+              --input knowledge/cosmos/applicability-test-v0.1.json \
+              --out knowledge/cosmos/decomposition-test-v0.1.json
+
+            node scripts/cosmos_candidate_validation.cjs \
+              --input knowledge/cosmos/decomposition-test-v0.1.json \
+              --out knowledge/cosmos/candidate-validation-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/candidate-validation-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Candidate Validation Planner did not create candidate-validation-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Candidate Validation schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "candidate_validation_targets_resolved") {
+            errors.push(
+              `Candidate Validation Planner failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_decomposition?.schema_version !== "0.1") {
+            errors.push(
+              `Candidate Validation Planner must consume Decomposition v0.1; got ${payload.source_decomposition?.schema_version}`
+            );
+          }
+
+          const state = payload.validation_state || {};
+          const targets = payload.validation_targets || [];
+          const queue = payload.future_evidence_queue || [];
+
+          if (!Array.isArray(targets) || targets.length < 1) {
+            errors.push("Candidate Validation Planner produced no validation_targets[]");
+          }
+
+          if (!Array.isArray(queue) || queue.length < 1) {
+            errors.push("Candidate Validation Planner future_evidence_queue[] missing or empty");
+          }
+
+          if (queue.length !== targets.length) {
+            errors.push(
+              `Candidate Validation target/evidence queue mismatch: ${targets.length} vs ${queue.length}`
+            );
+          }
+
+          if (Number(state.raw_candidate_count) !== 21) {
+            errors.push(
+              `Controlled Candidate Validation test expected 21 raw candidates; got ${state.raw_candidate_count}`
+            );
+          }
+
+          if (Number(state.unique_validation_target_count) !== 7) {
+            errors.push(
+              `Controlled Candidate Validation test expected 7 unique validation targets; got ${state.unique_validation_target_count}`
+            );
+          }
+
+          if (Number(state.duplicate_candidate_count) !== 14) {
+            errors.push(
+              `Controlled Candidate Validation test expected 14 duplicate candidates; got ${state.duplicate_candidate_count}`
+            );
+          }
+
+          if (Number(state.validated_target_count) !== 0 ||
+              Number(state.executable_target_count) !== 0) {
+            errors.push(
+              "Candidate Validation Planner v0.1 must not validate or execute targets"
+            );
+          }
+
+          if (state.external_execution_connected !== false) {
+            errors.push(
+              "Candidate Validation Planner v0.1 must not connect external execution"
+            );
+          }
+
+          if (state.conceptual_distance_limit !== null) {
+            errors.push(
+              "Candidate Validation conceptual distance must remain unlimited/null"
+            );
+          }
+
+          if (state.continuation_possible !== true) {
+            errors.push(
+              "Candidate Validation must preserve Cosmos continuation"
+            );
+          }
+
+          const targetIds = new Set();
+
+          for (const target of targets) {
+            if (!target.validation_target_id ||
+                !target.abstract_subject ||
+                !target.candidate_label ||
+                !target.candidate_class) {
+              errors.push(
+                "Candidate Validation target missing identity/context"
+              );
+              continue;
+            }
+
+            if (targetIds.has(target.validation_target_id)) {
+              errors.push(
+                `Duplicate validation_target_id ${target.validation_target_id}`
+              );
+            }
+            targetIds.add(target.validation_target_id);
+
+            if (target.epistemic_status !== "provisional_candidate" ||
+                target.validation_status !== "not_started" ||
+                target.executable !== false ||
+                target.knowledge_status !== "not_admitted") {
+              errors.push(
+                `Validation target ${target.validation_target_id} crossed epistemic/execution boundary`
+              );
+            }
+
+            if (!Array.isArray(target.source_candidate_ids) ||
+                target.source_candidate_ids.length < 1 ||
+                !Array.isArray(target.parent_acquisition_plan_ids) ||
+                target.parent_acquisition_plan_ids.length < 1 ||
+                !Array.isArray(target.parent_discovery_target_ids) ||
+                target.parent_discovery_target_ids.length < 1) {
+              errors.push(
+                `Validation target ${target.validation_target_id} missing merged lineage`
+              );
+            }
+
+            if (!Array.isArray(target.original_target_types) ||
+                target.original_target_types.length < 1 ||
+                !Array.isArray(target.proposed_investigation_types) ||
+                target.proposed_investigation_types.length < 1) {
+              errors.push(
+                `Validation target ${target.validation_target_id} missing investigation intents`
+              );
+            }
+
+            if (!target.validation_objective ||
+                !Array.isArray(target.validation_requirements) ||
+                target.validation_requirements.length < 1) {
+              errors.push(
+                `Validation target ${target.validation_target_id} missing validation contract`
+              );
+            }
+
+            const contract = target.evidence_contract || {};
+
+            if (Number(contract.minimum_independent_sources) < 1 ||
+                contract.preferred_source_characteristic !==
+                  "primary_or_authoritative_where_available" ||
+                contract.contradiction_capture_required !== true ||
+                contract.provenance_required !== true ||
+                contract.source_date_required !== true ||
+                contract.relationship_direction_required_where_applicable !== true ||
+                !Array.isArray(contract.disposition_options) ||
+                contract.disposition_options.length < 4) {
+              errors.push(
+                `Validation target ${target.validation_target_id} evidence contract invalid`
+              );
+            }
+
+            if (!target.post_validation_fanout ||
+                !Array.isArray(target.post_validation_fanout.if_supported) ||
+                !Array.isArray(target.post_validation_fanout.if_partially_supported) ||
+                !Array.isArray(target.post_validation_fanout.if_contradicted) ||
+                !Array.isArray(target.post_validation_fanout.if_insufficient_evidence)) {
+              errors.push(
+                `Validation target ${target.validation_target_id} post-validation fanout invalid`
+              );
+            }
+
+            if (!target.lineage ||
+                !Array.isArray(target.lineage.source_candidate_ids) ||
+                !Array.isArray(target.lineage.acquisition_plan_ids) ||
+                !Array.isArray(target.lineage.discovery_target_ids) ||
+                !Array.isArray(target.lineage.source_lineage)) {
+              errors.push(
+                `Validation target ${target.validation_target_id} lineage block invalid`
+              );
+            }
+          }
+
+          const expectedLabels = [
+            "AI compute infrastructure",
+            "semiconductors and accelerators",
+            "data centers",
+            "electricity demand",
+            "cooling systems",
+            "networking infrastructure",
+            "software/model infrastructure"
+          ];
+
+          const labels = new Set(
+            targets.map(x => String(x.candidate_label || ""))
+          );
+
+          for (const expected of expectedLabels) {
+            if (!labels.has(expected)) {
+              errors.push(
+                `Candidate Validation Planner missing expected unique target: ${expected}`
+              );
+            }
+          }
+
+          const dataCenters = targets.find(
+            x => String(x.candidate_label || "").toLowerCase() === "data centers"
+          );
+
+          if (!dataCenters) {
+            errors.push(
+              "Candidate Validation Planner did not resolve unique data centers target"
+            );
+          } else {
+            const types = new Set(dataCenters.original_target_types || []);
+
+            for (const expectedType of [
+              "identify_components",
+              "identify_materials",
+              "identify_capacity"
+            ]) {
+              if (!types.has(expectedType)) {
+                errors.push(
+                  `Data centers validation target lost parent intent ${expectedType}`
+                );
+              }
+            }
+
+            if (Number(dataCenters.merged_from_candidate_count) !== 3) {
+              errors.push(
+                `Data centers validation target should merge 3 candidates; got ${dataCenters.merged_from_candidate_count}`
+              );
+            }
+          }
+
+          for (let i = 0; i < queue.length; i += 1) {
+            const row = queue[i];
+
+            if (Number(row.evidence_rank) !== i + 1) {
+              errors.push(
+                `Future evidence queue rank invalid at index ${i}`
+              );
+            }
+
+            if (!targetIds.has(row.validation_target_id)) {
+              errors.push(
+                `Future evidence queue references unknown validation target ${row.validation_target_id}`
+              );
+            }
+
+            if (row.execution_status !== "not_connected" ||
+                row.validation_status !== "not_started") {
+              errors.push(
+                `Future evidence queue ${row.validation_target_id} crossed execution/validation boundary`
+              );
+            }
+
+            if (!row.validation_objective ||
+                !Array.isArray(row.validation_requirements) ||
+                !row.evidence_contract ||
+                !Array.isArray(row.proposed_investigation_types)) {
+              errors.push(
+                `Future evidence queue ${row.validation_target_id} missing evidence-ready planning fields`
+              );
+            }
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.validates_candidates !== false ||
+              safeguards.invents_evidence !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.promotes_candidates_to_facts !== false ||
+              safeguards.duplicate_semantic_candidates_consolidated !== true ||
+              safeguards.parent_lineage_preserved !== true ||
+              safeguards.investigation_intents_preserved !== true ||
+              safeguards.evidence_required_before_validation !== true ||
+              safeguards.validation_required_before_execution !== true ||
+              safeguards.unlimited_conceptual_continuation_preserved !== true) {
+            errors.push("Candidate Validation Planner safeguards invalid");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Candidate Validation Planner v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Candidate Validation Planner v0.1 isolated test passed.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Raw candidates:        ${state.raw_candidate_count}`);
+          console.log(`Unique targets:        ${state.unique_validation_target_count}`);
+          console.log(`Duplicates collapsed:  ${state.duplicate_candidate_count}`);
+          console.log(`Future evidence queue: ${queue.length}`);
+          console.log(`Validated:             ${state.validated_target_count}`);
+          console.log(`Executable:            ${state.executable_target_count}`);
+          console.log(
+            "Semantic consolidation, parent-lineage preservation, evidence contracts and no-validation/no-execution safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -5208,6 +5610,227 @@ jobs:
           echo "Controlled Cosmos Decomposition v0.1 output is now committed."
           echo "No OpenAI generation, external search, candidate validation, execution, or knowledge-graph write was executed."
 
+      - name: Generate Real Cosmos Candidate Validation Planner v0.1 Test Output
+        if: ${{ inputs.write_cosmos_candidate_validation_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Candidate Validation Planner v0.1 output."
+          echo "No OpenAI/API generation, external search, candidate validation, execution, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-candidate-validation-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_candidate_validation_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-candidate-validation-core-input-v0.1.json \
+            --out /tmp/core-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-candidate-validation-v0.1.json \
+            --out /tmp/attention-for-candidate-validation-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-candidate-validation-v0.2.json \
+            --out /tmp/consequence-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-candidate-validation-v0.1.json \
+            --out /tmp/discovery-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-candidate-validation-v0.1.json \
+            --out /tmp/acquisition-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-candidate-validation-v0.1.json \
+            --out /tmp/applicability-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-candidate-validation-v0.1.json \
+            --out /tmp/decomposition-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input /tmp/decomposition-for-candidate-validation-v0.1.json \
+            --out knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          test -f knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/candidate-validation-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Candidate Validation schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "candidate_validation_targets_resolved") {
+            throw new Error(
+              `Candidate Validation Planner failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_decomposition?.schema_version !== "0.1") {
+            throw new Error(
+              "Candidate Validation Planner did not consume Decomposition v0.1"
+            );
+          }
+
+          const state = payload.validation_state || {};
+          const targets = payload.validation_targets || [];
+          const queue = payload.future_evidence_queue || [];
+
+          if (Number(state.raw_candidate_count) !== 21 ||
+              Number(state.unique_validation_target_count) !== 7 ||
+              Number(state.duplicate_candidate_count) !== 14) {
+            throw new Error(
+              `Candidate Validation consolidation invariant failed: raw=${state.raw_candidate_count}, unique=${state.unique_validation_target_count}, duplicates=${state.duplicate_candidate_count}`
+            );
+          }
+
+          if (!Array.isArray(targets) || targets.length !== 7 ||
+              !Array.isArray(queue) || queue.length !== targets.length) {
+            throw new Error(
+              "Controlled Candidate Validation output target/evidence queue invalid"
+            );
+          }
+
+          if (Number(state.validated_target_count) !== 0 ||
+              Number(state.executable_target_count) !== 0 ||
+              state.external_execution_connected !== false ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Candidate Validation state invariants invalid"
+            );
+          }
+
+          const dataCenters = targets.find(
+            x => String(x.candidate_label || "").toLowerCase() === "data centers"
+          );
+
+          if (!dataCenters ||
+              Number(dataCenters.merged_from_candidate_count) !== 3) {
+            throw new Error(
+              "Candidate Validation did not correctly consolidate data centers candidate"
+            );
+          }
+
+          for (const expectedType of [
+            "identify_components",
+            "identify_materials",
+            "identify_capacity"
+          ]) {
+            if (!(dataCenters.original_target_types || []).includes(expectedType)) {
+              throw new Error(
+                `Candidate Validation data centers target lost ${expectedType}`
+              );
+            }
+          }
+
+          for (const target of targets) {
+            if (target.epistemic_status !== "provisional_candidate" ||
+                target.validation_status !== "not_started" ||
+                target.executable !== false ||
+                target.knowledge_status !== "not_admitted" ||
+                !target.validation_objective ||
+                !Array.isArray(target.validation_requirements) ||
+                !target.evidence_contract ||
+                !Array.isArray(target.post_validation_fanout?.if_supported)) {
+              throw new Error(
+                `Candidate Validation target invalid: ${target.validation_target_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.duplicate_semantic_candidates_consolidated !== true ||
+              payload.safeguards?.parent_lineage_preserved !== true ||
+              payload.safeguards?.investigation_intents_preserved !== true ||
+              payload.safeguards?.evidence_required_before_validation !== true ||
+              payload.safeguards?.validation_required_before_execution !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Candidate Validation Planner safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Candidate Validation Planner v0.1 output created.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Raw candidates:        ${state.raw_candidate_count}`);
+          console.log(`Unique targets:        ${state.unique_validation_target_count}`);
+          console.log(`Duplicates collapsed:  ${state.duplicate_candidate_count}`);
+          console.log(`Future evidence queue: ${queue.length}`);
+          console.log(`Output:                ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Candidate Validation Planner v0.1 Test Output
+        if: ${{ inputs.write_cosmos_candidate_validation_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Candidate Validation test changes to commit."
+          else
+            git commit -m "Add Cosmos Candidate Validation Planner v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Candidate Validation Planner v0.1 output is now committed."
+          echo "No OpenAI generation, external search, validation execution, or knowledge-graph write was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -5342,6 +5965,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_decomposition_test }}" = "true" ]; then
             echo "Controlled decomposition-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_candidate_validation_test }}" = "true" ]; then
+            echo "Controlled candidate-validation-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -5350,7 +5976,8 @@ jobs:
              [ "${{ inputs.write_cosmos_discovery_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_acquisition_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_applicability_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_decomposition_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_decomposition_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_candidate_validation_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
