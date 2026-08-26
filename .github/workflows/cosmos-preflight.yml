@@ -12,6 +12,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -80,6 +81,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Sync With Latest Branch Tip
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${GITHUB_REF_NAME}"
+          git checkout "${GITHUB_REF_NAME}"
+          git reset --hard "origin/${GITHUB_REF_NAME}"
+          echo "Workspace synchronized to origin/${GITHUB_REF_NAME}."
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -3918,7 +3928,32 @@ jobs:
             echo "No Cosmos State changes to commit."
           else
             git commit -m "Update Cosmos state ${DATE_UTC}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4025,7 +4060,32 @@ jobs:
             echo "No Cosmos Core test changes to commit."
           else
             git commit -m "Add Cosmos Core v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4220,7 +4280,32 @@ jobs:
             echo "No Cosmos Attention test changes to commit."
           else
             git commit -m "Add Cosmos Attention v0.2 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4354,7 +4439,32 @@ jobs:
             echo "No Cosmos Consequence test changes to commit."
           else
             git commit -m "Add Cosmos Consequence v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4500,7 +4610,32 @@ jobs:
             echo "No Cosmos Discovery test changes to commit."
           else
             git commit -m "Add Cosmos Discovery v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4662,7 +4797,32 @@ jobs:
             echo "No Cosmos Acquisition test changes to commit."
           else
             git commit -m "Add Cosmos Acquisition v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4831,7 +4991,32 @@ jobs:
             echo "No Cosmos Applicability test changes to commit."
           else
             git commit -m "Add Cosmos Acquisition Applicability v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -4991,7 +5176,32 @@ jobs:
             echo "No Cosmos Decomposition test changes to commit."
           else
             git commit -m "Add Cosmos Decomposition v0.1 controlled test output"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
@@ -5068,7 +5278,32 @@ jobs:
             echo "No Emergence changes to commit."
           else
             git commit -m "Update Cosmos emergence ${DATE_UTC}"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
           fi
 
           echo ""
