@@ -11,6 +11,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -53,6 +54,11 @@ on:
         type: boolean
       write_cosmos_applicability_test:
         description: "Generate and commit controlled Cosmos Acquisition Applicability v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_decomposition_test:
+        description: "Generate and commit controlled Cosmos Decomposition v0.1 test output"
         required: false
         default: false
         type: boolean
@@ -106,6 +112,7 @@ jobs:
             "scripts/cosmos_discovery.cjs"
             "scripts/cosmos_acquisition.cjs"
             "scripts/cosmos_acquisition_applicability.cjs"
+            "scripts/cosmos_decomposition.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -137,6 +144,7 @@ jobs:
           node --check scripts/cosmos_discovery.cjs
           node --check scripts/cosmos_acquisition.cjs
           node --check scripts/cosmos_acquisition_applicability.cjs
+          node --check scripts/cosmos_decomposition.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -3347,6 +3355,372 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Decomposition v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_core.cjs "$TEST_DIR/scripts/cosmos_core.cjs"
+          cp scripts/cosmos_attention.cjs "$TEST_DIR/scripts/cosmos_attention.cjs"
+          cp scripts/cosmos_consequence.cjs "$TEST_DIR/scripts/cosmos_consequence.cjs"
+          cp scripts/cosmos_discovery.cjs "$TEST_DIR/scripts/cosmos_discovery.cjs"
+          cp scripts/cosmos_acquisition.cjs "$TEST_DIR/scripts/cosmos_acquisition.cjs"
+          cp scripts/cosmos_acquisition_applicability.cjs \
+            "$TEST_DIR/scripts/cosmos_acquisition_applicability.cjs"
+          cp scripts/cosmos_decomposition.cjs \
+            "$TEST_DIR/scripts/cosmos_decomposition.cjs"
+          cp knowledge/cosmos/cosmos-state-current.json \
+            "$TEST_DIR/knowledge/cosmos/cosmos-state-current.json"
+
+          cat > "$TEST_DIR/core-input.json" <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "cosmos_decomposition_v0.1_preflight"
+            }
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_core.cjs \
+              --input core-input.json \
+              --out knowledge/cosmos/core-test-v0.1.json
+
+            node scripts/cosmos_attention.cjs \
+              --input knowledge/cosmos/core-test-v0.1.json \
+              --out knowledge/cosmos/attention-test-v0.2.json
+
+            node scripts/cosmos_consequence.cjs \
+              --input knowledge/cosmos/attention-test-v0.2.json \
+              --out knowledge/cosmos/consequence-test-v0.1.json
+
+            node scripts/cosmos_discovery.cjs \
+              --input knowledge/cosmos/consequence-test-v0.1.json \
+              --out knowledge/cosmos/discovery-test-v0.1.json
+
+            node scripts/cosmos_acquisition.cjs \
+              --input knowledge/cosmos/discovery-test-v0.1.json \
+              --out knowledge/cosmos/acquisition-test-v0.1.json
+
+            node scripts/cosmos_acquisition_applicability.cjs \
+              --input knowledge/cosmos/acquisition-test-v0.1.json \
+              --out knowledge/cosmos/applicability-test-v0.1.json
+
+            node scripts/cosmos_decomposition.cjs \
+              --input knowledge/cosmos/applicability-test-v0.1.json \
+              --out knowledge/cosmos/decomposition-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/decomposition-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Decomposition did not create decomposition-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Decomposition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "decomposition_candidates_resolved") {
+            errors.push(
+              `Cosmos Decomposition failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_applicability?.schema_version !== "0.1") {
+            errors.push(
+              `Cosmos Decomposition must consume Applicability v0.1; got ${payload.source_applicability?.schema_version}`
+            );
+          }
+
+          const state = payload.decomposition_state || {};
+          const decompositions = payload.decompositions || [];
+          const validationQueue = payload.candidate_validation_queue || [];
+
+          if (!Array.isArray(decompositions) || decompositions.length < 1) {
+            errors.push("Cosmos Decomposition decompositions[] missing or empty");
+          }
+
+          if (!Array.isArray(validationQueue) || validationQueue.length < 1) {
+            errors.push(
+              "Cosmos Decomposition candidate_validation_queue[] missing or empty"
+            );
+          }
+
+          if (Number(state.blocked_plan_count) !== decompositions.length) {
+            errors.push(
+              `Cosmos Decomposition blocked_plan_count mismatch: ${state.blocked_plan_count} vs ${decompositions.length}`
+            );
+          }
+
+          const allCandidates = decompositions.flatMap(
+            row => Array.isArray(row.candidates) ? row.candidates : []
+          );
+
+          if (Number(state.candidate_count) !== allCandidates.length) {
+            errors.push(
+              `Cosmos Decomposition candidate_count mismatch: ${state.candidate_count} vs ${allCandidates.length}`
+            );
+          }
+
+          if (Number(state.validated_candidate_count) !== 0) {
+            errors.push(
+              "Cosmos Decomposition v0.1 must not auto-validate candidates"
+            );
+          }
+
+          if (Number(state.executable_candidate_count) !== 0) {
+            errors.push(
+              "Cosmos Decomposition v0.1 must not make candidates executable"
+            );
+          }
+
+          if (state.external_execution_connected !== false) {
+            errors.push(
+              "Cosmos Decomposition v0.1 must not connect external execution"
+            );
+          }
+
+          if (state.conceptual_distance_limit !== null) {
+            errors.push(
+              "Cosmos Decomposition conceptual distance must remain unlimited/null"
+            );
+          }
+
+          if (state.continuation_possible !== true) {
+            errors.push(
+              "Cosmos Decomposition must preserve continuation"
+            );
+          }
+
+          for (const decomposition of decompositions) {
+            if (!decomposition.decomposition_id ||
+                !decomposition.acquisition_plan_id ||
+                !decomposition.discovery_target_id ||
+                !decomposition.abstract_subject ||
+                !decomposition.original_target_type) {
+              errors.push(
+                "Cosmos Decomposition item missing identity/lineage context"
+              );
+            }
+
+            if (![
+              "provisional_candidates_resolved",
+              "insufficient_decomposition_context"
+            ].includes(decomposition.status)) {
+              errors.push(
+                `Cosmos Decomposition invalid status ${decomposition.status}`
+              );
+            }
+
+            if (!Array.isArray(decomposition.candidates)) {
+              errors.push(
+                `Cosmos Decomposition ${decomposition.decomposition_id || "(unknown)"} candidates[] missing`
+              );
+              continue;
+            }
+
+            const contract = decomposition.resolution_contract || {};
+
+            if (contract.candidates_are_facts !== false ||
+                contract.candidates_are_executable !== false ||
+                contract.validation_required !== true ||
+                contract.external_evidence_required !== true ||
+                contract.parent_plan_remains_blocked !== true) {
+              errors.push(
+                `Cosmos Decomposition ${decomposition.decomposition_id || "(unknown)"} resolution contract invalid`
+              );
+            }
+
+            for (const candidate of decomposition.candidates) {
+              if (!candidate.decomposition_candidate_id ||
+                  !candidate.parent_acquisition_plan_id ||
+                  !candidate.parent_discovery_target_id ||
+                  !candidate.abstract_subject ||
+                  !candidate.candidate_label ||
+                  !candidate.candidate_class) {
+                errors.push(
+                  "Cosmos Decomposition candidate missing identity/context"
+                );
+              }
+
+              if (candidate.epistemic_status !== "provisional_candidate" ||
+                  candidate.validated !== false ||
+                  candidate.executable !== false) {
+                errors.push(
+                  `Candidate ${candidate.decomposition_candidate_id || "(unknown)"} improperly promoted`
+                );
+              }
+
+              if (!Array.isArray(candidate.proposed_investigation_types) ||
+                  candidate.proposed_investigation_types.length < 1) {
+                errors.push(
+                  `Candidate ${candidate.decomposition_candidate_id || "(unknown)"} lacks proposed investigation types`
+                );
+              }
+
+              if (!Array.isArray(candidate.validation_requirements) ||
+                  candidate.validation_requirements.length < 1) {
+                errors.push(
+                  `Candidate ${candidate.decomposition_candidate_id || "(unknown)"} lacks validation requirements`
+                );
+              }
+
+              if (!candidate.lineage ||
+                  !candidate.lineage.acquisition_plan_id ||
+                  !candidate.lineage.discovery_target_id) {
+                errors.push(
+                  `Candidate ${candidate.decomposition_candidate_id || "(unknown)"} missing lineage`
+                );
+              }
+            }
+          }
+
+          const candidateIds = new Set(
+            allCandidates.map(x => x.decomposition_candidate_id)
+          );
+
+          if (candidateIds.size !== allCandidates.length) {
+            errors.push("Cosmos Decomposition candidate IDs are not unique");
+          }
+
+          if (validationQueue.length !== allCandidates.length) {
+            errors.push(
+              `Cosmos Decomposition validation queue mismatch: ${validationQueue.length} vs ${allCandidates.length}`
+            );
+          }
+
+          for (let i = 0; i < validationQueue.length; i += 1) {
+            const row = validationQueue[i];
+
+            if (Number(row.validation_rank) !== i + 1) {
+              errors.push(
+                `Candidate validation queue rank invalid at index ${i}`
+              );
+            }
+
+            if (!candidateIds.has(row.decomposition_candidate_id)) {
+              errors.push(
+                `Candidate validation queue references unknown candidate ${row.decomposition_candidate_id}`
+              );
+            }
+
+            if (row.validation_status !== "not_started" ||
+                row.execution_status !== "blocked_pending_validation") {
+              errors.push(
+                `Candidate ${row.decomposition_candidate_id} crossed validation/execution boundary`
+              );
+            }
+
+            if (!Array.isArray(row.proposed_investigation_types) ||
+                !Array.isArray(row.validation_requirements)) {
+              errors.push(
+                `Candidate validation queue ${row.decomposition_candidate_id} missing investigation/validation fields`
+              );
+            }
+          }
+
+          const aiCandidates = allCandidates.filter(
+            row => /artificial intelligence/i.test(row.abstract_subject)
+          );
+
+          if (aiCandidates.length < 1) {
+            errors.push(
+              "Controlled Decomposition test produced no Artificial Intelligence candidates"
+            );
+          }
+
+          const expectedHints = [
+            "AI compute infrastructure",
+            "semiconductors and accelerators",
+            "data centers",
+            "electricity demand",
+            "cooling systems",
+            "networking infrastructure",
+            "software/model infrastructure"
+          ];
+
+          const aiLabels = new Set(
+            aiCandidates.map(x => String(x.candidate_label || ""))
+          );
+
+          for (const expected of expectedHints) {
+            if (!aiLabels.has(expected)) {
+              errors.push(
+                `Controlled Decomposition test missing expected AI candidate: ${expected}`
+              );
+            }
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.invents_evidence !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.promotes_candidates_to_facts !== false ||
+              safeguards.executes_candidates !== false ||
+              safeguards.validates_candidates !== false ||
+              safeguards.parent_acquisition_plans_remain_blocked !== true ||
+              safeguards.source_lineage_preserved !== true ||
+              safeguards.unlimited_conceptual_continuation_preserved !== true) {
+            errors.push("Cosmos Decomposition safeguards invalid");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Decomposition v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Decomposition v0.1 isolated test passed.");
+          console.log(`Status:              ${payload.status}`);
+          console.log(`Blocked plans:       ${state.blocked_plan_count}`);
+          console.log(`Decompositions:      ${decompositions.length}`);
+          console.log(`Candidates:          ${allCandidates.length}`);
+          console.log(`Validation queue:    ${validationQueue.length}`);
+          console.log(`Validated:           ${state.validated_candidate_count}`);
+          console.log(`Executable:          ${state.executable_candidate_count}`);
+          console.log(
+            "Provisional-candidate boundaries, lineage, validation queue and no-promotion safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -4464,6 +4838,166 @@ jobs:
           echo "Controlled Cosmos Acquisition Applicability v0.1 output is now committed."
           echo "No OpenAI generation, external search, evidence execution, or knowledge-graph write was executed."
 
+      - name: Generate Real Cosmos Decomposition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_decomposition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Decomposition v0.1 output."
+          echo "No OpenAI/API generation, external search, candidate validation, execution, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-decomposition-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_decomposition_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-decomposition-core-input-v0.1.json \
+            --out /tmp/core-for-decomposition-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-decomposition-v0.1.json \
+            --out /tmp/attention-for-decomposition-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-decomposition-v0.2.json \
+            --out /tmp/consequence-for-decomposition-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-decomposition-v0.1.json \
+            --out /tmp/discovery-for-decomposition-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-decomposition-v0.1.json \
+            --out /tmp/acquisition-for-decomposition-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-decomposition-v0.1.json \
+            --out /tmp/applicability-for-decomposition-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-decomposition-v0.1.json \
+            --out knowledge/cosmos/decomposition-test-v0.1.json
+
+          test -f knowledge/cosmos/decomposition-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/decomposition-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Decomposition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "decomposition_candidates_resolved") {
+            throw new Error(
+              `Cosmos Decomposition failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_applicability?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Decomposition did not consume Applicability v0.1"
+            );
+          }
+
+          const decompositions = payload.decompositions || [];
+          const candidates = decompositions.flatMap(
+            row => Array.isArray(row.candidates) ? row.candidates : []
+          );
+          const queue = payload.candidate_validation_queue || [];
+
+          if (!Array.isArray(decompositions) || decompositions.length < 1 ||
+              candidates.length < 1 ||
+              !Array.isArray(queue) ||
+              queue.length !== candidates.length) {
+            throw new Error(
+              "Controlled Decomposition output structure invalid"
+            );
+          }
+
+          if (payload.decomposition_state?.validated_candidate_count !== 0 ||
+              payload.decomposition_state?.executable_candidate_count !== 0 ||
+              payload.decomposition_state?.external_execution_connected !== false ||
+              payload.decomposition_state?.conceptual_distance_limit !== null ||
+              payload.decomposition_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Decomposition state invariants invalid"
+            );
+          }
+
+          for (const candidate of candidates) {
+            if (candidate.epistemic_status !== "provisional_candidate" ||
+                candidate.validated !== false ||
+                candidate.executable !== false ||
+                !Array.isArray(candidate.validation_requirements) ||
+                !Array.isArray(candidate.proposed_investigation_types)) {
+              throw new Error(
+                `Cosmos Decomposition candidate invalid: ${candidate.decomposition_candidate_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.executes_candidates !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.parent_acquisition_plans_remain_blocked !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Cosmos Decomposition safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Decomposition v0.1 output created.");
+          console.log(`Status:           ${payload.status}`);
+          console.log(`Decompositions:   ${decompositions.length}`);
+          console.log(`Candidates:       ${candidates.length}`);
+          console.log(`Validation queue: ${queue.length}`);
+          console.log(`Output:           ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Decomposition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_decomposition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/decomposition-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Decomposition test changes to commit."
+          else
+            git commit -m "Add Cosmos Decomposition v0.1 controlled test output"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Decomposition v0.1 output is now committed."
+          echo "No OpenAI generation, external search, candidate validation, execution, or knowledge-graph write was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -4570,6 +5104,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_applicability_test }}" = "true" ]; then
             echo "Controlled applicability-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_decomposition_test }}" = "true" ]; then
+            echo "Controlled decomposition-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -4577,7 +5114,8 @@ jobs:
              [ "${{ inputs.write_cosmos_consequence_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_discovery_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_acquisition_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_applicability_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_applicability_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_decomposition_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
