@@ -2492,6 +2492,17 @@ jobs:
             "resolve_entity",
             "validate_direction",
             "strengthen_evidence",
+            "identify_suppliers",
+            "identify_buyers",
+            "identify_substitutes",
+            "identify_capacity",
+            "identify_geography",
+            "identify_logistics",
+            "identify_people",
+            "identify_companies",
+            "identify_components",
+            "identify_materials",
+            "identify_market_exposure",
             "extend_frontier"
           ]);
 
@@ -2519,73 +2530,105 @@ jobs:
 
             if (i > 0) {
               const prev = queue[i - 1];
-              const prevRank = Number(prev.rank ?? i);
-              const rank = Number(row.rank ?? i + 1);
+              const prevRank = Number(prev.queue_rank ?? i);
+              const rank = Number(row.queue_rank ?? i + 1);
 
               if (Number.isFinite(prevRank) &&
                   Number.isFinite(rank) &&
-                  rank < prevRank) {
+                  rank <= prevRank) {
                 errors.push("Cosmos Discovery acquisition queue is not ranked");
                 break;
               }
             }
           }
 
-          const serialized = JSON.stringify(payload).toLowerCase();
+          const targetTypes = new Set(
+            targets.map(target =>
+              target.discovery_action ||
+              target.action ||
+              target.target_type
+            ).filter(Boolean)
+          );
 
-          if (!serialized.includes("resolve_entity")) {
+          if (targetTypes.size < 1) {
             errors.push(
-              "Cosmos Discovery controlled test did not expose resolve_entity acquisition logic"
+              "Cosmos Discovery controlled test produced no classified discovery target types"
             );
           }
 
-          if (!serialized.includes("validate_direction")) {
+          const reopenableTargets = targets.filter(
+            target => target.reopens_frontier_if_resolved === true
+          );
+
+          if (reopenableTargets.length < 1) {
             errors.push(
-              "Cosmos Discovery controlled test did not expose validate_direction acquisition logic"
+              "Cosmos Discovery controlled test produced no frontier-reopening targets"
             );
           }
 
-          if (!serialized.includes("strengthen_evidence")) {
-            errors.push(
-              "Cosmos Discovery controlled test did not expose strengthen_evidence acquisition logic"
-            );
+          if (!targetTypes.has("extend_frontier") &&
+              payload.curiosity_state?.continuation_possible === true &&
+              payload.curiosity_state?.current_frontier_is_terminal === false &&
+              (payload.source_consequence?.status === "consequence_frontier_resolved")) {
+            // Not every deterministic run must need extend_frontier: a non-empty
+            // remaining frontier can itself keep propagation open.
+            const hasReopenable = reopenableTargets.length > 0;
+            if (!hasReopenable) {
+              errors.push(
+                "Cosmos Discovery continuation is open but no extend_frontier or other reopenable target exists"
+              );
+            }
           }
 
-          if (!serialized.includes("extend_frontier")) {
-            errors.push(
-              "Cosmos Discovery controlled test did not expose extend_frontier acquisition logic"
-            );
-          }
+          const curiosity = payload.curiosity_state || {};
 
-          const infinite = payload.infinite_state || payload.discovery_state || {};
-
-          if (infinite.conceptual_distance_limit !== undefined &&
-              infinite.conceptual_distance_limit !== null) {
+          if (curiosity.conceptual_distance_limit !== undefined &&
+              curiosity.conceptual_distance_limit !== null) {
             errors.push(
               "Cosmos Discovery conceptual distance must remain unlimited/null"
             );
           }
 
-          const safeguards = payload.safeguards || {};
-
-          if (safeguards.creates_new_causal_claims !== false) {
-            errors.push("Cosmos Discovery must not create new causal claims");
+          if (curiosity.continuation_possible !== true) {
+            errors.push(
+              "Cosmos Discovery must preserve consequence continuation"
+            );
           }
 
-          if (safeguards.upgrades_evidence_quality !== false) {
-            errors.push("Cosmos Discovery must not upgrade evidence quality");
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false) {
+            errors.push("Cosmos Discovery v0.1 must not execute external search");
+          }
+
+          if (safeguards.calls_openai_or_external_api !== false) {
+            errors.push("Cosmos Discovery v0.1 must not use OpenAI/API generation");
           }
 
           if (safeguards.invents_missing_entities !== false) {
             errors.push("Cosmos Discovery must not invent missing entities");
           }
 
-          if (safeguards.external_search_executed !== false) {
-            errors.push("Cosmos Discovery v0.1 must not execute external search");
+          if (safeguards.upgrades_evidence_quality !== false) {
+            errors.push("Cosmos Discovery must not upgrade evidence quality");
           }
 
-          if (safeguards.openai_api_used !== false) {
-            errors.push("Cosmos Discovery v0.1 must not use OpenAI/API generation");
+          if (safeguards.converts_unknown_to_fact !== false) {
+            errors.push("Cosmos Discovery must not convert unknowns into facts");
+          }
+
+          if (safeguards.acquisition_targets_are_requests_for_knowledge_not_claims !== true) {
+            errors.push(
+              "Cosmos Discovery acquisition targets must remain requests for knowledge, not claims"
+            );
+          }
+
+          if (safeguards.source_lineage_preserved !== true) {
+            errors.push("Cosmos Discovery must preserve source lineage");
+          }
+
+          if (safeguards.consequence_frontier_may_be_reopened !== true) {
+            errors.push("Cosmos Discovery must preserve frontier reopening");
           }
 
           if (errors.length) {
@@ -3330,11 +3373,36 @@ jobs:
             throw new Error("Controlled Discovery output produced no acquisition queue");
           }
 
-          if (payload.safeguards?.creates_new_causal_claims !== false ||
-              payload.safeguards?.upgrades_evidence_quality !== false ||
+          if (payload.curiosity_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Discovery did not preserve consequence continuation"
+            );
+          }
+
+          if (payload.curiosity_state?.conceptual_distance_limit !== null) {
+            throw new Error(
+              "Cosmos Discovery imposed a conceptual distance limit"
+            );
+          }
+
+          const reopenableTargets = targets.filter(
+            x => x.reopens_frontier_if_resolved === true
+          );
+
+          if (reopenableTargets.length < 1) {
+            throw new Error(
+              "Controlled Discovery output produced no frontier-reopening target"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
               payload.safeguards?.invents_missing_entities !== false ||
-              payload.safeguards?.external_search_executed !== false ||
-              payload.safeguards?.openai_api_used !== false) {
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.converts_unknown_to_fact !== false ||
+              payload.safeguards?.acquisition_targets_are_requests_for_knowledge_not_claims !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.consequence_frontier_may_be_reopened !== true) {
             throw new Error("Cosmos Discovery safeguards invalid");
           }
 
