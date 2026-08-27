@@ -22,6 +22,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -117,6 +118,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_graph_evolution_test:
+        description: "Generate and commit controlled Cosmos Graph Evolution v0.1 planning output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -186,6 +192,7 @@ jobs:
             "scripts/cosmos_graph_integrity.cjs"
             "scripts/cosmos_graph_reversal.cjs"
             "scripts/cosmos_causal_narrative.cjs"
+            "scripts/cosmos_graph_evolution.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -227,6 +234,7 @@ jobs:
           node --check scripts/cosmos_graph_integrity.cjs
           node --check scripts/cosmos_graph_reversal.cjs
           node --check scripts/cosmos_causal_narrative.cjs
+          node --check scripts/cosmos_graph_evolution.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -7548,6 +7556,485 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Graph Evolution v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_evolution.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_evolution.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: "2026-08-26T12:00:00Z",
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [
+              {
+                graph_record_id: "graph_existing_same",
+                knowledge_admission_id: "knowledge_admission_existing_same",
+                validation_target_id: "validation_same",
+                claim_class: "validated_qualified_relationship",
+                validation_disposition: "partially_supported",
+                confidence_score: 70,
+                confidence_band: "high",
+                epistemic_status: "persistent_qualified_knowledge",
+                evidence_record_ids: [
+                  "evidence_old_1"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-20T12:00:00Z",
+                active: true
+              },
+              {
+                graph_record_id: "graph_existing_conflict",
+                knowledge_admission_id: "knowledge_admission_existing_conflict",
+                validation_target_id: "validation_conflict",
+                claim_class: "validated_relationship",
+                validation_disposition: "supported",
+                confidence_score: 82,
+                confidence_band: "high",
+                epistemic_status: "persistent_knowledge",
+                evidence_record_ids: [
+                  "evidence_conflict_old"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-21T12:00:00Z",
+                active: true
+              },
+              {
+                graph_record_id: "graph_existing_supersede",
+                knowledge_admission_id: "knowledge_admission_existing_supersede",
+                validation_target_id: "validation_supersede",
+                claim_class: "validated_relationship_v1",
+                validation_disposition: "supported",
+                confidence_score: 68,
+                confidence_band: "moderate",
+                epistemic_status: "persistent_knowledge",
+                evidence_record_ids: [
+                  "evidence_supersede_old"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-19T12:00:00Z",
+                active: true
+              }
+            ],
+            audit_log: [
+              {
+                audit_id: "audit_existing_same",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_same",
+                knowledge_admission_id: "knowledge_admission_existing_same"
+              },
+              {
+                audit_id: "audit_existing_conflict",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_conflict",
+                knowledge_admission_id: "knowledge_admission_existing_conflict"
+              },
+              {
+                audit_id: "audit_existing_supersede",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_supersede",
+                knowledge_admission_id: "knowledge_admission_existing_supersede"
+              }
+            ]
+          };
+
+          const admissions = [
+            {
+              knowledge_admission_id: "knowledge_admission_reinforce",
+              evidence_validation_id: "evidence_validation_reinforce",
+              validation_target_id: "validation_same",
+              admitted_claim_class: "validated_qualified_relationship",
+              validation_disposition: "partially_supported",
+              decision: "admit_with_qualification",
+              confidence_score: 82,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_old_1",
+                "evidence_new_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_qualify",
+              evidence_validation_id: "evidence_validation_qualify",
+              validation_target_id: "validation_same",
+              admitted_claim_class: "validated_qualified_relationship",
+              validation_disposition: "partially_supported",
+              decision: "admit_with_qualification",
+              confidence_score: 72,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_old_1",
+                "evidence_contradiction_new"
+              ],
+              qualification: {
+                contradiction_present: true
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_conflict",
+              evidence_validation_id: "evidence_validation_conflict",
+              validation_target_id: "validation_conflict",
+              admitted_claim_class: "validated_relationship",
+              validation_disposition: "contradicted",
+              decision: "admit_with_qualification",
+              confidence_score: 79,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_conflict_new"
+              ],
+              qualification: {
+                contradiction_present: true
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_supersede",
+              evidence_validation_id: "evidence_validation_supersede",
+              validation_target_id: "validation_supersede",
+              admitted_claim_class: "validated_relationship_v2",
+              validation_disposition: "supported",
+              decision: "admit",
+              confidence_score: 86,
+              confidence_band: "very_high",
+              persistence_level: "persistent_knowledge",
+              evidence_record_ids: [
+                "evidence_supersede_new_1",
+                "evidence_supersede_new_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_create",
+              evidence_validation_id: "evidence_validation_create",
+              validation_target_id: "validation_new",
+              admitted_claim_class: "validated_relationship",
+              validation_disposition: "supported",
+              decision: "admit",
+              confidence_score: 90,
+              confidence_band: "very_high",
+              persistence_level: "persistent_knowledge",
+              evidence_record_ids: [
+                "evidence_create_1",
+                "evidence_create_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            }
+          ];
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: "2026-08-27T12:00:00Z",
+            status: "knowledge_admission_resolved",
+            admissions,
+            graph_write_queue: admissions.map((row, index) => ({
+              ...row,
+              graph_write_rank: index + 1
+            }))
+          };
+
+          fs.writeFileSync(
+            path.join(root, "graph-fixture-v0.1.json"),
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "admission-fixture-v0.1.json"),
+            JSON.stringify(admission, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_evolution.cjs \
+              --graph graph-fixture-v0.1.json \
+              --admission admission-fixture-v0.1.json \
+              --out knowledge/cosmos/graph-evolution-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/graph-evolution-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Graph Evolution did not create graph-evolution-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Graph Evolution schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "graph_evolution_planned") {
+            errors.push(
+              `Cosmos Graph Evolution failed: ${payload.status}`
+            );
+          }
+
+          const state = payload.evolution_state || {};
+          const plans = payload.evolution_plans || [];
+          const executionQueue = payload.evolution_execution_queue || [];
+          const conflictQueue = payload.conflict_review_queue || [];
+
+          if (!Array.isArray(plans) || plans.length !== 5) {
+            errors.push(
+              `Controlled Graph Evolution expected 5 plans; got ${plans.length}`
+            );
+          }
+
+          if (Number(state.planned_count) !== plans.length) {
+            errors.push(
+              "Cosmos Graph Evolution planned_count mismatch"
+            );
+          }
+
+          if (Number(state.graph_mutation_count) !== 0) {
+            errors.push(
+              "Cosmos Graph Evolution planning layer must not mutate graph"
+            );
+          }
+
+          const actionByAdmission = new Map(
+            plans.map(row => [
+              row.knowledge_admission_id,
+              row.evolution_action
+            ])
+          );
+
+          const expected = new Map([
+            ["knowledge_admission_reinforce", "reinforce_existing"],
+            ["knowledge_admission_qualify", "qualify_existing"],
+            ["knowledge_admission_conflict", "conflict_review_required"],
+            ["knowledge_admission_supersede", "supersede_existing"],
+            ["knowledge_admission_create", "create_new"]
+          ]);
+
+          for (const [admissionId, action] of expected) {
+            if (actionByAdmission.get(admissionId) !== action) {
+              errors.push(
+                `Graph Evolution action mismatch for ${admissionId}: expected ${action}, got ${actionByAdmission.get(admissionId)}`
+              );
+            }
+          }
+
+          const reinforce = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_reinforce"
+          );
+
+          if (!reinforce ||
+              reinforce.current_active_records?.length !== 1 ||
+              Number(reinforce.incoming?.confidence_score) !== 82 ||
+              reinforce.execution_contract?.graph_mutation_performed !== false ||
+              reinforce.execution_contract?.preserve_prior_record_history !== true ||
+              reinforce.execution_contract?.preserve_prior_audit_history !== true) {
+            errors.push(
+              "Reinforce-existing plan contract invalid"
+            );
+          }
+
+          const qualify = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_qualify"
+          );
+
+          if (!qualify ||
+              qualify.incoming?.contradiction_present !== true ||
+              qualify.evolution_action !== "qualify_existing") {
+            errors.push(
+              "Qualify-existing contradiction handling invalid"
+            );
+          }
+
+          const conflict = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_conflict"
+          );
+
+          if (!conflict ||
+              conflict.evolution_action !==
+                "conflict_review_required" ||
+              conflict.execution_contract?.conflict_must_not_be_auto_resolved !== true ||
+              conflict.execution_contract?.requires_separate_evolution_executor !== true) {
+            errors.push(
+              "Conflict-review boundary invalid"
+            );
+          }
+
+          const supersede = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_supersede"
+          );
+
+          if (!supersede ||
+              supersede.evolution_action !== "supersede_existing" ||
+              supersede.execution_contract?.deactivate_prior_record_before_supersession !== true ||
+              supersede.execution_contract?.preserve_prior_record_history !== true ||
+              supersede.execution_contract?.preserve_prior_audit_history !== true ||
+              supersede.execution_contract?.reversible !== true) {
+            errors.push(
+              "Supersede-existing plan contract invalid"
+            );
+          }
+
+          const create = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_create"
+          );
+
+          if (!create ||
+              create.evolution_action !== "create_new" ||
+              create.current_active_records?.length !== 0) {
+            errors.push(
+              "Create-new plan contract invalid"
+            );
+          }
+
+          if (!Array.isArray(executionQueue) ||
+              executionQueue.length !== 4) {
+            errors.push(
+              `Controlled Graph Evolution expected 4 executable actions; got ${executionQueue.length}`
+            );
+          }
+
+          if (!Array.isArray(conflictQueue) ||
+              conflictQueue.length !== 1 ||
+              conflictQueue[0]?.knowledge_admission_id !==
+                "knowledge_admission_conflict") {
+            errors.push(
+              "Graph Evolution conflict review queue invalid"
+            );
+          }
+
+          for (let i = 0; i < executionQueue.length; i += 1) {
+            const row = executionQueue[i];
+
+            if (Number(row.evolution_rank) !== i + 1) {
+              errors.push(
+                `Graph Evolution execution queue rank invalid at index ${i}`
+              );
+            }
+
+            if (row.execution_status !== "not_started") {
+              errors.push(
+                `Graph Evolution execution queue ${row.graph_evolution_id || "(unknown)"} crossed execution boundary`
+              );
+            }
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_historical_knowledge !== false ||
+              safeguards.preserves_existing_records !== true ||
+              safeguards.preserves_audit_history !== true ||
+              safeguards.conflicting_polarity_requires_review !== true ||
+              safeguards.materially_equivalent_knowledge_not_duplicated !== true ||
+              safeguards.supersession_requires_explicit_execution !== true ||
+              safeguards.reversibility_required !== true) {
+            errors.push(
+              "Cosmos Graph Evolution safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Graph Evolution v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Evolution v0.1 isolated test passed.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Plans:             ${plans.length}`);
+          console.log(
+            `Create new:        ${state.by_action?.create_new || 0}`
+          );
+          console.log(
+            `Reinforce:         ${state.by_action?.reinforce_existing || 0}`
+          );
+          console.log(
+            `Qualify:           ${state.by_action?.qualify_existing || 0}`
+          );
+          console.log(
+            `Supersede:         ${state.by_action?.supersede_existing || 0}`
+          );
+          console.log(
+            `Conflict review:   ${state.by_action?.conflict_review_required || 0}`
+          );
+          console.log(`Execution queue:   ${executionQueue.length}`);
+          console.log(`Conflict queue:    ${conflictQueue.length}`);
+          console.log("Graph mutations:     0");
+          console.log(
+            "History preservation, explicit supersession, contradiction review and no-mutation safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -11289,6 +11776,217 @@ jobs:
           echo "Controlled Cosmos Causal Narrative v0.1 output committed."
           echo "No external search, OpenAI/API generation, or production graph mutation was executed."
 
+      - name: Generate Real Cosmos Graph Evolution v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_evolution_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Evolution v0.1 planning output."
+          echo "No external search, OpenAI/API generation, graph mutation or historical deletion is executed."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: "2026-08-26T12:00:00Z",
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [
+              {
+                graph_record_id: "graph_existing_repository_fixture",
+                knowledge_admission_id:
+                  "knowledge_admission_existing_repository_fixture",
+                validation_target_id:
+                  "validation_repository_fixture",
+                claim_class:
+                  "validated_qualified_relationship",
+                validation_disposition:
+                  "partially_supported",
+                confidence_score: 70,
+                confidence_band: "high",
+                epistemic_status:
+                  "persistent_qualified_knowledge",
+                evidence_record_ids: [
+                  "evidence_repository_old_1"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-20T12:00:00Z",
+                active: true
+              }
+            ],
+            audit_log: [
+              {
+                audit_id: "audit_repository_existing",
+                operation: "create_graph_record",
+                graph_record_id:
+                  "graph_existing_repository_fixture",
+                knowledge_admission_id:
+                  "knowledge_admission_existing_repository_fixture"
+              }
+            ]
+          };
+
+          const incoming = {
+            knowledge_admission_id:
+              "knowledge_admission_repository_reinforce",
+            evidence_validation_id:
+              "evidence_validation_repository_reinforce",
+            validation_target_id:
+              "validation_repository_fixture",
+            admitted_claim_class:
+              "validated_qualified_relationship",
+            validation_disposition:
+              "partially_supported",
+            decision:
+              "admit_with_qualification",
+            confidence_score: 84,
+            confidence_band: "high",
+            persistence_level:
+              "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_repository_old_1",
+              "evidence_repository_new_2"
+            ],
+            qualification: {
+              contradiction_present: false
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: "2026-08-27T12:00:00Z",
+            status: "knowledge_admission_resolved",
+            admissions: [incoming],
+            graph_write_queue: [
+              {
+                ...incoming,
+                graph_write_rank: 1
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-evolution-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-evolution-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_evolution.cjs \
+            --graph /tmp/cosmos-graph-evolution-graph-v0.1.json \
+            --admission /tmp/cosmos-graph-evolution-admission-v0.1.json \
+            --out knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          test -f knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/graph-evolution-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "graph_evolution_planned") {
+            throw new Error(
+              `Controlled Graph Evolution output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const plans = payload.evolution_plans || [];
+
+          if (plans.length !== 1 ||
+              plans[0]?.evolution_action !==
+                "reinforce_existing") {
+            throw new Error(
+              "Controlled Graph Evolution expected one reinforce_existing plan"
+            );
+          }
+
+          if (Number(payload.evolution_state?.graph_mutation_count) !== 0 ||
+              payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.deletes_historical_knowledge !== false ||
+              payload.safeguards?.preserves_existing_records !== true ||
+              payload.safeguards?.preserves_audit_history !== true ||
+              payload.safeguards?.conflicting_polarity_requires_review !== true ||
+              payload.safeguards?.supersession_requires_explicit_execution !== true ||
+              payload.safeguards?.reversibility_required !== true) {
+            throw new Error(
+              "Controlled Graph Evolution safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos Graph Evolution v0.1 planning output created."
+          );
+          console.log(`Status: ${payload.status}`);
+          console.log(
+            `Action: ${plans[0].evolution_action}`
+          );
+          console.log(
+            `Graph mutations: ${payload.evolution_state.graph_mutation_count}`
+          );
+          console.log(`Output: ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Evolution v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_evolution_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Evolution controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Evolution v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Evolution v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -11450,6 +12148,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_causal_narrative_test }}" = "true" ]; then
             echo "Controlled causal-narrative-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_graph_evolution_test }}" = "true" ]; then
+            echo "Controlled graph-evolution-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -11467,7 +12168,8 @@ jobs:
              [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_evolution_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
