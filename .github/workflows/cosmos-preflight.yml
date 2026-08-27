@@ -19,6 +19,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -99,6 +100,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_graph_integrity_test:
+        description: "Generate and commit controlled Cosmos Graph Integrity v0.1 report"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -165,6 +171,7 @@ jobs:
             "scripts/cosmos_evidence_validator.cjs"
             "scripts/cosmos_knowledge_admission.cjs"
             "scripts/cosmos_graph_writer.cjs"
+            "scripts/cosmos_graph_integrity.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -203,6 +210,7 @@ jobs:
           node --check scripts/cosmos_evidence_validator.cjs
           node --check scripts/cosmos_knowledge_admission.cjs
           node --check scripts/cosmos_graph_writer.cjs
+          node --check scripts/cosmos_graph_integrity.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -6286,6 +6294,269 @@ jobs:
           NODE
 
 
+      - name: Test Cosmos Graph Integrity v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+          cp scripts/cosmos_graph_integrity.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_integrity.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_integrity_fixture_qualified",
+            evidence_validation_id: "evidence_validation_integrity_fixture",
+            evidence_task_id: "evidence_task_integrity_fixture",
+            validation_target_id: "validation_integrity_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_integrity_1",
+              "evidence_integrity_2",
+              "evidence_integrity_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-fixture.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "empty-graph-fixture.json"),
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-fixture.json \
+              --graph empty-graph-fixture.json \
+              --out knowledge/cosmos/valid-graph-v0.1.json \
+              --report knowledge/cosmos/graph-writer-report-v0.1.json
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/valid-graph-v0.1.json \
+              --out knowledge/cosmos/graph-integrity-valid-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const graph = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/valid-graph-v0.1.json"),
+              "utf8"
+            )
+          );
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/graph-integrity-valid-v0.1.json"),
+              "utf8"
+            )
+          );
+
+          const errors = [];
+
+          if (report.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Graph Integrity schema_version: ${report.schema_version}`
+            );
+          }
+
+          if (report.status !== "graph_integrity_passed") {
+            errors.push(
+              `Valid controlled graph should pass integrity; got ${report.status}`
+            );
+          }
+
+          if (Number(report.integrity_state?.error_count) !== 0) {
+            errors.push(
+              `Valid graph integrity expected 0 errors; got ${report.integrity_state?.error_count}`
+            );
+          }
+
+          if (report.integrity_state?.production_write_safe !== true) {
+            errors.push(
+              "Valid graph should be production_write_safe=true"
+            );
+          }
+
+          if (Number(report.graph_state?.knowledge_record_count) !== 1 ||
+              Number(report.graph_state?.active_record_count) !== 1 ||
+              Number(report.graph_state?.audit_record_count) !== 1 ||
+              Number(report.graph_state?.unique_admission_count) !== 1 ||
+              Number(report.graph_state?.unique_validation_target_count) !== 1) {
+            errors.push(
+              "Valid graph state counts are incorrect"
+            );
+          }
+
+          if (!Array.isArray(graph.knowledge_records) ||
+              graph.knowledge_records.length !== 1 ||
+              graph.knowledge_records[0].qualification?.must_preserve_contradiction !== true) {
+            errors.push(
+              "Graph Writer fixture did not preserve qualified contradiction"
+            );
+          }
+
+          const safeguards = report.safeguards || {};
+
+          if (safeguards.read_only !== true ||
+              safeguards.mutates_graph !== false ||
+              safeguards.auto_repairs_graph !== false ||
+              safeguards.checks_duplicate_materialization !== true ||
+              safeguards.checks_broken_lineage !== true ||
+              safeguards.checks_qualification_loss !== true ||
+              safeguards.checks_confidence_integrity !== true ||
+              safeguards.checks_audit_integrity !== true ||
+              safeguards.checks_reversibility !== true ||
+              safeguards.checks_active_conflicts !== true ||
+              safeguards.checks_temporal_ordering !== true) {
+            errors.push(
+              "Graph Integrity safeguards invalid on valid graph"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Integrity valid-graph errors:");
+            for (const error of errors) console.error(`- ${error}`);
+            process.exit(1);
+          }
+
+          // Create an intentionally corrupted copy.
+          const corrupted = JSON.parse(JSON.stringify(graph));
+          corrupted.knowledge_records[0].qualification.must_preserve_contradiction = false;
+
+          fs.writeFileSync(
+            path.join(root, "knowledge/cosmos/corrupted-graph-v0.1.json"),
+            JSON.stringify(corrupted, null, 2)
+          );
+
+          console.log("");
+          console.log("Valid graph integrity test passed.");
+          console.log("Creating intentional qualification-loss corruption for negative test.");
+          NODE
+
+          set +e
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/corrupted-graph-v0.1.json \
+              --out knowledge/cosmos/graph-integrity-corrupt-v0.1.json
+          )
+          CORRUPT_EXIT=$?
+          set -e
+
+          if [ "$CORRUPT_EXIT" -eq 0 ]; then
+            echo "ERROR: Corrupted graph unexpectedly passed Graph Integrity."
+            exit 1
+          fi
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/graph-integrity-corrupt-v0.1.json"),
+              "utf8"
+            )
+          );
+
+          const codes = new Set((report.issues || []).map(x => x.code));
+
+          if (report.status !== "graph_integrity_failed") {
+            throw new Error(
+              `Corrupted graph must fail integrity; got ${report.status}`
+            );
+          }
+
+          if (Number(report.integrity_state?.error_count) < 1) {
+            throw new Error(
+              "Corrupted graph integrity report must contain at least one error"
+            );
+          }
+
+          if (report.integrity_state?.production_write_safe !== false) {
+            throw new Error(
+              "Corrupted graph must have production_write_safe=false"
+            );
+          }
+
+          if (!codes.has("QUALIFICATION_LOSS")) {
+            throw new Error(
+              `Expected QUALIFICATION_LOSS; got ${[...codes].join(", ")}`
+            );
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Integrity v0.1 isolated test passed.");
+          console.log("Valid graph:             PASS");
+          console.log(`Valid errors:            0`);
+          console.log("Intentional corruption:  REJECTED");
+          console.log(`Corrupt errors:          ${report.integrity_state.error_count}`);
+          console.log("Detected:                QUALIFICATION_LOSS");
+          console.log("Production graph writes: NONE");
+          console.log(
+            "Positive integrity and intentional-failure detection safeguards passed."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -9307,6 +9578,172 @@ jobs:
           echo "Controlled Cosmos Graph Writer v0.1 snapshot/report committed."
           echo "Production Cosmos graph was not mutated."
 
+      - name: Generate Real Cosmos Graph Integrity v0.1 Controlled Report
+        if: ${{ inputs.write_cosmos_graph_integrity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Integrity v0.1 report."
+          echo "This validates an isolated snapshot and does not mutate the production graph."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_integrity_repository_fixture",
+            evidence_validation_id: "evidence_validation_integrity_repository_fixture",
+            evidence_task_id: "evidence_task_integrity_repository_fixture",
+            validation_target_id: "validation_integrity_repository_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_integrity_repository_1",
+              "evidence_integrity_repository_2",
+              "evidence_integrity_repository_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-integrity-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            "/tmp/cosmos-integrity-empty-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-integrity-admission-v0.1.json \
+            --graph /tmp/cosmos-integrity-empty-graph-v0.1.json \
+            --out /tmp/cosmos-integrity-valid-graph-v0.1.json \
+            --report /tmp/cosmos-integrity-writer-report-v0.1.json
+
+          node scripts/cosmos_graph_integrity.cjs \
+            --graph /tmp/cosmos-integrity-valid-graph-v0.1.json \
+            --out knowledge/cosmos/graph-integrity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/graph-integrity-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "graph_integrity_passed") {
+            throw new Error(
+              `Controlled Graph Integrity output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          if (Number(payload.integrity_state?.error_count) !== 0 ||
+              payload.integrity_state?.production_write_safe !== true) {
+            throw new Error(
+              "Controlled Graph Integrity report must have zero errors and production_write_safe=true"
+            );
+          }
+
+          if (Number(payload.graph_state?.knowledge_record_count) !== 1 ||
+              Number(payload.graph_state?.active_record_count) !== 1 ||
+              Number(payload.graph_state?.audit_record_count) !== 1) {
+            throw new Error(
+              "Controlled Graph Integrity graph-state counts invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Graph Integrity v0.1 report created.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Errors:                ${payload.integrity_state.error_count}`);
+          console.log(`Warnings:              ${payload.integrity_state.warning_count}`);
+          console.log(`Production write safe: ${payload.integrity_state.production_write_safe}`);
+          console.log(`Output:                ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Integrity v0.1 Controlled Report
+        if: ${{ inputs.write_cosmos_graph_integrity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/graph-integrity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Integrity controlled-report changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Integrity v0.1 controlled report"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Integrity v0.1 report committed."
+          echo "Production Cosmos graph was not mutated."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -9459,6 +9896,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_graph_writer_test }}" = "true" ]; then
             echo "Controlled graph-writer-test-v0.1.json and graph-writer-report-v0.1.json were generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_graph_integrity_test }}" = "true" ]; then
+            echo "Controlled graph-integrity-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -9473,7 +9913,8 @@ jobs:
              [ "${{ inputs.write_cosmos_evidence_executor_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_evidence_validator_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
