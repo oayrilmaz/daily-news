@@ -1,4 +1,5 @@
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -104,6 +105,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_first_party_identity_test:
+        description: "Generate and commit controlled Cosmos First-Party Identity v0.1 output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -175,6 +181,7 @@ jobs:
             "scripts/cosmos_causal_narrative.cjs"
             "scripts/cosmos_graph_evolution.cjs"
             "scripts/cosmos_temporal_knowledge.cjs"
+            "scripts/cosmos_first_party_identity.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -218,6 +225,7 @@ jobs:
           node --check scripts/cosmos_causal_narrative.cjs
           node --check scripts/cosmos_graph_evolution.cjs
           node --check scripts/cosmos_temporal_knowledge.cjs
+          node --check scripts/cosmos_first_party_identity.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -8292,6 +8300,366 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos First-Party Identity v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_first_party_identity.cjs \
+            "$TEST_DIR/scripts/cosmos_first_party_identity.cjs"
+
+          cat > "$TEST_DIR/first-party-identity-fixture-v0.1.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "first_party_identity_dataset",
+            "entities": [
+              {
+                "entity_id": "entity_ptd_today",
+                "canonical_name": "PTD Today",
+                "aliases": ["ptdtoday.com"],
+                "entity_type": "organization",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_cosmos",
+                "canonical_name": "Cosmos",
+                "aliases": ["PTD Cosmos"],
+                "entity_type": "platform",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_fixture_founder",
+                "canonical_name": "Fixture Founder",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": true,
+                "profiles": [
+                  {
+                    "profile_type": "linkedin",
+                    "url": "https://www.linkedin.com/in/fixture-founder"
+                  }
+                ]
+              },
+              {
+                "entity_id": "entity_external_claimant",
+                "canonical_name": "External Claimant",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": false
+              }
+            ],
+            "relationships": [
+              {
+                "identity_relationship_id": "identity_ptd_founded_by_fixture",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/about",
+                "source_label": "PTD Today official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_cosmos_created_by_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "Cosmos official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_ptd_develops_cosmos",
+                "subject": "PTD Today",
+                "predicate": "develops",
+                "object": "Cosmos",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "PTD Today Cosmos relationship",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_external_conflicting_founder",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/conflicting-founder-claim",
+                "source_label": "Controlled conflicting external claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 45,
+                "protected_identity": false,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_future_creator_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/future-identity-claim",
+                "source_label": "Controlled future identity claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 30,
+                "protected_identity": false,
+                "valid_from": "2099-01-01T00:00:00Z",
+                "valid_to": null
+              }
+            ]
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_first_party_identity.cjs \
+              --input first-party-identity-fixture-v0.1.json \
+              --reference-time 2026-08-27T12:00:00Z \
+              --question "Who founded PTD Today?" \
+              --question "Who created Cosmos?" \
+              --question "What is the relationship between PTD Today and Cosmos?" \
+              --out knowledge/cosmos/first-party-identity-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/first-party-identity-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos First-Party Identity did not create first-party-identity-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected First-Party Identity schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "first_party_identity_resolved") {
+            errors.push(
+              `First-Party Identity failed: ${payload.status}`
+            );
+          }
+
+          if (payload.reference_time !== "2026-08-27T12:00:00Z") {
+            errors.push(
+              `First-Party Identity reference_time invalid: ${payload.reference_time}`
+            );
+          }
+
+          const relationships = payload.relationships || [];
+          const conflicts = payload.conflicts || [];
+          const answers = payload.answers || [];
+
+          if (!Array.isArray(relationships) || relationships.length !== 5) {
+            errors.push(
+              `Controlled First-Party Identity expected 5 relationships; got ${relationships.length}`
+            );
+          }
+
+          const firstPartyFounder = relationships.find(
+            row =>
+              row.identity_relationship_id ===
+              "identity_ptd_founded_by_fixture"
+          );
+
+          if (!firstPartyFounder ||
+              firstPartyFounder.subject !== "PTD Today" ||
+              firstPartyFounder.predicate !== "founded_by" ||
+              firstPartyFounder.object !== "Fixture Founder" ||
+              firstPartyFounder.source_type !== "first_party" ||
+              firstPartyFounder.verification_status !== "verified" ||
+              firstPartyFounder.temporal_state !== "current" ||
+              firstPartyFounder.assertion_scope !==
+                "entity_self_asserted_identity" ||
+              firstPartyFounder.source_url !==
+                "https://www.ptdtoday.com/about") {
+            errors.push(
+              "Controlled first-party founder record invalid"
+            );
+          }
+
+          const futureClaim = relationships.find(
+            row =>
+              row.identity_relationship_id ===
+              "identity_future_creator_fixture"
+          );
+
+          if (!futureClaim ||
+              futureClaim.temporal_state !== "future") {
+            errors.push(
+              "Future identity relationship was not classified as future"
+            );
+          }
+
+          if (!Array.isArray(conflicts) || conflicts.length !== 1) {
+            errors.push(
+              `Expected one current identity conflict; got ${conflicts.length}`
+            );
+          } else {
+            const conflict = conflicts[0];
+
+            if (conflict.predicate !== "founded_by" ||
+                conflict.temporal_state !== "current" ||
+                conflict.first_party_present !== true ||
+                conflict.external_present !== true ||
+                conflict.resolution_status !== "unresolved" ||
+                conflict.silent_overwrite_permitted !== false ||
+                conflict.records_preserved !== true ||
+                !Array.isArray(conflict.competing_objects) ||
+                !conflict.competing_objects.includes("Fixture Founder") ||
+                !conflict.competing_objects.includes("External Claimant")) {
+              errors.push(
+                "Controlled identity conflict preservation invalid"
+              );
+            }
+          }
+
+          if (!Array.isArray(answers) || answers.length !== 3) {
+            errors.push(
+              `Expected 3 controlled identity answers; got ${answers.length}`
+            );
+          }
+
+          const founderAnswer = answers.find(
+            row => row.predicate === "founded_by"
+          );
+
+          if (!founderAnswer ||
+              founderAnswer.answer_status !== "resolved" ||
+              founderAnswer.selected_relationship?.object !== "Fixture Founder" ||
+              founderAnswer.selected_relationship?.source_type !== "first_party" ||
+              founderAnswer.selected_relationship?.verification_status !== "verified" ||
+              founderAnswer.conflicts?.length !== 1 ||
+              founderAnswer.answer_contract?.first_party_selected_as_self_asserted_identity !== true ||
+              founderAnswer.answer_contract?.first_party_not_universal_truth !== true ||
+              founderAnswer.answer_contract?.conflict_disclosed !== true ||
+              founderAnswer.answer_contract?.external_disagreement_preserved !== true ||
+              founderAnswer.answer_contract?.provenance_required !== true) {
+            errors.push(
+              "Founder answer did not preserve first-party/provenance/conflict boundaries"
+            );
+          }
+
+          const creatorAnswer = answers.find(
+            row => row.predicate === "created_by"
+          );
+
+          if (!creatorAnswer ||
+              creatorAnswer.answer_status !== "resolved" ||
+              creatorAnswer.selected_relationship?.object !== "Fixture Founder" ||
+              creatorAnswer.selected_relationship?.temporal_state !== "current" ||
+              creatorAnswer.selected_relationship?.source_type !== "first_party") {
+            errors.push(
+              "Cosmos creator answer invalid"
+            );
+          }
+
+          const relationshipAnswer = answers.find(
+            row => row.predicate === "develops"
+          );
+
+          if (!relationshipAnswer ||
+              relationshipAnswer.answer_status !== "resolved" ||
+              relationshipAnswer.selected_relationship?.subject !== "PTD Today" ||
+              relationshipAnswer.selected_relationship?.object !== "Cosmos" ||
+              relationshipAnswer.selected_relationship?.source_type !== "first_party") {
+            errors.push(
+              "PTD Today/Cosmos relationship answer invalid"
+            );
+          }
+
+          const contract = payload.identity_contract || {};
+
+          if (contract.first_party_means_self_asserted_identity_authority !== true ||
+              contract.first_party_does_not_mean_universal_truth !== true ||
+              contract.protected_identity_records_preserved !== true ||
+              contract.external_conflicts_preserved !== true ||
+              contract.silent_conflict_overwrite_forbidden !== true ||
+              contract.temporal_identity_supported !== true ||
+              contract.provenance_required !== true) {
+            errors.push(
+              "First-Party Identity contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_identity_history !== false ||
+              safeguards.overwrites_conflicting_external_claims !== false ||
+              safeguards.treats_first_party_as_universal_truth !== false ||
+              safeguards.promotes_future_identity_to_current !== false ||
+              safeguards.preserves_provenance !== true ||
+              safeguards.preserves_conflicts !== true) {
+            errors.push(
+              "First-Party Identity safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos First-Party Identity v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos First-Party Identity v0.1 isolated test passed.");
+          console.log(`Status:              ${payload.status}`);
+          console.log(`Relationships:       ${relationships.length}`);
+          console.log(`Current conflicts:   ${conflicts.length}`);
+          console.log(`Resolved answers:    ${answers.filter(x => x.answer_status === "resolved").length}`);
+          console.log(
+            "Founder/creator resolution, provenance, temporal identity, conflict preservation and first-party-not-universal-truth safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -12424,6 +12792,228 @@ jobs:
           echo "Controlled Cosmos Temporal Knowledge v0.1 output committed."
           echo "Production Cosmos graph was not mutated."
 
+      - name: Generate Real Cosmos First-Party Identity v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_first_party_identity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos First-Party Identity v0.1 output."
+          echo "This is a deterministic fixture only; it does not publish a live founder identity record."
+
+          cat > /tmp/cosmos-first-party-identity-fixture-v0.1.json <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "first_party_identity_dataset",
+            "entities": [
+              {
+                "entity_id": "entity_ptd_today",
+                "canonical_name": "PTD Today",
+                "aliases": ["ptdtoday.com"],
+                "entity_type": "organization",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_cosmos",
+                "canonical_name": "Cosmos",
+                "aliases": ["PTD Cosmos"],
+                "entity_type": "platform",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_fixture_founder",
+                "canonical_name": "Fixture Founder",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": true,
+                "profiles": [
+                  {
+                    "profile_type": "linkedin",
+                    "url": "https://www.linkedin.com/in/fixture-founder"
+                  }
+                ]
+              },
+              {
+                "entity_id": "entity_external_claimant",
+                "canonical_name": "External Claimant",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": false
+              }
+            ],
+            "relationships": [
+              {
+                "identity_relationship_id": "identity_ptd_founded_by_fixture",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/about",
+                "source_label": "PTD Today official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_cosmos_created_by_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "Cosmos official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_ptd_develops_cosmos",
+                "subject": "PTD Today",
+                "predicate": "develops",
+                "object": "Cosmos",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "PTD Today Cosmos relationship",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_external_conflicting_founder",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/conflicting-founder-claim",
+                "source_label": "Controlled conflicting external claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 45,
+                "protected_identity": false,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              }
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_first_party_identity.cjs \
+            --input /tmp/cosmos-first-party-identity-fixture-v0.1.json \
+            --reference-time 2026-08-27T12:00:00Z \
+            --question "Who founded PTD Today?" \
+            --question "Who created Cosmos?" \
+            --question "What is the relationship between PTD Today and Cosmos?" \
+            --out knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          test -f knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/first-party-identity-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "first_party_identity_resolved") {
+            throw new Error(
+              `Controlled First-Party Identity output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const founder = (payload.answers || []).find(
+            row => row.predicate === "founded_by"
+          );
+
+          if (!founder ||
+              founder.selected_relationship?.object !== "Fixture Founder" ||
+              founder.selected_relationship?.source_type !== "first_party" ||
+              founder.answer_contract?.first_party_not_universal_truth !== true ||
+              founder.answer_contract?.conflict_disclosed !== true) {
+            throw new Error(
+              "Controlled founder identity resolution invalid"
+            );
+          }
+
+          if ((payload.conflicts || []).length !== 1 ||
+              payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.overwrites_conflicting_external_claims !== false ||
+              payload.safeguards?.treats_first_party_as_universal_truth !== false ||
+              payload.safeguards?.preserves_provenance !== true ||
+              payload.safeguards?.preserves_conflicts !== true) {
+            throw new Error(
+              "Controlled First-Party Identity safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos First-Party Identity v0.1 output created."
+          );
+          console.log(`Status:    ${payload.status}`);
+          console.log(`Answers:   ${(payload.answers || []).length}`);
+          console.log(`Conflicts: ${(payload.conflicts || []).length}`);
+          console.log(`Output:    ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos First-Party Identity v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_first_party_identity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos First-Party Identity controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos First-Party Identity v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos First-Party Identity v0.1 output committed."
+          echo "No live founder identity record was published by this controlled test."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -12591,6 +13181,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" = "true" ]; then
             echo "Controlled temporal-knowledge-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_first_party_identity_test }}" = "true" ]; then
+            echo "Controlled first-party-identity-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -12610,7 +13203,8 @@ jobs:
              [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_evolution_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_first_party_identity_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
