@@ -20,6 +20,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -105,6 +106,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_graph_reversal_test:
+        description: "Generate and commit controlled Cosmos Graph Reversal v0.1 snapshot, report and post-reversal integrity report"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -172,6 +178,7 @@ jobs:
             "scripts/cosmos_knowledge_admission.cjs"
             "scripts/cosmos_graph_writer.cjs"
             "scripts/cosmos_graph_integrity.cjs"
+            "scripts/cosmos_graph_reversal.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -211,6 +218,7 @@ jobs:
           node --check scripts/cosmos_knowledge_admission.cjs
           node --check scripts/cosmos_graph_writer.cjs
           node --check scripts/cosmos_graph_integrity.cjs
+          node --check scripts/cosmos_graph_reversal.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -6557,6 +6565,485 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Graph Reversal v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+          cp scripts/cosmos_graph_integrity.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_integrity.cjs"
+          cp scripts/cosmos_graph_reversal.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_reversal.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_reversal_fixture",
+            evidence_validation_id: "evidence_validation_reversal_fixture",
+            evidence_task_id: "evidence_task_reversal_fixture",
+            validation_target_id: "validation_reversal_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_reversal_1",
+              "evidence_reversal_2",
+              "evidence_reversal_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          const request = {
+            schema_version: "0.1",
+            requested_at: new Date().toISOString(),
+            knowledge_admission_id:
+              "knowledge_admission_reversal_fixture",
+            reason:
+              "controlled_preflight_reversal_test",
+            requested_by:
+              "cosmos_preflight"
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-fixture.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "empty-graph-fixture.json"),
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "reversal-request-fixture.json"),
+            JSON.stringify(request, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-fixture.json \
+              --graph empty-graph-fixture.json \
+              --out knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/pre-reversal-writer-report-v0.1.json
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --out knowledge/cosmos/pre-reversal-integrity-v0.1.json
+          )
+
+          PRE_HASH="$(
+            sha256sum "$TEST_DIR/knowledge/cosmos/pre-reversal-graph-v0.1.json" |
+            awk '{print $1}'
+          )"
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --request reversal-request-fixture.json \
+              --out knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/graph-reversal-report-v0.1.json
+          )
+
+          POST_INPUT_HASH="$(
+            sha256sum "$TEST_DIR/knowledge/cosmos/pre-reversal-graph-v0.1.json" |
+            awk '{print $1}'
+          )"
+
+          if [ "$PRE_HASH" != "$POST_INPUT_HASH" ]; then
+            echo "ERROR: Graph Reversal mutated its input graph."
+            exit 1
+          fi
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --out knowledge/cosmos/post-reversal-integrity-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          function read(relative) {
+            return JSON.parse(
+              fs.readFileSync(path.join(root, relative), "utf8")
+            );
+          }
+
+          const before = read(
+            "knowledge/cosmos/pre-reversal-graph-v0.1.json"
+          );
+          const beforeIntegrity = read(
+            "knowledge/cosmos/pre-reversal-integrity-v0.1.json"
+          );
+          const after = read(
+            "knowledge/cosmos/post-reversal-graph-v0.1.json"
+          );
+          const report = read(
+            "knowledge/cosmos/graph-reversal-report-v0.1.json"
+          );
+          const afterIntegrity = read(
+            "knowledge/cosmos/post-reversal-integrity-v0.1.json"
+          );
+
+          const errors = [];
+
+          if (beforeIntegrity.status !== "graph_integrity_passed" ||
+              Number(beforeIntegrity.integrity_state?.error_count) !== 0) {
+            errors.push(
+              "Pre-reversal graph must pass Graph Integrity"
+            );
+          }
+
+          if (report.schema_version !== "0.1" ||
+              report.status !== "graph_reversal_resolved") {
+            errors.push(
+              `Unexpected Graph Reversal result: ${report.schema_version} / ${report.status}`
+            );
+          }
+
+          if (Number(report.reversal_state?.requested_count) !== 1 ||
+              Number(report.reversal_state?.reversed_count) !== 1 ||
+              Number(report.reversal_state?.idempotent_skip_count) !== 0 ||
+              Number(report.reversal_state?.error_count) !== 0 ||
+              Number(report.reversal_state?.active_graph_record_count) !== 0 ||
+              Number(report.reversal_state?.inactive_graph_record_count) !== 1) {
+            errors.push(
+              "First reversal state counts invalid"
+            );
+          }
+
+          if (!Array.isArray(before.knowledge_records) ||
+              before.knowledge_records.length !== 1 ||
+              !Array.isArray(after.knowledge_records) ||
+              after.knowledge_records.length !== 1) {
+            errors.push(
+              "Graph Reversal must preserve exactly one historical graph record"
+            );
+          } else {
+            const prior = before.knowledge_records[0];
+            const current = after.knowledge_records[0];
+
+            if (prior.graph_record_id !== current.graph_record_id ||
+                prior.knowledge_admission_id !== current.knowledge_admission_id ||
+                prior.validation_target_id !== current.validation_target_id) {
+              errors.push(
+                "Graph Reversal changed graph-record identity/lineage"
+              );
+            }
+
+            if (current.active !== false ||
+                !current.deactivated_at ||
+                current.deactivation?.operation !==
+                  "deactivate_graph_record" ||
+                current.deactivation?.reversible_history_preserved !== true) {
+              errors.push(
+                "Graph Reversal did not safely deactivate the record"
+              );
+            }
+
+            if (Number(current.confidence_score) !== 76 ||
+                current.validation_disposition !==
+                  "partially_supported" ||
+                current.qualification?.contradiction_present !== true ||
+                current.qualification?.must_preserve_contradiction !== true ||
+                !Array.isArray(current.evidence_record_ids) ||
+                current.evidence_record_ids.length !== 3) {
+              errors.push(
+                "Graph Reversal lost confidence, qualification, contradiction or evidence lineage"
+              );
+            }
+          }
+
+          if (!Array.isArray(before.audit_log) ||
+              before.audit_log.length !== 1 ||
+              !Array.isArray(after.audit_log) ||
+              after.audit_log.length !== 2) {
+            errors.push(
+              "Graph Reversal must preserve creation audit and append exactly one reversal audit"
+            );
+          } else {
+            const creationAudit = before.audit_log[0];
+            const preservedCreation = after.audit_log.find(
+              row => row.audit_id === creationAudit.audit_id
+            );
+            const reversalAudit = after.audit_log.find(
+              row => row.operation === "deactivate_graph_record"
+            );
+
+            if (!preservedCreation) {
+              errors.push(
+                "Original creation audit was not preserved"
+              );
+            }
+
+            if (!reversalAudit ||
+                reversalAudit.prior_active_state !== true ||
+                reversalAudit.resulting_active_state !== false ||
+                reversalAudit.preserves_original_record !== true ||
+                reversalAudit.preserves_creation_audit !== true ||
+                reversalAudit.reversible !== true ||
+                reversalAudit.reversal_operation !==
+                  "deactivate_graph_record" ||
+                !Array.isArray(reversalAudit.evidence_record_ids) ||
+                reversalAudit.evidence_record_ids.length !== 3 ||
+                Number(reversalAudit.confidence_score) !== 76) {
+              errors.push(
+                "Reversal audit contract invalid"
+              );
+            }
+          }
+
+          if (afterIntegrity.status !== "graph_integrity_passed" ||
+              Number(afterIntegrity.integrity_state?.error_count) !== 0 ||
+              afterIntegrity.integrity_state?.production_write_safe !== true ||
+              Number(afterIntegrity.graph_state?.active_record_count) !== 0 ||
+              Number(afterIntegrity.graph_state?.inactive_record_count) !== 1 ||
+              Number(afterIntegrity.graph_state?.audit_record_count) !== 2) {
+            errors.push(
+              "Post-reversal Graph Integrity did not pass with 0 active / 1 inactive / 2 audits"
+            );
+          }
+
+          const safeguards = report.safeguards || {};
+
+          if (safeguards.mutates_input_graph_in_place !== false ||
+              safeguards.deletes_graph_records !== false ||
+              safeguards.preserves_historical_record !== true ||
+              safeguards.preserves_creation_audit !== true ||
+              safeguards.appends_reversal_audit !== true ||
+              safeguards.requires_explicit_target !== true ||
+              safeguards.respects_reversibility_contract !== true ||
+              safeguards.idempotent_for_inactive_record !== true ||
+              safeguards.writes_only_explicit_output_snapshot !== true) {
+            errors.push(
+              "Graph Reversal safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Reversal v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("First Cosmos Graph Reversal v0.1 test passed.");
+          console.log("Before: 1 active / 0 inactive / 1 audit");
+          console.log("After:  0 active / 1 inactive / 2 audits");
+          console.log("Post-reversal Graph Integrity: PASS");
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --request reversal-request-fixture.json \
+              --out knowledge/cosmos/second-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/second-reversal-report-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          function read(relative) {
+            return JSON.parse(
+              fs.readFileSync(path.join(root, relative), "utf8")
+            );
+          }
+
+          const once = read(
+            "knowledge/cosmos/post-reversal-graph-v0.1.json"
+          );
+          const twice = read(
+            "knowledge/cosmos/second-reversal-graph-v0.1.json"
+          );
+          const report = read(
+            "knowledge/cosmos/second-reversal-report-v0.1.json"
+          );
+
+          if (report.status !== "graph_reversal_resolved" ||
+              Number(report.reversal_state?.reversed_count) !== 0 ||
+              Number(report.reversal_state?.idempotent_skip_count) !== 1 ||
+              Number(report.reversal_state?.error_count) !== 0) {
+            throw new Error(
+              "Second reversal did not resolve as an idempotent skip"
+            );
+          }
+
+          if (twice.knowledge_records?.length !== 1 ||
+              twice.audit_log?.length !== 2 ||
+              twice.knowledge_records?.[0]?.active !== false) {
+            throw new Error(
+              "Second reversal changed already-reversed graph history"
+            );
+          }
+
+          if (JSON.stringify(once.knowledge_records) !==
+              JSON.stringify(twice.knowledge_records) ||
+              JSON.stringify(once.audit_log) !==
+              JSON.stringify(twice.audit_log)) {
+            throw new Error(
+              "Second reversal was not structurally idempotent"
+            );
+          }
+
+          console.log("");
+          console.log("Second reversal idempotency test passed.");
+          console.log("Second-run reversals: 0");
+          console.log("Idempotent skips:     1");
+          console.log("Additional audits:    0");
+          NODE
+
+          cat > "$TEST_DIR/unknown-reversal-request.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "knowledge_admission_id": "knowledge_admission_does_not_exist",
+            "reason": "intentional_unknown_target_test",
+            "requested_by": "cosmos_preflight"
+          }
+          JSON
+
+          set +e
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --request unknown-reversal-request.json \
+              --out knowledge/cosmos/unknown-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/unknown-reversal-report-v0.1.json
+          )
+          UNKNOWN_EXIT=$?
+          set -e
+
+          if [ "$UNKNOWN_EXIT" -eq 0 ]; then
+            echo "ERROR: Unknown reversal target unexpectedly succeeded."
+            exit 1
+          fi
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const graph = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/unknown-reversal-graph-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          const original = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/post-reversal-graph-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/unknown-reversal-report-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          if (report.status !== "graph_reversal_rejected" ||
+              Number(report.reversal_state?.reversed_count) !== 0 ||
+              Number(report.reversal_state?.error_count) !== 1 ||
+              report.errors?.[0]?.code !== "reversal_target_not_found") {
+            throw new Error(
+              "Unknown target rejection contract invalid"
+            );
+          }
+
+          if (JSON.stringify(graph.knowledge_records) !==
+              JSON.stringify(original.knowledge_records) ||
+              JSON.stringify(graph.audit_log) !==
+              JSON.stringify(original.audit_log)) {
+            throw new Error(
+              "Rejected unknown reversal modified graph history"
+            );
+          }
+
+          console.log("");
+          console.log("Unknown-target negative reversal test passed.");
+          console.log("Unknown target: REJECTED");
+          console.log("Graph changes:  0");
+          console.log("Repository files were not modified by isolated tests.");
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -9744,6 +10231,209 @@ jobs:
           echo "Controlled Cosmos Graph Integrity v0.1 report committed."
           echo "Production Cosmos graph was not mutated."
 
+      - name: Generate Real Cosmos Graph Reversal v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_reversal_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Reversal v0.1 output."
+          echo "This operates on an isolated graph snapshot, not the production Cosmos graph."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_reversal_repository_fixture",
+            evidence_validation_id: "evidence_validation_reversal_repository_fixture",
+            evidence_task_id: "evidence_task_reversal_repository_fixture",
+            validation_target_id: "validation_reversal_repository_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_reversal_repository_1",
+              "evidence_reversal_repository_2",
+              "evidence_reversal_repository_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          const request = {
+            schema_version: "0.1",
+            knowledge_admission_id:
+              "knowledge_admission_reversal_repository_fixture",
+            reason:
+              "controlled_repository_reversal_test",
+            requested_by:
+              "cosmos_preflight"
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-empty-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-request-v0.1.json",
+            JSON.stringify(request, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-reversal-admission-v0.1.json \
+            --graph /tmp/cosmos-reversal-empty-graph-v0.1.json \
+            --out /tmp/cosmos-pre-reversal-graph-v0.1.json \
+            --report /tmp/cosmos-pre-reversal-writer-report-v0.1.json
+
+          node scripts/cosmos_graph_reversal.cjs \
+            --graph /tmp/cosmos-pre-reversal-graph-v0.1.json \
+            --request /tmp/cosmos-reversal-request-v0.1.json \
+            --out knowledge/cosmos/graph-reversal-test-v0.1.json \
+            --report knowledge/cosmos/graph-reversal-report-v0.1.json
+
+          node scripts/cosmos_graph_integrity.cjs \
+            --graph knowledge/cosmos/graph-reversal-test-v0.1.json \
+            --out knowledge/cosmos/graph-reversal-integrity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graphFile =
+            "knowledge/cosmos/graph-reversal-test-v0.1.json";
+          const reportFile =
+            "knowledge/cosmos/graph-reversal-report-v0.1.json";
+          const integrityFile =
+            "knowledge/cosmos/graph-reversal-integrity-test-v0.1.json";
+
+          const graph = JSON.parse(fs.readFileSync(graphFile, "utf8"));
+          const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+          const integrity = JSON.parse(
+            fs.readFileSync(integrityFile, "utf8")
+          );
+
+          if (report.status !== "graph_reversal_resolved" ||
+              Number(report.reversal_state?.reversed_count) !== 1 ||
+              Number(report.reversal_state?.error_count) !== 0) {
+            throw new Error(
+              "Controlled Graph Reversal output invalid"
+            );
+          }
+
+          if (graph.knowledge_records?.length !== 1 ||
+              graph.knowledge_records?.[0]?.active !== false ||
+              graph.audit_log?.length !== 2) {
+            throw new Error(
+              "Controlled reversed graph must contain 1 inactive historical record and 2 audits"
+            );
+          }
+
+          if (integrity.status !== "graph_integrity_passed" ||
+              Number(integrity.integrity_state?.error_count) !== 0 ||
+              integrity.integrity_state?.production_write_safe !== true) {
+            throw new Error(
+              "Controlled reversed graph failed post-reversal Graph Integrity"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Graph Reversal v0.1 output created.");
+          console.log(`Reversed records: ${report.reversal_state.reversed_count}`);
+          console.log(`Active records:   ${integrity.graph_state.active_record_count}`);
+          console.log(`Inactive records: ${integrity.graph_state.inactive_record_count}`);
+          console.log(`Audit records:    ${integrity.graph_state.audit_record_count}`);
+          console.log(`Integrity:        ${integrity.status}`);
+          console.log(`Graph:            ${graphFile}`);
+          console.log(`Report:           ${reportFile}`);
+          console.log(`Integrity report: ${integrityFile}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Reversal v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_reversal_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/graph-reversal-test-v0.1.json \
+            knowledge/cosmos/graph-reversal-report-v0.1.json \
+            knowledge/cosmos/graph-reversal-integrity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Reversal controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Reversal v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Reversal v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -9899,6 +10589,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_graph_integrity_test }}" = "true" ]; then
             echo "Controlled graph-integrity-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_graph_reversal_test }}" = "true" ]; then
+            echo "Controlled graph-reversal-test-v0.1.json, graph-reversal-report-v0.1.json and graph-reversal-integrity-test-v0.1.json were generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -9914,7 +10607,8 @@ jobs:
              [ "${{ inputs.write_cosmos_evidence_validator_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
