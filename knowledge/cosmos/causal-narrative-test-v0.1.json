@@ -1,0 +1,361 @@
+{
+  "schema_version": "0.1",
+  "generated_at": "2026-08-27T16:51:53.694Z",
+  "status": "causal_narrative_resolved",
+  "focal_signal": {
+    "node_id": "substation_pressure",
+    "label": "Substation capacity pressure",
+    "type": "signal"
+  },
+  "why_now": {
+    "activation_event_count": 3,
+    "strongest_activation_events": [
+      {
+        "activation_id": "activation_1",
+        "label": "Recent data-center project announcements increased",
+        "kind": "new_evidence",
+        "evidence_status": "supported",
+        "confidence_score": 88,
+        "source_record_ids": [
+          "activation_evidence_1"
+        ],
+        "occurred_at": "2026-08-27T12:00:00Z",
+        "relevance_score": 95
+      },
+      {
+        "activation_id": "activation_2",
+        "label": "Utility load forecasts strengthened",
+        "kind": "strengthened_evidence",
+        "evidence_status": "supported",
+        "confidence_score": 84,
+        "source_record_ids": [
+          "activation_evidence_2"
+        ],
+        "occurred_at": "2026-08-27T10:00:00Z",
+        "relevance_score": 90
+      },
+      {
+        "activation_id": "activation_3",
+        "label": "Transformer lead-time pressure remained unresolved",
+        "kind": "related_signal",
+        "evidence_status": "supported",
+        "confidence_score": 80,
+        "source_record_ids": [
+          "activation_evidence_3"
+        ],
+        "occurred_at": "2026-08-26T18:00:00Z",
+        "relevance_score": 82
+      }
+    ],
+    "explanation_status": "activation_evidence_available",
+    "rule": "Why-now explains recent activation, not the long-run causal origin of the signal."
+  },
+  "upstream_drivers": [
+    {
+      "narrative_edge_id": "narrative_edge_a1478607",
+      "causal_depth": 1,
+      "from_node_id": "data_center_expansion",
+      "from_label": "Data-center capacity expansion",
+      "to_node_id": "substation_pressure",
+      "to_label": "Substation capacity pressure",
+      "relationship": "increases",
+      "evidence_status": "supported",
+      "original_confidence_score": 88,
+      "effective_confidence_score": 84,
+      "effective_confidence_band": "high",
+      "source_record_ids": [
+        "evidence_dc_grid_1",
+        "evidence_dc_grid_2"
+      ],
+      "time_horizon": "short",
+      "geography_scope": "United States",
+      "temporal_scope": "current"
+    },
+    {
+      "narrative_edge_id": "narrative_edge_f1acd05e",
+      "causal_depth": 2,
+      "from_node_id": "ai_compute",
+      "from_label": "AI compute demand growth",
+      "to_node_id": "data_center_expansion",
+      "to_label": "Data-center capacity expansion",
+      "relationship": "drives",
+      "evidence_status": "supported",
+      "original_confidence_score": 92,
+      "effective_confidence_score": 82,
+      "effective_confidence_band": "high",
+      "source_record_ids": [
+        "evidence_ai_dc_1",
+        "evidence_ai_dc_2"
+      ],
+      "time_horizon": "current_to_short",
+      "geography_scope": "global",
+      "temporal_scope": "current"
+    }
+  ],
+  "downstream_story": {
+    "direct_effects": [
+      {
+        "narrative_edge_id": "narrative_edge_72ff3a48",
+        "causal_depth": 1,
+        "from_node_id": "substation_pressure",
+        "from_label": "Substation capacity pressure",
+        "to_node_id": "transformer_demand",
+        "to_label": "Transformer capacity demand",
+        "relationship": "increases",
+        "evidence_status": "supported",
+        "original_confidence_score": 84,
+        "effective_confidence_score": 80,
+        "effective_confidence_band": "high",
+        "source_record_ids": [
+          "evidence_substation_transformer_1"
+        ],
+        "time_horizon": "short",
+        "geography_scope": "United States",
+        "temporal_scope": "current"
+      }
+    ],
+    "second_order_effects": [
+      {
+        "narrative_edge_id": "narrative_edge_4075f54e",
+        "causal_depth": 2,
+        "from_node_id": "transformer_demand",
+        "from_label": "Transformer capacity demand",
+        "to_node_id": "oem_capacity_pressure",
+        "to_label": "OEM manufacturing capacity pressure",
+        "relationship": "constrains",
+        "evidence_status": "inferred",
+        "original_confidence_score": 78,
+        "effective_confidence_score": 62,
+        "effective_confidence_band": "moderate",
+        "source_record_ids": [
+          "evidence_oem_capacity_1"
+        ],
+        "time_horizon": "short_to_mid",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      }
+    ],
+    "third_order_effects": [
+      {
+        "narrative_edge_id": "narrative_edge_74a33c30",
+        "causal_depth": 3,
+        "from_node_id": "oem_capacity_pressure",
+        "from_label": "OEM manufacturing capacity pressure",
+        "to_node_id": "lead_time_pressure",
+        "to_label": "Transformer lead-time pressure",
+        "relationship": "increases",
+        "evidence_status": "scenario",
+        "original_confidence_score": 74,
+        "effective_confidence_score": 44,
+        "effective_confidence_band": "low",
+        "source_record_ids": [
+          "evidence_lead_time_1"
+        ],
+        "time_horizon": "mid",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      }
+    ],
+    "emerging_effects": [
+      {
+        "narrative_edge_id": "narrative_edge_e5d5449d",
+        "causal_depth": 4,
+        "from_node_id": "lead_time_pressure",
+        "from_label": "Transformer lead-time pressure",
+        "to_node_id": "project_schedule_pressure",
+        "to_label": "Project schedule pressure",
+        "relationship": "increases",
+        "evidence_status": "scenario",
+        "original_confidence_score": 70,
+        "effective_confidence_score": 34,
+        "effective_confidence_band": "low",
+        "source_record_ids": [
+          "evidence_schedule_1"
+        ],
+        "time_horizon": "mid_to_long",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      },
+      {
+        "narrative_edge_id": "narrative_edge_242731c2",
+        "causal_depth": 5,
+        "from_node_id": "project_schedule_pressure",
+        "from_label": "Project schedule pressure",
+        "to_node_id": "investment_relocation",
+        "to_label": "Potential geographic investment relocation",
+        "relationship": "may_influence",
+        "evidence_status": "speculative",
+        "original_confidence_score": 62,
+        "effective_confidence_score": 8,
+        "effective_confidence_band": "very_low",
+        "source_record_ids": [
+          "evidence_location_scenario_1"
+        ],
+        "time_horizon": "long",
+        "geography_scope": "multi-region",
+        "temporal_scope": "forward"
+      }
+    ]
+  },
+  "butterfly_effect": {
+    "all_downstream_edges": [
+      {
+        "narrative_edge_id": "narrative_edge_72ff3a48",
+        "causal_depth": 1,
+        "from_node_id": "substation_pressure",
+        "from_label": "Substation capacity pressure",
+        "to_node_id": "transformer_demand",
+        "to_label": "Transformer capacity demand",
+        "relationship": "increases",
+        "evidence_status": "supported",
+        "original_confidence_score": 84,
+        "effective_confidence_score": 80,
+        "effective_confidence_band": "high",
+        "source_record_ids": [
+          "evidence_substation_transformer_1"
+        ],
+        "time_horizon": "short",
+        "geography_scope": "United States",
+        "temporal_scope": "current"
+      },
+      {
+        "narrative_edge_id": "narrative_edge_4075f54e",
+        "causal_depth": 2,
+        "from_node_id": "transformer_demand",
+        "from_label": "Transformer capacity demand",
+        "to_node_id": "oem_capacity_pressure",
+        "to_label": "OEM manufacturing capacity pressure",
+        "relationship": "constrains",
+        "evidence_status": "inferred",
+        "original_confidence_score": 78,
+        "effective_confidence_score": 62,
+        "effective_confidence_band": "moderate",
+        "source_record_ids": [
+          "evidence_oem_capacity_1"
+        ],
+        "time_horizon": "short_to_mid",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      },
+      {
+        "narrative_edge_id": "narrative_edge_74a33c30",
+        "causal_depth": 3,
+        "from_node_id": "oem_capacity_pressure",
+        "from_label": "OEM manufacturing capacity pressure",
+        "to_node_id": "lead_time_pressure",
+        "to_label": "Transformer lead-time pressure",
+        "relationship": "increases",
+        "evidence_status": "scenario",
+        "original_confidence_score": 74,
+        "effective_confidence_score": 44,
+        "effective_confidence_band": "low",
+        "source_record_ids": [
+          "evidence_lead_time_1"
+        ],
+        "time_horizon": "mid",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      },
+      {
+        "narrative_edge_id": "narrative_edge_e5d5449d",
+        "causal_depth": 4,
+        "from_node_id": "lead_time_pressure",
+        "from_label": "Transformer lead-time pressure",
+        "to_node_id": "project_schedule_pressure",
+        "to_label": "Project schedule pressure",
+        "relationship": "increases",
+        "evidence_status": "scenario",
+        "original_confidence_score": 70,
+        "effective_confidence_score": 34,
+        "effective_confidence_band": "low",
+        "source_record_ids": [
+          "evidence_schedule_1"
+        ],
+        "time_horizon": "mid_to_long",
+        "geography_scope": "global",
+        "temporal_scope": "forward"
+      },
+      {
+        "narrative_edge_id": "narrative_edge_242731c2",
+        "causal_depth": 5,
+        "from_node_id": "project_schedule_pressure",
+        "from_label": "Project schedule pressure",
+        "to_node_id": "investment_relocation",
+        "to_label": "Potential geographic investment relocation",
+        "relationship": "may_influence",
+        "evidence_status": "speculative",
+        "original_confidence_score": 62,
+        "effective_confidence_score": 8,
+        "effective_confidence_band": "very_low",
+        "source_record_ids": [
+          "evidence_location_scenario_1"
+        ],
+        "time_horizon": "long",
+        "geography_scope": "multi-region",
+        "temporal_scope": "forward"
+      }
+    ],
+    "potential_new_signals": [
+      {
+        "candidate_signal_id": "candidate_signal_46af806f",
+        "label": "OEM manufacturing capacity pressure",
+        "derived_from_narrative_edge_id": "narrative_edge_4075f54e",
+        "causal_depth": 2,
+        "evidence_status": "inferred",
+        "confidence_score": 62,
+        "confidence_band": "moderate",
+        "status": "candidate_only",
+        "promotion_to_signal": false
+      },
+      {
+        "candidate_signal_id": "candidate_signal_720aa9ed",
+        "label": "Transformer lead-time pressure",
+        "derived_from_narrative_edge_id": "narrative_edge_74a33c30",
+        "causal_depth": 3,
+        "evidence_status": "scenario",
+        "confidence_score": 44,
+        "confidence_band": "low",
+        "status": "candidate_only",
+        "promotion_to_signal": false
+      },
+      {
+        "candidate_signal_id": "candidate_signal_07461389",
+        "label": "Project schedule pressure",
+        "derived_from_narrative_edge_id": "narrative_edge_e5d5449d",
+        "causal_depth": 4,
+        "evidence_status": "scenario",
+        "confidence_score": 34,
+        "confidence_band": "low",
+        "status": "candidate_only",
+        "promotion_to_signal": false
+      }
+    ],
+    "max_causal_depth": 5,
+    "path_count": 5,
+    "rule": "A consequence may become a candidate new signal, but never becomes an observed fact merely because it appears in a causal path."
+  },
+  "narrative_contract": {
+    "machine_readable_only": true,
+    "article_prose_generated": false,
+    "causal_direction_preserved": true,
+    "causal_depth_preserved": true,
+    "time_horizon_preserved": true,
+    "evidence_status_preserved": true,
+    "evidence_lineage_preserved": true,
+    "confidence_degrades_with_distance": true,
+    "why_now_separated_from_root_cause": true,
+    "possibility_never_silently_promoted_to_fact": true
+  },
+  "safeguards": {
+    "performs_external_search": false,
+    "calls_openai_or_external_api": false,
+    "writes_to_knowledge_graph": false,
+    "mutates_input_graph": false,
+    "creates_unverified_facts": false,
+    "preserves_source_lineage": true,
+    "preserves_epistemic_status": true,
+    "causal_distance_penalizes_confidence": true,
+    "activation_logic_separate_from_causality": true,
+    "candidate_signals_not_auto_promoted": true
+  }
+}
