@@ -229,6 +229,8 @@ function applyReversal(graphRaw, requestRaw){
     requested_by:requestedBy,
     prior_active_state:true,
     resulting_active_state:false,
+    reversible:true,
+    reversal_operation:"deactivate_graph_record",
     preserves_original_record:true,
     preserves_creation_audit:true,
     evidence_record_ids:Array.isArray(record.evidence_record_ids)
