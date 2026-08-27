@@ -21,6 +21,7 @@
 
 
 
+
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -111,6 +112,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_causal_narrative_test:
+        description: "Generate and commit controlled Cosmos Causal Narrative v0.1 output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -179,6 +185,7 @@ jobs:
             "scripts/cosmos_graph_writer.cjs"
             "scripts/cosmos_graph_integrity.cjs"
             "scripts/cosmos_graph_reversal.cjs"
+            "scripts/cosmos_causal_narrative.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -219,6 +226,7 @@ jobs:
           node --check scripts/cosmos_graph_writer.cjs
           node --check scripts/cosmos_graph_integrity.cjs
           node --check scripts/cosmos_graph_reversal.cjs
+          node --check scripts/cosmos_causal_narrative.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -7044,6 +7052,502 @@ jobs:
           console.log("Repository files were not modified by isolated tests.");
           NODE
 
+      - name: Test Cosmos Causal Narrative v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_causal_narrative.cjs \
+            "$TEST_DIR/scripts/cosmos_causal_narrative.cjs"
+
+          cat > "$TEST_DIR/causal-input-v0.1.json" <<'JSON'
+          {
+            "focal_signal": {
+              "node_id": "substation_pressure",
+              "label": "Substation capacity pressure",
+              "type": "signal",
+              "role": "focal_signal"
+            },
+            "nodes": [
+              {
+                "node_id": "ai_compute",
+                "label": "AI compute demand growth",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "data_center_expansion",
+                "label": "Data-center capacity expansion",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "substation_pressure",
+                "label": "Substation capacity pressure",
+                "type": "signal",
+                "role": "focal_signal"
+              },
+              {
+                "node_id": "transformer_demand",
+                "label": "Transformer capacity demand",
+                "type": "consequence",
+                "role": "direct_effect"
+              },
+              {
+                "node_id": "oem_capacity_pressure",
+                "label": "OEM manufacturing capacity pressure",
+                "type": "consequence",
+                "role": "second_order_effect"
+              },
+              {
+                "node_id": "lead_time_pressure",
+                "label": "Transformer lead-time pressure",
+                "type": "consequence",
+                "role": "third_order_effect"
+              },
+              {
+                "node_id": "project_schedule_pressure",
+                "label": "Project schedule pressure",
+                "type": "consequence",
+                "role": "emerging_effect"
+              },
+              {
+                "node_id": "investment_relocation",
+                "label": "Potential geographic investment relocation",
+                "type": "scenario",
+                "role": "emerging_effect"
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "edge_ai_to_dc",
+                "from_node_id": "ai_compute",
+                "to_node_id": "data_center_expansion",
+                "relationship": "drives",
+                "evidence_status": "supported",
+                "confidence_score": 92,
+                "source_record_ids": [
+                  "evidence_ai_dc_1",
+                  "evidence_ai_dc_2"
+                ],
+                "time_horizon": "current_to_short",
+                "geography_scope": "global",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_dc_to_substation",
+                "from_node_id": "data_center_expansion",
+                "to_node_id": "substation_pressure",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "evidence_dc_grid_1",
+                  "evidence_dc_grid_2"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_substation_to_transformer",
+                "from_node_id": "substation_pressure",
+                "to_node_id": "transformer_demand",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "evidence_substation_transformer_1"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_transformer_to_oem",
+                "from_node_id": "transformer_demand",
+                "to_node_id": "oem_capacity_pressure",
+                "relationship": "constrains",
+                "evidence_status": "inferred",
+                "confidence_score": 78,
+                "source_record_ids": [
+                  "evidence_oem_capacity_1"
+                ],
+                "time_horizon": "short_to_mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_oem_to_lead",
+                "from_node_id": "oem_capacity_pressure",
+                "to_node_id": "lead_time_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 74,
+                "source_record_ids": [
+                  "evidence_lead_time_1"
+                ],
+                "time_horizon": "mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_lead_to_schedule",
+                "from_node_id": "lead_time_pressure",
+                "to_node_id": "project_schedule_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 70,
+                "source_record_ids": [
+                  "evidence_schedule_1"
+                ],
+                "time_horizon": "mid_to_long",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_schedule_to_relocation",
+                "from_node_id": "project_schedule_pressure",
+                "to_node_id": "investment_relocation",
+                "relationship": "may_influence",
+                "evidence_status": "speculative",
+                "confidence_score": 62,
+                "source_record_ids": [
+                  "evidence_location_scenario_1"
+                ],
+                "time_horizon": "long",
+                "geography_scope": "multi-region",
+                "temporal_scope": "forward"
+              }
+            ],
+            "activation_events": [
+              {
+                "activation_id": "activation_1",
+                "label": "Recent data-center project announcements increased",
+                "kind": "new_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "activation_evidence_1"
+                ],
+                "occurred_at": "2026-08-27T12:00:00Z",
+                "relevance_score": 95
+              },
+              {
+                "activation_id": "activation_2",
+                "label": "Utility load forecasts strengthened",
+                "kind": "strengthened_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "activation_evidence_2"
+                ],
+                "occurred_at": "2026-08-27T10:00:00Z",
+                "relevance_score": 90
+              },
+              {
+                "activation_id": "activation_3",
+                "label": "Transformer lead-time pressure remained unresolved",
+                "kind": "related_signal",
+                "evidence_status": "supported",
+                "confidence_score": 80,
+                "source_record_ids": [
+                  "activation_evidence_3"
+                ],
+                "occurred_at": "2026-08-26T18:00:00Z",
+                "relevance_score": 82
+              }
+            ],
+            "max_causal_depth": 5
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_causal_narrative.cjs \
+              --input causal-input-v0.1.json \
+              --out knowledge/cosmos/causal-narrative-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/causal-narrative-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Causal Narrative did not create causal-narrative-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Causal Narrative schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "causal_narrative_resolved") {
+            errors.push(
+              `Cosmos Causal Narrative failed: ${payload.status}`
+            );
+          }
+
+          if (payload.focal_signal?.node_id !== "substation_pressure" ||
+              payload.focal_signal?.label !== "Substation capacity pressure") {
+            errors.push(
+              "Cosmos Causal Narrative focal signal invalid"
+            );
+          }
+
+          const whyNow = payload.why_now || {};
+
+          if (whyNow.explanation_status !==
+                "activation_evidence_available" ||
+              Number(whyNow.activation_event_count) !== 3 ||
+              !Array.isArray(whyNow.strongest_activation_events) ||
+              whyNow.strongest_activation_events.length !== 3) {
+            errors.push(
+              "Cosmos Causal Narrative why_now activation block invalid"
+            );
+          }
+
+          if (!String(whyNow.rule || "").includes(
+                "not the long-run causal origin"
+              )) {
+            errors.push(
+              "Cosmos Causal Narrative did not separate Why Now from root causality"
+            );
+          }
+
+          const upstream = payload.upstream_drivers || [];
+
+          if (!Array.isArray(upstream) || upstream.length !== 2) {
+            errors.push(
+              `Controlled Causal Narrative expected 2 upstream drivers; got ${upstream.length}`
+            );
+          } else {
+            const depths = new Set(
+              upstream.map(x => Number(x.causal_depth))
+            );
+
+            if (!depths.has(1) || !depths.has(2)) {
+              errors.push(
+                "Controlled upstream drivers did not preserve causal depth 1 and 2"
+              );
+            }
+
+            const labels = new Set(
+              upstream.map(x => String(x.from_label || ""))
+            );
+
+            if (!labels.has("Data-center capacity expansion") ||
+                !labels.has("AI compute demand growth")) {
+              errors.push(
+                "Controlled upstream driver labels invalid"
+              );
+            }
+          }
+
+          const story = payload.downstream_story || {};
+          const direct = story.direct_effects || [];
+          const second = story.second_order_effects || [];
+          const third = story.third_order_effects || [];
+          const emerging = story.emerging_effects || [];
+
+          if (direct.length !== 1 ||
+              second.length !== 1 ||
+              third.length !== 1 ||
+              emerging.length !== 2) {
+            errors.push(
+              `Controlled downstream grouping invalid: direct=${direct.length}, second=${second.length}, third=${third.length}, emerging=${emerging.length}`
+            );
+          }
+
+          if (direct[0]?.to_label !== "Transformer capacity demand") {
+            errors.push(
+              "Direct effect should be Transformer capacity demand"
+            );
+          }
+
+          if (second[0]?.to_label !==
+                "OEM manufacturing capacity pressure") {
+            errors.push(
+              "Second-order effect should be OEM manufacturing capacity pressure"
+            );
+          }
+
+          if (third[0]?.to_label !==
+                "Transformer lead-time pressure") {
+            errors.push(
+              "Third-order effect should be Transformer lead-time pressure"
+            );
+          }
+
+          const butterfly = payload.butterfly_effect || {};
+          const downstream = butterfly.all_downstream_edges || [];
+          const candidates = butterfly.potential_new_signals || [];
+
+          if (!Array.isArray(downstream) || downstream.length !== 5) {
+            errors.push(
+              `Controlled butterfly effect expected 5 downstream edges; got ${downstream.length}`
+            );
+          }
+
+          const expectedDepths = [1,2,3,4,5];
+
+          for (const depth of expectedDepths) {
+            if (!downstream.some(
+                  row => Number(row.causal_depth) === depth
+                )) {
+              errors.push(
+                `Butterfly effect missing causal depth ${depth}`
+              );
+            }
+          }
+
+          // Confidence must never increase beyond the original edge confidence
+          // and should not increase as the path gets farther away.
+          let priorEffective = Infinity;
+
+          for (const row of [...downstream].sort(
+            (a,b) => Number(a.causal_depth)-Number(b.causal_depth)
+          )) {
+            const effective =
+              Number(row.effective_confidence_score);
+            const original =
+              Number(row.original_confidence_score);
+
+            if (!Number.isFinite(effective) ||
+                !Number.isFinite(original) ||
+                effective > original + 1e-9) {
+              errors.push(
+                `Causal confidence inflation on ${row.narrative_edge_id || "(unknown)"}`
+              );
+            }
+
+            if (effective > priorEffective + 1e-9) {
+              errors.push(
+                `Effective confidence increased with causal distance at depth ${row.causal_depth}`
+              );
+            }
+
+            priorEffective = effective;
+
+            if (!Array.isArray(row.source_record_ids) ||
+                row.source_record_ids.length < 1) {
+              errors.push(
+                `Causal edge ${row.narrative_edge_id || "(unknown)"} lost evidence lineage`
+              );
+            }
+
+            if (!row.time_horizon ||
+                !row.evidence_status ||
+                !row.effective_confidence_band) {
+              errors.push(
+                `Causal edge ${row.narrative_edge_id || "(unknown)"} lost narrative metadata`
+              );
+            }
+          }
+
+          if (!Array.isArray(candidates) || candidates.length < 1) {
+            errors.push(
+              "Cosmos Causal Narrative produced no potential_new_signals"
+            );
+          }
+
+          for (const candidate of candidates) {
+            if (candidate.status !== "candidate_only" ||
+                candidate.promotion_to_signal !== false) {
+              errors.push(
+                `Potential new signal ${candidate.candidate_signal_id || "(unknown)"} was improperly promoted`
+              );
+            }
+
+            if (Number(candidate.causal_depth) < 2) {
+              errors.push(
+                `Potential new signal ${candidate.candidate_signal_id || "(unknown)"} is too close to focal signal`
+              );
+            }
+          }
+
+          const contract = payload.narrative_contract || {};
+
+          if (contract.machine_readable_only !== true ||
+              contract.article_prose_generated !== false ||
+              contract.causal_direction_preserved !== true ||
+              contract.causal_depth_preserved !== true ||
+              contract.time_horizon_preserved !== true ||
+              contract.evidence_status_preserved !== true ||
+              contract.evidence_lineage_preserved !== true ||
+              contract.confidence_degrades_with_distance !== true ||
+              contract.why_now_separated_from_root_cause !== true ||
+              contract.possibility_never_silently_promoted_to_fact !== true) {
+            errors.push(
+              "Cosmos Causal Narrative narrative contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.mutates_input_graph !== false ||
+              safeguards.creates_unverified_facts !== false ||
+              safeguards.preserves_source_lineage !== true ||
+              safeguards.preserves_epistemic_status !== true ||
+              safeguards.causal_distance_penalizes_confidence !== true ||
+              safeguards.activation_logic_separate_from_causality !== true ||
+              safeguards.candidate_signals_not_auto_promoted !== true) {
+            errors.push(
+              "Cosmos Causal Narrative safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Causal Narrative v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Causal Narrative v0.1 isolated test passed.");
+          console.log(`Status:              ${payload.status}`);
+          console.log(`Why-now events:      ${whyNow.activation_event_count}`);
+          console.log(`Upstream drivers:    ${upstream.length}`);
+          console.log(`Direct effects:      ${direct.length}`);
+          console.log(`Second-order:        ${second.length}`);
+          console.log(`Third-order:         ${third.length}`);
+          console.log(`Emerging effects:    ${emerging.length}`);
+          console.log(`Butterfly edges:     ${downstream.length}`);
+          console.log(`Candidate signals:   ${candidates.length}`);
+          console.log(
+            "Why-now separation, causal ordering, confidence decay, evidence lineage and candidate-only butterfly safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -10434,6 +10938,357 @@ jobs:
           echo "Controlled Cosmos Graph Reversal v0.1 output committed."
           echo "Production Cosmos graph was not mutated."
 
+      - name: Generate Real Cosmos Causal Narrative v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_causal_narrative_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Causal Narrative v0.1 output."
+          echo "No external search, OpenAI/API generation, or graph mutation is executed by this step."
+
+          cat > /tmp/cosmos-causal-narrative-input-v0.1.json <<'JSON'
+          {
+            "focal_signal": {
+              "node_id": "substation_pressure",
+              "label": "Substation capacity pressure",
+              "type": "signal",
+              "role": "focal_signal"
+            },
+            "nodes": [
+              {
+                "node_id": "ai_compute",
+                "label": "AI compute demand growth",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "data_center_expansion",
+                "label": "Data-center capacity expansion",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "substation_pressure",
+                "label": "Substation capacity pressure",
+                "type": "signal",
+                "role": "focal_signal"
+              },
+              {
+                "node_id": "transformer_demand",
+                "label": "Transformer capacity demand",
+                "type": "consequence"
+              },
+              {
+                "node_id": "oem_capacity_pressure",
+                "label": "OEM manufacturing capacity pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "lead_time_pressure",
+                "label": "Transformer lead-time pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "project_schedule_pressure",
+                "label": "Project schedule pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "investment_relocation",
+                "label": "Potential geographic investment relocation",
+                "type": "scenario"
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "edge_ai_to_dc",
+                "from_node_id": "ai_compute",
+                "to_node_id": "data_center_expansion",
+                "relationship": "drives",
+                "evidence_status": "supported",
+                "confidence_score": 92,
+                "source_record_ids": [
+                  "evidence_ai_dc_1",
+                  "evidence_ai_dc_2"
+                ],
+                "time_horizon": "current_to_short",
+                "geography_scope": "global",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_dc_to_substation",
+                "from_node_id": "data_center_expansion",
+                "to_node_id": "substation_pressure",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "evidence_dc_grid_1",
+                  "evidence_dc_grid_2"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_substation_to_transformer",
+                "from_node_id": "substation_pressure",
+                "to_node_id": "transformer_demand",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "evidence_substation_transformer_1"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_transformer_to_oem",
+                "from_node_id": "transformer_demand",
+                "to_node_id": "oem_capacity_pressure",
+                "relationship": "constrains",
+                "evidence_status": "inferred",
+                "confidence_score": 78,
+                "source_record_ids": [
+                  "evidence_oem_capacity_1"
+                ],
+                "time_horizon": "short_to_mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_oem_to_lead",
+                "from_node_id": "oem_capacity_pressure",
+                "to_node_id": "lead_time_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 74,
+                "source_record_ids": [
+                  "evidence_lead_time_1"
+                ],
+                "time_horizon": "mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_lead_to_schedule",
+                "from_node_id": "lead_time_pressure",
+                "to_node_id": "project_schedule_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 70,
+                "source_record_ids": [
+                  "evidence_schedule_1"
+                ],
+                "time_horizon": "mid_to_long",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_schedule_to_relocation",
+                "from_node_id": "project_schedule_pressure",
+                "to_node_id": "investment_relocation",
+                "relationship": "may_influence",
+                "evidence_status": "speculative",
+                "confidence_score": 62,
+                "source_record_ids": [
+                  "evidence_location_scenario_1"
+                ],
+                "time_horizon": "long",
+                "geography_scope": "multi-region",
+                "temporal_scope": "forward"
+              }
+            ],
+            "activation_events": [
+              {
+                "activation_id": "activation_1",
+                "label": "Recent data-center project announcements increased",
+                "kind": "new_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "activation_evidence_1"
+                ],
+                "occurred_at": "2026-08-27T12:00:00Z",
+                "relevance_score": 95
+              },
+              {
+                "activation_id": "activation_2",
+                "label": "Utility load forecasts strengthened",
+                "kind": "strengthened_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "activation_evidence_2"
+                ],
+                "occurred_at": "2026-08-27T10:00:00Z",
+                "relevance_score": 90
+              },
+              {
+                "activation_id": "activation_3",
+                "label": "Transformer lead-time pressure remained unresolved",
+                "kind": "related_signal",
+                "evidence_status": "supported",
+                "confidence_score": 80,
+                "source_record_ids": [
+                  "activation_evidence_3"
+                ],
+                "occurred_at": "2026-08-26T18:00:00Z",
+                "relevance_score": 82
+              }
+            ],
+            "max_causal_depth": 5
+          }
+          JSON
+
+          node scripts/cosmos_causal_narrative.cjs \
+            --input /tmp/cosmos-causal-narrative-input-v0.1.json \
+            --out knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          test -f knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/causal-narrative-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "causal_narrative_resolved") {
+            throw new Error(
+              `Controlled Causal Narrative output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const story = payload.downstream_story || {};
+          const downstream =
+            payload.butterfly_effect?.all_downstream_edges || [];
+          const candidates =
+            payload.butterfly_effect?.potential_new_signals || [];
+
+          if (payload.why_now?.explanation_status !==
+                "activation_evidence_available" ||
+              Number(payload.why_now?.activation_event_count) !== 3) {
+            throw new Error(
+              "Controlled Causal Narrative why_now block invalid"
+            );
+          }
+
+          if ((payload.upstream_drivers || []).length !== 2 ||
+              (story.direct_effects || []).length !== 1 ||
+              (story.second_order_effects || []).length !== 1 ||
+              (story.third_order_effects || []).length !== 1 ||
+              (story.emerging_effects || []).length !== 2 ||
+              downstream.length !== 5) {
+            throw new Error(
+              "Controlled Causal Narrative causal grouping/counts invalid"
+            );
+          }
+
+          let prior = Infinity;
+
+          for (const row of [...downstream].sort(
+            (a,b) => Number(a.causal_depth)-Number(b.causal_depth)
+          )) {
+            const effective =
+              Number(row.effective_confidence_score);
+            const original =
+              Number(row.original_confidence_score);
+
+            if (effective > original + 1e-9 ||
+                effective > prior + 1e-9) {
+              throw new Error(
+                `Controlled Causal Narrative confidence inflation at depth ${row.causal_depth}`
+              );
+            }
+
+            prior = effective;
+          }
+
+          if (!candidates.length ||
+              candidates.some(
+                row =>
+                  row.status !== "candidate_only" ||
+                  row.promotion_to_signal !== false
+              )) {
+            throw new Error(
+              "Controlled Causal Narrative candidate-signal boundary invalid"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.mutates_input_graph !== false ||
+              payload.safeguards?.creates_unverified_facts !== false ||
+              payload.safeguards?.causal_distance_penalizes_confidence !== true ||
+              payload.safeguards?.activation_logic_separate_from_causality !== true ||
+              payload.safeguards?.candidate_signals_not_auto_promoted !== true) {
+            throw new Error(
+              "Controlled Causal Narrative safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Causal Narrative v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Why-now events:    ${payload.why_now.activation_event_count}`);
+          console.log(`Upstream drivers:  ${payload.upstream_drivers.length}`);
+          console.log(`Butterfly edges:   ${downstream.length}`);
+          console.log(`Candidate signals: ${candidates.length}`);
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Causal Narrative v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_causal_narrative_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Causal Narrative controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Causal Narrative v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Causal Narrative v0.1 output committed."
+          echo "No external search, OpenAI/API generation, or production graph mutation was executed."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -10592,6 +11447,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_graph_reversal_test }}" = "true" ]; then
             echo "Controlled graph-reversal-test-v0.1.json, graph-reversal-report-v0.1.json and graph-reversal-integrity-test-v0.1.json were generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_causal_narrative_test }}" = "true" ]; then
+            echo "Controlled causal-narrative-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -10608,7 +11466,8 @@ jobs:
              [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
