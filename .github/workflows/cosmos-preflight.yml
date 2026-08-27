@@ -1,28 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 name: Cosmos Preflight (No OpenAI)
 
 on:
@@ -123,6 +99,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_temporal_knowledge_test:
+        description: "Generate and commit controlled Cosmos Temporal Knowledge v0.1 output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -193,6 +174,7 @@ jobs:
             "scripts/cosmos_graph_reversal.cjs"
             "scripts/cosmos_causal_narrative.cjs"
             "scripts/cosmos_graph_evolution.cjs"
+            "scripts/cosmos_temporal_knowledge.cjs"
             "scripts/backfill_history_from_articles.js"
             "package.json"
           )
@@ -235,6 +217,7 @@ jobs:
           node --check scripts/cosmos_graph_reversal.cjs
           node --check scripts/cosmos_causal_narrative.cjs
           node --check scripts/cosmos_graph_evolution.cjs
+          node --check scripts/cosmos_temporal_knowledge.cjs
           node --check scripts/backfill_history_from_articles.js
           echo "All Cosmos JavaScript files passed syntax validation."
 
@@ -8035,6 +8018,280 @@ jobs:
           );
           NODE
 
+      - name: Test Cosmos Temporal Knowledge v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_temporal_knowledge.cjs \
+            "$TEST_DIR/scripts/cosmos_temporal_knowledge.cjs"
+
+          cat > "$TEST_DIR/temporal-graph-fixture-v0.1.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "cosmos_graph_snapshot",
+            "knowledge_records": [
+              {
+                "graph_record_id": "graph_past",
+                "knowledge_admission_id": "knowledge_admission_past",
+                "validation_target_id": "validation_temporal_shared",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 68,
+                "confidence_band": "moderate",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_past_1"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-07-01T00:00:00Z",
+                "deactivated_at": "2026-08-01T00:00:00Z",
+                "active": false
+              },
+              {
+                "graph_record_id": "graph_current",
+                "knowledge_admission_id": "knowledge_admission_current",
+                "validation_target_id": "validation_temporal_shared",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 82,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_current_1","evidence_current_2"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-08-01T00:00:01Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_transition",
+                "knowledge_admission_id": "knowledge_admission_transition",
+                "validation_target_id": "validation_transition",
+                "claim_class": "validated_qualified_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 74,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_qualified_knowledge",
+                "evidence_record_ids": ["evidence_transition_1"],
+                "temporal_scope": "transition",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-20T00:00:00Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_future",
+                "knowledge_admission_id": "knowledge_admission_future",
+                "validation_target_id": "validation_future",
+                "claim_class": "scenario_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 58,
+                "confidence_band": "moderate",
+                "epistemic_status": "scenario_knowledge",
+                "evidence_record_ids": ["evidence_future_1"],
+                "temporal_scope": "future",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-25T00:00:00Z",
+                "active": true
+              }
+            ],
+            "audit_log": []
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_temporal_knowledge.cjs \
+              --graph temporal-graph-fixture-v0.1.json \
+              --reference-time 2026-08-27T12:00:00Z \
+              --out knowledge/cosmos/temporal-knowledge-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/temporal-knowledge-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Temporal Knowledge did not create temporal-knowledge-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Temporal Knowledge schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "temporal_knowledge_resolved") {
+            errors.push(
+              `Temporal Knowledge failed: ${payload.status}`
+            );
+          }
+
+          if (payload.reference_time !== "2026-08-27T12:00:00Z") {
+            errors.push(
+              `Temporal Knowledge reference_time invalid: ${payload.reference_time}`
+            );
+          }
+
+          const state = payload.temporal_state || {};
+
+          if (Number(state.record_count) !== 4 ||
+              Number(state.past_count) !== 1 ||
+              Number(state.current_count) !== 1 ||
+              Number(state.transition_count) !== 1 ||
+              Number(state.future_count) !== 1 ||
+              Number(state.unknown_count) !== 0) {
+            errors.push(
+              `Temporal state counts invalid: ${JSON.stringify(state)}`
+            );
+          }
+
+          const timeline = payload.timeline || {};
+
+          if ((timeline.past || []).length !== 1 ||
+              timeline.past?.[0]?.graph_record_id !== "graph_past" ||
+              timeline.past?.[0]?.active !== false) {
+            errors.push(
+              "Historical record classification invalid"
+            );
+          }
+
+          if ((timeline.current || []).length !== 1 ||
+              timeline.current?.[0]?.graph_record_id !== "graph_current" ||
+              timeline.current?.[0]?.active !== true) {
+            errors.push(
+              "Current record classification invalid"
+            );
+          }
+
+          if ((timeline.transition || []).length !== 1 ||
+              timeline.transition?.[0]?.graph_record_id !== "graph_transition") {
+            errors.push(
+              "Transition record classification invalid"
+            );
+          }
+
+          if ((timeline.future || []).length !== 1 ||
+              timeline.future?.[0]?.graph_record_id !== "graph_future" ||
+              timeline.future?.[0]?.temporal_contract?.future_is_not_current_fact !== true ||
+              timeline.future?.[0]?.temporal_contract?.current_state_claimed !== false) {
+            errors.push(
+              "Future scenario boundary invalid"
+            );
+          }
+
+          const future = timeline.future?.[0];
+
+          if (!future ||
+              Number(future.confidence_score) !== 58 ||
+              future.confidence_band !== "moderate" ||
+              future.geography_scope !== "Global" ||
+              !Array.isArray(future.evidence_record_ids) ||
+              future.evidence_record_ids.length !== 1 ||
+              future.evidence_record_ids[0] !== "evidence_future_1") {
+            errors.push(
+              "Future record lost confidence/geography/evidence lineage"
+            );
+          }
+
+          const transitions = payload.transitions || [];
+
+          if (!Array.isArray(transitions) ||
+              transitions.length !== 1) {
+            errors.push(
+              `Expected one observed historical transition; got ${transitions.length}`
+            );
+          } else {
+            const t = transitions[0];
+
+            if (t.validation_target_id !== "validation_temporal_shared" ||
+                t.from_graph_record_id !== "graph_past" ||
+                t.to_graph_record_id !== "graph_current" ||
+                t.from_temporal_state !== "past" ||
+                t.to_temporal_state !== "current" ||
+                t.confidence_changed !== true ||
+                Number(t.confidence_delta) !== 14 ||
+                t.transition_status !== "observed_from_graph_history") {
+              errors.push(
+                "Past-to-current transition detection invalid"
+              );
+            }
+          }
+
+          const contract = payload.temporal_contract || {};
+
+          if (contract.past_present_future_separated !== true ||
+              contract.inactive_records_preserved_as_history !== true ||
+              contract.future_scenarios_not_promoted_to_current_fact !== true ||
+              contract.transition_state_supported !== true ||
+              contract.evidence_lineage_preserved !== true ||
+              contract.confidence_preserved !== true ||
+              contract.geography_scope_preserved !== true ||
+              contract.temporal_scope_preserved !== true) {
+            errors.push(
+              "Temporal Knowledge contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_historical_knowledge !== false ||
+              safeguards.rewrites_original_records !== false ||
+              safeguards.promotes_future_to_fact !== false ||
+              safeguards.collapses_temporal_states !== false ||
+              safeguards.preserves_source_lineage !== true ||
+              safeguards.preserves_confidence !== true ||
+              safeguards.preserves_epistemic_status !== true) {
+            errors.push(
+              "Temporal Knowledge safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Temporal Knowledge v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Temporal Knowledge v0.1 isolated test passed.");
+          console.log(`Status:       ${payload.status}`);
+          console.log(`Past:         ${state.past_count}`);
+          console.log(`Current:      ${state.current_count}`);
+          console.log(`Transition:   ${state.transition_count}`);
+          console.log(`Future:       ${state.future_count}`);
+          console.log(`Transitions:  ${state.transition_event_count}`);
+          console.log(
+            "Past/current/transition/future separation, future-not-fact boundary, lineage preservation and historical transition safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
       - name: Generate Real Cosmos State Output
         if: ${{ inputs.write_cosmos_state == true }}
         shell: bash
@@ -11987,6 +12244,186 @@ jobs:
           echo "Controlled Cosmos Graph Evolution v0.1 output committed."
           echo "Production Cosmos graph was not mutated."
 
+      - name: Generate Real Cosmos Temporal Knowledge v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_temporal_knowledge_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Temporal Knowledge v0.1 output."
+          echo "No external search, OpenAI/API generation, graph mutation or historical deletion is executed."
+
+          cat > /tmp/cosmos-temporal-knowledge-graph-v0.1.json <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "cosmos_graph_snapshot",
+            "knowledge_records": [
+              {
+                "graph_record_id": "graph_temporal_repository_past",
+                "knowledge_admission_id": "knowledge_temporal_repository_past",
+                "validation_target_id": "validation_temporal_repository",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 66,
+                "confidence_band": "moderate",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_temporal_repository_past"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-07-15T00:00:00Z",
+                "deactivated_at": "2026-08-15T00:00:00Z",
+                "active": false
+              },
+              {
+                "graph_record_id": "graph_temporal_repository_current",
+                "knowledge_admission_id": "knowledge_temporal_repository_current",
+                "validation_target_id": "validation_temporal_repository",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 81,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": [
+                  "evidence_temporal_repository_current_1",
+                  "evidence_temporal_repository_current_2"
+                ],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-08-15T00:00:01Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_temporal_repository_future",
+                "knowledge_admission_id": "knowledge_temporal_repository_future",
+                "validation_target_id": "validation_temporal_repository_future",
+                "claim_class": "scenario_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 55,
+                "confidence_band": "moderate",
+                "epistemic_status": "scenario_knowledge",
+                "evidence_record_ids": ["evidence_temporal_repository_future"],
+                "temporal_scope": "future",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-26T00:00:00Z",
+                "active": true
+              }
+            ],
+            "audit_log": []
+          }
+          JSON
+
+          node scripts/cosmos_temporal_knowledge.cjs \
+            --graph /tmp/cosmos-temporal-knowledge-graph-v0.1.json \
+            --reference-time 2026-08-27T12:00:00Z \
+            --out knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          test -f knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/temporal-knowledge-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "temporal_knowledge_resolved") {
+            throw new Error(
+              `Controlled Temporal Knowledge output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          if (Number(payload.temporal_state?.past_count) !== 1 ||
+              Number(payload.temporal_state?.current_count) !== 1 ||
+              Number(payload.temporal_state?.future_count) !== 1 ||
+              Number(payload.temporal_state?.transition_count) !== 0 ||
+              Number(payload.temporal_state?.unknown_count) !== 0) {
+            throw new Error(
+              "Controlled Temporal Knowledge temporal counts invalid"
+            );
+          }
+
+          const future = payload.timeline?.future?.[0];
+
+          if (!future ||
+              future.temporal_contract?.future_is_not_current_fact !== true ||
+              future.temporal_contract?.current_state_claimed !== false) {
+            throw new Error(
+              "Controlled future scenario was not safely separated from current fact"
+            );
+          }
+
+          if (payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.deletes_historical_knowledge !== false ||
+              payload.safeguards?.promotes_future_to_fact !== false ||
+              payload.safeguards?.collapses_temporal_states !== false ||
+              payload.safeguards?.preserves_source_lineage !== true ||
+              payload.safeguards?.preserves_confidence !== true) {
+            throw new Error(
+              "Controlled Temporal Knowledge safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos Temporal Knowledge v0.1 output created."
+          );
+          console.log(`Status:  ${payload.status}`);
+          console.log(`Past:    ${payload.temporal_state.past_count}`);
+          console.log(`Current: ${payload.temporal_state.current_count}`);
+          console.log(`Future:  ${payload.temporal_state.future_count}`);
+          console.log(`Output:  ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Temporal Knowledge v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_temporal_knowledge_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Temporal Knowledge controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Temporal Knowledge v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Temporal Knowledge v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
       - name: Generate Real Emergence Output
         if: ${{ inputs.write_emergence == true }}
         shell: bash
@@ -12151,6 +12588,9 @@ jobs:
           if [ "${{ inputs.write_cosmos_graph_evolution_test }}" = "true" ]; then
             echo "Controlled graph-evolution-test-v0.1.json was generated and committed."
           fi
+          if [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" = "true" ]; then
+            echo "Controlled temporal-knowledge-test-v0.1.json was generated and committed."
+          fi
           if [ "${{ inputs.write_emergence }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
@@ -12169,7 +12609,8 @@ jobs:
              [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ] && \
              [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ] && \
-             [ "${{ inputs.write_cosmos_graph_evolution_test }}" != "true" ]; then
+             [ "${{ inputs.write_cosmos_graph_evolution_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" != "true" ]; then
             echo "Isolated validation only; repository intelligence files were not changed."
           else
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
