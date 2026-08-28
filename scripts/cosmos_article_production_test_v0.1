@@ -1,0 +1,228 @@
+#!/usr/bin/env node
+
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { spawnSync } from "child_process";
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function writeJson(filePath, value) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
+}
+
+const generatorPath = path.resolve(
+  process.argv[process.argv.indexOf("--generator") + 1] ||
+  "scripts/generate_ai_news.js"
+);
+const rendererPath = path.resolve(
+  process.argv[process.argv.indexOf("--renderer") + 1] ||
+  "scripts/cosmos_render_articles_v0.1.mjs"
+);
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cosmos-article-production-"));
+const briefsDir = path.join(tmp, "briefs");
+const knowledgeDir = path.join(tmp, "knowledge");
+const articlesDir = path.join(tmp, "articles");
+const manifestPath = path.join(
+  knowledgeDir,
+  "cosmos",
+  "article-production-manifest-v0.1.json"
+);
+
+const brief = {
+  schema_version: "2.0-transitional",
+  content_mode: "ai_scenario",
+  updated_at: "2026-08-28T12:00:00Z",
+  date_utc: "2026-08-28",
+  items: [
+    {
+      id: "dev_match",
+      development_id: "dev_match",
+      created_at: "2026-08-28T12:00:00Z",
+      category: "Substations",
+      region: "North America",
+      countries: ["United States"],
+      title: "Matched production signal",
+      lede: "Matched signal lede.",
+      body: "Matched production article body.",
+      summary: "Matched summary.",
+      why_it_matters: "Matched signal matters.",
+      confidence_score: 0.78,
+      tags: ["substations"],
+      watchlist: ["Watch matched trigger"],
+      evidence: {
+        mode: "ai_scenario",
+        status: "unverified",
+        note: "Scenario evidence remains unverified."
+      },
+      entities: [],
+      relationships: []
+    },
+    {
+      id: "dev_fallback",
+      development_id: "dev_fallback",
+      created_at: "2026-08-28T12:00:00Z",
+      category: "Power Grid",
+      region: "Global",
+      countries: [],
+      title: "Fallback production signal",
+      lede: "Fallback signal lede.",
+      body: "Fallback production article body.",
+      summary: "Fallback summary.",
+      why_it_matters: "Fallback signal matters.",
+      confidence_score: 0.70,
+      tags: ["grid"],
+      watchlist: ["Watch fallback trigger"],
+      evidence: {
+        mode: "ai_scenario",
+        status: "unverified",
+        note: "Scenario evidence remains unverified."
+      },
+      entities: [],
+      relationships: []
+    }
+  ]
+};
+
+const narrative = {
+  schema_version: "0.1",
+  status: "causal_narrative_resolved",
+  generated_at: "2026-08-28T12:05:00Z",
+  focal_signal: {
+    development_id: "dev_match",
+    title: "Matched production signal"
+  },
+  why_now: [
+    { title: "A current activation signal strengthened", confidence: 88 }
+  ],
+  upstream_drivers: [
+    { statement: "Production driver", confidence: 84 }
+  ],
+  downstream_consequences: [
+    {
+      depth: 1,
+      from: "Matched production signal",
+      relation: "increases",
+      to: "Direct consequence",
+      effective_confidence: 80,
+      qualification: "scenario"
+    },
+    {
+      depth: 2,
+      from: "Direct consequence",
+      relation: "may influence",
+      to: "Second-order consequence",
+      effective_confidence: 58,
+      qualification: "scenario"
+    }
+  ],
+  what_could_change_this_path: ["A production trigger reverses"],
+  evidence_note: "Production causal fixture with preserved uncertainty."
+};
+
+const ignoredTestNarrative = {
+  schema_version: "0.1",
+  status: "causal_narrative_resolved",
+  focal_signal: {
+    development_id: "dev_fallback",
+    title: "Fallback production signal"
+  },
+  why_now: [{ title: "Fixture-only reason", confidence: 99 }]
+};
+
+writeJson(path.join(briefsDir, "daily-ai.json"), brief);
+writeJson(
+  path.join(knowledgeDir, "cosmos", "causal-narrative-production-v0.1.json"),
+  narrative
+);
+writeJson(
+  path.join(knowledgeDir, "cosmos", "causal-narrative-test-fixture.json"),
+  ignoredTestNarrative
+);
+
+const run = spawnSync(
+  process.execPath,
+  [
+    rendererPath,
+    "--generator", generatorPath,
+    "--brief", path.join(briefsDir, "daily-ai.json"),
+    "--knowledge-dir", knowledgeDir,
+    "--articles-dir", articlesDir,
+    "--manifest", manifestPath,
+    "--site-origin", "https://ptdtoday.com"
+  ],
+  {
+    encoding: "utf8",
+    env: process.env
+  }
+);
+
+if (run.status !== 0) {
+  console.error(run.stdout);
+  console.error(run.stderr);
+  process.exit(run.status || 1);
+}
+
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+const matchedHtml = fs.readFileSync(
+  path.join(articlesDir, "dev_match.html"),
+  "utf8"
+);
+const fallbackHtml = fs.readFileSync(
+  path.join(articlesDir, "dev_fallback.html"),
+  "utf8"
+);
+
+assert(
+  manifest.status === "article_production_integration_resolved",
+  "Production integration did not resolve"
+);
+assert(manifest.article_count === 2, "Expected two rendered articles");
+assert(manifest.causal_narrative_count === 1, "Expected one narrative-matched article");
+assert(manifest.fallback_count === 1, "Expected one fallback article");
+assert(
+  manifest.production_contract?.controlled_test_narratives_excluded_by_default === true,
+  "Controlled test narratives must be excluded by default"
+);
+assert(
+  matchedHtml.includes("A current activation signal strengthened."),
+  "Matched article did not use production causal narrative"
+);
+assert(
+  matchedHtml.includes("Production driver"),
+  "Matched article did not render production driver"
+);
+assert(
+  matchedHtml.includes("80% effective confidence") &&
+  matchedHtml.includes("58% effective confidence"),
+  "Matched article did not preserve causal confidence"
+);
+assert(
+  !fallbackHtml.includes("Fixture-only reason"),
+  "Fallback article incorrectly consumed controlled test narrative"
+);
+assert(
+  fallbackHtml.includes("Fallback summary"),
+  "Fallback article did not render safe fallback context"
+);
+
+const safeguards = manifest.safeguards || {};
+assert(safeguards.performs_external_search === false, "External search safeguard failed");
+assert(safeguards.calls_openai_or_external_api === false, "OpenAI/API safeguard failed");
+assert(safeguards.mutates_graph === false, "Graph mutation safeguard failed");
+assert(safeguards.rewrites_daily_brief === false, "Daily brief rewrite safeguard failed");
+assert(safeguards.promotes_scenario_to_fact === false, "Scenario promotion safeguard failed");
+
+console.log(JSON.stringify({
+  schema_version: "0.1",
+  status: "article_production_integration_test_passed",
+  article_count: manifest.article_count,
+  causal_narrative_count: manifest.causal_narrative_count,
+  fallback_count: manifest.fallback_count,
+  production_contract: manifest.production_contract,
+  safeguards: manifest.safeguards
+}, null, 2));
