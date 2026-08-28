@@ -1562,7 +1562,7 @@ function buildFallbackCausalPresentation(item) {
   };
 }
 
-function buildCausalPresentation(item, causalNarrative = null) {
+export function buildCausalPresentation(item, causalNarrative = null) {
   if (!causalNarrative) return buildFallbackCausalPresentation(item);
 
   const whyNowRows = Array.isArray(causalNarrative?.why_now)
@@ -1740,7 +1740,7 @@ function renderCausalSections(presentation) {
 /* Backward-compatible article rendering                                      */
 /* -------------------------------------------------------------------------- */
 
-function renderArticleHtml({ siteOrigin, item, payload, causalNarrative = null }) {
+export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative = null }) {
   const id = cleanString(item.development_id || item.id);
   const title = cleanString(item.title, "PTD Today");
   const lede = cleanString(item.lede || item.summary);
@@ -2332,7 +2332,13 @@ async function main() {
   console.log(`- ${articlesDir}/*.html`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+const isDirectExecution =
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+
+if (isDirectExecution) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
