@@ -1,0 +1,4693 @@
+name: Cosmos Preflight - Controlled Outputs
+
+on:
+  workflow_call:
+    inputs:
+      write_emergence:
+        description: "Generate and commit real emergence-current.json from current committed Cosmos data"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_state:
+        description: "Generate and commit real cosmos-state-current.json from current committed Cosmos data"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_core_test:
+        description: "Generate and commit controlled Cosmos Core v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_attention_test:
+        description: "Generate and commit controlled Cosmos Attention v0.2 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_consequence_test:
+        description: "Generate and commit controlled Cosmos Consequence v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_discovery_test:
+        description: "Generate and commit controlled Cosmos Discovery v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_acquisition_test:
+        description: "Generate and commit controlled Cosmos Acquisition v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_applicability_test:
+        description: "Generate and commit controlled Cosmos Acquisition Applicability v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_decomposition_test:
+        description: "Generate and commit controlled Cosmos Decomposition v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_candidate_validation_test:
+        description: "Generate and commit controlled Cosmos Candidate Validation Planner v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_evidence_strategy_test:
+        description: "Generate and commit controlled Cosmos Evidence Strategy v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_evidence_executor_test:
+        description: "Generate and commit controlled Cosmos Evidence Executor v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_evidence_validator_test:
+        description: "Generate and commit controlled Cosmos Evidence Validator v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_knowledge_admission_test:
+        description: "Generate and commit controlled Cosmos Knowledge Admission v0.1 test output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_graph_writer_test:
+        description: "Generate and commit controlled Cosmos Graph Writer v0.1 snapshot and report"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_graph_integrity_test:
+        description: "Generate and commit controlled Cosmos Graph Integrity v0.1 report"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_graph_reversal_test:
+        description: "Generate and commit controlled Cosmos Graph Reversal v0.1 snapshot, report and post-reversal integrity report"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_causal_narrative_test:
+        description: "Generate and commit controlled Cosmos Causal Narrative v0.1 output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_graph_evolution_test:
+        description: "Generate and commit controlled Cosmos Graph Evolution v0.1 planning output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_temporal_knowledge_test:
+        description: "Generate and commit controlled Cosmos Temporal Knowledge v0.1 output"
+        required: false
+        default: false
+        type: boolean
+      write_cosmos_first_party_identity_test:
+        description: "Generate and commit controlled Cosmos First-Party Identity v0.1 output"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  controlled-outputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync With Latest Branch Tip
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${GITHUB_REF_NAME}"
+          git checkout "${GITHUB_REF_NAME}"
+          git reset --hard "origin/${GITHUB_REF_NAME}"
+          echo "Workspace synchronized to origin/${GITHUB_REF_NAME}."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Real Cosmos State Output
+        if: ${{ inputs.write_cosmos_state == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating real Cosmos State from current committed Cosmos data."
+          echo "No OpenAI/API generation is executed by this step."
+
+          node scripts/cosmos_state_builder.cjs
+
+          test -f knowledge/cosmos/cosmos-state-current.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/cosmos-state-current.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.6") {
+            throw new Error(
+              `Unexpected Cosmos State schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "ready") {
+            throw new Error(`Invalid Cosmos State status: ${payload.status}`);
+          }
+
+          if (
+            payload.methodology?.reasoning_mode !==
+            "deterministic_cosmos_state_synthesis"
+          ) {
+            throw new Error("Cosmos State methodology missing");
+          }
+
+          if (
+            payload.safeguards?.forecast !== false ||
+            payload.safeguards?.evidence_quality_upgraded !== false
+          ) {
+            throw new Error("Cosmos State safeguards invalid");
+          }
+
+          if (!Array.isArray(payload.attention?.clusters)) {
+            throw new Error("Cosmos State attention.clusters[] missing");
+          }
+
+          if (payload.attention.clusters.length > 5) {
+            throw new Error(
+              `Cosmos State must retain at most 5 distinct bounded systems; found ${payload.attention.clusters.length}`
+            );
+          }
+
+          for (const cluster of payload.attention.clusters) {
+            if (!Array.isArray(cluster.member_attention_ids) || cluster.member_attention_ids.length < 2) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} is not a real multi-member bounded system`
+              );
+            }
+
+            if (cluster.member_attention_ids.length > 7) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.6 7-member bound`
+              );
+            }
+
+            if (
+              !cluster.anchor_attention_id ||
+              !["emergence", "pattern"].includes(cluster.anchor_type) ||
+              !Array.isArray(cluster.anchor_entity_ids) ||
+              cluster.anchor_entity_ids.length < 1
+            ) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing valid v0.6 anchor identity`
+              );
+            }
+
+            if (typeof cluster.cross_family !== "boolean") {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing cross_family`
+              );
+            }
+
+            if (!cluster.member_type_counts || typeof cluster.member_type_counts !== "object") {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing member_type_counts`
+              );
+            }
+
+            if (Number(cluster.member_type_counts.impact || 0) < 1) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} must contain at least 1 Impact member in v0.6`
+              );
+            }
+
+            if (Number(cluster.member_type_counts.emergence || 0) > 3) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} exceeds v0.6 Emergence cap`
+              );
+            }
+
+            const interpretation = String(cluster.interpretation || "").toLowerCase();
+            if (
+              !interpretation.includes("qualifies directly against the original anchor") ||
+              !interpretation.includes("membership is not transitive") ||
+              !interpretation.includes("anchor identity is preserved") ||
+              !interpretation.includes("relevant impact signals are explicitly admitted") ||
+              !interpretation.includes("near-duplicate emergence signals are suppressed") ||
+              !interpretation.includes("does not establish new causality") ||
+              !interpretation.includes("verification") ||
+              !interpretation.includes("forecast")
+            ) {
+              throw new Error(
+                `Cosmos State cluster ${cluster.cluster_id || "unknown"} missing v0.6 bounded-system safeguard`
+              );
+            }
+          }
+
+          const counts = payload.counts || {};
+
+          if (Number(counts.attention_cluster_members_max || 0) > 7) {
+            throw new Error("Cosmos State attention_cluster_members_max exceeds 7");
+          }
+
+          if (Number(counts.attention_distinct_system_target_max || 0) !== 5) {
+            throw new Error("Cosmos State attention_distinct_system_target_max must equal 5");
+          }
+
+          if (
+            Number(counts.attention_cross_family_clusters || 0) >
+            Number(counts.attention_clusters || 0)
+          ) {
+            throw new Error("Cosmos State cross-family cluster count invalid");
+          }
+
+          if (
+            Number(counts.attention_clusters_with_impact || 0) !==
+            Number(counts.attention_clusters || 0)
+          ) {
+            throw new Error(
+              `Cosmos State v0.6 requires every retained system to contain Impact; ` +
+              `with-impact=${counts.attention_clusters_with_impact}, ` +
+              `clusters=${counts.attention_clusters}`
+            );
+          }
+
+          if (
+            Number(counts.attention_cluster_emergence_members_max || 0) > 3
+          ) {
+            throw new Error(
+              "Cosmos State v0.6 attention_cluster_emergence_members_max exceeds 3"
+            );
+          }
+
+          if (
+            Number(counts.attention_patterns || 0) > 8 ||
+            Number(counts.attention_emergences || 0) > 6 ||
+            Number(counts.attention_impacts || 0) > 6
+          ) {
+            throw new Error("Cosmos State attention diversity quota invalid");
+          }
+
+          console.log("");
+          console.log("Real Cosmos State output created.");
+          console.log(`Date:       ${payload.date_utc}`);
+          console.log(`Attention:  ${payload.counts?.attention_retained ?? 0}`);
+          console.log(`Clusters:   ${payload.counts?.attention_clusters ?? 0}`);
+          console.log(`With Impact:${payload.counts?.attention_clusters_with_impact ?? 0}`);
+          console.log(`Max Emerg.: ${payload.counts?.attention_cluster_emergence_members_max ?? 0}`);
+          console.log(`Output:     ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos State Output
+        if: ${{ inputs.write_cosmos_state == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DATE_UTC="$(node -p "require('./knowledge/cosmos/cosmos-state-current.json').date_utc")"
+          HISTORY_FILE="knowledge/cosmos/cosmos-state-history/${DATE_UTC}.json"
+
+          if [ ! -f "$HISTORY_FILE" ]; then
+            echo "ERROR: Expected Cosmos State history file was not generated: $HISTORY_FILE"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/cosmos-state-current.json \
+            "$HISTORY_FILE"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos State changes to commit."
+          else
+            git commit -m "Update Cosmos state ${DATE_UTC}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Real Cosmos State output is now committed to the repository."
+          echo "No OpenAI generation was executed."
+
+      - name: Generate Real Cosmos Core v0.1 Test Output
+        if: ${{ inputs.write_cosmos_core_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Core v0.1 output from frozen Cosmos State."
+          echo "No OpenAI/API generation is executed by this step."
+
+          cat > /tmp/cosmos-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-core-input-v0.1.json \
+            --out knowledge/cosmos/core-test-v0.1.json
+
+          test -f knowledge/cosmos/core-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/core-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Core schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "context_resolved") {
+            throw new Error(
+              `Cosmos Core failed to resolve controlled context: ${payload.status}`
+            );
+          }
+
+          if (payload.knowledge_state?.cosmos_state_schema_version !== "0.6") {
+            throw new Error(
+              "Cosmos Core did not consume frozen Cosmos State v0.6"
+            );
+          }
+
+          if (payload.infinite_state?.terminal !== false ||
+              payload.infinite_state?.continuation_allowed !== true) {
+            throw new Error(
+              "Cosmos Core Infinite State continuation safeguards invalid"
+            );
+          }
+
+          if (payload.safeguards?.creates_new_causal_claims !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.forecast_generated !== false ||
+              payload.safeguards?.sector_whitelist_present !== false) {
+            throw new Error(
+              "Cosmos Core safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Core v0.1 output created.");
+          console.log(`Status:        ${payload.status}`);
+          console.log(
+            `Starting:      ${(payload.resolution?.starting_points || []).map(x => x.name).join(" | ")}`
+          );
+          console.log(
+            `Systems:       ${(payload.selected_context?.systems || []).length}`
+          );
+          console.log(
+            `Relationships: ${(payload.selected_context?.relationships || []).length}`
+          );
+          console.log(`Output:        ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Core v0.1 Test Output
+        if: ${{ inputs.write_cosmos_core_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/core-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Core test changes to commit."
+          else
+            git commit -m "Add Cosmos Core v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Core v0.1 output is now committed."
+          echo "No OpenAI generation was executed."
+
+      - name: Generate Real Cosmos Attention v0.2 Test Output
+        if: ${{ inputs.write_cosmos_attention_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Attention v0.2 output."
+          echo "No OpenAI/API generation is executed by this step."
+
+          cat > /tmp/cosmos-attention-core-input-v0.2.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_attention_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-attention-core-input-v0.2.json \
+            --out /tmp/core-for-attention-v0.2.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-attention-v0.2.json \
+            --out knowledge/cosmos/attention-test-v0.2.json
+
+          test -f knowledge/cosmos/attention-test-v0.2.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/attention-test-v0.2.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.2") {
+            throw new Error(
+              `Unexpected Cosmos Attention schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "attention_resolved") {
+            throw new Error(
+              `Cosmos Attention failed to resolve: ${payload.status}`
+            );
+          }
+
+          const active = payload.active_context || {};
+          const budget = payload.attention_state?.budget || {};
+          const suppressed = payload.attention_state?.suppressed_count || {};
+
+          if ((active.primary_pathways || []).length < 1 ||
+              (active.primary_pathways || []).length >
+                Number(budget.primary_pathways || 0)) {
+            throw new Error("Cosmos Attention primary pathway count invalid");
+          }
+
+          const primaryPathways = active.primary_pathways || [];
+          const rawEntityPattern = /^ent_[a-z0-9]+$/i;
+
+          for (const pathway of primaryPathways) {
+            const fromName = String(pathway.from?.name || "").trim();
+            const toName = String(pathway.to?.name || "").trim();
+
+            if (!fromName || !toName ||
+                rawEntityPattern.test(fromName) ||
+                rawEntityPattern.test(toName) ||
+                fromName === pathway.from?.entity_id ||
+                toName === pathway.to?.entity_id) {
+              throw new Error(
+                `Cosmos Attention v0.2 primary pathway exposes unresolved entity: ${pathway.pathway_id || "unknown"}`
+              );
+            }
+
+            if (!Number.isFinite(Number(pathway.relationship?.semantic_adjustment))) {
+              throw new Error(
+                `Cosmos Attention v0.2 pathway missing semantic adjustment: ${pathway.pathway_id || "unknown"}`
+              );
+            }
+          }
+
+          const locatedInPrimary = primaryPathways.filter(
+            pathway =>
+              String(pathway.relationship?.type || "").toUpperCase() === "LOCATED_IN"
+          );
+
+          const consequencePrimary = primaryPathways.filter(pathway =>
+            ["AFFECTS", "IMPACTS", "DRIVES", "REQUIRES", "DEPENDS_ON",
+             "CONSTRAINS", "ENABLES", "CAUSES", "INCREASES", "DECREASES",
+             "SUPPLIES", "SUPPORTS"].includes(
+              String(pathway.relationship?.type || "").toUpperCase()
+            )
+          );
+
+          if (locatedInPrimary.length > 0 && consequencePrimary.length > 0) {
+            const bestLocated = Math.max(
+              ...locatedInPrimary.map(x => Number(x.score || 0))
+            );
+            const bestConsequence = Math.max(
+              ...consequencePrimary.map(x => Number(x.score || 0))
+            );
+
+            if (bestLocated >= bestConsequence) {
+              throw new Error(
+                "Cosmos Attention v0.2 LOCATED_IN pathway outranks consequence pathway for impact question"
+              );
+            }
+          }
+
+          if ((active.patterns || []).length > Number(budget.patterns || 0) ||
+              (active.emergences || []).length > Number(budget.emergences || 0) ||
+              (active.impacts || []).length > Number(budget.impacts || 0) ||
+              (active.relationships || []).length > Number(budget.relationships || 0)) {
+            throw new Error(
+              "Cosmos Attention active context exceeds configured budget"
+            );
+          }
+
+          for (const key of ["patterns", "emergences", "impacts", "relationships"]) {
+            const discovered = Number(suppressed[key]?.discovered || 0);
+            const activeCount = Number(suppressed[key]?.active || 0);
+            const expandable =
+              Number(suppressed[key]?.available_for_expansion || 0);
+
+            if (activeCount + expandable !== discovered) {
+              throw new Error(
+                `Cosmos Attention ${key} existence-preservation invariant failed`
+              );
+            }
+          }
+
+          if (payload.infinite_state?.terminal !== false ||
+              payload.infinite_state?.continuation_allowed !== true ||
+              payload.infinite_state?.attention_can_move !== true ||
+              payload.infinite_state?.underlying_context_preserved !== true) {
+            throw new Error("Cosmos Attention Infinite State safeguards invalid");
+          }
+
+          if (payload.safeguards?.creates_new_causal_claims !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.forecast_generated !== false ||
+              payload.safeguards?.sector_whitelist_present !== false ||
+              payload.safeguards?.visibility_suppression_only !== true ||
+              payload.safeguards?.existence_preserved !== true ||
+              payload.safeguards?.primary_pathways_require_resolved_entities !== true ||
+              payload.safeguards?.descriptive_relationships_are_intent_weighted !== true ||
+              payload.safeguards?.source_lineage_preserved !== true) {
+            throw new Error("Cosmos Attention safeguards invalid");
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Attention v0.2 output created.");
+          console.log(`Status:           ${payload.status}`);
+          console.log(`Primary paths:    ${(active.primary_pathways || []).length}`);
+          console.log(
+            `Patterns:         ${suppressed.patterns?.discovered || 0} -> ${(active.patterns || []).length}`
+          );
+          console.log(
+            `Emergences:       ${suppressed.emergences?.discovered || 0} -> ${(active.emergences || []).length}`
+          );
+          console.log(
+            `Impacts:          ${suppressed.impacts?.discovered || 0} -> ${(active.impacts || []).length}`
+          );
+          console.log(
+            `Relationships:    ${suppressed.relationships?.discovered || 0} -> ${(active.relationships || []).length}`
+          );
+          console.log(`Output:           ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Attention v0.2 Test Output
+        if: ${{ inputs.write_cosmos_attention_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/attention-test-v0.2.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Attention test changes to commit."
+          else
+            git commit -m "Add Cosmos Attention v0.2 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Attention v0.2 output is now committed."
+          echo "No OpenAI generation was executed."
+
+      - name: Generate Real Cosmos Consequence v0.1 Test Output
+        if: ${{ inputs.write_cosmos_consequence_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Consequence v0.1 output."
+          echo "No OpenAI/API generation is executed by this step."
+
+          cat > /tmp/cosmos-consequence-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_consequence_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-consequence-core-input-v0.1.json \
+            --out /tmp/core-for-consequence-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-consequence-v0.1.json \
+            --out /tmp/attention-for-consequence-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-consequence-v0.2.json \
+            --out knowledge/cosmos/consequence-test-v0.1.json
+
+          test -f knowledge/cosmos/consequence-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/consequence-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Consequence schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "consequence_frontier_resolved") {
+            throw new Error(
+              `Cosmos Consequence failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_attention?.schema_version !== "0.2") {
+            throw new Error(
+              "Cosmos Consequence did not consume Attention v0.2"
+            );
+          }
+
+          const rows = payload.consequence_field?.consequences || [];
+          if (rows.length < 2) {
+            throw new Error(
+              "Controlled consequence output did not produce multiple consequences"
+            );
+          }
+
+          const distances = rows
+            .map(x => Number(x.butterfly_distance))
+            .filter(Number.isFinite);
+
+          if (!distances.includes(1) || !distances.some(x => x >= 2)) {
+            throw new Error(
+              "Controlled consequence output lacks direct and deeper ripple layers"
+            );
+          }
+
+          if (payload.butterfly_state?.conceptual_distance_limit !== null ||
+              payload.butterfly_state?.runtime_distance_is_computational_budget_only !== true ||
+              payload.butterfly_state?.continuation_possible !== true ||
+              payload.butterfly_state?.frontier_is_terminal !== false ||
+              payload.butterfly_state?.consequence_can_become_new_origin !== true) {
+            throw new Error(
+              "Cosmos Consequence butterfly-state invariants invalid"
+            );
+          }
+
+          if (payload.safeguards?.creates_new_causal_claims !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.numeric_forecast_generated !== false ||
+              payload.safeguards?.unidentified_material_is_not_assumed !== true ||
+              payload.safeguards?.reverse_relationships_are_not_treated_as_forward_causality !== true ||
+              payload.safeguards?.alternatives_require_validation !== true ||
+              payload.safeguards?.runtime_budget_is_not_conceptual_limit !== true ||
+              payload.safeguards?.source_lineage_preserved !== true) {
+            throw new Error(
+              "Cosmos Consequence safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Consequence v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Consequences:      ${rows.length}`);
+          console.log(`Max distance seen: ${Math.max(...distances)}`);
+          console.log(`Actors:            ${(payload.affected_actors || []).length}`);
+          console.log(`Alternatives:      ${(payload.alternatives?.items || []).length}`);
+          console.log(`Knowledge gaps:    ${(payload.knowledge_gaps?.items || []).length}`);
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Consequence v0.1 Test Output
+        if: ${{ inputs.write_cosmos_consequence_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/consequence-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Consequence test changes to commit."
+          else
+            git commit -m "Add Cosmos Consequence v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Consequence v0.1 output is now committed."
+          echo "No OpenAI generation was executed."
+
+      - name: Generate Real Cosmos Discovery v0.1 Test Output
+        if: ${{ inputs.write_cosmos_discovery_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Discovery v0.1 output."
+          echo "No OpenAI/API generation or external search is executed by this step."
+
+          cat > /tmp/cosmos-discovery-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_discovery_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-discovery-core-input-v0.1.json \
+            --out /tmp/core-for-discovery-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-discovery-v0.1.json \
+            --out /tmp/attention-for-discovery-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-discovery-v0.2.json \
+            --out /tmp/consequence-for-discovery-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-discovery-v0.1.json \
+            --out knowledge/cosmos/discovery-test-v0.1.json
+
+          test -f knowledge/cosmos/discovery-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/discovery-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Discovery schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "discovery_targets_resolved") {
+            throw new Error(
+              `Cosmos Discovery failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_consequence?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Discovery did not consume Consequence v0.1"
+            );
+          }
+
+          const targets =
+            payload.discovery_targets?.items ||
+            payload.discovery_targets ||
+            [];
+
+          const queue = payload.next_acquisition_queue || [];
+
+          if (!Array.isArray(targets) || targets.length < 1) {
+            throw new Error("Controlled Discovery output produced no discovery targets");
+          }
+
+          if (!Array.isArray(queue) || queue.length < 1) {
+            throw new Error("Controlled Discovery output produced no acquisition queue");
+          }
+
+          if (payload.curiosity_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Discovery did not preserve consequence continuation"
+            );
+          }
+
+          if (payload.curiosity_state?.conceptual_distance_limit !== null) {
+            throw new Error(
+              "Cosmos Discovery imposed a conceptual distance limit"
+            );
+          }
+
+          const reopenableTargets = targets.filter(
+            x => x.reopens_frontier_if_resolved === true
+          );
+
+          if (reopenableTargets.length < 1) {
+            throw new Error(
+              "Controlled Discovery output produced no frontier-reopening target"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_missing_entities !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.converts_unknown_to_fact !== false ||
+              payload.safeguards?.acquisition_targets_are_requests_for_knowledge_not_claims !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.consequence_frontier_may_be_reopened !== true) {
+            throw new Error("Cosmos Discovery safeguards invalid");
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Discovery v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Discovery targets: ${targets.length}`);
+          console.log(`Acquisition queue: ${queue.length}`);
+          console.log(
+            `Reopenable:         ${targets.filter(x => x.reopens_frontier_if_resolved === true).length}`
+          );
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Discovery v0.1 Test Output
+        if: ${{ inputs.write_cosmos_discovery_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/discovery-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Discovery test changes to commit."
+          else
+            git commit -m "Add Cosmos Discovery v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Discovery v0.1 output is now committed."
+          echo "No OpenAI generation or external search was executed."
+
+      - name: Generate Real Cosmos Acquisition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_acquisition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Acquisition v0.1 output."
+          echo "No OpenAI/API generation, external search, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-acquisition-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_acquisition_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-acquisition-core-input-v0.1.json \
+            --out /tmp/core-for-acquisition-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-acquisition-v0.1.json \
+            --out /tmp/attention-for-acquisition-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-acquisition-v0.2.json \
+            --out /tmp/consequence-for-acquisition-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-acquisition-v0.1.json \
+            --out /tmp/discovery-for-acquisition-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-acquisition-v0.1.json \
+            --out knowledge/cosmos/acquisition-test-v0.1.json
+
+          test -f knowledge/cosmos/acquisition-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/acquisition-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Acquisition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "acquisition_plans_resolved") {
+            throw new Error(
+              `Cosmos Acquisition failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_discovery?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Acquisition did not consume Discovery v0.1"
+            );
+          }
+
+          const plans = payload.acquisition_plans || [];
+          const executorQueue = payload.future_executor_queue || [];
+
+          if (!Array.isArray(plans) || plans.length < 1) {
+            throw new Error(
+              "Controlled Acquisition output produced no acquisition plans"
+            );
+          }
+
+          if (!Array.isArray(executorQueue) ||
+              executorQueue.length !== plans.length) {
+            throw new Error(
+              "Controlled Acquisition output executor queue invalid"
+            );
+          }
+
+          if (payload.acquisition_state?.execution_mode !== "planned_only" ||
+              payload.acquisition_state?.external_execution_connected !== false ||
+              payload.acquisition_state?.evidence_validation_required_before_graph_admission !== true ||
+              payload.acquisition_state?.conceptual_distance_limit !== null ||
+              payload.acquisition_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Acquisition state invariants invalid"
+            );
+          }
+
+          for (const plan of plans) {
+            if (!plan.discovery_target_id ||
+                !Array.isArray(plan.query_templates) ||
+                plan.query_templates.length < 1 ||
+                !Array.isArray(plan.source_strategy) ||
+                plan.source_strategy.length < 1 ||
+                plan.evidence_contract?.evidence_is_not_knowledge_until_validated !== true ||
+                plan.evidence_contract?.knowledge_admission_status !== "not_evaluated" ||
+                plan.execution?.mode !== "planned_only" ||
+                plan.execution?.network_execution_performed !== false ||
+                plan.execution?.executor_status !== "not_connected" ||
+                Number(plan.execution?.result_count) !== 0) {
+              throw new Error(
+                `Cosmos Acquisition plan invalid: ${plan.acquisition_plan_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.invents_entities !== false ||
+              payload.safeguards?.upgrades_evidence_quality !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.converts_acquisition_plan_to_fact !== false ||
+              payload.safeguards?.evidence_requires_validation !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.discovery_lineage_preserved !== true ||
+              payload.safeguards?.frontier_reopens_only_after_validation !== true) {
+            throw new Error(
+              "Cosmos Acquisition safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Acquisition v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Plans:             ${plans.length}`);
+          console.log(`Executor queue:    ${executorQueue.length}`);
+          console.log(
+            `Reopening plans:   ${plans.filter(x => x.frontier_effect?.reopens_frontier_if_resolved === true).length}`
+          );
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Acquisition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_acquisition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/acquisition-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Acquisition test changes to commit."
+          else
+            git commit -m "Add Cosmos Acquisition v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Acquisition v0.1 output is now committed."
+          echo "No OpenAI generation, external search, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Acquisition Applicability v0.1 Test Output
+        if: ${{ inputs.write_cosmos_applicability_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Acquisition Applicability v0.1 output."
+          echo "No OpenAI/API generation, external search, evidence execution, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-applicability-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_applicability_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-applicability-core-input-v0.1.json \
+            --out /tmp/core-for-applicability-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-applicability-v0.1.json \
+            --out /tmp/attention-for-applicability-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-applicability-v0.2.json \
+            --out /tmp/consequence-for-applicability-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-applicability-v0.1.json \
+            --out /tmp/discovery-for-applicability-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-applicability-v0.1.json \
+            --out /tmp/acquisition-for-applicability-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-applicability-v0.1.json \
+            --out knowledge/cosmos/applicability-test-v0.1.json
+
+          test -f knowledge/cosmos/applicability-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/applicability-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Applicability schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "acquisition_applicability_resolved") {
+            throw new Error(
+              `Cosmos Applicability failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_acquisition?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Applicability did not consume Acquisition v0.1"
+            );
+          }
+
+          const evaluations = payload.evaluations || [];
+          const executable = payload.executable_queue || [];
+          const decompositions = payload.decomposition_queue || [];
+
+          if (!Array.isArray(evaluations) || evaluations.length < 1) {
+            throw new Error(
+              "Controlled Applicability output produced no evaluations"
+            );
+          }
+
+          if (!Array.isArray(executable) ||
+              !Array.isArray(decompositions)) {
+            throw new Error(
+              "Controlled Applicability queues invalid"
+            );
+          }
+
+          if (payload.applicability_state?.external_execution_connected !== false ||
+              payload.applicability_state?.conceptual_distance_limit !== null ||
+              payload.applicability_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Applicability state invariants invalid"
+            );
+          }
+
+          const aiBlocks = evaluations.filter(row =>
+            row.applicability_status === "decomposition_required" &&
+            /artificial intelligence/i.test(row.subject) &&
+            ["identify_components", "identify_materials", "identify_capacity"]
+              .includes(row.target_type)
+          );
+
+          if (aiBlocks.length < 1) {
+            throw new Error(
+              "Controlled Applicability output did not block abstract AI physical investigation"
+            );
+          }
+
+          const transformerApplicable = evaluations.filter(row =>
+            row.applicability_status === "applicable" &&
+            /transformers/i.test(row.subject) &&
+            ["identify_components", "identify_materials", "identify_capacity"]
+              .includes(row.target_type)
+          );
+
+          if (transformerApplicable.length < 1) {
+            throw new Error(
+              "Controlled Applicability output did not retain Transformer physical investigation"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.invents_entities !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.mutates_source_acquisition_plans !== false ||
+              payload.safeguards?.executes_decomposition_hints_as_facts !== false ||
+              payload.safeguards?.abstract_targets_blocked_from_physical_execution !== true ||
+              payload.safeguards?.source_lineage_preserved !== true) {
+            throw new Error(
+              "Cosmos Applicability safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Acquisition Applicability v0.1 output created.");
+          console.log(`Status:                 ${payload.status}`);
+          console.log(`Evaluations:            ${evaluations.length}`);
+          console.log(`Executable:             ${executable.length}`);
+          console.log(`Decomposition required: ${decompositions.length}`);
+          console.log(`Output:                 ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Acquisition Applicability v0.1 Test Output
+        if: ${{ inputs.write_cosmos_applicability_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/applicability-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Applicability test changes to commit."
+          else
+            git commit -m "Add Cosmos Acquisition Applicability v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Acquisition Applicability v0.1 output is now committed."
+          echo "No OpenAI generation, external search, evidence execution, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Decomposition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_decomposition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Decomposition v0.1 output."
+          echo "No OpenAI/API generation, external search, candidate validation, execution, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-decomposition-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_decomposition_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-decomposition-core-input-v0.1.json \
+            --out /tmp/core-for-decomposition-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-decomposition-v0.1.json \
+            --out /tmp/attention-for-decomposition-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-decomposition-v0.2.json \
+            --out /tmp/consequence-for-decomposition-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-decomposition-v0.1.json \
+            --out /tmp/discovery-for-decomposition-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-decomposition-v0.1.json \
+            --out /tmp/acquisition-for-decomposition-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-decomposition-v0.1.json \
+            --out /tmp/applicability-for-decomposition-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-decomposition-v0.1.json \
+            --out knowledge/cosmos/decomposition-test-v0.1.json
+
+          test -f knowledge/cosmos/decomposition-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/decomposition-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Decomposition schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "decomposition_candidates_resolved") {
+            throw new Error(
+              `Cosmos Decomposition failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_applicability?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Decomposition did not consume Applicability v0.1"
+            );
+          }
+
+          const decompositions = payload.decompositions || [];
+          const candidates = decompositions.flatMap(
+            row => Array.isArray(row.candidates) ? row.candidates : []
+          );
+          const queue = payload.candidate_validation_queue || [];
+
+          if (!Array.isArray(decompositions) || decompositions.length < 1 ||
+              candidates.length < 1 ||
+              !Array.isArray(queue) ||
+              queue.length !== candidates.length) {
+            throw new Error(
+              "Controlled Decomposition output structure invalid"
+            );
+          }
+
+          if (payload.decomposition_state?.validated_candidate_count !== 0 ||
+              payload.decomposition_state?.executable_candidate_count !== 0 ||
+              payload.decomposition_state?.external_execution_connected !== false ||
+              payload.decomposition_state?.conceptual_distance_limit !== null ||
+              payload.decomposition_state?.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Decomposition state invariants invalid"
+            );
+          }
+
+          for (const candidate of candidates) {
+            if (candidate.epistemic_status !== "provisional_candidate" ||
+                candidate.validated !== false ||
+                candidate.executable !== false ||
+                !Array.isArray(candidate.validation_requirements) ||
+                !Array.isArray(candidate.proposed_investigation_types)) {
+              throw new Error(
+                `Cosmos Decomposition candidate invalid: ${candidate.decomposition_candidate_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.executes_candidates !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.parent_acquisition_plans_remain_blocked !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Cosmos Decomposition safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Decomposition v0.1 output created.");
+          console.log(`Status:           ${payload.status}`);
+          console.log(`Decompositions:   ${decompositions.length}`);
+          console.log(`Candidates:       ${candidates.length}`);
+          console.log(`Validation queue: ${queue.length}`);
+          console.log(`Output:           ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Decomposition v0.1 Test Output
+        if: ${{ inputs.write_cosmos_decomposition_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/decomposition-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Decomposition test changes to commit."
+          else
+            git commit -m "Add Cosmos Decomposition v0.1 controlled test output"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Decomposition v0.1 output is now committed."
+          echo "No OpenAI generation, external search, candidate validation, execution, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Candidate Validation Planner v0.1 Test Output
+        if: ${{ inputs.write_cosmos_candidate_validation_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Candidate Validation Planner v0.1 output."
+          echo "No OpenAI/API generation, external search, candidate validation, execution, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-candidate-validation-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_candidate_validation_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-candidate-validation-core-input-v0.1.json \
+            --out /tmp/core-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-candidate-validation-v0.1.json \
+            --out /tmp/attention-for-candidate-validation-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-candidate-validation-v0.2.json \
+            --out /tmp/consequence-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-candidate-validation-v0.1.json \
+            --out /tmp/discovery-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-candidate-validation-v0.1.json \
+            --out /tmp/acquisition-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-candidate-validation-v0.1.json \
+            --out /tmp/applicability-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-candidate-validation-v0.1.json \
+            --out /tmp/decomposition-for-candidate-validation-v0.1.json
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input /tmp/decomposition-for-candidate-validation-v0.1.json \
+            --out knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          test -f knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/candidate-validation-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Candidate Validation schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "candidate_validation_targets_resolved") {
+            throw new Error(
+              `Candidate Validation Planner failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_decomposition?.schema_version !== "0.1") {
+            throw new Error(
+              "Candidate Validation Planner did not consume Decomposition v0.1"
+            );
+          }
+
+          const state = payload.validation_state || {};
+          const targets = payload.validation_targets || [];
+          const queue = payload.future_evidence_queue || [];
+
+          if (Number(state.raw_candidate_count) !== 21 ||
+              Number(state.unique_validation_target_count) !== 7 ||
+              Number(state.duplicate_candidate_count) !== 14) {
+            throw new Error(
+              `Candidate Validation consolidation invariant failed: raw=${state.raw_candidate_count}, unique=${state.unique_validation_target_count}, duplicates=${state.duplicate_candidate_count}`
+            );
+          }
+
+          if (!Array.isArray(targets) || targets.length !== 7 ||
+              !Array.isArray(queue) || queue.length !== targets.length) {
+            throw new Error(
+              "Controlled Candidate Validation output target/evidence queue invalid"
+            );
+          }
+
+          if (Number(state.validated_target_count) !== 0 ||
+              Number(state.executable_target_count) !== 0 ||
+              state.external_execution_connected !== false ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Candidate Validation state invariants invalid"
+            );
+          }
+
+          const dataCenters = targets.find(
+            x => String(x.candidate_label || "").toLowerCase() === "data centers"
+          );
+
+          if (!dataCenters ||
+              Number(dataCenters.merged_from_candidate_count) !== 3) {
+            throw new Error(
+              "Candidate Validation did not correctly consolidate data centers candidate"
+            );
+          }
+
+          for (const expectedType of [
+            "identify_components",
+            "identify_materials",
+            "identify_capacity"
+          ]) {
+            if (!(dataCenters.original_target_types || []).includes(expectedType)) {
+              throw new Error(
+                `Candidate Validation data centers target lost ${expectedType}`
+              );
+            }
+          }
+
+          for (const target of targets) {
+            if (target.epistemic_status !== "provisional_candidate" ||
+                target.validation_status !== "not_started" ||
+                target.executable !== false ||
+                target.knowledge_status !== "not_admitted" ||
+                !target.validation_objective ||
+                !Array.isArray(target.validation_requirements) ||
+                !target.evidence_contract ||
+                !Array.isArray(target.post_validation_fanout?.if_supported)) {
+              throw new Error(
+                `Candidate Validation target invalid: ${target.validation_target_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.duplicate_semantic_candidates_consolidated !== true ||
+              payload.safeguards?.parent_lineage_preserved !== true ||
+              payload.safeguards?.investigation_intents_preserved !== true ||
+              payload.safeguards?.evidence_required_before_validation !== true ||
+              payload.safeguards?.validation_required_before_execution !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Candidate Validation Planner safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Candidate Validation Planner v0.1 output created.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Raw candidates:        ${state.raw_candidate_count}`);
+          console.log(`Unique targets:        ${state.unique_validation_target_count}`);
+          console.log(`Duplicates collapsed:  ${state.duplicate_candidate_count}`);
+          console.log(`Future evidence queue: ${queue.length}`);
+          console.log(`Output:                ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Candidate Validation Planner v0.1 Test Output
+        if: ${{ inputs.write_cosmos_candidate_validation_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/candidate-validation-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Candidate Validation test changes to commit."
+          else
+            git commit -m "Add Cosmos Candidate Validation Planner v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Candidate Validation Planner v0.1 output is now committed."
+          echo "No OpenAI generation, external search, validation execution, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Evidence Strategy v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_strategy_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Evidence Strategy v0.1 output."
+          echo "No OpenAI/API generation, external search, evidence collection, validation, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-evidence-strategy-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_evidence_strategy_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-evidence-strategy-core-input-v0.1.json \
+            --out /tmp/core-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-evidence-strategy-v0.1.json \
+            --out /tmp/attention-for-evidence-strategy-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-evidence-strategy-v0.2.json \
+            --out /tmp/consequence-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-evidence-strategy-v0.1.json \
+            --out /tmp/discovery-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-evidence-strategy-v0.1.json \
+            --out /tmp/acquisition-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-evidence-strategy-v0.1.json \
+            --out /tmp/applicability-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-evidence-strategy-v0.1.json \
+            --out /tmp/decomposition-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input /tmp/decomposition-for-evidence-strategy-v0.1.json \
+            --out /tmp/candidate-validation-for-evidence-strategy-v0.1.json
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input /tmp/candidate-validation-for-evidence-strategy-v0.1.json \
+            --out knowledge/cosmos/evidence-strategy-test-v0.1.json
+
+          test -f knowledge/cosmos/evidence-strategy-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/evidence-strategy-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected Cosmos Evidence Strategy schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "evidence_strategy_resolved") {
+            throw new Error(
+              `Cosmos Evidence Strategy failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_candidate_validation?.schema_version !== "0.1") {
+            throw new Error(
+              "Cosmos Evidence Strategy did not consume Candidate Validation v0.1"
+            );
+          }
+
+          const state = payload.evidence_state || {};
+          const tasks = payload.evidence_tasks || [];
+          const queue = payload.executor_queue || [];
+
+          if (Number(state.validation_target_count) !== 7 ||
+              Number(state.evidence_task_count) !== 7 ||
+              !Array.isArray(tasks) ||
+              tasks.length !== 7 ||
+              !Array.isArray(queue) ||
+              queue.length !== 7) {
+            throw new Error(
+              "Controlled Evidence Strategy target/task/queue invariants failed"
+            );
+          }
+
+          if (Number(state.evidence_collected_count) !== 0 ||
+              Number(state.validation_decision_count) !== 0 ||
+              Number(state.knowledge_admission_count) !== 0 ||
+              state.external_execution_connected !== false ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Cosmos Evidence Strategy state invariants invalid"
+            );
+          }
+
+          for (const task of tasks) {
+            if (!task.evidence_task_id ||
+                !task.validation_target_id ||
+                !Array.isArray(task.evidence_questions) ||
+                task.evidence_questions.length < 1 ||
+                !Array.isArray(task.query_intents) ||
+                task.query_intents.length < 1 ||
+                !Array.isArray(task.source_strategy) ||
+                task.source_strategy.length < 1 ||
+                Number(task.sufficiency_contract?.minimum_total_sources) !== 2 ||
+                Number(task.sufficiency_contract?.minimum_independent_sources) !== 2 ||
+                task.sufficiency_contract?.contradiction_search_required !== true ||
+                task.validation_boundary?.evidence_collected !== false ||
+                task.validation_boundary?.validation_decision_made !== false ||
+                task.validation_boundary?.candidate_promoted !== false ||
+                task.validation_boundary?.executable !== false ||
+                task.validation_boundary?.knowledge_admitted !== false ||
+                task.execution?.mode !== "planned_only" ||
+                task.execution?.external_search_performed !== false ||
+                task.execution?.executor_status !== "not_connected" ||
+                Number(task.execution?.result_count) !== 0) {
+              throw new Error(
+                `Cosmos Evidence Strategy task invalid: ${task.evidence_task_id || "unknown"}`
+              );
+            }
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.collects_evidence !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.source_authority_ranked !== true ||
+              payload.safeguards?.contradiction_search_required !== true ||
+              payload.safeguards?.independent_corroboration_planned !== true ||
+              payload.safeguards?.validation_required_before_execution !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Cosmos Evidence Strategy safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Evidence Strategy v0.1 output created.");
+          console.log(`Status:             ${payload.status}`);
+          console.log(`Validation targets: ${state.validation_target_count}`);
+          console.log(`Evidence tasks:     ${state.evidence_task_count}`);
+          console.log(`Executor queue:     ${queue.length}`);
+          console.log(`Output:             ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Evidence Strategy v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_strategy_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/evidence-strategy-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Evidence Strategy test changes to commit."
+          else
+            git commit -m "Add Cosmos Evidence Strategy v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Evidence Strategy v0.1 output is now committed."
+          echo "No OpenAI generation, external search, evidence collection, validation execution, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Evidence Executor v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_executor_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Evidence Executor v0.1 output."
+          echo "The adapter input is a deterministic fixture. No public web/API search, validation decision, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-evidence-executor-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_evidence_executor_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-evidence-executor-core-input-v0.1.json \
+            --out /tmp/core-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-evidence-executor-v0.1.json \
+            --out /tmp/attention-for-evidence-executor-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-evidence-executor-v0.2.json \
+            --out /tmp/consequence-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-evidence-executor-v0.1.json \
+            --out /tmp/discovery-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-evidence-executor-v0.1.json \
+            --out /tmp/acquisition-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-evidence-executor-v0.1.json \
+            --out /tmp/applicability-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-evidence-executor-v0.1.json \
+            --out /tmp/decomposition-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input /tmp/decomposition-for-evidence-executor-v0.1.json \
+            --out /tmp/candidate-validation-for-evidence-executor-v0.1.json
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input /tmp/candidate-validation-for-evidence-executor-v0.1.json \
+            --out /tmp/evidence-strategy-for-executor-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const strategy = JSON.parse(
+            fs.readFileSync(
+              "/tmp/evidence-strategy-for-executor-v0.1.json",
+              "utf8"
+            )
+          );
+
+          const dataCenters = (strategy.evidence_tasks || []).find(
+            x => String(x.candidate_label || "").toLowerCase() === "data centers"
+          );
+
+          if (!dataCenters) {
+            throw new Error(
+              "Controlled Evidence Executor fixture could not locate the data centers task."
+            );
+          }
+
+          const now = new Date().toISOString();
+
+          const adapter = {
+            schema_version: "0.1-fixture",
+            generated_at: now,
+            status: "adapter_results_ready",
+            adapter_name: "cosmos_preflight_mock_adapter",
+            adapter_mode: "deterministic_fixture",
+            results: [
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://operator/ai-data-center-1",
+                source_type: "official_project_or_operator_document",
+                source_title: "Operator AI Infrastructure Requirement",
+                source_publisher_or_owner: "Fixture Operator A",
+                source_date_or_event_date: "2026-01-15",
+                retrieved_at: now,
+                extracted_fact: "The operator identifies data-center infrastructure as a direct platform for AI compute workloads.",
+                supports_or_contradicts: "supports",
+                directness: "direct",
+                authority_score: 100,
+                independence_group: "operator-a",
+                geography_scope: "global",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" official",
+                source_rank: 1
+              },
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://government/ai-data-center-2",
+                source_type: "regulatory_or_government_document",
+                source_title: "Government AI Compute Infrastructure Assessment",
+                source_publisher_or_owner: "Fixture Government Agency",
+                source_date_or_event_date: "2026-02-20",
+                retrieved_at: now,
+                extracted_fact: "The assessment describes data centers as infrastructure supporting large-scale AI training and inference.",
+                supports_or_contradicts: "supports",
+                directness: "direct",
+                authority_score: 96,
+                independence_group: "government-a",
+                geography_scope: "United States",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" infrastructure",
+                source_rank: 2
+              },
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://research/ai-edge-counterexample",
+                source_type: "industry_body_or_research_institution",
+                source_title: "Edge AI Deployment Note",
+                source_publisher_or_owner: "Fixture Research Institution",
+                source_date_or_event_date: "2026-03-10",
+                retrieved_at: now,
+                extracted_fact: "Some AI inference workloads can execute on distributed edge devices without relying on centralized data centers.",
+                supports_or_contradicts: "contradicts",
+                directness: "direct",
+                authority_score: 82,
+                independence_group: "research-a",
+                geography_scope: "global",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" limitation",
+                source_rank: 3
+              },
+              {
+                evidence_task_id: "unknown_fixture_task",
+                source_url_or_identifier: "fixture://orphan/result",
+                source_title: "Unmapped Adapter Result",
+                extracted_fact: "This result intentionally exercises orphan-result preservation.",
+                supports_or_contradicts: "context_only",
+                directness: "contextual",
+                authority_score: 50,
+                independence_group: "orphan-fixture"
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            "/tmp/evidence-adapter-results-v0.1.json",
+            JSON.stringify(adapter, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy /tmp/evidence-strategy-for-executor-v0.1.json \
+            --adapter-results /tmp/evidence-adapter-results-v0.1.json \
+            --out knowledge/cosmos/evidence-executor-test-v0.1.json
+
+          test -f knowledge/cosmos/evidence-executor-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/evidence-executor-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "evidence_execution_normalized") {
+            throw new Error(
+              `Controlled Evidence Executor output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const state = payload.execution_state || {};
+          const records = payload.evidence_records || [];
+          const orphans = payload.orphan_results || [];
+
+          if (Number(state.evidence_task_count) !== 7 ||
+              Number(state.adapter_result_count) !== 4 ||
+              Number(state.normalized_evidence_record_count) !== 3 ||
+              Number(state.orphan_result_count) !== 1 ||
+              Number(state.validation_decision_count) !== 0 ||
+              Number(state.knowledge_admission_count) !== 0 ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Controlled Evidence Executor state invariants invalid"
+            );
+          }
+
+          if (records.filter(
+                r => r.supports_or_contradicts === "contradicts"
+              ).length !== 1) {
+            throw new Error(
+              "Controlled Evidence Executor did not preserve contradictory evidence"
+            );
+          }
+
+          if (!Array.isArray(payload.validation_queue) ||
+              payload.validation_queue.length !== 7 ||
+              payload.validation_queue.some(
+                row =>
+                  row.validation_status !== "not_started" ||
+                  row.knowledge_admission_status !== "not_started"
+              )) {
+            throw new Error(
+              "Controlled Evidence Executor validation queue invalid"
+            );
+          }
+
+          if (!Array.isArray(orphans) ||
+              orphans.length !== 1 ||
+              orphans[0].reason !== "unknown_evidence_task_id") {
+            throw new Error(
+              "Controlled Evidence Executor orphan handling invalid"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.adapter_results_are_treated_as_unvalidated_input !== true ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.validates_candidates !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.preserves_contradictory_evidence !== true ||
+              payload.safeguards?.preserves_orphan_adapter_results !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.validation_required_before_knowledge_admission !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Controlled Evidence Executor safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Evidence Executor v0.1 output created.");
+          console.log(`Status:             ${payload.status}`);
+          console.log(`Evidence tasks:     ${state.evidence_task_count}`);
+          console.log(`Adapter results:    ${state.adapter_result_count}`);
+          console.log(`Normalized records: ${state.normalized_evidence_record_count}`);
+          console.log(`Orphan results:     ${state.orphan_result_count}`);
+          console.log(`Output:             ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Evidence Executor v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_executor_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/evidence-executor-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Evidence Executor test changes to commit."
+          else
+            git commit -m "Add Cosmos Evidence Executor v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Evidence Executor v0.1 output is now committed."
+          echo "No public web/API search, validation decision, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Evidence Validator v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_validator_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Evidence Validator v0.1 output."
+          echo "No public web/API search, permanent knowledge admission, or knowledge-graph write is executed by this step."
+
+          cat > /tmp/cosmos-evidence-validator-core-input-v0.1.json <<'JSON'
+          {
+            "text": "What could AI data-center growth affect?",
+            "language": "en",
+            "entity_hints": [
+              "Artificial Intelligence",
+              "Data Centers"
+            ],
+            "mode": "open",
+            "metadata": {
+              "purpose": "controlled_evidence_validator_repository_test"
+            }
+          }
+          JSON
+
+          node scripts/cosmos_core.cjs \
+            --input /tmp/cosmos-evidence-validator-core-input-v0.1.json \
+            --out /tmp/core-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_attention.cjs \
+            --input /tmp/core-for-evidence-validator-v0.1.json \
+            --out /tmp/attention-for-evidence-validator-v0.2.json
+
+          node scripts/cosmos_consequence.cjs \
+            --input /tmp/attention-for-evidence-validator-v0.2.json \
+            --out /tmp/consequence-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_discovery.cjs \
+            --input /tmp/consequence-for-evidence-validator-v0.1.json \
+            --out /tmp/discovery-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_acquisition.cjs \
+            --input /tmp/discovery-for-evidence-validator-v0.1.json \
+            --out /tmp/acquisition-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_acquisition_applicability.cjs \
+            --input /tmp/acquisition-for-evidence-validator-v0.1.json \
+            --out /tmp/applicability-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_decomposition.cjs \
+            --input /tmp/applicability-for-evidence-validator-v0.1.json \
+            --out /tmp/decomposition-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input /tmp/decomposition-for-evidence-validator-v0.1.json \
+            --out /tmp/candidate-validation-for-evidence-validator-v0.1.json
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input /tmp/candidate-validation-for-evidence-validator-v0.1.json \
+            --out /tmp/evidence-strategy-for-validator-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const strategy = JSON.parse(
+            fs.readFileSync(
+              "/tmp/evidence-strategy-for-validator-v0.1.json",
+              "utf8"
+            )
+          );
+
+          const dataCenters = (strategy.evidence_tasks || []).find(
+            x => String(x.candidate_label || "").toLowerCase() === "data centers"
+          );
+
+          if (!dataCenters) {
+            throw new Error(
+              "Controlled Evidence Validator fixture could not locate the data centers task."
+            );
+          }
+
+          const now = new Date().toISOString();
+
+          const adapter = {
+            schema_version: "0.1-fixture",
+            generated_at: now,
+            status: "adapter_results_ready",
+            adapter_name: "cosmos_preflight_mock_adapter",
+            adapter_mode: "deterministic_fixture",
+            results: [
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://operator/ai-data-center-1",
+                source_type: "official_project_or_operator_document",
+                source_title: "Operator AI Infrastructure Requirement",
+                source_publisher_or_owner: "Fixture Operator A",
+                source_date_or_event_date: "2026-01-15",
+                retrieved_at: now,
+                extracted_fact: "The operator identifies data-center infrastructure as a direct platform for AI compute workloads.",
+                supports_or_contradicts: "supports",
+                directness: "direct",
+                authority_score: 100,
+                independence_group: "operator-a",
+                geography_scope: "global",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" official",
+                source_rank: 1
+              },
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://government/ai-data-center-2",
+                source_type: "regulatory_or_government_document",
+                source_title: "Government AI Compute Infrastructure Assessment",
+                source_publisher_or_owner: "Fixture Government Agency",
+                source_date_or_event_date: "2026-02-20",
+                retrieved_at: now,
+                extracted_fact: "The assessment describes data centers as infrastructure supporting large-scale AI training and inference.",
+                supports_or_contradicts: "supports",
+                directness: "direct",
+                authority_score: 96,
+                independence_group: "government-a",
+                geography_scope: "United States",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" infrastructure",
+                source_rank: 2
+              },
+              {
+                evidence_task_id: dataCenters.evidence_task_id,
+                source_url_or_identifier: "fixture://research/ai-edge-counterexample",
+                source_type: "industry_body_or_research_institution",
+                source_title: "Edge AI Deployment Note",
+                source_publisher_or_owner: "Fixture Research Institution",
+                source_date_or_event_date: "2026-03-10",
+                retrieved_at: now,
+                extracted_fact: "Some AI inference workloads can execute on distributed edge devices without relying on centralized data centers.",
+                supports_or_contradicts: "contradicts",
+                directness: "direct",
+                authority_score: 82,
+                independence_group: "research-a",
+                geography_scope: "global",
+                temporal_scope: "current",
+                entity_ids: [],
+                relationship_ids: [],
+                query_used: "\"data centers\" \"Artificial Intelligence\" limitation",
+                source_rank: 3
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            "/tmp/evidence-adapter-results-for-validator-v0.1.json",
+            JSON.stringify(adapter, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy /tmp/evidence-strategy-for-validator-v0.1.json \
+            --adapter-results /tmp/evidence-adapter-results-for-validator-v0.1.json \
+            --out /tmp/evidence-executor-for-validator-v0.1.json
+
+          node scripts/cosmos_evidence_validator.cjs \
+            --input /tmp/evidence-executor-for-validator-v0.1.json \
+            --out knowledge/cosmos/evidence-validator-test-v0.1.json
+
+          test -f knowledge/cosmos/evidence-validator-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+          const file = "knowledge/cosmos/evidence-validator-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "evidence_validation_resolved") {
+            throw new Error(
+              `Controlled Evidence Validator output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const state = payload.validation_state || {};
+          const validations = payload.validations || [];
+          const queue = payload.knowledge_admission_queue || [];
+
+          if (Number(state.validation_target_count) !== 7 ||
+              Number(state.completed_validation_count) !== 7 ||
+              Number(state.knowledge_admission_count) !== 0 ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Controlled Evidence Validator state invariants invalid"
+            );
+          }
+
+          if (!Array.isArray(validations) || validations.length !== 7) {
+            throw new Error(
+              "Controlled Evidence Validator validations[] invalid"
+            );
+          }
+
+          const dataCenters = validations.find(
+            row => Number(row.evidence_record_count) === 3
+          );
+
+          if (!dataCenters ||
+              dataCenters.disposition !== "partially_supported" ||
+              dataCenters.validation_status !== "completed" ||
+              dataCenters.knowledge_admission_status !== "not_started" ||
+              dataCenters.executable_for_knowledge_admission !== true) {
+            throw new Error(
+              "Controlled Data Centers validation did not resolve as partially_supported and admission-eligible"
+            );
+          }
+
+          if (validations.filter(
+                row => row.disposition === "insufficient_evidence"
+              ).length !== 6) {
+            throw new Error(
+              "Controlled Evidence Validator expected 6 insufficient-evidence validations"
+            );
+          }
+
+          if (!Array.isArray(queue) || queue.length !== 1 ||
+              queue[0].disposition !== "partially_supported" ||
+              queue[0].admission_status !== "not_started") {
+            throw new Error(
+              "Controlled Evidence Validator knowledge_admission_queue invalid"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.invents_evidence !== false ||
+              payload.safeguards?.preserves_contradictory_evidence !== true ||
+              payload.safeguards?.validation_uses_authority_directness_independence_and_completeness !== true ||
+              payload.safeguards?.validation_does_not_equal_knowledge_admission !== true ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.promotes_candidates_to_facts !== false ||
+              payload.safeguards?.unresolved_or_insufficient_targets_not_admission_eligible !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.unlimited_conceptual_continuation_preserved !== true) {
+            throw new Error(
+              "Controlled Evidence Validator safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Evidence Validator v0.1 output created.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Validations:           ${validations.length}`);
+          console.log(`Partially supported:   ${state.by_disposition?.partially_supported || 0}`);
+          console.log(`Insufficient evidence: ${state.by_disposition?.insufficient_evidence || 0}`);
+          console.log(`Admission queue:       ${queue.length}`);
+          console.log(`Output:                ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Evidence Validator v0.1 Test Output
+        if: ${{ inputs.write_cosmos_evidence_validator_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/evidence-validator-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Evidence Validator test changes to commit."
+          else
+            git commit -m "Add Cosmos Evidence Validator v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Evidence Validator v0.1 output is now committed."
+          echo "No public web/API search, permanent knowledge admission, or knowledge-graph write was executed."
+
+      - name: Generate Real Cosmos Knowledge Admission v0.1 Test Output
+        if: ${{ inputs.write_cosmos_knowledge_admission_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Knowledge Admission v0.1 output."
+          echo "No public web/API search and no direct knowledge-graph mutation is executed by this step."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const partiallySupported = {
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            evidence_record_count: 3,
+            disposition: "partially_supported",
+            confidence_score: 76,
+            confidence_band: "high",
+            evidence_balance: {
+              weighted_support: 196,
+              weighted_contradiction: 82,
+              independent_source_groups: 3,
+              direct_high_authority_records: 2
+            },
+            validation_status: "completed",
+            knowledge_admission_status: "not_started",
+            executable_for_knowledge_admission: true
+          };
+
+          const insufficientIds = [
+            ["evidence_validation_3bf0d71e", "evidence_task_a6c1f318", "validation_787b6815"],
+            ["evidence_validation_64afcb5a", "evidence_task_3e80975d", "validation_83169e60"],
+            ["evidence_validation_932cf23f", "evidence_task_64771149", "validation_4600b8de"],
+            ["evidence_validation_e319e364", "evidence_task_2f80881f", "validation_224b2a14"],
+            ["evidence_validation_eb71dfb6", "evidence_task_e1e94d3d", "validation_e81fcda8"],
+            ["evidence_validation_60545a0e", "evidence_task_39c6b18f", "validation_04b40a48"]
+          ];
+
+          const insufficient = insufficientIds.map(([validationId, taskId, targetId]) => ({
+            evidence_validation_id: validationId,
+            evidence_task_id: taskId,
+            validation_target_id: targetId,
+            evidence_record_ids: [],
+            evidence_record_count: 0,
+            disposition: "insufficient_evidence",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            evidence_balance: {
+              weighted_support: 0,
+              weighted_contradiction: 0,
+              independent_source_groups: 0,
+              direct_high_authority_records: 0
+            },
+            validation_status: "completed",
+            knowledge_admission_status: "not_started",
+            executable_for_knowledge_admission: false
+          }));
+
+          const fixture = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "evidence_validation_resolved",
+            validation_state: {
+              validation_target_count: 7,
+              completed_validation_count: 7,
+              knowledge_admission_count: 0,
+              by_disposition: {
+                insufficient_evidence: 6,
+                partially_supported: 1
+              },
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            validations: [
+              insufficient[0],
+              insufficient[1],
+              partiallySupported,
+              insufficient[2],
+              insufficient[3],
+              insufficient[4],
+              insufficient[5]
+            ],
+            knowledge_admission_queue: [
+              {
+                admission_rank: 1,
+                evidence_validation_id: partiallySupported.evidence_validation_id,
+                evidence_task_id: partiallySupported.evidence_task_id,
+                validation_target_id: partiallySupported.validation_target_id,
+                disposition: "partially_supported",
+                confidence_score: 76,
+                confidence_band: "high",
+                evidence_record_ids: partiallySupported.evidence_record_ids,
+                admission_status: "not_started"
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            "/tmp/evidence-validator-for-knowledge-admission-v0.1.json",
+            JSON.stringify(fixture, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_knowledge_admission.cjs \
+            --input /tmp/evidence-validator-for-knowledge-admission-v0.1.json \
+            --out knowledge/cosmos/knowledge-admission-test-v0.1.json
+
+          test -f knowledge/cosmos/knowledge-admission-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/knowledge-admission-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "knowledge_admission_resolved") {
+            throw new Error(
+              `Controlled Knowledge Admission output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const state = payload.admission_state || {};
+          const admissions = payload.admissions || [];
+          const queue = payload.graph_write_queue || [];
+
+          if (Number(state.validation_count) !== 7 ||
+              Number(state.reviewed_count) !== 7 ||
+              Number(state.validator_queue_count) !== 1 ||
+              Number(state.graph_write_eligible_count) !== 1 ||
+              Number(state.graph_write_count) !== 0 ||
+              state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            throw new Error(
+              "Controlled Knowledge Admission state invariants invalid"
+            );
+          }
+
+          const qualified = admissions.filter(
+            row => row.decision === "admit_with_qualification"
+          );
+
+          const rejected = admissions.filter(
+            row => row.decision === "reject_for_now"
+          );
+
+          if (qualified.length !== 1 ||
+              rejected.length !== 6 ||
+              qualified[0].validation_disposition !== "partially_supported" ||
+              Number(qualified[0].confidence_score) !== 76 ||
+              qualified[0].qualification?.must_preserve_contradiction !== true ||
+              qualified[0].graph_write_eligibility !== true) {
+            throw new Error(
+              "Controlled Knowledge Admission decisions invalid"
+            );
+          }
+
+          if (!Array.isArray(queue) ||
+              queue.length !== 1 ||
+              queue[0].admitted_claim_class !== "validated_qualified_relationship" ||
+              queue[0].graph_write_status !== "not_started") {
+            throw new Error(
+              "Controlled Knowledge Admission graph_write_queue invalid"
+            );
+          }
+
+          if (payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.admission_is_not_graph_mutation !== true ||
+              payload.safeguards?.insufficient_or_unresolved_not_admitted !== true ||
+              payload.safeguards?.partially_supported_requires_qualification !== true ||
+              payload.safeguards?.contradictory_evidence_preserved !== true ||
+              payload.safeguards?.confidence_preserved !== true ||
+              payload.safeguards?.source_lineage_preserved !== true ||
+              payload.safeguards?.graph_writes_are_reversible !== true ||
+              payload.safeguards?.separate_graph_writer_required !== true) {
+            throw new Error(
+              "Controlled Knowledge Admission safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Knowledge Admission v0.1 output created.");
+          console.log(`Status:                   ${payload.status}`);
+          console.log(`Validations reviewed:     ${state.reviewed_count}`);
+          console.log(`Admit with qualification: ${state.by_decision?.admit_with_qualification || 0}`);
+          console.log(`Reject for now:           ${state.by_decision?.reject_for_now || 0}`);
+          console.log(`Graph-write eligible:     ${state.graph_write_eligible_count}`);
+          console.log(`Graph writes performed:   ${state.graph_write_count}`);
+          console.log(`Output:                   ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Knowledge Admission v0.1 Test Output
+        if: ${{ inputs.write_cosmos_knowledge_admission_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/knowledge-admission-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Knowledge Admission test changes to commit."
+          else
+            git commit -m "Add Cosmos Knowledge Admission v0.1 controlled test output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Knowledge Admission v0.1 output is now committed."
+          echo "No public web/API search or direct knowledge-graph mutation was executed."
+
+      - name: Generate Real Cosmos Graph Writer v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_writer_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Writer v0.1 snapshot."
+          echo "This does NOT mutate the production Cosmos graph in place."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_qualified",
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const rejected = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_rejected",
+            evidence_validation_id: "evidence_validation_rejected_fixture",
+            evidence_task_id: "evidence_task_rejected_fixture",
+            validation_target_id: "validation_rejected_fixture",
+            admitted_claim_class: null,
+            validation_disposition: "insufficient_evidence",
+            decision: "reject_for_now",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            persistence_level: "none",
+            evidence_record_ids: [],
+            qualification: {
+              contradiction_present: false,
+              must_preserve_contradiction: false
+            },
+            graph_write_eligibility: false,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              validation_count: 2,
+              reviewed_count: 2,
+              graph_write_eligible_count: 1,
+              graph_write_count: 0,
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified, rejected],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 },
+              { ...rejected, graph_write_rank: 2 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-writer-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-writer-before-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          BEFORE_HASH="$(sha256sum /tmp/cosmos-graph-writer-before-v0.1.json | awk '{print $1}')"
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-graph-writer-admission-v0.1.json \
+            --graph /tmp/cosmos-graph-writer-before-v0.1.json \
+            --out knowledge/cosmos/graph-writer-test-v0.1.json \
+            --report knowledge/cosmos/graph-writer-report-v0.1.json
+
+          AFTER_HASH="$(sha256sum /tmp/cosmos-graph-writer-before-v0.1.json | awk '{print $1}')"
+
+          if [ "$BEFORE_HASH" != "$AFTER_HASH" ]; then
+            echo "ERROR: Graph Writer mutated its input graph."
+            exit 1
+          fi
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-graph-writer-admission-v0.1.json \
+            --graph knowledge/cosmos/graph-writer-test-v0.1.json \
+            --out /tmp/cosmos-graph-writer-second-v0.1.json \
+            --report /tmp/cosmos-graph-writer-second-report-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graph = JSON.parse(
+            fs.readFileSync(
+              "knowledge/cosmos/graph-writer-test-v0.1.json",
+              "utf8"
+            )
+          );
+          const report = JSON.parse(
+            fs.readFileSync(
+              "knowledge/cosmos/graph-writer-report-v0.1.json",
+              "utf8"
+            )
+          );
+          const graph2 = JSON.parse(
+            fs.readFileSync(
+              "/tmp/cosmos-graph-writer-second-v0.1.json",
+              "utf8"
+            )
+          );
+          const report2 = JSON.parse(
+            fs.readFileSync(
+              "/tmp/cosmos-graph-writer-second-report-v0.1.json",
+              "utf8"
+            )
+          );
+
+          if (report.status !== "graph_write_resolved") {
+            throw new Error(`Graph Writer report status invalid: ${report.status}`);
+          }
+
+          if (report.graph_write_state?.written_count !== 1 ||
+              report.graph_write_state?.error_count !== 1) {
+            throw new Error(
+              "First Graph Writer run must write exactly 1 eligible record and refuse exactly 1 non-eligible record."
+            );
+          }
+
+          if (!Array.isArray(graph.knowledge_records) ||
+              graph.knowledge_records.length !== 1 ||
+              !Array.isArray(graph.audit_log) ||
+              graph.audit_log.length !== 1) {
+            throw new Error(
+              "Controlled graph snapshot must contain exactly 1 knowledge record and 1 audit record."
+            );
+          }
+
+          const record = graph.knowledge_records[0];
+
+          if (record.validation_disposition !== "partially_supported" ||
+              Number(record.confidence_score) !== 76 ||
+              record.qualification?.contradiction_present !== true ||
+              record.qualification?.must_preserve_contradiction !== true ||
+              !Array.isArray(record.evidence_record_ids) ||
+              record.evidence_record_ids.length !== 3 ||
+              record.reversibility?.reversible !== true) {
+            throw new Error(
+              "Graph Writer failed to preserve qualification, contradiction, confidence, evidence lineage or reversibility."
+            );
+          }
+
+          if (report2.graph_write_state?.written_count !== 0 ||
+              report2.graph_write_state?.idempotent_skip_count !== 1 ||
+              graph2.knowledge_records?.length !== 1 ||
+              graph2.audit_log?.length !== 1) {
+            throw new Error(
+              "Graph Writer idempotency test failed on second execution."
+            );
+          }
+
+          if (report.safeguards?.mutates_input_graph_in_place !== false ||
+              report.safeguards?.writes_only_explicit_output_snapshot !== true ||
+              report.safeguards?.requires_graph_write_eligibility !== true ||
+              report.safeguards?.preserves_qualification !== true ||
+              report.safeguards?.preserves_contradiction !== true ||
+              report.safeguards?.preserves_confidence !== true ||
+              report.safeguards?.preserves_evidence_lineage !== true ||
+              report.safeguards?.idempotent_by_knowledge_admission_id !== true ||
+              report.safeguards?.audit_log_required !== true ||
+              report.safeguards?.graph_records_reversible !== true ||
+              report.safeguards?.rejected_admissions_not_written !== true) {
+            throw new Error("Graph Writer safeguards invalid.");
+          }
+
+          console.log("");
+          console.log("Controlled Cosmos Graph Writer v0.1 output created.");
+          console.log(`Graph records:       ${graph.knowledge_records.length}`);
+          console.log(`Audit records:       ${graph.audit_log.length}`);
+          console.log(`First-run writes:    ${report.graph_write_state.written_count}`);
+          console.log(`Second-run writes:   ${report2.graph_write_state.written_count}`);
+          console.log(`Idempotent skips:    ${report2.graph_write_state.idempotent_skip_count}`);
+          console.log("Production graph mutation: NONE");
+          NODE
+
+      - name: Commit Real Cosmos Graph Writer v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_writer_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/graph-writer-test-v0.1.json \
+            knowledge/cosmos/graph-writer-report-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Writer controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Writer v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Writer v0.1 snapshot/report committed."
+          echo "Production Cosmos graph was not mutated."
+
+      - name: Generate Real Cosmos Graph Integrity v0.1 Controlled Report
+        if: ${{ inputs.write_cosmos_graph_integrity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Integrity v0.1 report."
+          echo "This validates an isolated snapshot and does not mutate the production graph."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_integrity_repository_fixture",
+            evidence_validation_id: "evidence_validation_integrity_repository_fixture",
+            evidence_task_id: "evidence_task_integrity_repository_fixture",
+            validation_target_id: "validation_integrity_repository_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_integrity_repository_1",
+              "evidence_integrity_repository_2",
+              "evidence_integrity_repository_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-integrity-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            "/tmp/cosmos-integrity-empty-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-integrity-admission-v0.1.json \
+            --graph /tmp/cosmos-integrity-empty-graph-v0.1.json \
+            --out /tmp/cosmos-integrity-valid-graph-v0.1.json \
+            --report /tmp/cosmos-integrity-writer-report-v0.1.json
+
+          node scripts/cosmos_graph_integrity.cjs \
+            --graph /tmp/cosmos-integrity-valid-graph-v0.1.json \
+            --out knowledge/cosmos/graph-integrity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/graph-integrity-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "graph_integrity_passed") {
+            throw new Error(
+              `Controlled Graph Integrity output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          if (Number(payload.integrity_state?.error_count) !== 0 ||
+              payload.integrity_state?.production_write_safe !== true) {
+            throw new Error(
+              "Controlled Graph Integrity report must have zero errors and production_write_safe=true"
+            );
+          }
+
+          if (Number(payload.graph_state?.knowledge_record_count) !== 1 ||
+              Number(payload.graph_state?.active_record_count) !== 1 ||
+              Number(payload.graph_state?.audit_record_count) !== 1) {
+            throw new Error(
+              "Controlled Graph Integrity graph-state counts invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Graph Integrity v0.1 report created.");
+          console.log(`Status:                ${payload.status}`);
+          console.log(`Errors:                ${payload.integrity_state.error_count}`);
+          console.log(`Warnings:              ${payload.integrity_state.warning_count}`);
+          console.log(`Production write safe: ${payload.integrity_state.production_write_safe}`);
+          console.log(`Output:                ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Integrity v0.1 Controlled Report
+        if: ${{ inputs.write_cosmos_graph_integrity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/graph-integrity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Integrity controlled-report changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Integrity v0.1 controlled report"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Integrity v0.1 report committed."
+          echo "Production Cosmos graph was not mutated."
+
+      - name: Generate Real Cosmos Graph Reversal v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_reversal_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Reversal v0.1 output."
+          echo "This operates on an isolated graph snapshot, not the production Cosmos graph."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_reversal_repository_fixture",
+            evidence_validation_id: "evidence_validation_reversal_repository_fixture",
+            evidence_task_id: "evidence_task_reversal_repository_fixture",
+            validation_target_id: "validation_reversal_repository_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_reversal_repository_1",
+              "evidence_reversal_repository_2",
+              "evidence_reversal_repository_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          const request = {
+            schema_version: "0.1",
+            knowledge_admission_id:
+              "knowledge_admission_reversal_repository_fixture",
+            reason:
+              "controlled_repository_reversal_test",
+            requested_by:
+              "cosmos_preflight"
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-empty-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+          fs.writeFileSync(
+            "/tmp/cosmos-reversal-request-v0.1.json",
+            JSON.stringify(request, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_writer.cjs \
+            --admission /tmp/cosmos-reversal-admission-v0.1.json \
+            --graph /tmp/cosmos-reversal-empty-graph-v0.1.json \
+            --out /tmp/cosmos-pre-reversal-graph-v0.1.json \
+            --report /tmp/cosmos-pre-reversal-writer-report-v0.1.json
+
+          node scripts/cosmos_graph_reversal.cjs \
+            --graph /tmp/cosmos-pre-reversal-graph-v0.1.json \
+            --request /tmp/cosmos-reversal-request-v0.1.json \
+            --out knowledge/cosmos/graph-reversal-test-v0.1.json \
+            --report knowledge/cosmos/graph-reversal-report-v0.1.json
+
+          node scripts/cosmos_graph_integrity.cjs \
+            --graph knowledge/cosmos/graph-reversal-test-v0.1.json \
+            --out knowledge/cosmos/graph-reversal-integrity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graphFile =
+            "knowledge/cosmos/graph-reversal-test-v0.1.json";
+          const reportFile =
+            "knowledge/cosmos/graph-reversal-report-v0.1.json";
+          const integrityFile =
+            "knowledge/cosmos/graph-reversal-integrity-test-v0.1.json";
+
+          const graph = JSON.parse(fs.readFileSync(graphFile, "utf8"));
+          const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+          const integrity = JSON.parse(
+            fs.readFileSync(integrityFile, "utf8")
+          );
+
+          if (report.status !== "graph_reversal_resolved" ||
+              Number(report.reversal_state?.reversed_count) !== 1 ||
+              Number(report.reversal_state?.error_count) !== 0) {
+            throw new Error(
+              "Controlled Graph Reversal output invalid"
+            );
+          }
+
+          if (graph.knowledge_records?.length !== 1 ||
+              graph.knowledge_records?.[0]?.active !== false ||
+              graph.audit_log?.length !== 2) {
+            throw new Error(
+              "Controlled reversed graph must contain 1 inactive historical record and 2 audits"
+            );
+          }
+
+          if (integrity.status !== "graph_integrity_passed" ||
+              Number(integrity.integrity_state?.error_count) !== 0 ||
+              integrity.integrity_state?.production_write_safe !== true) {
+            throw new Error(
+              "Controlled reversed graph failed post-reversal Graph Integrity"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Graph Reversal v0.1 output created.");
+          console.log(`Reversed records: ${report.reversal_state.reversed_count}`);
+          console.log(`Active records:   ${integrity.graph_state.active_record_count}`);
+          console.log(`Inactive records: ${integrity.graph_state.inactive_record_count}`);
+          console.log(`Audit records:    ${integrity.graph_state.audit_record_count}`);
+          console.log(`Integrity:        ${integrity.status}`);
+          console.log(`Graph:            ${graphFile}`);
+          console.log(`Report:           ${reportFile}`);
+          console.log(`Integrity report: ${integrityFile}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Reversal v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_reversal_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/graph-reversal-test-v0.1.json \
+            knowledge/cosmos/graph-reversal-report-v0.1.json \
+            knowledge/cosmos/graph-reversal-integrity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Reversal controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Reversal v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Reversal v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
+      - name: Generate Real Cosmos Causal Narrative v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_causal_narrative_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Causal Narrative v0.1 output."
+          echo "No external search, OpenAI/API generation, or graph mutation is executed by this step."
+
+          cat > /tmp/cosmos-causal-narrative-input-v0.1.json <<'JSON'
+          {
+            "focal_signal": {
+              "node_id": "substation_pressure",
+              "label": "Substation capacity pressure",
+              "type": "signal",
+              "role": "focal_signal"
+            },
+            "nodes": [
+              {
+                "node_id": "ai_compute",
+                "label": "AI compute demand growth",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "data_center_expansion",
+                "label": "Data-center capacity expansion",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "substation_pressure",
+                "label": "Substation capacity pressure",
+                "type": "signal",
+                "role": "focal_signal"
+              },
+              {
+                "node_id": "transformer_demand",
+                "label": "Transformer capacity demand",
+                "type": "consequence"
+              },
+              {
+                "node_id": "oem_capacity_pressure",
+                "label": "OEM manufacturing capacity pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "lead_time_pressure",
+                "label": "Transformer lead-time pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "project_schedule_pressure",
+                "label": "Project schedule pressure",
+                "type": "consequence"
+              },
+              {
+                "node_id": "investment_relocation",
+                "label": "Potential geographic investment relocation",
+                "type": "scenario"
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "edge_ai_to_dc",
+                "from_node_id": "ai_compute",
+                "to_node_id": "data_center_expansion",
+                "relationship": "drives",
+                "evidence_status": "supported",
+                "confidence_score": 92,
+                "source_record_ids": [
+                  "evidence_ai_dc_1",
+                  "evidence_ai_dc_2"
+                ],
+                "time_horizon": "current_to_short",
+                "geography_scope": "global",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_dc_to_substation",
+                "from_node_id": "data_center_expansion",
+                "to_node_id": "substation_pressure",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "evidence_dc_grid_1",
+                  "evidence_dc_grid_2"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_substation_to_transformer",
+                "from_node_id": "substation_pressure",
+                "to_node_id": "transformer_demand",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "evidence_substation_transformer_1"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_transformer_to_oem",
+                "from_node_id": "transformer_demand",
+                "to_node_id": "oem_capacity_pressure",
+                "relationship": "constrains",
+                "evidence_status": "inferred",
+                "confidence_score": 78,
+                "source_record_ids": [
+                  "evidence_oem_capacity_1"
+                ],
+                "time_horizon": "short_to_mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_oem_to_lead",
+                "from_node_id": "oem_capacity_pressure",
+                "to_node_id": "lead_time_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 74,
+                "source_record_ids": [
+                  "evidence_lead_time_1"
+                ],
+                "time_horizon": "mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_lead_to_schedule",
+                "from_node_id": "lead_time_pressure",
+                "to_node_id": "project_schedule_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 70,
+                "source_record_ids": [
+                  "evidence_schedule_1"
+                ],
+                "time_horizon": "mid_to_long",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_schedule_to_relocation",
+                "from_node_id": "project_schedule_pressure",
+                "to_node_id": "investment_relocation",
+                "relationship": "may_influence",
+                "evidence_status": "speculative",
+                "confidence_score": 62,
+                "source_record_ids": [
+                  "evidence_location_scenario_1"
+                ],
+                "time_horizon": "long",
+                "geography_scope": "multi-region",
+                "temporal_scope": "forward"
+              }
+            ],
+            "activation_events": [
+              {
+                "activation_id": "activation_1",
+                "label": "Recent data-center project announcements increased",
+                "kind": "new_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "activation_evidence_1"
+                ],
+                "occurred_at": "2026-08-27T12:00:00Z",
+                "relevance_score": 95
+              },
+              {
+                "activation_id": "activation_2",
+                "label": "Utility load forecasts strengthened",
+                "kind": "strengthened_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "activation_evidence_2"
+                ],
+                "occurred_at": "2026-08-27T10:00:00Z",
+                "relevance_score": 90
+              },
+              {
+                "activation_id": "activation_3",
+                "label": "Transformer lead-time pressure remained unresolved",
+                "kind": "related_signal",
+                "evidence_status": "supported",
+                "confidence_score": 80,
+                "source_record_ids": [
+                  "activation_evidence_3"
+                ],
+                "occurred_at": "2026-08-26T18:00:00Z",
+                "relevance_score": 82
+              }
+            ],
+            "max_causal_depth": 5
+          }
+          JSON
+
+          node scripts/cosmos_causal_narrative.cjs \
+            --input /tmp/cosmos-causal-narrative-input-v0.1.json \
+            --out knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          test -f knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/causal-narrative-test-v0.1.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "causal_narrative_resolved") {
+            throw new Error(
+              `Controlled Causal Narrative output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const story = payload.downstream_story || {};
+          const downstream =
+            payload.butterfly_effect?.all_downstream_edges || [];
+          const candidates =
+            payload.butterfly_effect?.potential_new_signals || [];
+
+          if (payload.why_now?.explanation_status !==
+                "activation_evidence_available" ||
+              Number(payload.why_now?.activation_event_count) !== 3) {
+            throw new Error(
+              "Controlled Causal Narrative why_now block invalid"
+            );
+          }
+
+          if ((payload.upstream_drivers || []).length !== 2 ||
+              (story.direct_effects || []).length !== 1 ||
+              (story.second_order_effects || []).length !== 1 ||
+              (story.third_order_effects || []).length !== 1 ||
+              (story.emerging_effects || []).length !== 2 ||
+              downstream.length !== 5) {
+            throw new Error(
+              "Controlled Causal Narrative causal grouping/counts invalid"
+            );
+          }
+
+          let prior = Infinity;
+
+          for (const row of [...downstream].sort(
+            (a,b) => Number(a.causal_depth)-Number(b.causal_depth)
+          )) {
+            const effective =
+              Number(row.effective_confidence_score);
+            const original =
+              Number(row.original_confidence_score);
+
+            if (effective > original + 1e-9 ||
+                effective > prior + 1e-9) {
+              throw new Error(
+                `Controlled Causal Narrative confidence inflation at depth ${row.causal_depth}`
+              );
+            }
+
+            prior = effective;
+          }
+
+          if (!candidates.length ||
+              candidates.some(
+                row =>
+                  row.status !== "candidate_only" ||
+                  row.promotion_to_signal !== false
+              )) {
+            throw new Error(
+              "Controlled Causal Narrative candidate-signal boundary invalid"
+            );
+          }
+
+          if (payload.safeguards?.performs_external_search !== false ||
+              payload.safeguards?.calls_openai_or_external_api !== false ||
+              payload.safeguards?.writes_to_knowledge_graph !== false ||
+              payload.safeguards?.mutates_input_graph !== false ||
+              payload.safeguards?.creates_unverified_facts !== false ||
+              payload.safeguards?.causal_distance_penalizes_confidence !== true ||
+              payload.safeguards?.activation_logic_separate_from_causality !== true ||
+              payload.safeguards?.candidate_signals_not_auto_promoted !== true) {
+            throw new Error(
+              "Controlled Causal Narrative safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log("Real controlled Cosmos Causal Narrative v0.1 output created.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Why-now events:    ${payload.why_now.activation_event_count}`);
+          console.log(`Upstream drivers:  ${payload.upstream_drivers.length}`);
+          console.log(`Butterfly edges:   ${downstream.length}`);
+          console.log(`Candidate signals: ${candidates.length}`);
+          console.log(`Output:            ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Causal Narrative v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_causal_narrative_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/causal-narrative-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Causal Narrative controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Causal Narrative v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Causal Narrative v0.1 output committed."
+          echo "No external search, OpenAI/API generation, or production graph mutation was executed."
+
+      - name: Generate Real Cosmos Graph Evolution v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_evolution_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Graph Evolution v0.1 planning output."
+          echo "No external search, OpenAI/API generation, graph mutation or historical deletion is executed."
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: "2026-08-26T12:00:00Z",
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [
+              {
+                graph_record_id: "graph_existing_repository_fixture",
+                knowledge_admission_id:
+                  "knowledge_admission_existing_repository_fixture",
+                validation_target_id:
+                  "validation_repository_fixture",
+                claim_class:
+                  "validated_qualified_relationship",
+                validation_disposition:
+                  "partially_supported",
+                confidence_score: 70,
+                confidence_band: "high",
+                epistemic_status:
+                  "persistent_qualified_knowledge",
+                evidence_record_ids: [
+                  "evidence_repository_old_1"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-20T12:00:00Z",
+                active: true
+              }
+            ],
+            audit_log: [
+              {
+                audit_id: "audit_repository_existing",
+                operation: "create_graph_record",
+                graph_record_id:
+                  "graph_existing_repository_fixture",
+                knowledge_admission_id:
+                  "knowledge_admission_existing_repository_fixture"
+              }
+            ]
+          };
+
+          const incoming = {
+            knowledge_admission_id:
+              "knowledge_admission_repository_reinforce",
+            evidence_validation_id:
+              "evidence_validation_repository_reinforce",
+            validation_target_id:
+              "validation_repository_fixture",
+            admitted_claim_class:
+              "validated_qualified_relationship",
+            validation_disposition:
+              "partially_supported",
+            decision:
+              "admit_with_qualification",
+            confidence_score: 84,
+            confidence_band: "high",
+            persistence_level:
+              "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_repository_old_1",
+              "evidence_repository_new_2"
+            ],
+            qualification: {
+              contradiction_present: false
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: "2026-08-27T12:00:00Z",
+            status: "knowledge_admission_resolved",
+            admissions: [incoming],
+            graph_write_queue: [
+              {
+                ...incoming,
+                graph_write_rank: 1
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-evolution-graph-v0.1.json",
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            "/tmp/cosmos-graph-evolution-admission-v0.1.json",
+            JSON.stringify(admission, null, 2)
+          );
+          NODE
+
+          node scripts/cosmos_graph_evolution.cjs \
+            --graph /tmp/cosmos-graph-evolution-graph-v0.1.json \
+            --admission /tmp/cosmos-graph-evolution-admission-v0.1.json \
+            --out knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          test -f knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/graph-evolution-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "graph_evolution_planned") {
+            throw new Error(
+              `Controlled Graph Evolution output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const plans = payload.evolution_plans || [];
+
+          if (plans.length !== 1 ||
+              plans[0]?.evolution_action !==
+                "reinforce_existing") {
+            throw new Error(
+              "Controlled Graph Evolution expected one reinforce_existing plan"
+            );
+          }
+
+          if (Number(payload.evolution_state?.graph_mutation_count) !== 0 ||
+              payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.deletes_historical_knowledge !== false ||
+              payload.safeguards?.preserves_existing_records !== true ||
+              payload.safeguards?.preserves_audit_history !== true ||
+              payload.safeguards?.conflicting_polarity_requires_review !== true ||
+              payload.safeguards?.supersession_requires_explicit_execution !== true ||
+              payload.safeguards?.reversibility_required !== true) {
+            throw new Error(
+              "Controlled Graph Evolution safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos Graph Evolution v0.1 planning output created."
+          );
+          console.log(`Status: ${payload.status}`);
+          console.log(
+            `Action: ${plans[0].evolution_action}`
+          );
+          console.log(
+            `Graph mutations: ${payload.evolution_state.graph_mutation_count}`
+          );
+          console.log(`Output: ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Graph Evolution v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_graph_evolution_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/graph-evolution-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Graph Evolution controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Graph Evolution v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Graph Evolution v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
+      - name: Generate Real Cosmos Temporal Knowledge v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_temporal_knowledge_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos Temporal Knowledge v0.1 output."
+          echo "No external search, OpenAI/API generation, graph mutation or historical deletion is executed."
+
+          cat > /tmp/cosmos-temporal-knowledge-graph-v0.1.json <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "cosmos_graph_snapshot",
+            "knowledge_records": [
+              {
+                "graph_record_id": "graph_temporal_repository_past",
+                "knowledge_admission_id": "knowledge_temporal_repository_past",
+                "validation_target_id": "validation_temporal_repository",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 66,
+                "confidence_band": "moderate",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_temporal_repository_past"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-07-15T00:00:00Z",
+                "deactivated_at": "2026-08-15T00:00:00Z",
+                "active": false
+              },
+              {
+                "graph_record_id": "graph_temporal_repository_current",
+                "knowledge_admission_id": "knowledge_temporal_repository_current",
+                "validation_target_id": "validation_temporal_repository",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 81,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": [
+                  "evidence_temporal_repository_current_1",
+                  "evidence_temporal_repository_current_2"
+                ],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-08-15T00:00:01Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_temporal_repository_future",
+                "knowledge_admission_id": "knowledge_temporal_repository_future",
+                "validation_target_id": "validation_temporal_repository_future",
+                "claim_class": "scenario_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 55,
+                "confidence_band": "moderate",
+                "epistemic_status": "scenario_knowledge",
+                "evidence_record_ids": ["evidence_temporal_repository_future"],
+                "temporal_scope": "future",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-26T00:00:00Z",
+                "active": true
+              }
+            ],
+            "audit_log": []
+          }
+          JSON
+
+          node scripts/cosmos_temporal_knowledge.cjs \
+            --graph /tmp/cosmos-temporal-knowledge-graph-v0.1.json \
+            --reference-time 2026-08-27T12:00:00Z \
+            --out knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          test -f knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/temporal-knowledge-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "temporal_knowledge_resolved") {
+            throw new Error(
+              `Controlled Temporal Knowledge output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          if (Number(payload.temporal_state?.past_count) !== 1 ||
+              Number(payload.temporal_state?.current_count) !== 1 ||
+              Number(payload.temporal_state?.future_count) !== 1 ||
+              Number(payload.temporal_state?.transition_count) !== 0 ||
+              Number(payload.temporal_state?.unknown_count) !== 0) {
+            throw new Error(
+              "Controlled Temporal Knowledge temporal counts invalid"
+            );
+          }
+
+          const future = payload.timeline?.future?.[0];
+
+          if (!future ||
+              future.temporal_contract?.future_is_not_current_fact !== true ||
+              future.temporal_contract?.current_state_claimed !== false) {
+            throw new Error(
+              "Controlled future scenario was not safely separated from current fact"
+            );
+          }
+
+          if (payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.deletes_historical_knowledge !== false ||
+              payload.safeguards?.promotes_future_to_fact !== false ||
+              payload.safeguards?.collapses_temporal_states !== false ||
+              payload.safeguards?.preserves_source_lineage !== true ||
+              payload.safeguards?.preserves_confidence !== true) {
+            throw new Error(
+              "Controlled Temporal Knowledge safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos Temporal Knowledge v0.1 output created."
+          );
+          console.log(`Status:  ${payload.status}`);
+          console.log(`Past:    ${payload.temporal_state.past_count}`);
+          console.log(`Current: ${payload.temporal_state.current_count}`);
+          console.log(`Future:  ${payload.temporal_state.future_count}`);
+          console.log(`Output:  ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos Temporal Knowledge v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_temporal_knowledge_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/temporal-knowledge-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Temporal Knowledge controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos Temporal Knowledge v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos Temporal Knowledge v0.1 output committed."
+          echo "Production Cosmos graph was not mutated."
+
+      - name: Generate Real Cosmos First-Party Identity v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_first_party_identity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating controlled Cosmos First-Party Identity v0.1 output."
+          echo "This is a deterministic fixture only; it does not publish a live founder identity record."
+
+          cat > /tmp/cosmos-first-party-identity-fixture-v0.1.json <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "first_party_identity_dataset",
+            "entities": [
+              {
+                "entity_id": "entity_ptd_today",
+                "canonical_name": "PTD Today",
+                "aliases": ["ptdtoday.com"],
+                "entity_type": "organization",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_cosmos",
+                "canonical_name": "Cosmos",
+                "aliases": ["PTD Cosmos"],
+                "entity_type": "platform",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_fixture_founder",
+                "canonical_name": "Fixture Founder",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": true,
+                "profiles": [
+                  {
+                    "profile_type": "linkedin",
+                    "url": "https://www.linkedin.com/in/fixture-founder"
+                  }
+                ]
+              },
+              {
+                "entity_id": "entity_external_claimant",
+                "canonical_name": "External Claimant",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": false
+              }
+            ],
+            "relationships": [
+              {
+                "identity_relationship_id": "identity_ptd_founded_by_fixture",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/about",
+                "source_label": "PTD Today official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_cosmos_created_by_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "Cosmos official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_ptd_develops_cosmos",
+                "subject": "PTD Today",
+                "predicate": "develops",
+                "object": "Cosmos",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "PTD Today Cosmos relationship",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_external_conflicting_founder",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/conflicting-founder-claim",
+                "source_label": "Controlled conflicting external claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 45,
+                "protected_identity": false,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              }
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_first_party_identity.cjs \
+            --input /tmp/cosmos-first-party-identity-fixture-v0.1.json \
+            --reference-time 2026-08-27T12:00:00Z \
+            --question "Who founded PTD Today?" \
+            --question "Who created Cosmos?" \
+            --question "What is the relationship between PTD Today and Cosmos?" \
+            --out knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          test -f knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file =
+            "knowledge/cosmos/first-party-identity-test-v0.1.json";
+          const payload = JSON.parse(
+            fs.readFileSync(file, "utf8")
+          );
+
+          if (payload.schema_version !== "0.1" ||
+              payload.status !== "first_party_identity_resolved") {
+            throw new Error(
+              `Controlled First-Party Identity output invalid: ${payload.schema_version} / ${payload.status}`
+            );
+          }
+
+          const founder = (payload.answers || []).find(
+            row => row.predicate === "founded_by"
+          );
+
+          if (!founder ||
+              founder.selected_relationship?.object !== "Fixture Founder" ||
+              founder.selected_relationship?.source_type !== "first_party" ||
+              founder.answer_contract?.first_party_not_universal_truth !== true ||
+              founder.answer_contract?.conflict_disclosed !== true) {
+            throw new Error(
+              "Controlled founder identity resolution invalid"
+            );
+          }
+
+          if ((payload.conflicts || []).length !== 1 ||
+              payload.safeguards?.mutates_graph !== false ||
+              payload.safeguards?.overwrites_conflicting_external_claims !== false ||
+              payload.safeguards?.treats_first_party_as_universal_truth !== false ||
+              payload.safeguards?.preserves_provenance !== true ||
+              payload.safeguards?.preserves_conflicts !== true) {
+            throw new Error(
+              "Controlled First-Party Identity safeguards invalid"
+            );
+          }
+
+          console.log("");
+          console.log(
+            "Real controlled Cosmos First-Party Identity v0.1 output created."
+          );
+          console.log(`Status:    ${payload.status}`);
+          console.log(`Answers:   ${(payload.answers || []).length}`);
+          console.log(`Conflicts: ${(payload.conflicts || []).length}`);
+          console.log(`Output:    ${file}`);
+          NODE
+
+      - name: Commit Real Cosmos First-Party Identity v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_first_party_identity_test == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add knowledge/cosmos/first-party-identity-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos First-Party Identity controlled-output changes to commit."
+          else
+            git commit -m "Add Cosmos First-Party Identity v0.1 controlled output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Controlled Cosmos First-Party Identity v0.1 output committed."
+          echo "No live founder identity record was published by this controlled test."
+
+      - name: Generate Real Emergence Output
+        if: ${{ inputs.write_emergence == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Generating real Emergence output from the current committed Cosmos data."
+          echo "No OpenAI/API generation is executed by this step."
+
+          node scripts/cosmos_emergence_engine.cjs
+
+          test -f knowledge/cosmos/emergence-current.json
+
+          node <<'NODE'
+          const fs = require("fs");
+
+          const file = "knowledge/cosmos/emergence-current.json";
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+
+          if (payload.schema_version !== "0.1") {
+            throw new Error(
+              `Unexpected emergence schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (
+            !["ready", "no_emergence_above_threshold"].includes(payload.status)
+          ) {
+            throw new Error(
+              `Invalid emergence status: ${payload.status}`
+            );
+          }
+
+          if (!Array.isArray(payload.emergences)) {
+            throw new Error("emergence-current.json: emergences[] missing");
+          }
+
+          console.log("");
+          console.log("Real Emergence output created.");
+          console.log(`Date:       ${payload.date_utc}`);
+          console.log(`Status:     ${payload.status}`);
+          console.log(`Emergences: ${payload.summary?.emergence_count ?? payload.emergences.length}`);
+          console.log(`Output:     ${file}`);
+          NODE
+
+      - name: Commit Real Emergence Output
+        if: ${{ inputs.write_emergence == true }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DATE_UTC="$(node -p "require('./knowledge/cosmos/emergence-current.json').date_utc")"
+          HISTORY_FILE="knowledge/cosmos/emergence-history/${DATE_UTC}.json"
+
+          if [ ! -f "$HISTORY_FILE" ]; then
+            echo "ERROR: Expected emergence history file was not generated: $HISTORY_FILE"
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            knowledge/cosmos/emergence-current.json \
+            "$HISTORY_FILE"
+
+          if git diff --cached --quiet; then
+            echo "No Emergence changes to commit."
+          else
+            git commit -m "Update Cosmos emergence ${DATE_UTC}"
+            # Another workflow may have updated main while this job was running.
+            # Rebase this generated-output commit onto the latest remote tip before pushing.
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase generated Cosmos output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo ""
+          echo "Real Emergence output is now committed to the repository."
+          echo "No OpenAI generation was executed."
+
+      - name: Preflight Complete
+        run: |
+          echo "======================================================"
+          echo "COSMOS PREFLIGHT PASSED"
+          echo "No OpenAI generation was executed by this workflow."
+          if [ "${{ inputs.write_emergence }}" = "true" ]; then
+            echo "Real emergence-current.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_state }}" = "true" ]; then
+            echo "Real cosmos-state-current.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_core_test }}" = "true" ]; then
+            echo "Controlled core-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_attention_test }}" = "true" ]; then
+            echo "Controlled attention-test-v0.2.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_consequence_test }}" = "true" ]; then
+            echo "Controlled consequence-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_discovery_test }}" = "true" ]; then
+            echo "Controlled discovery-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_acquisition_test }}" = "true" ]; then
+            echo "Controlled acquisition-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_applicability_test }}" = "true" ]; then
+            echo "Controlled applicability-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_decomposition_test }}" = "true" ]; then
+            echo "Controlled decomposition-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_candidate_validation_test }}" = "true" ]; then
+            echo "Controlled candidate-validation-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_evidence_strategy_test }}" = "true" ]; then
+            echo "Controlled evidence-strategy-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_evidence_executor_test }}" = "true" ]; then
+            echo "Controlled evidence-executor-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_evidence_validator_test }}" = "true" ]; then
+            echo "Controlled evidence-validator-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_knowledge_admission_test }}" = "true" ]; then
+            echo "Controlled knowledge-admission-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_graph_writer_test }}" = "true" ]; then
+            echo "Controlled graph-writer-test-v0.1.json and graph-writer-report-v0.1.json were generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_graph_integrity_test }}" = "true" ]; then
+            echo "Controlled graph-integrity-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_graph_reversal_test }}" = "true" ]; then
+            echo "Controlled graph-reversal-test-v0.1.json, graph-reversal-report-v0.1.json and graph-reversal-integrity-test-v0.1.json were generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_causal_narrative_test }}" = "true" ]; then
+            echo "Controlled causal-narrative-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_graph_evolution_test }}" = "true" ]; then
+            echo "Controlled graph-evolution-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" = "true" ]; then
+            echo "Controlled temporal-knowledge-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_cosmos_first_party_identity_test }}" = "true" ]; then
+            echo "Controlled first-party-identity-test-v0.1.json was generated and committed."
+          fi
+          if [ "${{ inputs.write_emergence }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_state }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_core_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_attention_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_consequence_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_discovery_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_acquisition_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_applicability_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_decomposition_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_candidate_validation_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_evidence_strategy_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_evidence_executor_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_evidence_validator_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_knowledge_admission_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_writer_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_integrity_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_reversal_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_causal_narrative_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_graph_evolution_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_temporal_knowledge_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_first_party_identity_test }}" != "true" ]; then
+            echo "Isolated validation only; repository intelligence files were not changed."
+          else
+            echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
+          fi
+          echo "======================================================"
