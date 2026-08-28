@@ -1365,8 +1365,6 @@ function renderSummaryShareHtml({ siteOrigin, payload }) {
 
   const title = `PTD Today — Intelligence Summary | ${date}`;
   const ogImage = `${base}/assets/og-default.png`;
-  const causalPresentation = buildCausalPresentation(item, causalNarrative);
-  const causalSectionsHtml = renderCausalSections(causalPresentation);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1753,6 +1751,8 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
   const base = siteOrigin.replace(/\/$/, "");
   const url = `${base}/articles/${encodeURIComponent(id)}.html`;
   const ogImage = `${base}/assets/og-default.png`;
+  const causalPresentation = buildCausalPresentation(item, causalNarrative);
+  const causalSectionsHtml = renderCausalSections(causalPresentation);
 
   const bodyParagraphs = toTextParagraphs(body)
     .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
