@@ -23,6 +23,12 @@ const rendererPath = path.resolve(
   "scripts/cosmos_render_articles_v0.1.mjs"
 );
 
+const controlledOutputDirIndex = process.argv.indexOf("--output-dir");
+const controlledOutputDir =
+  controlledOutputDirIndex >= 0 && process.argv[controlledOutputDirIndex + 1]
+    ? path.resolve(process.argv[controlledOutputDirIndex + 1])
+    : "";
+
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cosmos-article-production-"));
 const briefsDir = path.join(tmp, "briefs");
 const knowledgeDir = path.join(tmp, "knowledge");
@@ -216,6 +222,25 @@ assert(safeguards.calls_openai_or_external_api === false, "OpenAI/API safeguard 
 assert(safeguards.mutates_graph === false, "Graph mutation safeguard failed");
 assert(safeguards.rewrites_daily_brief === false, "Daily brief rewrite safeguard failed");
 assert(safeguards.promotes_scenario_to_fact === false, "Scenario promotion safeguard failed");
+
+if (controlledOutputDir) {
+  fs.mkdirSync(controlledOutputDir, { recursive: true });
+
+  fs.copyFileSync(
+    path.join(articlesDir, "dev_match.html"),
+    path.join(controlledOutputDir, "matched-causal-article.html")
+  );
+
+  fs.copyFileSync(
+    path.join(articlesDir, "dev_fallback.html"),
+    path.join(controlledOutputDir, "fallback-article.html")
+  );
+
+  fs.copyFileSync(
+    manifestPath,
+    path.join(controlledOutputDir, "article-production-manifest-v0.1.json")
+  );
+}
 
 console.log(JSON.stringify({
   schema_version: "0.1",
