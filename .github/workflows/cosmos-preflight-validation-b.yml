@@ -1,0 +1,3323 @@
+name: Cosmos Preflight - Validation B
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync With Latest Branch Tip
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${GITHUB_REF_NAME}"
+          git checkout "${GITHUB_REF_NAME}"
+          git reset --hard "origin/${GITHUB_REF_NAME}"
+          echo "Workspace synchronized to origin/${GITHUB_REF_NAME}."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Cosmos Source Files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REQUIRED_FILES=(
+            "scripts/generate_ai_news.js"
+            "scripts/resolve_entities.js"
+            "scripts/update_entity_lifecycle.js"
+            "scripts/normalize_map_signals.cjs"
+            "scripts/validate_intelligence.cjs"
+            "scripts/cosmos_state_delta.cjs"
+            "scripts/cosmos_impact_engine.cjs"
+            "scripts/cosmos_pattern_engine.cjs"
+            "scripts/cosmos_emergence_engine.cjs"
+            "scripts/cosmos_state_builder.cjs"
+            "scripts/cosmos_core.cjs"
+            "scripts/cosmos_attention.cjs"
+            "scripts/cosmos_consequence.cjs"
+            "scripts/cosmos_discovery.cjs"
+            "scripts/cosmos_acquisition.cjs"
+            "scripts/cosmos_acquisition_applicability.cjs"
+            "scripts/cosmos_decomposition.cjs"
+            "scripts/cosmos_candidate_validation.cjs"
+            "scripts/cosmos_evidence_strategy.cjs"
+            "scripts/cosmos_evidence_executor.cjs"
+            "scripts/cosmos_evidence_validator.cjs"
+            "scripts/cosmos_knowledge_admission.cjs"
+            "scripts/cosmos_graph_writer.cjs"
+            "scripts/cosmos_graph_integrity.cjs"
+            "scripts/cosmos_graph_reversal.cjs"
+            "scripts/cosmos_causal_narrative.cjs"
+            "scripts/cosmos_graph_evolution.cjs"
+            "scripts/cosmos_temporal_knowledge.cjs"
+            "scripts/cosmos_first_party_identity.cjs"
+            "scripts/backfill_history_from_articles.js"
+            "package.json"
+          )
+
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "ERROR: Missing required file: $file"
+              exit 1
+            fi
+            echo "OK: $file"
+          done
+
+      - name: Check JavaScript Syntax
+        run: |
+          set -e
+          node --check scripts/generate_ai_news.js
+          node --check scripts/resolve_entities.js
+          node --check scripts/update_entity_lifecycle.js
+          node --check scripts/normalize_map_signals.cjs
+          node --check scripts/validate_intelligence.cjs
+          node --check scripts/cosmos_state_delta.cjs
+          node --check scripts/cosmos_impact_engine.cjs
+          node --check scripts/cosmos_pattern_engine.cjs
+          node --check scripts/cosmos_emergence_engine.cjs
+          node --check scripts/cosmos_state_builder.cjs
+          node --check scripts/cosmos_core.cjs
+          node --check scripts/cosmos_attention.cjs
+          node --check scripts/cosmos_consequence.cjs
+          node --check scripts/cosmos_discovery.cjs
+          node --check scripts/cosmos_acquisition.cjs
+          node --check scripts/cosmos_acquisition_applicability.cjs
+          node --check scripts/cosmos_decomposition.cjs
+          node --check scripts/cosmos_candidate_validation.cjs
+          node --check scripts/cosmos_evidence_strategy.cjs
+          node --check scripts/cosmos_evidence_executor.cjs
+          node --check scripts/cosmos_evidence_validator.cjs
+          node --check scripts/cosmos_knowledge_admission.cjs
+          node --check scripts/cosmos_graph_writer.cjs
+          node --check scripts/cosmos_graph_integrity.cjs
+          node --check scripts/cosmos_graph_reversal.cjs
+          node --check scripts/cosmos_causal_narrative.cjs
+          node --check scripts/cosmos_graph_evolution.cjs
+          node --check scripts/cosmos_temporal_knowledge.cjs
+          node --check scripts/cosmos_first_party_identity.cjs
+          node --check scripts/backfill_history_from_articles.js
+          echo "All Cosmos JavaScript files passed syntax validation."
+
+      - name: Verify package.json
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const pkg = JSON.parse(
+            fs.readFileSync("package.json", "utf8")
+          );
+
+          if (!pkg.scripts || !pkg.scripts["generate:ai"]) {
+            throw new Error(
+              'package.json is missing scripts["generate:ai"].'
+            );
+          }
+
+          if (!pkg.dependencies || !pkg.dependencies.openai) {
+            throw new Error(
+              'package.json is missing the "openai" dependency.'
+            );
+          }
+
+          console.log("generate:ai:", pkg.scripts["generate:ai"]);
+          console.log("OpenAI dependency:", pkg.dependencies.openai);
+          console.log("package.json validation passed.");
+          NODE
+
+      - name: Validate Existing JSON Files
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          const required = [
+            "briefs/daily-ai.json",
+            "briefs/map-signals.json",
+            "briefs/trends.json",
+            "briefs/outlook.json",
+            "knowledge/developments.json",
+            "knowledge/entities.json",
+            "knowledge/relationships.json",
+            "knowledge/timeline-events.json",
+            "knowledge/entity-lifecycle.json"
+          ];
+
+          let failed = false;
+
+          for (const file of required) {
+            if (!fs.existsSync(file)) {
+              console.error(`ERROR: Missing ${file}`);
+              failed = true;
+              continue;
+            }
+
+            try {
+              JSON.parse(fs.readFileSync(file, "utf8"));
+              console.log(`OK JSON: ${file}`);
+            } catch (error) {
+              console.error(
+                `ERROR: Invalid JSON in ${file}: ${error.message}`
+              );
+              failed = true;
+            }
+          }
+
+          if (failed) process.exit(1);
+
+          console.log(
+            "All currently committed critical JSON files parse correctly."
+          );
+          NODE
+
+      - name: Verify Current Knowledge Structure
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+
+          function read(file) {
+            return JSON.parse(fs.readFileSync(file, "utf8"));
+          }
+
+          const daily = read("briefs/daily-ai.json");
+          const map = read("briefs/map-signals.json");
+          const developments = read("knowledge/developments.json");
+          const entities = read("knowledge/entities.json");
+          const relationships = read("knowledge/relationships.json");
+          const timeline = read("knowledge/timeline-events.json");
+          const lifecycle = read("knowledge/entity-lifecycle.json");
+
+          const errors = [];
+
+          if (!Array.isArray(daily.items)) {
+            errors.push("briefs/daily-ai.json: items[] missing");
+          }
+
+          if (!Array.isArray(map.signals)) {
+            errors.push("briefs/map-signals.json: signals[] missing");
+          }
+
+          if (!Array.isArray(developments.developments)) {
+            errors.push(
+              "knowledge/developments.json: developments[] missing"
+            );
+          }
+
+          if (!Array.isArray(entities.entities)) {
+            errors.push("knowledge/entities.json: entities[] missing");
+          }
+
+          if (!Array.isArray(relationships.relationships)) {
+            errors.push(
+              "knowledge/relationships.json: relationships[] missing"
+            );
+          }
+
+          if (!Array.isArray(timeline.events)) {
+            errors.push(
+              "knowledge/timeline-events.json: events[] missing"
+            );
+          }
+
+          if (
+            !lifecycle ||
+            typeof lifecycle !== "object" ||
+            !lifecycle.rankings
+          ) {
+            errors.push(
+              "knowledge/entity-lifecycle.json: lifecycle structure missing"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCompatibility errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("\nCurrent committed data structure:");
+          console.log(`Daily items:      ${daily.items.length}`);
+          console.log(`Map signals:      ${map.signals.length}`);
+          console.log(`Developments:     ${developments.developments.length}`);
+          console.log(`Entities:         ${entities.entities.length}`);
+          console.log(`Relationships:    ${relationships.relationships.length}`);
+          console.log(`Timeline events:  ${timeline.events.length}`);
+
+          if (Array.isArray(lifecycle.entities)) {
+            console.log(`Lifecycle registry: ${lifecycle.entities.length}`);
+          } else {
+            console.log(
+              "Lifecycle registry: legacy format currently committed " +
+              "(File 5 will create lifecycle.entities[] on the next production run)"
+            );
+          }
+
+          console.log("\nCosmos source/data compatibility checks passed.");
+          NODE
+
+      - name: Test Cosmos Knowledge Admission v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_knowledge_admission.cjs \
+            "$TEST_DIR/scripts/cosmos_knowledge_admission.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const partiallySupported = {
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            evidence_record_count: 3,
+            disposition: "partially_supported",
+            confidence_score: 76,
+            confidence_band: "high",
+            rationale:
+              "Supporting evidence outweighs contradiction, but contradiction remains material and prevents an unqualified supported conclusion.",
+            evidence_balance: {
+              weighted_support: 196,
+              weighted_contradiction: 82,
+              independent_source_groups: 3,
+              direct_high_authority_records: 2
+            },
+            sufficiency_observation: {
+              total_source_threshold_met: true,
+              independent_source_threshold_met: true,
+              direct_primary_preference_met: true,
+              contradiction_search_observed: true
+            },
+            record_assessments: [],
+            validation_status: "completed",
+            knowledge_admission_status: "not_started",
+            executable_for_knowledge_admission: true,
+            epistemic_rule:
+              "Validation may classify evidence, but only Knowledge Admission may create or update persistent Cosmos knowledge."
+          };
+
+          const insufficientIds = [
+            ["evidence_validation_3bf0d71e", "evidence_task_a6c1f318", "validation_787b6815"],
+            ["evidence_validation_64afcb5a", "evidence_task_3e80975d", "validation_83169e60"],
+            ["evidence_validation_932cf23f", "evidence_task_64771149", "validation_4600b8de"],
+            ["evidence_validation_e319e364", "evidence_task_2f80881f", "validation_224b2a14"],
+            ["evidence_validation_eb71dfb6", "evidence_task_e1e94d3d", "validation_e81fcda8"],
+            ["evidence_validation_60545a0e", "evidence_task_39c6b18f", "validation_04b40a48"]
+          ];
+
+          const insufficient = insufficientIds.map(([validationId, taskId, targetId]) => ({
+            evidence_validation_id: validationId,
+            evidence_task_id: taskId,
+            validation_target_id: targetId,
+            evidence_record_ids: [],
+            evidence_record_count: 0,
+            disposition: "insufficient_evidence",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            rationale: "No evidence records were collected for this target.",
+            evidence_balance: {
+              weighted_support: 0,
+              weighted_contradiction: 0,
+              independent_source_groups: 0,
+              direct_high_authority_records: 0
+            },
+            sufficiency_observation: {
+              total_source_threshold_met: false,
+              independent_source_threshold_met: false,
+              direct_primary_preference_met: false,
+              contradiction_search_observed: false
+            },
+            record_assessments: [],
+            validation_status: "completed",
+            knowledge_admission_status: "not_started",
+            executable_for_knowledge_admission: false,
+            epistemic_rule:
+              "Validation may classify evidence, but only Knowledge Admission may create or update persistent Cosmos knowledge."
+          }));
+
+          const fixture = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "evidence_validation_resolved",
+            source_evidence_executor: {
+              schema_version: "0.1",
+              generated_at: new Date().toISOString(),
+              status: "evidence_execution_normalized"
+            },
+            validation_state: {
+              validation_target_count: 7,
+              completed_validation_count: 7,
+              knowledge_admission_count: 0,
+              by_disposition: {
+                insufficient_evidence: 6,
+                partially_supported: 1
+              },
+              conceptual_distance_limit: null,
+              continuation_possible: true,
+              principle:
+                "Cosmos may classify what the collected evidence justifies, but validation is not permanent knowledge admission."
+            },
+            validations: [
+              insufficient[0],
+              insufficient[1],
+              partiallySupported,
+              insufficient[2],
+              insufficient[3],
+              insufficient[4],
+              insufficient[5]
+            ],
+            knowledge_admission_queue: [
+              {
+                admission_rank: 1,
+                evidence_validation_id: partiallySupported.evidence_validation_id,
+                evidence_task_id: partiallySupported.evidence_task_id,
+                validation_target_id: partiallySupported.validation_target_id,
+                disposition: "partially_supported",
+                confidence_score: 76,
+                confidence_band: "high",
+                evidence_record_ids: partiallySupported.evidence_record_ids,
+                admission_status: "not_started"
+              }
+            ]
+          };
+
+          fs.writeFileSync(
+            path.join(root, "evidence-validator-fixture-v0.1.json"),
+            JSON.stringify(fixture, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_knowledge_admission.cjs \
+              --input evidence-validator-fixture-v0.1.json \
+              --out knowledge/cosmos/knowledge-admission-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/knowledge-admission-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Knowledge Admission did not create knowledge-admission-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Knowledge Admission schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "knowledge_admission_resolved") {
+            errors.push(
+              `Cosmos Knowledge Admission failed: ${payload.status}`
+            );
+          }
+
+          if (payload.source_evidence_validator?.schema_version !== "0.1" ||
+              payload.source_evidence_validator?.status !== "evidence_validation_resolved") {
+            errors.push(
+              "Cosmos Knowledge Admission must consume Evidence Validator v0.1"
+            );
+          }
+
+          const state = payload.admission_state || {};
+          const admissions = payload.admissions || [];
+          const graphQueue = payload.graph_write_queue || [];
+
+          if (Number(state.validation_count) !== 7 ||
+              Number(state.reviewed_count) !== 7 ||
+              Number(state.validator_queue_count) !== 1) {
+            errors.push(
+              `Knowledge Admission counts invalid: validations=${state.validation_count}, reviewed=${state.reviewed_count}, validator_queue=${state.validator_queue_count}`
+            );
+          }
+
+          if (Number(state.graph_write_eligible_count) !== 1) {
+            errors.push(
+              `Controlled Knowledge Admission expected exactly 1 graph-write-eligible item; got ${state.graph_write_eligible_count}`
+            );
+          }
+
+          if (Number(state.graph_write_count) !== 0) {
+            errors.push(
+              "Knowledge Admission v0.1 must not perform graph writes"
+            );
+          }
+
+          if (state.conceptual_distance_limit !== null ||
+              state.continuation_possible !== true) {
+            errors.push(
+              "Knowledge Admission did not preserve unlimited continuation"
+            );
+          }
+
+          if (!Array.isArray(admissions) || admissions.length !== 7) {
+            errors.push(
+              `Controlled Knowledge Admission expected 7 admissions; got ${admissions.length}`
+            );
+          }
+
+          const qualified = admissions.filter(
+            row => row.decision === "admit_with_qualification"
+          );
+
+          const rejected = admissions.filter(
+            row => row.decision === "reject_for_now"
+          );
+
+          if (qualified.length !== 1) {
+            errors.push(
+              `Expected exactly 1 admit_with_qualification; got ${qualified.length}`
+            );
+          }
+
+          if (rejected.length !== 6) {
+            errors.push(
+              `Expected exactly 6 reject_for_now decisions; got ${rejected.length}`
+            );
+          }
+
+          if (Number(state.by_decision?.admit_with_qualification || 0) !== 1 ||
+              Number(state.by_decision?.reject_for_now || 0) !== 6) {
+            errors.push(
+              "Knowledge Admission decision summary invalid"
+            );
+          }
+
+          if (qualified.length === 1) {
+            const row = qualified[0];
+
+            if (row.validation_disposition !== "partially_supported" ||
+                Number(row.confidence_score) !== 76 ||
+                row.confidence_band !== "high") {
+              errors.push(
+                "Qualified admission lost Evidence Validator disposition/confidence"
+              );
+            }
+
+            if (row.admitted_claim_class !==
+                  "validated_qualified_relationship" ||
+                row.persistence_level !==
+                  "persistent_qualified_knowledge") {
+              errors.push(
+                "Qualified admission claim/persistence class invalid"
+              );
+            }
+
+            if (row.qualification?.contradiction_present !== true ||
+                row.qualification?.must_preserve_contradiction !== true ||
+                row.qualification?.confidence_must_be_preserved !== true ||
+                row.qualification?.source_lineage_must_be_preserved !== true ||
+                row.qualification?.temporal_scope_must_be_preserved !== true ||
+                row.qualification?.geography_scope_must_be_preserved !== true) {
+              errors.push(
+                "Qualified admission failed contradiction/scope preservation contract"
+              );
+            }
+
+            if (!Array.isArray(row.evidence_record_ids) ||
+                row.evidence_record_ids.length !== 3) {
+              errors.push(
+                "Qualified admission did not preserve all evidence-record lineage"
+              );
+            }
+
+            if (row.knowledge_write_contract?.direct_graph_write_performed !== false ||
+                row.knowledge_write_contract?.requires_separate_graph_writer !== true ||
+                row.knowledge_write_contract?.preserve_validation_disposition !== true ||
+                row.knowledge_write_contract?.preserve_confidence !== true ||
+                row.knowledge_write_contract?.preserve_evidence_lineage !== true ||
+                row.knowledge_write_contract?.preserve_contradiction !== true ||
+                row.knowledge_write_contract?.reversible !== true) {
+              errors.push(
+                "Qualified admission graph-write contract invalid"
+              );
+            }
+
+            if (row.graph_write_eligibility !== true ||
+                row.graph_write_status !== "not_started") {
+              errors.push(
+                "Qualified admission graph-write boundary invalid"
+              );
+            }
+          }
+
+          for (const row of rejected) {
+            if (row.validation_disposition !== "insufficient_evidence" ||
+                row.persistence_level !== "none" ||
+                row.graph_write_eligibility !== false ||
+                row.graph_write_status !== "not_started") {
+              errors.push(
+                `Insufficient-evidence admission ${row.knowledge_admission_id || "(unknown)"} improperly became graph eligible`
+              );
+            }
+          }
+
+          if (!Array.isArray(graphQueue) || graphQueue.length !== 1) {
+            errors.push(
+              `Controlled Knowledge Admission expected 1 graph_write_queue item; got ${graphQueue.length}`
+            );
+          } else {
+            const row = graphQueue[0];
+
+            if (row.graph_write_rank !== 1 ||
+                row.admitted_claim_class !== "validated_qualified_relationship" ||
+                row.validation_disposition !== "partially_supported" ||
+                Number(row.confidence_score) !== 76 ||
+                row.graph_write_status !== "not_started" ||
+                !Array.isArray(row.evidence_record_ids) ||
+                row.evidence_record_ids.length !== 3) {
+              errors.push(
+                "Knowledge Admission graph_write_queue item invalid"
+              );
+            }
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.admission_is_not_graph_mutation !== true ||
+              safeguards.insufficient_or_unresolved_not_admitted !== true ||
+              safeguards.partially_supported_requires_qualification !== true ||
+              safeguards.contradictory_evidence_preserved !== true ||
+              safeguards.confidence_preserved !== true ||
+              safeguards.source_lineage_preserved !== true ||
+              safeguards.graph_writes_are_reversible !== true ||
+              safeguards.separate_graph_writer_required !== true ||
+              safeguards.unlimited_conceptual_continuation_preserved !== true) {
+            errors.push(
+              "Cosmos Knowledge Admission safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Knowledge Admission v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Knowledge Admission v0.1 isolated test passed.");
+          console.log(`Status:                    ${payload.status}`);
+          console.log(`Validations reviewed:      ${state.reviewed_count}`);
+          console.log(`Admit with qualification:  ${state.by_decision?.admit_with_qualification || 0}`);
+          console.log(`Reject for now:            ${state.by_decision?.reject_for_now || 0}`);
+          console.log(`Graph-write eligible:      ${state.graph_write_eligible_count}`);
+          console.log(`Graph writes performed:    ${state.graph_write_count}`);
+          console.log(
+            "Qualified admission, contradiction/confidence/lineage preservation, insufficient-evidence exclusion, reversible graph-write contract and separate-writer safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Test Cosmos Graph Writer v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_qualified",
+            evidence_validation_id: "evidence_validation_5ca25c15",
+            evidence_task_id: "evidence_task_115f3b3e",
+            validation_target_id: "validation_3642f09d",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_d0143201",
+              "evidence_6cccfc61",
+              "evidence_65ed10af"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const rejected = {
+            knowledge_admission_id: "knowledge_admission_graph_writer_fixture_rejected",
+            evidence_validation_id: "evidence_validation_rejected_fixture",
+            evidence_task_id: "evidence_task_rejected_fixture",
+            validation_target_id: "validation_rejected_fixture",
+            admitted_claim_class: null,
+            validation_disposition: "insufficient_evidence",
+            decision: "reject_for_now",
+            confidence_score: 0,
+            confidence_band: "very_low",
+            persistence_level: "none",
+            evidence_record_ids: [],
+            qualification: {
+              contradiction_present: false,
+              must_preserve_contradiction: false
+            },
+            graph_write_eligibility: false,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              validation_count: 2,
+              reviewed_count: 2,
+              graph_write_eligible_count: 1,
+              graph_write_count: 0,
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified, rejected],
+            graph_write_queue: [
+              {
+                ...qualified,
+                graph_write_rank: 1
+              },
+              {
+                ...rejected,
+                graph_write_rank: 2
+              }
+            ]
+          };
+
+          const emptyGraph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-graph-writer-fixture-v0.1.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "graph-before-v0.1.json"),
+            JSON.stringify(emptyGraph, null, 2)
+          );
+          NODE
+
+          BEFORE_HASH="$(sha256sum "$TEST_DIR/graph-before-v0.1.json" | awk '{print $1}')"
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-graph-writer-fixture-v0.1.json \
+              --graph graph-before-v0.1.json \
+              --out knowledge/cosmos/graph-after-first-v0.1.json \
+              --report knowledge/cosmos/graph-write-first-report-v0.1.json
+          )
+
+          AFTER_INPUT_HASH="$(sha256sum "$TEST_DIR/graph-before-v0.1.json" | awk '{print $1}')"
+
+          if [ "$BEFORE_HASH" != "$AFTER_INPUT_HASH" ]; then
+            echo "ERROR: Cosmos Graph Writer mutated the input graph in place."
+            exit 1
+          fi
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-graph-writer-fixture-v0.1.json \
+              --graph knowledge/cosmos/graph-after-first-v0.1.json \
+              --out knowledge/cosmos/graph-after-second-v0.1.json \
+              --report knowledge/cosmos/graph-write-second-report-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const read = (name) => JSON.parse(
+            fs.readFileSync(path.join(root, "knowledge/cosmos", name), "utf8")
+          );
+
+          const firstGraph = read("graph-after-first-v0.1.json");
+          const secondGraph = read("graph-after-second-v0.1.json");
+          const firstReport = read("graph-write-first-report-v0.1.json");
+          const secondReport = read("graph-write-second-report-v0.1.json");
+          const errors = [];
+
+          if (firstGraph.status !== "cosmos_graph_snapshot" ||
+              secondGraph.status !== "cosmos_graph_snapshot") {
+            errors.push("Graph Writer did not produce Cosmos graph snapshots");
+          }
+
+          if (firstReport.status !== "graph_write_resolved" ||
+              secondReport.status !== "graph_write_resolved") {
+            errors.push("Graph Writer reports did not resolve successfully");
+          }
+
+          const firstState = firstReport.graph_write_state || {};
+          const secondState = secondReport.graph_write_state || {};
+
+          if (Number(firstState.written_count) !== 1 ||
+              Number(firstState.idempotent_skip_count) !== 0 ||
+              Number(firstState.error_count) !== 1) {
+            errors.push(
+              `First graph write invalid: written=${firstState.written_count}, skipped=${firstState.idempotent_skip_count}, errors=${firstState.error_count}`
+            );
+          }
+
+          if (Number(secondState.written_count) !== 0 ||
+              Number(secondState.idempotent_skip_count) !== 1 ||
+              Number(secondState.error_count) !== 1) {
+            errors.push(
+              `Second graph write failed idempotency: written=${secondState.written_count}, skipped=${secondState.idempotent_skip_count}, errors=${secondState.error_count}`
+            );
+          }
+
+          if (firstGraph.knowledge_records.length !== 1 ||
+              secondGraph.knowledge_records.length !== 1) {
+            errors.push(
+              `Idempotency failed: first_records=${firstGraph.knowledge_records.length}, second_records=${secondGraph.knowledge_records.length}`
+            );
+          }
+
+          if (firstGraph.audit_log.length !== 1 ||
+              secondGraph.audit_log.length !== 1) {
+            errors.push(
+              `Idempotency failed for audit log: first=${firstGraph.audit_log.length}, second=${secondGraph.audit_log.length}`
+            );
+          }
+
+          const firstRecord = firstGraph.knowledge_records[0];
+          const secondRecord = secondGraph.knowledge_records[0];
+
+          if (!firstRecord || !secondRecord ||
+              firstRecord.graph_record_id !== secondRecord.graph_record_id ||
+              firstRecord.knowledge_admission_id !== secondRecord.knowledge_admission_id) {
+            errors.push("Second run did not preserve the original graph record identity");
+          }
+
+          if (firstRecord?.claim_class !== "validated_qualified_relationship" ||
+              firstRecord?.validation_disposition !== "partially_supported" ||
+              Number(firstRecord?.confidence_score) !== 76 ||
+              firstRecord?.confidence_band !== "high") {
+            errors.push("Graph record lost claim class, disposition or confidence");
+          }
+
+          if (firstRecord?.qualification?.contradiction_present !== true ||
+              firstRecord?.qualification?.must_preserve_contradiction !== true ||
+              firstRecord?.qualification?.confidence_preserved !== true ||
+              firstRecord?.qualification?.source_lineage_preserved !== true ||
+              firstRecord?.qualification?.temporal_scope_preserved !== true ||
+              firstRecord?.qualification?.geography_scope_preserved !== true) {
+            errors.push("Graph record lost qualification or preservation metadata");
+          }
+
+          if (!Array.isArray(firstRecord?.evidence_record_ids) ||
+              firstRecord.evidence_record_ids.length !== 3) {
+            errors.push("Graph record did not preserve complete evidence lineage");
+          }
+
+          if (firstRecord?.reversibility?.reversible !== true ||
+              firstRecord?.reversibility?.reversal_operation !== "deactivate_graph_record" ||
+              firstRecord?.reversibility?.reversal_key !== firstRecord?.knowledge_admission_id) {
+            errors.push("Graph record reversibility contract invalid");
+          }
+
+          const rejectedId = "knowledge_admission_graph_writer_fixture_rejected";
+          if (firstGraph.knowledge_records.some(
+                row => row.knowledge_admission_id === rejectedId
+              ) ||
+              secondGraph.knowledge_records.some(
+                row => row.knowledge_admission_id === rejectedId
+              )) {
+            errors.push("Non-eligible admission was materialized into the graph");
+          }
+
+          if (!firstReport.errors.some(
+                row => row.knowledge_admission_id === rejectedId &&
+                       row.reason === "admission_not_graph_write_eligible"
+              ) ||
+              !secondReport.errors.some(
+                row => row.knowledge_admission_id === rejectedId &&
+                       row.reason === "admission_not_graph_write_eligible"
+              )) {
+            errors.push("Graph Writer did not explicitly refuse the non-eligible admission");
+          }
+
+          if (!secondReport.skipped.some(
+                row => row.knowledge_admission_id === firstRecord?.knowledge_admission_id &&
+                       row.reason === "already_materialized_idempotent_skip"
+              )) {
+            errors.push("Second run did not record the expected idempotent skip");
+          }
+
+          const safeguards = firstReport.safeguards || {};
+          if (safeguards.mutates_input_graph_in_place !== false ||
+              safeguards.writes_only_explicit_output_snapshot !== true ||
+              safeguards.requires_graph_write_eligibility !== true ||
+              safeguards.preserves_qualification !== true ||
+              safeguards.preserves_contradiction !== true ||
+              safeguards.preserves_confidence !== true ||
+              safeguards.preserves_evidence_lineage !== true ||
+              safeguards.idempotent_by_knowledge_admission_id !== true ||
+              safeguards.audit_log_required !== true ||
+              safeguards.graph_records_reversible !== true ||
+              safeguards.rejected_admissions_not_written !== true ||
+              safeguards.unlimited_conceptual_continuation_preserved !== true) {
+            errors.push("Cosmos Graph Writer safeguards invalid");
+          }
+
+          if (firstState.conceptual_distance_limit !== null ||
+              firstState.continuation_possible !== true ||
+              secondState.conceptual_distance_limit !== null ||
+              secondState.continuation_possible !== true) {
+            errors.push("Graph Writer did not preserve unlimited conceptual continuation");
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Writer v0.1 preflight errors:");
+            for (const error of errors) console.error(`- ${error}`);
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Writer v0.1 isolated test passed.");
+          console.log(`First run writes:          ${firstState.written_count}`);
+          console.log(`First run refused:         ${firstState.error_count}`);
+          console.log(`Second run writes:         ${secondState.written_count}`);
+          console.log(`Second run idempotent skip:${secondState.idempotent_skip_count}`);
+          console.log(`Stable graph records:      ${secondGraph.knowledge_records.length}`);
+          console.log(`Stable audit records:      ${secondGraph.audit_log.length}`);
+          console.log(
+            "Eligibility enforcement, qualification/confidence/lineage preservation, reversibility, snapshot isolation and second-run idempotency safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+
+      - name: Test Cosmos Graph Integrity v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+          cp scripts/cosmos_graph_integrity.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_integrity.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_integrity_fixture_qualified",
+            evidence_validation_id: "evidence_validation_integrity_fixture",
+            evidence_task_id: "evidence_task_integrity_fixture",
+            validation_target_id: "validation_integrity_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_integrity_1",
+              "evidence_integrity_2",
+              "evidence_integrity_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-fixture.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "empty-graph-fixture.json"),
+            JSON.stringify(graph, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-fixture.json \
+              --graph empty-graph-fixture.json \
+              --out knowledge/cosmos/valid-graph-v0.1.json \
+              --report knowledge/cosmos/graph-writer-report-v0.1.json
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/valid-graph-v0.1.json \
+              --out knowledge/cosmos/graph-integrity-valid-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const graph = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/valid-graph-v0.1.json"),
+              "utf8"
+            )
+          );
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/graph-integrity-valid-v0.1.json"),
+              "utf8"
+            )
+          );
+
+          const errors = [];
+
+          if (report.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Graph Integrity schema_version: ${report.schema_version}`
+            );
+          }
+
+          if (report.status !== "graph_integrity_passed") {
+            errors.push(
+              `Valid controlled graph should pass integrity; got ${report.status}`
+            );
+          }
+
+          if (Number(report.integrity_state?.error_count) !== 0) {
+            errors.push(
+              `Valid graph integrity expected 0 errors; got ${report.integrity_state?.error_count}`
+            );
+          }
+
+          if (report.integrity_state?.production_write_safe !== true) {
+            errors.push(
+              "Valid graph should be production_write_safe=true"
+            );
+          }
+
+          if (Number(report.graph_state?.knowledge_record_count) !== 1 ||
+              Number(report.graph_state?.active_record_count) !== 1 ||
+              Number(report.graph_state?.audit_record_count) !== 1 ||
+              Number(report.graph_state?.unique_admission_count) !== 1 ||
+              Number(report.graph_state?.unique_validation_target_count) !== 1) {
+            errors.push(
+              "Valid graph state counts are incorrect"
+            );
+          }
+
+          if (!Array.isArray(graph.knowledge_records) ||
+              graph.knowledge_records.length !== 1 ||
+              graph.knowledge_records[0].qualification?.must_preserve_contradiction !== true) {
+            errors.push(
+              "Graph Writer fixture did not preserve qualified contradiction"
+            );
+          }
+
+          const safeguards = report.safeguards || {};
+
+          if (safeguards.read_only !== true ||
+              safeguards.mutates_graph !== false ||
+              safeguards.auto_repairs_graph !== false ||
+              safeguards.checks_duplicate_materialization !== true ||
+              safeguards.checks_broken_lineage !== true ||
+              safeguards.checks_qualification_loss !== true ||
+              safeguards.checks_confidence_integrity !== true ||
+              safeguards.checks_audit_integrity !== true ||
+              safeguards.checks_reversibility !== true ||
+              safeguards.checks_active_conflicts !== true ||
+              safeguards.checks_temporal_ordering !== true) {
+            errors.push(
+              "Graph Integrity safeguards invalid on valid graph"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Integrity valid-graph errors:");
+            for (const error of errors) console.error(`- ${error}`);
+            process.exit(1);
+          }
+
+          // Create an intentionally corrupted copy.
+          const corrupted = JSON.parse(JSON.stringify(graph));
+          corrupted.knowledge_records[0].qualification.must_preserve_contradiction = false;
+
+          fs.writeFileSync(
+            path.join(root, "knowledge/cosmos/corrupted-graph-v0.1.json"),
+            JSON.stringify(corrupted, null, 2)
+          );
+
+          console.log("");
+          console.log("Valid graph integrity test passed.");
+          console.log("Creating intentional qualification-loss corruption for negative test.");
+          NODE
+
+          set +e
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/corrupted-graph-v0.1.json \
+              --out knowledge/cosmos/graph-integrity-corrupt-v0.1.json
+          )
+          CORRUPT_EXIT=$?
+          set -e
+
+          if [ "$CORRUPT_EXIT" -eq 0 ]; then
+            echo "ERROR: Corrupted graph unexpectedly passed Graph Integrity."
+            exit 1
+          fi
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(root, "knowledge/cosmos/graph-integrity-corrupt-v0.1.json"),
+              "utf8"
+            )
+          );
+
+          const codes = new Set((report.issues || []).map(x => x.code));
+
+          if (report.status !== "graph_integrity_failed") {
+            throw new Error(
+              `Corrupted graph must fail integrity; got ${report.status}`
+            );
+          }
+
+          if (Number(report.integrity_state?.error_count) < 1) {
+            throw new Error(
+              "Corrupted graph integrity report must contain at least one error"
+            );
+          }
+
+          if (report.integrity_state?.production_write_safe !== false) {
+            throw new Error(
+              "Corrupted graph must have production_write_safe=false"
+            );
+          }
+
+          if (!codes.has("QUALIFICATION_LOSS")) {
+            throw new Error(
+              `Expected QUALIFICATION_LOSS; got ${[...codes].join(", ")}`
+            );
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Integrity v0.1 isolated test passed.");
+          console.log("Valid graph:             PASS");
+          console.log(`Valid errors:            0`);
+          console.log("Intentional corruption:  REJECTED");
+          console.log(`Corrupt errors:          ${report.integrity_state.error_count}`);
+          console.log("Detected:                QUALIFICATION_LOSS");
+          console.log("Production graph writes: NONE");
+          console.log(
+            "Positive integrity and intentional-failure detection safeguards passed."
+          );
+          NODE
+
+      - name: Test Cosmos Graph Reversal v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_writer.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_writer.cjs"
+          cp scripts/cosmos_graph_integrity.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_integrity.cjs"
+          cp scripts/cosmos_graph_reversal.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_reversal.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const qualified = {
+            knowledge_admission_id: "knowledge_admission_reversal_fixture",
+            evidence_validation_id: "evidence_validation_reversal_fixture",
+            evidence_task_id: "evidence_task_reversal_fixture",
+            validation_target_id: "validation_reversal_fixture",
+            admitted_claim_class: "validated_qualified_relationship",
+            validation_disposition: "partially_supported",
+            decision: "admit_with_qualification",
+            confidence_score: 76,
+            confidence_band: "high",
+            persistence_level: "persistent_qualified_knowledge",
+            evidence_record_ids: [
+              "evidence_reversal_1",
+              "evidence_reversal_2",
+              "evidence_reversal_3"
+            ],
+            qualification: {
+              contradiction_present: true,
+              must_preserve_contradiction: true,
+              confidence_must_be_preserved: true,
+              source_lineage_must_be_preserved: true,
+              temporal_scope_must_be_preserved: true,
+              geography_scope_must_be_preserved: true
+            },
+            graph_write_eligibility: true,
+            graph_write_status: "not_started"
+          };
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: new Date().toISOString(),
+            status: "knowledge_admission_resolved",
+            admission_state: {
+              conceptual_distance_limit: null,
+              continuation_possible: true
+            },
+            admissions: [qualified],
+            graph_write_queue: [
+              { ...qualified, graph_write_rank: 1 }
+            ]
+          };
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: null,
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [],
+            audit_log: []
+          };
+
+          const request = {
+            schema_version: "0.1",
+            requested_at: new Date().toISOString(),
+            knowledge_admission_id:
+              "knowledge_admission_reversal_fixture",
+            reason:
+              "controlled_preflight_reversal_test",
+            requested_by:
+              "cosmos_preflight"
+          };
+
+          fs.writeFileSync(
+            path.join(root, "knowledge-admission-fixture.json"),
+            JSON.stringify(admission, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "empty-graph-fixture.json"),
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "reversal-request-fixture.json"),
+            JSON.stringify(request, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_writer.cjs \
+              --admission knowledge-admission-fixture.json \
+              --graph empty-graph-fixture.json \
+              --out knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/pre-reversal-writer-report-v0.1.json
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --out knowledge/cosmos/pre-reversal-integrity-v0.1.json
+          )
+
+          PRE_HASH="$(
+            sha256sum "$TEST_DIR/knowledge/cosmos/pre-reversal-graph-v0.1.json" |
+            awk '{print $1}'
+          )"
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/pre-reversal-graph-v0.1.json \
+              --request reversal-request-fixture.json \
+              --out knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/graph-reversal-report-v0.1.json
+          )
+
+          POST_INPUT_HASH="$(
+            sha256sum "$TEST_DIR/knowledge/cosmos/pre-reversal-graph-v0.1.json" |
+            awk '{print $1}'
+          )"
+
+          if [ "$PRE_HASH" != "$POST_INPUT_HASH" ]; then
+            echo "ERROR: Graph Reversal mutated its input graph."
+            exit 1
+          fi
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_integrity.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --out knowledge/cosmos/post-reversal-integrity-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          function read(relative) {
+            return JSON.parse(
+              fs.readFileSync(path.join(root, relative), "utf8")
+            );
+          }
+
+          const before = read(
+            "knowledge/cosmos/pre-reversal-graph-v0.1.json"
+          );
+          const beforeIntegrity = read(
+            "knowledge/cosmos/pre-reversal-integrity-v0.1.json"
+          );
+          const after = read(
+            "knowledge/cosmos/post-reversal-graph-v0.1.json"
+          );
+          const report = read(
+            "knowledge/cosmos/graph-reversal-report-v0.1.json"
+          );
+          const afterIntegrity = read(
+            "knowledge/cosmos/post-reversal-integrity-v0.1.json"
+          );
+
+          const errors = [];
+
+          if (beforeIntegrity.status !== "graph_integrity_passed" ||
+              Number(beforeIntegrity.integrity_state?.error_count) !== 0) {
+            errors.push(
+              "Pre-reversal graph must pass Graph Integrity"
+            );
+          }
+
+          if (report.schema_version !== "0.1" ||
+              report.status !== "graph_reversal_resolved") {
+            errors.push(
+              `Unexpected Graph Reversal result: ${report.schema_version} / ${report.status}`
+            );
+          }
+
+          if (Number(report.reversal_state?.requested_count) !== 1 ||
+              Number(report.reversal_state?.reversed_count) !== 1 ||
+              Number(report.reversal_state?.idempotent_skip_count) !== 0 ||
+              Number(report.reversal_state?.error_count) !== 0 ||
+              Number(report.reversal_state?.active_graph_record_count) !== 0 ||
+              Number(report.reversal_state?.inactive_graph_record_count) !== 1) {
+            errors.push(
+              "First reversal state counts invalid"
+            );
+          }
+
+          if (!Array.isArray(before.knowledge_records) ||
+              before.knowledge_records.length !== 1 ||
+              !Array.isArray(after.knowledge_records) ||
+              after.knowledge_records.length !== 1) {
+            errors.push(
+              "Graph Reversal must preserve exactly one historical graph record"
+            );
+          } else {
+            const prior = before.knowledge_records[0];
+            const current = after.knowledge_records[0];
+
+            if (prior.graph_record_id !== current.graph_record_id ||
+                prior.knowledge_admission_id !== current.knowledge_admission_id ||
+                prior.validation_target_id !== current.validation_target_id) {
+              errors.push(
+                "Graph Reversal changed graph-record identity/lineage"
+              );
+            }
+
+            if (current.active !== false ||
+                !current.deactivated_at ||
+                current.deactivation?.operation !==
+                  "deactivate_graph_record" ||
+                current.deactivation?.reversible_history_preserved !== true) {
+              errors.push(
+                "Graph Reversal did not safely deactivate the record"
+              );
+            }
+
+            if (Number(current.confidence_score) !== 76 ||
+                current.validation_disposition !==
+                  "partially_supported" ||
+                current.qualification?.contradiction_present !== true ||
+                current.qualification?.must_preserve_contradiction !== true ||
+                !Array.isArray(current.evidence_record_ids) ||
+                current.evidence_record_ids.length !== 3) {
+              errors.push(
+                "Graph Reversal lost confidence, qualification, contradiction or evidence lineage"
+              );
+            }
+          }
+
+          if (!Array.isArray(before.audit_log) ||
+              before.audit_log.length !== 1 ||
+              !Array.isArray(after.audit_log) ||
+              after.audit_log.length !== 2) {
+            errors.push(
+              "Graph Reversal must preserve creation audit and append exactly one reversal audit"
+            );
+          } else {
+            const creationAudit = before.audit_log[0];
+            const preservedCreation = after.audit_log.find(
+              row => row.audit_id === creationAudit.audit_id
+            );
+            const reversalAudit = after.audit_log.find(
+              row => row.operation === "deactivate_graph_record"
+            );
+
+            if (!preservedCreation) {
+              errors.push(
+                "Original creation audit was not preserved"
+              );
+            }
+
+            if (!reversalAudit ||
+                reversalAudit.prior_active_state !== true ||
+                reversalAudit.resulting_active_state !== false ||
+                reversalAudit.preserves_original_record !== true ||
+                reversalAudit.preserves_creation_audit !== true ||
+                reversalAudit.reversible !== true ||
+                reversalAudit.reversal_operation !==
+                  "deactivate_graph_record" ||
+                !Array.isArray(reversalAudit.evidence_record_ids) ||
+                reversalAudit.evidence_record_ids.length !== 3 ||
+                Number(reversalAudit.confidence_score) !== 76) {
+              errors.push(
+                "Reversal audit contract invalid"
+              );
+            }
+          }
+
+          if (afterIntegrity.status !== "graph_integrity_passed" ||
+              Number(afterIntegrity.integrity_state?.error_count) !== 0 ||
+              afterIntegrity.integrity_state?.production_write_safe !== true ||
+              Number(afterIntegrity.graph_state?.active_record_count) !== 0 ||
+              Number(afterIntegrity.graph_state?.inactive_record_count) !== 1 ||
+              Number(afterIntegrity.graph_state?.audit_record_count) !== 2) {
+            errors.push(
+              "Post-reversal Graph Integrity did not pass with 0 active / 1 inactive / 2 audits"
+            );
+          }
+
+          const safeguards = report.safeguards || {};
+
+          if (safeguards.mutates_input_graph_in_place !== false ||
+              safeguards.deletes_graph_records !== false ||
+              safeguards.preserves_historical_record !== true ||
+              safeguards.preserves_creation_audit !== true ||
+              safeguards.appends_reversal_audit !== true ||
+              safeguards.requires_explicit_target !== true ||
+              safeguards.respects_reversibility_contract !== true ||
+              safeguards.idempotent_for_inactive_record !== true ||
+              safeguards.writes_only_explicit_output_snapshot !== true) {
+            errors.push(
+              "Graph Reversal safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error("\nCosmos Graph Reversal v0.1 preflight errors:");
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("First Cosmos Graph Reversal v0.1 test passed.");
+          console.log("Before: 1 active / 0 inactive / 1 audit");
+          console.log("After:  0 active / 1 inactive / 2 audits");
+          console.log("Post-reversal Graph Integrity: PASS");
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --request reversal-request-fixture.json \
+              --out knowledge/cosmos/second-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/second-reversal-report-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          function read(relative) {
+            return JSON.parse(
+              fs.readFileSync(path.join(root, relative), "utf8")
+            );
+          }
+
+          const once = read(
+            "knowledge/cosmos/post-reversal-graph-v0.1.json"
+          );
+          const twice = read(
+            "knowledge/cosmos/second-reversal-graph-v0.1.json"
+          );
+          const report = read(
+            "knowledge/cosmos/second-reversal-report-v0.1.json"
+          );
+
+          if (report.status !== "graph_reversal_resolved" ||
+              Number(report.reversal_state?.reversed_count) !== 0 ||
+              Number(report.reversal_state?.idempotent_skip_count) !== 1 ||
+              Number(report.reversal_state?.error_count) !== 0) {
+            throw new Error(
+              "Second reversal did not resolve as an idempotent skip"
+            );
+          }
+
+          if (twice.knowledge_records?.length !== 1 ||
+              twice.audit_log?.length !== 2 ||
+              twice.knowledge_records?.[0]?.active !== false) {
+            throw new Error(
+              "Second reversal changed already-reversed graph history"
+            );
+          }
+
+          if (JSON.stringify(once.knowledge_records) !==
+              JSON.stringify(twice.knowledge_records) ||
+              JSON.stringify(once.audit_log) !==
+              JSON.stringify(twice.audit_log)) {
+            throw new Error(
+              "Second reversal was not structurally idempotent"
+            );
+          }
+
+          console.log("");
+          console.log("Second reversal idempotency test passed.");
+          console.log("Second-run reversals: 0");
+          console.log("Idempotent skips:     1");
+          console.log("Additional audits:    0");
+          NODE
+
+          cat > "$TEST_DIR/unknown-reversal-request.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "knowledge_admission_id": "knowledge_admission_does_not_exist",
+            "reason": "intentional_unknown_target_test",
+            "requested_by": "cosmos_preflight"
+          }
+          JSON
+
+          set +e
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_reversal.cjs \
+              --graph knowledge/cosmos/post-reversal-graph-v0.1.json \
+              --request unknown-reversal-request.json \
+              --out knowledge/cosmos/unknown-reversal-graph-v0.1.json \
+              --report knowledge/cosmos/unknown-reversal-report-v0.1.json
+          )
+          UNKNOWN_EXIT=$?
+          set -e
+
+          if [ "$UNKNOWN_EXIT" -eq 0 ]; then
+            echo "ERROR: Unknown reversal target unexpectedly succeeded."
+            exit 1
+          fi
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const graph = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/unknown-reversal-graph-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          const original = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/post-reversal-graph-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          const report = JSON.parse(
+            fs.readFileSync(
+              path.join(
+                root,
+                "knowledge/cosmos/unknown-reversal-report-v0.1.json"
+              ),
+              "utf8"
+            )
+          );
+
+          if (report.status !== "graph_reversal_rejected" ||
+              Number(report.reversal_state?.reversed_count) !== 0 ||
+              Number(report.reversal_state?.error_count) !== 1 ||
+              report.errors?.[0]?.code !== "reversal_target_not_found") {
+            throw new Error(
+              "Unknown target rejection contract invalid"
+            );
+          }
+
+          if (JSON.stringify(graph.knowledge_records) !==
+              JSON.stringify(original.knowledge_records) ||
+              JSON.stringify(graph.audit_log) !==
+              JSON.stringify(original.audit_log)) {
+            throw new Error(
+              "Rejected unknown reversal modified graph history"
+            );
+          }
+
+          console.log("");
+          console.log("Unknown-target negative reversal test passed.");
+          console.log("Unknown target: REJECTED");
+          console.log("Graph changes:  0");
+          console.log("Repository files were not modified by isolated tests.");
+          NODE
+
+      - name: Test Cosmos Causal Narrative v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_causal_narrative.cjs \
+            "$TEST_DIR/scripts/cosmos_causal_narrative.cjs"
+
+          cat > "$TEST_DIR/causal-input-v0.1.json" <<'JSON'
+          {
+            "focal_signal": {
+              "node_id": "substation_pressure",
+              "label": "Substation capacity pressure",
+              "type": "signal",
+              "role": "focal_signal"
+            },
+            "nodes": [
+              {
+                "node_id": "ai_compute",
+                "label": "AI compute demand growth",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "data_center_expansion",
+                "label": "Data-center capacity expansion",
+                "type": "driver",
+                "role": "upstream_driver"
+              },
+              {
+                "node_id": "substation_pressure",
+                "label": "Substation capacity pressure",
+                "type": "signal",
+                "role": "focal_signal"
+              },
+              {
+                "node_id": "transformer_demand",
+                "label": "Transformer capacity demand",
+                "type": "consequence",
+                "role": "direct_effect"
+              },
+              {
+                "node_id": "oem_capacity_pressure",
+                "label": "OEM manufacturing capacity pressure",
+                "type": "consequence",
+                "role": "second_order_effect"
+              },
+              {
+                "node_id": "lead_time_pressure",
+                "label": "Transformer lead-time pressure",
+                "type": "consequence",
+                "role": "third_order_effect"
+              },
+              {
+                "node_id": "project_schedule_pressure",
+                "label": "Project schedule pressure",
+                "type": "consequence",
+                "role": "emerging_effect"
+              },
+              {
+                "node_id": "investment_relocation",
+                "label": "Potential geographic investment relocation",
+                "type": "scenario",
+                "role": "emerging_effect"
+              }
+            ],
+            "edges": [
+              {
+                "edge_id": "edge_ai_to_dc",
+                "from_node_id": "ai_compute",
+                "to_node_id": "data_center_expansion",
+                "relationship": "drives",
+                "evidence_status": "supported",
+                "confidence_score": 92,
+                "source_record_ids": [
+                  "evidence_ai_dc_1",
+                  "evidence_ai_dc_2"
+                ],
+                "time_horizon": "current_to_short",
+                "geography_scope": "global",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_dc_to_substation",
+                "from_node_id": "data_center_expansion",
+                "to_node_id": "substation_pressure",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "evidence_dc_grid_1",
+                  "evidence_dc_grid_2"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_substation_to_transformer",
+                "from_node_id": "substation_pressure",
+                "to_node_id": "transformer_demand",
+                "relationship": "increases",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "evidence_substation_transformer_1"
+                ],
+                "time_horizon": "short",
+                "geography_scope": "United States",
+                "temporal_scope": "current"
+              },
+              {
+                "edge_id": "edge_transformer_to_oem",
+                "from_node_id": "transformer_demand",
+                "to_node_id": "oem_capacity_pressure",
+                "relationship": "constrains",
+                "evidence_status": "inferred",
+                "confidence_score": 78,
+                "source_record_ids": [
+                  "evidence_oem_capacity_1"
+                ],
+                "time_horizon": "short_to_mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_oem_to_lead",
+                "from_node_id": "oem_capacity_pressure",
+                "to_node_id": "lead_time_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 74,
+                "source_record_ids": [
+                  "evidence_lead_time_1"
+                ],
+                "time_horizon": "mid",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_lead_to_schedule",
+                "from_node_id": "lead_time_pressure",
+                "to_node_id": "project_schedule_pressure",
+                "relationship": "increases",
+                "evidence_status": "scenario",
+                "confidence_score": 70,
+                "source_record_ids": [
+                  "evidence_schedule_1"
+                ],
+                "time_horizon": "mid_to_long",
+                "geography_scope": "global",
+                "temporal_scope": "forward"
+              },
+              {
+                "edge_id": "edge_schedule_to_relocation",
+                "from_node_id": "project_schedule_pressure",
+                "to_node_id": "investment_relocation",
+                "relationship": "may_influence",
+                "evidence_status": "speculative",
+                "confidence_score": 62,
+                "source_record_ids": [
+                  "evidence_location_scenario_1"
+                ],
+                "time_horizon": "long",
+                "geography_scope": "multi-region",
+                "temporal_scope": "forward"
+              }
+            ],
+            "activation_events": [
+              {
+                "activation_id": "activation_1",
+                "label": "Recent data-center project announcements increased",
+                "kind": "new_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 88,
+                "source_record_ids": [
+                  "activation_evidence_1"
+                ],
+                "occurred_at": "2026-08-27T12:00:00Z",
+                "relevance_score": 95
+              },
+              {
+                "activation_id": "activation_2",
+                "label": "Utility load forecasts strengthened",
+                "kind": "strengthened_evidence",
+                "evidence_status": "supported",
+                "confidence_score": 84,
+                "source_record_ids": [
+                  "activation_evidence_2"
+                ],
+                "occurred_at": "2026-08-27T10:00:00Z",
+                "relevance_score": 90
+              },
+              {
+                "activation_id": "activation_3",
+                "label": "Transformer lead-time pressure remained unresolved",
+                "kind": "related_signal",
+                "evidence_status": "supported",
+                "confidence_score": 80,
+                "source_record_ids": [
+                  "activation_evidence_3"
+                ],
+                "occurred_at": "2026-08-26T18:00:00Z",
+                "relevance_score": 82
+              }
+            ],
+            "max_causal_depth": 5
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_causal_narrative.cjs \
+              --input causal-input-v0.1.json \
+              --out knowledge/cosmos/causal-narrative-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/causal-narrative-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Causal Narrative did not create causal-narrative-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Causal Narrative schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "causal_narrative_resolved") {
+            errors.push(
+              `Cosmos Causal Narrative failed: ${payload.status}`
+            );
+          }
+
+          if (payload.focal_signal?.node_id !== "substation_pressure" ||
+              payload.focal_signal?.label !== "Substation capacity pressure") {
+            errors.push(
+              "Cosmos Causal Narrative focal signal invalid"
+            );
+          }
+
+          const whyNow = payload.why_now || {};
+
+          if (whyNow.explanation_status !==
+                "activation_evidence_available" ||
+              Number(whyNow.activation_event_count) !== 3 ||
+              !Array.isArray(whyNow.strongest_activation_events) ||
+              whyNow.strongest_activation_events.length !== 3) {
+            errors.push(
+              "Cosmos Causal Narrative why_now activation block invalid"
+            );
+          }
+
+          if (!String(whyNow.rule || "").includes(
+                "not the long-run causal origin"
+              )) {
+            errors.push(
+              "Cosmos Causal Narrative did not separate Why Now from root causality"
+            );
+          }
+
+          const upstream = payload.upstream_drivers || [];
+
+          if (!Array.isArray(upstream) || upstream.length !== 2) {
+            errors.push(
+              `Controlled Causal Narrative expected 2 upstream drivers; got ${upstream.length}`
+            );
+          } else {
+            const depths = new Set(
+              upstream.map(x => Number(x.causal_depth))
+            );
+
+            if (!depths.has(1) || !depths.has(2)) {
+              errors.push(
+                "Controlled upstream drivers did not preserve causal depth 1 and 2"
+              );
+            }
+
+            const labels = new Set(
+              upstream.map(x => String(x.from_label || ""))
+            );
+
+            if (!labels.has("Data-center capacity expansion") ||
+                !labels.has("AI compute demand growth")) {
+              errors.push(
+                "Controlled upstream driver labels invalid"
+              );
+            }
+          }
+
+          const story = payload.downstream_story || {};
+          const direct = story.direct_effects || [];
+          const second = story.second_order_effects || [];
+          const third = story.third_order_effects || [];
+          const emerging = story.emerging_effects || [];
+
+          if (direct.length !== 1 ||
+              second.length !== 1 ||
+              third.length !== 1 ||
+              emerging.length !== 2) {
+            errors.push(
+              `Controlled downstream grouping invalid: direct=${direct.length}, second=${second.length}, third=${third.length}, emerging=${emerging.length}`
+            );
+          }
+
+          if (direct[0]?.to_label !== "Transformer capacity demand") {
+            errors.push(
+              "Direct effect should be Transformer capacity demand"
+            );
+          }
+
+          if (second[0]?.to_label !==
+                "OEM manufacturing capacity pressure") {
+            errors.push(
+              "Second-order effect should be OEM manufacturing capacity pressure"
+            );
+          }
+
+          if (third[0]?.to_label !==
+                "Transformer lead-time pressure") {
+            errors.push(
+              "Third-order effect should be Transformer lead-time pressure"
+            );
+          }
+
+          const butterfly = payload.butterfly_effect || {};
+          const downstream = butterfly.all_downstream_edges || [];
+          const candidates = butterfly.potential_new_signals || [];
+
+          if (!Array.isArray(downstream) || downstream.length !== 5) {
+            errors.push(
+              `Controlled butterfly effect expected 5 downstream edges; got ${downstream.length}`
+            );
+          }
+
+          const expectedDepths = [1,2,3,4,5];
+
+          for (const depth of expectedDepths) {
+            if (!downstream.some(
+                  row => Number(row.causal_depth) === depth
+                )) {
+              errors.push(
+                `Butterfly effect missing causal depth ${depth}`
+              );
+            }
+          }
+
+          // Confidence must never increase beyond the original edge confidence
+          // and should not increase as the path gets farther away.
+          let priorEffective = Infinity;
+
+          for (const row of [...downstream].sort(
+            (a,b) => Number(a.causal_depth)-Number(b.causal_depth)
+          )) {
+            const effective =
+              Number(row.effective_confidence_score);
+            const original =
+              Number(row.original_confidence_score);
+
+            if (!Number.isFinite(effective) ||
+                !Number.isFinite(original) ||
+                effective > original + 1e-9) {
+              errors.push(
+                `Causal confidence inflation on ${row.narrative_edge_id || "(unknown)"}`
+              );
+            }
+
+            if (effective > priorEffective + 1e-9) {
+              errors.push(
+                `Effective confidence increased with causal distance at depth ${row.causal_depth}`
+              );
+            }
+
+            priorEffective = effective;
+
+            if (!Array.isArray(row.source_record_ids) ||
+                row.source_record_ids.length < 1) {
+              errors.push(
+                `Causal edge ${row.narrative_edge_id || "(unknown)"} lost evidence lineage`
+              );
+            }
+
+            if (!row.time_horizon ||
+                !row.evidence_status ||
+                !row.effective_confidence_band) {
+              errors.push(
+                `Causal edge ${row.narrative_edge_id || "(unknown)"} lost narrative metadata`
+              );
+            }
+          }
+
+          if (!Array.isArray(candidates) || candidates.length < 1) {
+            errors.push(
+              "Cosmos Causal Narrative produced no potential_new_signals"
+            );
+          }
+
+          for (const candidate of candidates) {
+            if (candidate.status !== "candidate_only" ||
+                candidate.promotion_to_signal !== false) {
+              errors.push(
+                `Potential new signal ${candidate.candidate_signal_id || "(unknown)"} was improperly promoted`
+              );
+            }
+
+            if (Number(candidate.causal_depth) < 2) {
+              errors.push(
+                `Potential new signal ${candidate.candidate_signal_id || "(unknown)"} is too close to focal signal`
+              );
+            }
+          }
+
+          const contract = payload.narrative_contract || {};
+
+          if (contract.machine_readable_only !== true ||
+              contract.article_prose_generated !== false ||
+              contract.causal_direction_preserved !== true ||
+              contract.causal_depth_preserved !== true ||
+              contract.time_horizon_preserved !== true ||
+              contract.evidence_status_preserved !== true ||
+              contract.evidence_lineage_preserved !== true ||
+              contract.confidence_degrades_with_distance !== true ||
+              contract.why_now_separated_from_root_cause !== true ||
+              contract.possibility_never_silently_promoted_to_fact !== true) {
+            errors.push(
+              "Cosmos Causal Narrative narrative contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.writes_to_knowledge_graph !== false ||
+              safeguards.mutates_input_graph !== false ||
+              safeguards.creates_unverified_facts !== false ||
+              safeguards.preserves_source_lineage !== true ||
+              safeguards.preserves_epistemic_status !== true ||
+              safeguards.causal_distance_penalizes_confidence !== true ||
+              safeguards.activation_logic_separate_from_causality !== true ||
+              safeguards.candidate_signals_not_auto_promoted !== true) {
+            errors.push(
+              "Cosmos Causal Narrative safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Causal Narrative v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Causal Narrative v0.1 isolated test passed.");
+          console.log(`Status:              ${payload.status}`);
+          console.log(`Why-now events:      ${whyNow.activation_event_count}`);
+          console.log(`Upstream drivers:    ${upstream.length}`);
+          console.log(`Direct effects:      ${direct.length}`);
+          console.log(`Second-order:        ${second.length}`);
+          console.log(`Third-order:         ${third.length}`);
+          console.log(`Emerging effects:    ${emerging.length}`);
+          console.log(`Butterfly edges:     ${downstream.length}`);
+          console.log(`Candidate signals:   ${candidates.length}`);
+          console.log(
+            "Why-now separation, causal ordering, confidence decay, evidence lineage and candidate-only butterfly safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Test Cosmos Graph Evolution v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_graph_evolution.cjs \
+            "$TEST_DIR/scripts/cosmos_graph_evolution.cjs"
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+
+          const graph = {
+            schema_version: "0.1",
+            generated_at: "2026-08-26T12:00:00Z",
+            status: "cosmos_graph_snapshot",
+            knowledge_records: [
+              {
+                graph_record_id: "graph_existing_same",
+                knowledge_admission_id: "knowledge_admission_existing_same",
+                validation_target_id: "validation_same",
+                claim_class: "validated_qualified_relationship",
+                validation_disposition: "partially_supported",
+                confidence_score: 70,
+                confidence_band: "high",
+                epistemic_status: "persistent_qualified_knowledge",
+                evidence_record_ids: [
+                  "evidence_old_1"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-20T12:00:00Z",
+                active: true
+              },
+              {
+                graph_record_id: "graph_existing_conflict",
+                knowledge_admission_id: "knowledge_admission_existing_conflict",
+                validation_target_id: "validation_conflict",
+                claim_class: "validated_relationship",
+                validation_disposition: "supported",
+                confidence_score: 82,
+                confidence_band: "high",
+                epistemic_status: "persistent_knowledge",
+                evidence_record_ids: [
+                  "evidence_conflict_old"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-21T12:00:00Z",
+                active: true
+              },
+              {
+                graph_record_id: "graph_existing_supersede",
+                knowledge_admission_id: "knowledge_admission_existing_supersede",
+                validation_target_id: "validation_supersede",
+                claim_class: "validated_relationship_v1",
+                validation_disposition: "supported",
+                confidence_score: 68,
+                confidence_band: "moderate",
+                epistemic_status: "persistent_knowledge",
+                evidence_record_ids: [
+                  "evidence_supersede_old"
+                ],
+                qualification: {
+                  contradiction_present: false
+                },
+                admitted_at: "2026-08-19T12:00:00Z",
+                active: true
+              }
+            ],
+            audit_log: [
+              {
+                audit_id: "audit_existing_same",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_same",
+                knowledge_admission_id: "knowledge_admission_existing_same"
+              },
+              {
+                audit_id: "audit_existing_conflict",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_conflict",
+                knowledge_admission_id: "knowledge_admission_existing_conflict"
+              },
+              {
+                audit_id: "audit_existing_supersede",
+                operation: "create_graph_record",
+                graph_record_id: "graph_existing_supersede",
+                knowledge_admission_id: "knowledge_admission_existing_supersede"
+              }
+            ]
+          };
+
+          const admissions = [
+            {
+              knowledge_admission_id: "knowledge_admission_reinforce",
+              evidence_validation_id: "evidence_validation_reinforce",
+              validation_target_id: "validation_same",
+              admitted_claim_class: "validated_qualified_relationship",
+              validation_disposition: "partially_supported",
+              decision: "admit_with_qualification",
+              confidence_score: 82,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_old_1",
+                "evidence_new_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_qualify",
+              evidence_validation_id: "evidence_validation_qualify",
+              validation_target_id: "validation_same",
+              admitted_claim_class: "validated_qualified_relationship",
+              validation_disposition: "partially_supported",
+              decision: "admit_with_qualification",
+              confidence_score: 72,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_old_1",
+                "evidence_contradiction_new"
+              ],
+              qualification: {
+                contradiction_present: true
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_conflict",
+              evidence_validation_id: "evidence_validation_conflict",
+              validation_target_id: "validation_conflict",
+              admitted_claim_class: "validated_relationship",
+              validation_disposition: "contradicted",
+              decision: "admit_with_qualification",
+              confidence_score: 79,
+              confidence_band: "high",
+              persistence_level: "persistent_qualified_knowledge",
+              evidence_record_ids: [
+                "evidence_conflict_new"
+              ],
+              qualification: {
+                contradiction_present: true
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_supersede",
+              evidence_validation_id: "evidence_validation_supersede",
+              validation_target_id: "validation_supersede",
+              admitted_claim_class: "validated_relationship_v2",
+              validation_disposition: "supported",
+              decision: "admit",
+              confidence_score: 86,
+              confidence_band: "very_high",
+              persistence_level: "persistent_knowledge",
+              evidence_record_ids: [
+                "evidence_supersede_new_1",
+                "evidence_supersede_new_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            },
+            {
+              knowledge_admission_id: "knowledge_admission_create",
+              evidence_validation_id: "evidence_validation_create",
+              validation_target_id: "validation_new",
+              admitted_claim_class: "validated_relationship",
+              validation_disposition: "supported",
+              decision: "admit",
+              confidence_score: 90,
+              confidence_band: "very_high",
+              persistence_level: "persistent_knowledge",
+              evidence_record_ids: [
+                "evidence_create_1",
+                "evidence_create_2"
+              ],
+              qualification: {
+                contradiction_present: false
+              },
+              graph_write_eligibility: true,
+              graph_write_status: "not_started"
+            }
+          ];
+
+          const admission = {
+            schema_version: "0.1",
+            generated_at: "2026-08-27T12:00:00Z",
+            status: "knowledge_admission_resolved",
+            admissions,
+            graph_write_queue: admissions.map((row, index) => ({
+              ...row,
+              graph_write_rank: index + 1
+            }))
+          };
+
+          fs.writeFileSync(
+            path.join(root, "graph-fixture-v0.1.json"),
+            JSON.stringify(graph, null, 2)
+          );
+
+          fs.writeFileSync(
+            path.join(root, "admission-fixture-v0.1.json"),
+            JSON.stringify(admission, null, 2)
+          );
+          NODE
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_graph_evolution.cjs \
+              --graph graph-fixture-v0.1.json \
+              --admission admission-fixture-v0.1.json \
+              --out knowledge/cosmos/graph-evolution-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/graph-evolution-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Graph Evolution did not create graph-evolution-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Cosmos Graph Evolution schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "graph_evolution_planned") {
+            errors.push(
+              `Cosmos Graph Evolution failed: ${payload.status}`
+            );
+          }
+
+          const state = payload.evolution_state || {};
+          const plans = payload.evolution_plans || [];
+          const executionQueue = payload.evolution_execution_queue || [];
+          const conflictQueue = payload.conflict_review_queue || [];
+
+          if (!Array.isArray(plans) || plans.length !== 5) {
+            errors.push(
+              `Controlled Graph Evolution expected 5 plans; got ${plans.length}`
+            );
+          }
+
+          if (Number(state.planned_count) !== plans.length) {
+            errors.push(
+              "Cosmos Graph Evolution planned_count mismatch"
+            );
+          }
+
+          if (Number(state.graph_mutation_count) !== 0) {
+            errors.push(
+              "Cosmos Graph Evolution planning layer must not mutate graph"
+            );
+          }
+
+          const actionByAdmission = new Map(
+            plans.map(row => [
+              row.knowledge_admission_id,
+              row.evolution_action
+            ])
+          );
+
+          const expected = new Map([
+            ["knowledge_admission_reinforce", "reinforce_existing"],
+            ["knowledge_admission_qualify", "qualify_existing"],
+            ["knowledge_admission_conflict", "conflict_review_required"],
+            ["knowledge_admission_supersede", "supersede_existing"],
+            ["knowledge_admission_create", "create_new"]
+          ]);
+
+          for (const [admissionId, action] of expected) {
+            if (actionByAdmission.get(admissionId) !== action) {
+              errors.push(
+                `Graph Evolution action mismatch for ${admissionId}: expected ${action}, got ${actionByAdmission.get(admissionId)}`
+              );
+            }
+          }
+
+          const reinforce = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_reinforce"
+          );
+
+          if (!reinforce ||
+              reinforce.current_active_records?.length !== 1 ||
+              Number(reinforce.incoming?.confidence_score) !== 82 ||
+              reinforce.execution_contract?.graph_mutation_performed !== false ||
+              reinforce.execution_contract?.preserve_prior_record_history !== true ||
+              reinforce.execution_contract?.preserve_prior_audit_history !== true) {
+            errors.push(
+              "Reinforce-existing plan contract invalid"
+            );
+          }
+
+          const qualify = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_qualify"
+          );
+
+          if (!qualify ||
+              qualify.incoming?.contradiction_present !== true ||
+              qualify.evolution_action !== "qualify_existing") {
+            errors.push(
+              "Qualify-existing contradiction handling invalid"
+            );
+          }
+
+          const conflict = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_conflict"
+          );
+
+          if (!conflict ||
+              conflict.evolution_action !==
+                "conflict_review_required" ||
+              conflict.execution_contract?.conflict_must_not_be_auto_resolved !== true ||
+              conflict.execution_contract?.requires_separate_evolution_executor !== true) {
+            errors.push(
+              "Conflict-review boundary invalid"
+            );
+          }
+
+          const supersede = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_supersede"
+          );
+
+          if (!supersede ||
+              supersede.evolution_action !== "supersede_existing" ||
+              supersede.execution_contract?.deactivate_prior_record_before_supersession !== true ||
+              supersede.execution_contract?.preserve_prior_record_history !== true ||
+              supersede.execution_contract?.preserve_prior_audit_history !== true ||
+              supersede.execution_contract?.reversible !== true) {
+            errors.push(
+              "Supersede-existing plan contract invalid"
+            );
+          }
+
+          const create = plans.find(
+            row =>
+              row.knowledge_admission_id ===
+              "knowledge_admission_create"
+          );
+
+          if (!create ||
+              create.evolution_action !== "create_new" ||
+              create.current_active_records?.length !== 0) {
+            errors.push(
+              "Create-new plan contract invalid"
+            );
+          }
+
+          if (!Array.isArray(executionQueue) ||
+              executionQueue.length !== 4) {
+            errors.push(
+              `Controlled Graph Evolution expected 4 executable actions; got ${executionQueue.length}`
+            );
+          }
+
+          if (!Array.isArray(conflictQueue) ||
+              conflictQueue.length !== 1 ||
+              conflictQueue[0]?.knowledge_admission_id !==
+                "knowledge_admission_conflict") {
+            errors.push(
+              "Graph Evolution conflict review queue invalid"
+            );
+          }
+
+          for (let i = 0; i < executionQueue.length; i += 1) {
+            const row = executionQueue[i];
+
+            if (Number(row.evolution_rank) !== i + 1) {
+              errors.push(
+                `Graph Evolution execution queue rank invalid at index ${i}`
+              );
+            }
+
+            if (row.execution_status !== "not_started") {
+              errors.push(
+                `Graph Evolution execution queue ${row.graph_evolution_id || "(unknown)"} crossed execution boundary`
+              );
+            }
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_historical_knowledge !== false ||
+              safeguards.preserves_existing_records !== true ||
+              safeguards.preserves_audit_history !== true ||
+              safeguards.conflicting_polarity_requires_review !== true ||
+              safeguards.materially_equivalent_knowledge_not_duplicated !== true ||
+              safeguards.supersession_requires_explicit_execution !== true ||
+              safeguards.reversibility_required !== true) {
+            errors.push(
+              "Cosmos Graph Evolution safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Graph Evolution v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Graph Evolution v0.1 isolated test passed.");
+          console.log(`Status:            ${payload.status}`);
+          console.log(`Plans:             ${plans.length}`);
+          console.log(
+            `Create new:        ${state.by_action?.create_new || 0}`
+          );
+          console.log(
+            `Reinforce:         ${state.by_action?.reinforce_existing || 0}`
+          );
+          console.log(
+            `Qualify:           ${state.by_action?.qualify_existing || 0}`
+          );
+          console.log(
+            `Supersede:         ${state.by_action?.supersede_existing || 0}`
+          );
+          console.log(
+            `Conflict review:   ${state.by_action?.conflict_review_required || 0}`
+          );
+          console.log(`Execution queue:   ${executionQueue.length}`);
+          console.log(`Conflict queue:    ${conflictQueue.length}`);
+          console.log("Graph mutations:     0");
+          console.log(
+            "History preservation, explicit supersession, contradiction review and no-mutation safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Test Cosmos Temporal Knowledge v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_temporal_knowledge.cjs \
+            "$TEST_DIR/scripts/cosmos_temporal_knowledge.cjs"
+
+          cat > "$TEST_DIR/temporal-graph-fixture-v0.1.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "cosmos_graph_snapshot",
+            "knowledge_records": [
+              {
+                "graph_record_id": "graph_past",
+                "knowledge_admission_id": "knowledge_admission_past",
+                "validation_target_id": "validation_temporal_shared",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 68,
+                "confidence_band": "moderate",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_past_1"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-07-01T00:00:00Z",
+                "deactivated_at": "2026-08-01T00:00:00Z",
+                "active": false
+              },
+              {
+                "graph_record_id": "graph_current",
+                "knowledge_admission_id": "knowledge_admission_current",
+                "validation_target_id": "validation_temporal_shared",
+                "claim_class": "validated_relationship",
+                "validation_disposition": "supported",
+                "confidence_score": 82,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_knowledge",
+                "evidence_record_ids": ["evidence_current_1","evidence_current_2"],
+                "temporal_scope": "current",
+                "geography_scope": "United States",
+                "admitted_at": "2026-08-01T00:00:01Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_transition",
+                "knowledge_admission_id": "knowledge_admission_transition",
+                "validation_target_id": "validation_transition",
+                "claim_class": "validated_qualified_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 74,
+                "confidence_band": "high",
+                "epistemic_status": "persistent_qualified_knowledge",
+                "evidence_record_ids": ["evidence_transition_1"],
+                "temporal_scope": "transition",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-20T00:00:00Z",
+                "active": true
+              },
+              {
+                "graph_record_id": "graph_future",
+                "knowledge_admission_id": "knowledge_admission_future",
+                "validation_target_id": "validation_future",
+                "claim_class": "scenario_relationship",
+                "validation_disposition": "partially_supported",
+                "confidence_score": 58,
+                "confidence_band": "moderate",
+                "epistemic_status": "scenario_knowledge",
+                "evidence_record_ids": ["evidence_future_1"],
+                "temporal_scope": "future",
+                "geography_scope": "Global",
+                "admitted_at": "2026-08-25T00:00:00Z",
+                "active": true
+              }
+            ],
+            "audit_log": []
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+            node scripts/cosmos_temporal_knowledge.cjs \
+              --graph temporal-graph-fixture-v0.1.json \
+              --reference-time 2026-08-27T12:00:00Z \
+              --out knowledge/cosmos/temporal-knowledge-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/temporal-knowledge-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos Temporal Knowledge did not create temporal-knowledge-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected Temporal Knowledge schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "temporal_knowledge_resolved") {
+            errors.push(
+              `Temporal Knowledge failed: ${payload.status}`
+            );
+          }
+
+          if (payload.reference_time !== "2026-08-27T12:00:00Z") {
+            errors.push(
+              `Temporal Knowledge reference_time invalid: ${payload.reference_time}`
+            );
+          }
+
+          const state = payload.temporal_state || {};
+
+          if (Number(state.record_count) !== 4 ||
+              Number(state.past_count) !== 1 ||
+              Number(state.current_count) !== 1 ||
+              Number(state.transition_count) !== 1 ||
+              Number(state.future_count) !== 1 ||
+              Number(state.unknown_count) !== 0) {
+            errors.push(
+              `Temporal state counts invalid: ${JSON.stringify(state)}`
+            );
+          }
+
+          const timeline = payload.timeline || {};
+
+          if ((timeline.past || []).length !== 1 ||
+              timeline.past?.[0]?.graph_record_id !== "graph_past" ||
+              timeline.past?.[0]?.active !== false) {
+            errors.push(
+              "Historical record classification invalid"
+            );
+          }
+
+          if ((timeline.current || []).length !== 1 ||
+              timeline.current?.[0]?.graph_record_id !== "graph_current" ||
+              timeline.current?.[0]?.active !== true) {
+            errors.push(
+              "Current record classification invalid"
+            );
+          }
+
+          if ((timeline.transition || []).length !== 1 ||
+              timeline.transition?.[0]?.graph_record_id !== "graph_transition") {
+            errors.push(
+              "Transition record classification invalid"
+            );
+          }
+
+          if ((timeline.future || []).length !== 1 ||
+              timeline.future?.[0]?.graph_record_id !== "graph_future" ||
+              timeline.future?.[0]?.temporal_contract?.future_is_not_current_fact !== true ||
+              timeline.future?.[0]?.temporal_contract?.current_state_claimed !== false) {
+            errors.push(
+              "Future scenario boundary invalid"
+            );
+          }
+
+          const future = timeline.future?.[0];
+
+          if (!future ||
+              Number(future.confidence_score) !== 58 ||
+              future.confidence_band !== "moderate" ||
+              future.geography_scope !== "Global" ||
+              !Array.isArray(future.evidence_record_ids) ||
+              future.evidence_record_ids.length !== 1 ||
+              future.evidence_record_ids[0] !== "evidence_future_1") {
+            errors.push(
+              "Future record lost confidence/geography/evidence lineage"
+            );
+          }
+
+          const transitions = payload.transitions || [];
+
+          if (!Array.isArray(transitions) ||
+              transitions.length !== 1) {
+            errors.push(
+              `Expected one observed historical transition; got ${transitions.length}`
+            );
+          } else {
+            const t = transitions[0];
+
+            if (t.validation_target_id !== "validation_temporal_shared" ||
+                t.from_graph_record_id !== "graph_past" ||
+                t.to_graph_record_id !== "graph_current" ||
+                t.from_temporal_state !== "past" ||
+                t.to_temporal_state !== "current" ||
+                t.confidence_changed !== true ||
+                Number(t.confidence_delta) !== 14 ||
+                t.transition_status !== "observed_from_graph_history") {
+              errors.push(
+                "Past-to-current transition detection invalid"
+              );
+            }
+          }
+
+          const contract = payload.temporal_contract || {};
+
+          if (contract.past_present_future_separated !== true ||
+              contract.inactive_records_preserved_as_history !== true ||
+              contract.future_scenarios_not_promoted_to_current_fact !== true ||
+              contract.transition_state_supported !== true ||
+              contract.evidence_lineage_preserved !== true ||
+              contract.confidence_preserved !== true ||
+              contract.geography_scope_preserved !== true ||
+              contract.temporal_scope_preserved !== true) {
+            errors.push(
+              "Temporal Knowledge contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_historical_knowledge !== false ||
+              safeguards.rewrites_original_records !== false ||
+              safeguards.promotes_future_to_fact !== false ||
+              safeguards.collapses_temporal_states !== false ||
+              safeguards.preserves_source_lineage !== true ||
+              safeguards.preserves_confidence !== true ||
+              safeguards.preserves_epistemic_status !== true) {
+            errors.push(
+              "Temporal Knowledge safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos Temporal Knowledge v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos Temporal Knowledge v0.1 isolated test passed.");
+          console.log(`Status:       ${payload.status}`);
+          console.log(`Past:         ${state.past_count}`);
+          console.log(`Current:      ${state.current_count}`);
+          console.log(`Transition:   ${state.transition_count}`);
+          console.log(`Future:       ${state.future_count}`);
+          console.log(`Transitions:  ${state.transition_event_count}`);
+          console.log(
+            "Past/current/transition/future separation, future-not-fact boundary, lineage preservation and historical transition safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
+
+      - name: Test Cosmos First-Party Identity v0.1 In Isolated Workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TEST_DIR"' EXIT
+
+          mkdir -p "$TEST_DIR/scripts"
+          mkdir -p "$TEST_DIR/knowledge/cosmos"
+
+          cp scripts/cosmos_first_party_identity.cjs \
+            "$TEST_DIR/scripts/cosmos_first_party_identity.cjs"
+
+          cat > "$TEST_DIR/first-party-identity-fixture-v0.1.json" <<'JSON'
+          {
+            "schema_version": "0.1",
+            "generated_at": "2026-08-27T12:00:00Z",
+            "status": "first_party_identity_dataset",
+            "entities": [
+              {
+                "entity_id": "entity_ptd_today",
+                "canonical_name": "PTD Today",
+                "aliases": ["ptdtoday.com"],
+                "entity_type": "organization",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_cosmos",
+                "canonical_name": "Cosmos",
+                "aliases": ["PTD Cosmos"],
+                "entity_type": "platform",
+                "protected_identity": true
+              },
+              {
+                "entity_id": "entity_fixture_founder",
+                "canonical_name": "Fixture Founder",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": true,
+                "profiles": [
+                  {
+                    "profile_type": "linkedin",
+                    "url": "https://www.linkedin.com/in/fixture-founder"
+                  }
+                ]
+              },
+              {
+                "entity_id": "entity_external_claimant",
+                "canonical_name": "External Claimant",
+                "aliases": [],
+                "entity_type": "person",
+                "protected_identity": false
+              }
+            ],
+            "relationships": [
+              {
+                "identity_relationship_id": "identity_ptd_founded_by_fixture",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/about",
+                "source_label": "PTD Today official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_cosmos_created_by_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "Fixture Founder",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "Cosmos official identity record",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_ptd_develops_cosmos",
+                "subject": "PTD Today",
+                "predicate": "develops",
+                "object": "Cosmos",
+                "source_type": "first_party",
+                "source_url": "https://www.ptdtoday.com/cosmos",
+                "source_label": "PTD Today Cosmos relationship",
+                "verification_status": "verified",
+                "verified_at": "2026-08-27T12:00:00Z",
+                "confidence_score": 100,
+                "protected_identity": true,
+                "valid_from": "2026-08-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_external_conflicting_founder",
+                "subject": "PTD Today",
+                "predicate": "founded_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/conflicting-founder-claim",
+                "source_label": "Controlled conflicting external claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 45,
+                "protected_identity": false,
+                "valid_from": "2026-01-01T00:00:00Z",
+                "valid_to": null
+              },
+              {
+                "identity_relationship_id": "identity_future_creator_fixture",
+                "subject": "Cosmos",
+                "predicate": "created_by",
+                "object": "External Claimant",
+                "source_type": "external_secondary",
+                "source_url": "https://example.com/future-identity-claim",
+                "source_label": "Controlled future identity claim",
+                "verification_status": "unverified",
+                "verified_at": null,
+                "confidence_score": 30,
+                "protected_identity": false,
+                "valid_from": "2099-01-01T00:00:00Z",
+                "valid_to": null
+              }
+            ]
+          }
+          JSON
+
+          (
+            cd "$TEST_DIR"
+
+            node scripts/cosmos_first_party_identity.cjs \
+              --input first-party-identity-fixture-v0.1.json \
+              --reference-time 2026-08-27T12:00:00Z \
+              --question "Who founded PTD Today?" \
+              --question "Who created Cosmos?" \
+              --question "What is the relationship between PTD Today and Cosmos?" \
+              --out knowledge/cosmos/first-party-identity-test-v0.1.json
+          )
+
+          TEST_DIR="$TEST_DIR" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const root = process.env.TEST_DIR;
+          const file = path.join(
+            root,
+            "knowledge/cosmos/first-party-identity-test-v0.1.json"
+          );
+
+          if (!fs.existsSync(file)) {
+            throw new Error(
+              "Cosmos First-Party Identity did not create first-party-identity-test-v0.1.json"
+            );
+          }
+
+          const payload = JSON.parse(fs.readFileSync(file, "utf8"));
+          const errors = [];
+
+          if (payload.schema_version !== "0.1") {
+            errors.push(
+              `Unexpected First-Party Identity schema_version: ${payload.schema_version}`
+            );
+          }
+
+          if (payload.status !== "first_party_identity_resolved") {
+            errors.push(
+              `First-Party Identity failed: ${payload.status}`
+            );
+          }
+
+          if (payload.reference_time !== "2026-08-27T12:00:00Z") {
+            errors.push(
+              `First-Party Identity reference_time invalid: ${payload.reference_time}`
+            );
+          }
+
+          const relationships = payload.relationships || [];
+          const conflicts = payload.conflicts || [];
+          const answers = payload.answers || [];
+
+          if (!Array.isArray(relationships) || relationships.length !== 5) {
+            errors.push(
+              `Controlled First-Party Identity expected 5 relationships; got ${relationships.length}`
+            );
+          }
+
+          const firstPartyFounder = relationships.find(
+            row =>
+              row.identity_relationship_id ===
+              "identity_ptd_founded_by_fixture"
+          );
+
+          if (!firstPartyFounder ||
+              firstPartyFounder.subject !== "PTD Today" ||
+              firstPartyFounder.predicate !== "founded_by" ||
+              firstPartyFounder.object !== "Fixture Founder" ||
+              firstPartyFounder.source_type !== "first_party" ||
+              firstPartyFounder.verification_status !== "verified" ||
+              firstPartyFounder.temporal_state !== "current" ||
+              firstPartyFounder.assertion_scope !==
+                "entity_self_asserted_identity" ||
+              firstPartyFounder.source_url !==
+                "https://www.ptdtoday.com/about") {
+            errors.push(
+              "Controlled first-party founder record invalid"
+            );
+          }
+
+          const futureClaim = relationships.find(
+            row =>
+              row.identity_relationship_id ===
+              "identity_future_creator_fixture"
+          );
+
+          if (!futureClaim ||
+              futureClaim.temporal_state !== "future") {
+            errors.push(
+              "Future identity relationship was not classified as future"
+            );
+          }
+
+          if (!Array.isArray(conflicts) || conflicts.length !== 1) {
+            errors.push(
+              `Expected one current identity conflict; got ${conflicts.length}`
+            );
+          } else {
+            const conflict = conflicts[0];
+
+            if (conflict.predicate !== "founded_by" ||
+                conflict.temporal_state !== "current" ||
+                conflict.first_party_present !== true ||
+                conflict.external_present !== true ||
+                conflict.resolution_status !== "unresolved" ||
+                conflict.silent_overwrite_permitted !== false ||
+                conflict.records_preserved !== true ||
+                !Array.isArray(conflict.competing_objects) ||
+                !conflict.competing_objects.includes("Fixture Founder") ||
+                !conflict.competing_objects.includes("External Claimant")) {
+              errors.push(
+                "Controlled identity conflict preservation invalid"
+              );
+            }
+          }
+
+          if (!Array.isArray(answers) || answers.length !== 3) {
+            errors.push(
+              `Expected 3 controlled identity answers; got ${answers.length}`
+            );
+          }
+
+          const founderAnswer = answers.find(
+            row => row.predicate === "founded_by"
+          );
+
+          if (!founderAnswer ||
+              founderAnswer.answer_status !== "resolved" ||
+              founderAnswer.selected_relationship?.object !== "Fixture Founder" ||
+              founderAnswer.selected_relationship?.source_type !== "first_party" ||
+              founderAnswer.selected_relationship?.verification_status !== "verified" ||
+              founderAnswer.conflicts?.length !== 1 ||
+              founderAnswer.answer_contract?.first_party_selected_as_self_asserted_identity !== true ||
+              founderAnswer.answer_contract?.first_party_not_universal_truth !== true ||
+              founderAnswer.answer_contract?.conflict_disclosed !== true ||
+              founderAnswer.answer_contract?.external_disagreement_preserved !== true ||
+              founderAnswer.answer_contract?.provenance_required !== true) {
+            errors.push(
+              "Founder answer did not preserve first-party/provenance/conflict boundaries"
+            );
+          }
+
+          const creatorAnswer = answers.find(
+            row => row.predicate === "created_by"
+          );
+
+          if (!creatorAnswer ||
+              creatorAnswer.answer_status !== "resolved" ||
+              creatorAnswer.selected_relationship?.object !== "Fixture Founder" ||
+              creatorAnswer.selected_relationship?.temporal_state !== "current" ||
+              creatorAnswer.selected_relationship?.source_type !== "first_party") {
+            errors.push(
+              "Cosmos creator answer invalid"
+            );
+          }
+
+          const relationshipAnswer = answers.find(
+            row => row.predicate === "develops"
+          );
+
+          if (!relationshipAnswer ||
+              relationshipAnswer.answer_status !== "resolved" ||
+              relationshipAnswer.selected_relationship?.subject !== "PTD Today" ||
+              relationshipAnswer.selected_relationship?.object !== "Cosmos" ||
+              relationshipAnswer.selected_relationship?.source_type !== "first_party") {
+            errors.push(
+              "PTD Today/Cosmos relationship answer invalid"
+            );
+          }
+
+          const contract = payload.identity_contract || {};
+
+          if (contract.first_party_means_self_asserted_identity_authority !== true ||
+              contract.first_party_does_not_mean_universal_truth !== true ||
+              contract.protected_identity_records_preserved !== true ||
+              contract.external_conflicts_preserved !== true ||
+              contract.silent_conflict_overwrite_forbidden !== true ||
+              contract.temporal_identity_supported !== true ||
+              contract.provenance_required !== true) {
+            errors.push(
+              "First-Party Identity contract invalid"
+            );
+          }
+
+          const safeguards = payload.safeguards || {};
+
+          if (safeguards.performs_external_search !== false ||
+              safeguards.calls_openai_or_external_api !== false ||
+              safeguards.mutates_graph !== false ||
+              safeguards.deletes_identity_history !== false ||
+              safeguards.overwrites_conflicting_external_claims !== false ||
+              safeguards.treats_first_party_as_universal_truth !== false ||
+              safeguards.promotes_future_identity_to_current !== false ||
+              safeguards.preserves_provenance !== true ||
+              safeguards.preserves_conflicts !== true) {
+            errors.push(
+              "First-Party Identity safeguards invalid"
+            );
+          }
+
+          if (errors.length) {
+            console.error(
+              "\nCosmos First-Party Identity v0.1 preflight errors:"
+            );
+            for (const error of errors) {
+              console.error(`- ${error}`);
+            }
+            process.exit(1);
+          }
+
+          console.log("");
+          console.log("Cosmos First-Party Identity v0.1 isolated test passed.");
+          console.log(`Status:              ${payload.status}`);
+          console.log(`Relationships:       ${relationships.length}`);
+          console.log(`Current conflicts:   ${conflicts.length}`);
+          console.log(`Resolved answers:    ${answers.filter(x => x.answer_status === "resolved").length}`);
+          console.log(
+            "Founder/creator resolution, provenance, temporal identity, conflict preservation and first-party-not-universal-truth safeguards passed."
+          );
+          console.log(
+            "Repository files were not modified by the isolated test."
+          );
+          NODE
