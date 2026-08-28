@@ -260,16 +260,29 @@ for (const expected of requiredText) {
   assert(html.includes(expected), `Rendered article missing: ${expected}`);
 }
 
-assert(
-  html.indexOf("Why Cosmos noticed this today") <
-    html.indexOf("Substation capacity pressure is the focal signal"),
-  "Why-now section must appear before readable article body"
-);
+const sequence = [
+  "Why Cosmos noticed this today",
+  "What is driving it",
+  "Substation capacity pressure is the focal signal",
+  "Why it matters",
+  "🦋 Butterfly Effect",
+  "Follow the ripple",
+  "What could change this path?",
+  "Evidence & confidence"
+];
+
+for (let i = 1; i < sequence.length; i += 1) {
+  assert(
+    html.indexOf(sequence[i - 1]) < html.indexOf(sequence[i]),
+    `Article reading sequence is wrong: ${sequence[i - 1]} must appear before ${sequence[i]}`
+  );
+}
 
 assert(
-  html.indexOf("Substation capacity pressure is the focal signal") <
-    html.indexOf("Why it matters"),
-  "Readable article body must appear before Why it matters"
+  html.includes(
+    "Recent data-center project announcements increased. Utility load forecasts strengthened. Transformer lead-time pressure remained unresolved."
+  ),
+  "Why-now activation events must render as readable sentences"
 );
 
 assert(
