@@ -1599,6 +1599,7 @@ export function buildCausalPresentation(item, causalNarrative = null) {
         )
       )
       .filter(Boolean)
+      .map((statement) => /[.!?]$/.test(statement) ? statement : `${statement}.`)
       .join(" "),
     drivers: drivers.slice(0, 4).map((row) => ({
       statement: cleanString(
@@ -1695,22 +1696,24 @@ function renderCausalSections(presentation) {
     .map((item) => `<li>${esc(item)}</li>`)
     .join("");
 
-  return `
-    ${presentation.why_now ? `
-      <section class="cosmosBlock">
-        <div class="eyebrow">Why Cosmos noticed this today</div>
-        <p>${esc(presentation.why_now)}</p>
-      </section>
-    ` : ""}
+  return {
+    contextHtml: `
+      ${presentation.why_now ? `
+        <section class="cosmosBlock">
+          <div class="eyebrow">Why Cosmos noticed this today</div>
+          <p>${esc(presentation.why_now)}</p>
+        </section>
+      ` : ""}
 
-    ${driversHtml ? `
-      <section class="cosmosBlock">
-        <div class="eyebrow">What is driving it</div>
-        <ul class="driverList">${driversHtml}</ul>
-      </section>
-    ` : ""}
+      ${driversHtml ? `
+        <section class="cosmosBlock">
+          <div class="eyebrow">What is driving it</div>
+          <ul class="driverList">${driversHtml}</ul>
+        </section>
+      ` : ""}
+    `,
 
-    ${consequenceRows ? `
+    butterflyHtml: consequenceRows ? `
       <section class="cosmosBlock butterfly">
         <div class="eyebrow">🦋 Butterfly Effect</div>
         <div class="butterflyIntro">
@@ -1718,20 +1721,15 @@ function renderCausalSections(presentation) {
         </div>
         <div class="rippleStack">${consequenceRows}</div>
       </section>
-    ` : ""}
+    ` : "",
 
-    ${changeHtml ? `
+    changeHtml: changeHtml ? `
       <section class="cosmosBlock">
         <div class="eyebrow">What could change this path?</div>
         <ul class="driverList">${changeHtml}</ul>
       </section>
-    ` : ""}
-
-    <section class="cosmosBlock evidenceBox">
-      <div class="eyebrow">Evidence & confidence</div>
-      <p>${esc(presentation.evidence_note)}</p>
-    </section>
-  `;
+    ` : ""
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1752,7 +1750,7 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
   const url = `${base}/articles/${encodeURIComponent(id)}.html`;
   const ogImage = `${base}/assets/og-default.png`;
   const causalPresentation = buildCausalPresentation(item, causalNarrative);
-  const causalSectionsHtml = renderCausalSections(causalPresentation);
+  const causalSections = renderCausalSections(causalPresentation);
 
   const bodyParagraphs = toTextParagraphs(body)
     .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
@@ -1869,7 +1867,7 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
       <h1>${escapeHtml(title)}</h1>
       <p class="lede">${escapeHtml(lede)}</p>
 
-      ${causalSectionsHtml.split('<section class="cosmosBlock evidenceBox">')[0]}
+      ${causalSections.contextHtml}
 
       <div class="content">${bodyParagraphs}</div>
 
@@ -1878,10 +1876,14 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
         <div>${escapeHtml(item.why_it_matters)}</div>
       </section>
 
+      ${causalSections.butterflyHtml}
+
       ${relationshipRows ? `
         <h2>Follow the ripple</h2>
         <ul>${relationshipRows}</ul>
       ` : ""}
+
+      ${causalSections.changeHtml}
 
       <section class="cosmosBlock evidenceBox">
         <div class="eyebrow">Evidence & confidence</div>
