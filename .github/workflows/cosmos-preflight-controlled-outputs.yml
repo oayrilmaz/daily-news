@@ -113,6 +113,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_article_production_test:
+        description: "Write controlled Cosmos Production Article Integration v0.1 test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -4732,3 +4737,74 @@ jobs:
               sleep 3
             done
           fi
+
+      - name: Write Cosmos Production Article Integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_article_production_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/article-production-integration-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          node scripts/cosmos_article_production_test_v0.1.mjs \
+            --generator scripts/generate_ai_news.js \
+            --renderer scripts/cosmos_render_articles_v0.1.mjs \
+            --output-dir "$OUTPUT_DIR" \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Production Article Integration test output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos production article integration v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                echo "ERROR: Could not rebase controlled article output onto latest ${GITHUB_REF_NAME}."
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              echo "Remote changed again before push; retrying..."
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push after 3 synchronization attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Production Article Integration output generated."
+          echo "No OpenAI generation was executed."
+
+      - name: Cosmos Article Integration Summary
+        if: ${{ always() }}
+        run: |
+          echo "======================================================"
+          echo "COSMOS ARTICLE INTEGRATION SUMMARY"
+          if [ "${{ inputs.write_cosmos_article_presentation_test }}" = "true" ]; then
+            echo "Controlled Article Presentation output was requested."
+          fi
+          if [ "${{ inputs.write_cosmos_article_production_test }}" = "true" ]; then
+            echo "Controlled Production Article Integration output was requested."
+          fi
+          if [ "${{ inputs.write_cosmos_article_presentation_test }}" != "true" ] && \
+             [ "${{ inputs.write_cosmos_article_production_test }}" != "true" ]; then
+            echo "Article integration ran in isolated-validation mode only."
+          fi
+          echo "No OpenAI generation is performed by the article integration tests."
+          echo "======================================================"
