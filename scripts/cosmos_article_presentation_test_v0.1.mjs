@@ -252,7 +252,7 @@ const requiredText = [
   "3rd-order",
   "Follow the ripple",
   "What could change this path?",
-  "Evidence &amp; confidence",
+  "Evidence & confidence",
   "AI-generated scenario intelligence"
 ];
 
