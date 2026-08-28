@@ -1,6 +1,7 @@
 
 
 
+
 // scripts/generate_ai_news.js
 // PTD Today — Transitional Intelligence Generator for the new PTDToday.com
 //
@@ -1364,6 +1365,8 @@ function renderSummaryShareHtml({ siteOrigin, payload }) {
 
   const title = `PTD Today — Intelligence Summary | ${date}`;
   const ogImage = `${base}/assets/og-default.png`;
+  const causalPresentation = buildCausalPresentation(item, causalNarrative);
+  const causalSectionsHtml = renderCausalSections(causalPresentation);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1471,11 +1474,273 @@ function renderSummaryShareHtml({ siteOrigin, payload }) {
 </html>`;
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* Cosmos article presentation helpers                                        */
+/* -------------------------------------------------------------------------- */
+
+function readJsonIfExistsSafe(filePath, fallback = null) {
+  return readJsonIfExists(filePath, fallback);
+}
+
+function findCausalNarrativeForItem(item, knowledgeDir = "knowledge") {
+  const candidates = [
+    path.join(knowledgeDir, "cosmos", "causal-narrative-current.json"),
+    path.join(knowledgeDir, "cosmos", "causal-narrative-test-v0.1.json")
+  ];
+
+  for (const filePath of candidates) {
+    const payload = readJsonIfExistsSafe(filePath, null);
+    if (!payload || typeof payload !== "object") continue;
+
+    const focalId = cleanString(
+      payload?.focal_signal?.development_id ||
+      payload?.focal_signal?.signal_id ||
+      payload?.focal_signal?.id
+    );
+
+    const itemId = cleanString(item?.development_id || item?.id);
+    const focalTitle = cleanString(payload?.focal_signal?.title || payload?.focal_signal?.statement);
+    const itemTitle = cleanString(item?.title);
+
+    if (
+      (focalId && itemId && focalId === itemId) ||
+      (focalTitle && itemTitle &&
+       normalizeKey(focalTitle) === normalizeKey(itemTitle))
+    ) {
+      return payload;
+    }
+  }
+
+  return null;
+}
+
+function buildFallbackCausalPresentation(item) {
+  const relationships = Array.isArray(item?.relationships) ? item.relationships : [];
+  const entityById = new Map(
+    (item?.entities || []).map((entity) => [entity.entity_id, entity.name])
+  );
+
+  const downstream = relationships.slice(0, 4).map((relationship, index) => ({
+    depth: index + 1,
+    from: entityById.get(relationship.from_entity_id) || "Signal",
+    relation: cleanString(
+      relationship.label ||
+      relationship.relationship_type?.toLowerCase().replace(/_/g, " "),
+      "affects"
+    ),
+    to: entityById.get(relationship.to_entity_id) || "Related system",
+    confidence:
+      Number.isFinite(Number(relationship.confidence))
+        ? Math.round(Number(relationship.confidence) * 100)
+        : null,
+    qualification: "scenario relationship from article knowledge graph"
+  }));
+
+  return {
+    why_now: cleanString(
+      item?.summary || item?.lede,
+      "This signal is active in today’s intelligence set."
+    ),
+    drivers: relationships.slice(0, 3).map((relationship) => ({
+      statement: cleanString(
+        relationship.explanation ||
+        relationship.label ||
+        relationship.relationship_type,
+        "Related structural pressure is present."
+      ),
+      confidence:
+        Number.isFinite(Number(relationship.confidence))
+          ? Math.round(Number(relationship.confidence) * 100)
+          : null
+    })),
+    consequences: downstream,
+    change_conditions: cleanStringArray(item?.watchlist, 5),
+    evidence_note:
+      item?.evidence?.note ||
+      "Scenario intelligence only; authoritative external evidence has not yet been attached."
+  };
+}
+
+function buildCausalPresentation(item, causalNarrative = null) {
+  if (!causalNarrative) return buildFallbackCausalPresentation(item);
+
+  const whyNowRows = Array.isArray(causalNarrative?.why_now)
+    ? causalNarrative.why_now
+    : Array.isArray(causalNarrative?.activation_events)
+      ? causalNarrative.activation_events
+      : [];
+
+  const drivers = Array.isArray(causalNarrative?.upstream_drivers)
+    ? causalNarrative.upstream_drivers
+    : [];
+
+  const consequences = Array.isArray(causalNarrative?.downstream_consequences)
+    ? causalNarrative.downstream_consequences
+    : Array.isArray(causalNarrative?.butterfly_effect)
+      ? causalNarrative.butterfly_effect
+      : [];
+
+  const changeConditions =
+    cleanStringArray(
+      causalNarrative?.change_conditions ||
+      causalNarrative?.what_could_change_this_path ||
+      item?.watchlist,
+      6
+    );
+
+  return {
+    why_now: whyNowRows
+      .slice(0, 3)
+      .map((row) =>
+        cleanString(
+          row?.statement ||
+          row?.title ||
+          row?.activation_event ||
+          row?.description
+        )
+      )
+      .filter(Boolean)
+      .join(" "),
+    drivers: drivers.slice(0, 4).map((row) => ({
+      statement: cleanString(
+        row?.statement ||
+        row?.title ||
+        row?.driver ||
+        row?.description
+      ),
+      confidence: Number.isFinite(Number(row?.confidence))
+        ? Math.round(Number(row.confidence))
+        : Number.isFinite(Number(row?.effective_confidence))
+          ? Math.round(Number(row.effective_confidence))
+          : null
+    })),
+    consequences: consequences.slice(0, 6).map((row, index) => ({
+      depth: Number(row?.depth || row?.butterfly_distance || index + 1),
+      from: cleanString(row?.from || row?.from_name || row?.origin || ""),
+      relation: cleanString(
+        row?.relation ||
+        row?.relationship ||
+        row?.relationship_label ||
+        "may affect"
+      ),
+      to: cleanString(
+        row?.to ||
+        row?.to_name ||
+        row?.target ||
+        row?.statement ||
+        row?.consequence ||
+        ""
+      ),
+      confidence: Number.isFinite(Number(row?.effective_confidence))
+        ? Math.round(Number(row.effective_confidence))
+        : Number.isFinite(Number(row?.confidence))
+          ? Math.round(Number(row.confidence))
+          : null,
+      qualification: cleanString(
+        row?.qualification ||
+        row?.epistemic_status ||
+        row?.claim_class ||
+        "scenario"
+      )
+    })),
+    change_conditions: changeConditions,
+    evidence_note: cleanString(
+      causalNarrative?.evidence_note ||
+      causalNarrative?.evidence_status ||
+      item?.evidence?.note,
+      "Evidence lineage is preserved separately from causal interpretation."
+    )
+  };
+}
+
+function renderCausalSections(presentation) {
+  const esc = escapeHtml;
+
+  const driversHtml = (presentation.drivers || [])
+    .filter((row) => row.statement)
+    .map((row) => `
+      <li>
+        ${esc(row.statement)}
+        ${row.confidence !== null ? `<span class="confidence">${row.confidence}% confidence</span>` : ""}
+      </li>
+    `)
+    .join("");
+
+  const consequenceRows = (presentation.consequences || [])
+    .filter((row) => row.to || row.from)
+    .map((row) => {
+      const depthLabel =
+        row.depth === 1 ? "Direct" :
+        row.depth === 2 ? "2nd-order" :
+        row.depth === 3 ? "3rd-order" :
+        `Depth ${row.depth}`;
+
+      const chain = [row.from, row.relation, row.to].filter(Boolean).join(" ");
+
+      return `
+        <div class="rippleRow">
+          <div class="rippleDepth">${esc(depthLabel)}</div>
+          <div class="rippleMain">
+            <div class="rippleChain">${esc(chain)}</div>
+            <div class="rippleMeta">
+              ${row.confidence !== null ? `${esc(String(row.confidence))}% effective confidence` : ""}
+              ${row.qualification ? `${row.confidence !== null ? " • " : ""}${esc(row.qualification)}` : ""}
+            </div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  const changeHtml = (presentation.change_conditions || [])
+    .map((item) => `<li>${esc(item)}</li>`)
+    .join("");
+
+  return `
+    ${presentation.why_now ? `
+      <section class="cosmosBlock">
+        <div class="eyebrow">Why Cosmos noticed this today</div>
+        <p>${esc(presentation.why_now)}</p>
+      </section>
+    ` : ""}
+
+    ${driversHtml ? `
+      <section class="cosmosBlock">
+        <div class="eyebrow">What is driving it</div>
+        <ul class="driverList">${driversHtml}</ul>
+      </section>
+    ` : ""}
+
+    ${consequenceRows ? `
+      <section class="cosmosBlock butterfly">
+        <div class="eyebrow">🦋 Butterfly Effect</div>
+        <div class="butterflyIntro">
+          The signal may propagate through connected systems. Deeper paths carry lower confidence and remain scenario-qualified.
+        </div>
+        <div class="rippleStack">${consequenceRows}</div>
+      </section>
+    ` : ""}
+
+    ${changeHtml ? `
+      <section class="cosmosBlock">
+        <div class="eyebrow">What could change this path?</div>
+        <ul class="driverList">${changeHtml}</ul>
+      </section>
+    ` : ""}
+
+    <section class="cosmosBlock evidenceBox">
+      <div class="eyebrow">Evidence & confidence</div>
+      <p>${esc(presentation.evidence_note)}</p>
+    </section>
+  `;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Backward-compatible article rendering                                      */
 /* -------------------------------------------------------------------------- */
 
-function renderArticleHtml({ siteOrigin, item, payload }) {
+function renderArticleHtml({ siteOrigin, item, payload, causalNarrative = null }) {
   const id = cleanString(item.development_id || item.id);
   const title = cleanString(item.title, "PTD Today");
   const lede = cleanString(item.lede || item.summary);
@@ -1561,6 +1826,18 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
     h1{font:800 clamp(34px,7vw,56px)/1.04 Georgia,serif;margin:10px 0 16px}
     .lede{font-size:20px;color:#344054}
     .why{margin:24px 0;padding:18px;border-left:4px solid var(--accent);background:#eff4ff;border-radius:0 14px 14px 0}
+    .cosmosBlock{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:16px;background:#fff}
+    .eyebrow{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#344054;margin-bottom:8px}
+    .driverList{margin:0;padding-left:20px}.driverList li{margin:9px 0}
+    .confidence{display:inline-block;margin-left:8px;color:var(--muted);font-size:12px}
+    .butterfly{background:linear-gradient(180deg,#fff,#f8fafc)}
+    .butterflyIntro{color:var(--muted);margin-bottom:14px}
+    .rippleStack{display:grid;gap:10px}
+    .rippleRow{display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+    .rippleDepth{font-size:12px;font-weight:800;color:#344054}
+    .rippleChain{font-weight:700}
+    .rippleMeta{color:var(--muted);font-size:12px;margin-top:4px}
+    .evidenceBox{background:#fcfcfd}
     .content p{margin:0 0 16px}
     h2{font-size:20px;margin:28px 0 10px}
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
@@ -1592,23 +1869,28 @@ function renderArticleHtml({ siteOrigin, item, payload }) {
       <h1>${escapeHtml(title)}</h1>
       <p class="lede">${escapeHtml(lede)}</p>
 
+      ${causalSectionsHtml.split('<section class="cosmosBlock evidenceBox">')[0]}
+
+      <div class="content">${bodyParagraphs}</div>
+
       <section class="why">
         <strong>Why it matters</strong>
         <div>${escapeHtml(item.why_it_matters)}</div>
       </section>
 
-      <div class="content">${bodyParagraphs}</div>
-
       ${relationshipRows ? `
-        <h2>Explore why</h2>
+        <h2>Follow the ripple</h2>
         <ul>${relationshipRows}</ul>
       ` : ""}
 
-      <h2>Evidence status</h2>
-      <p>
-        This item is currently classified as
-        <strong>AI-generated scenario intelligence</strong> and is not verified reporting.
-      </p>
+      <section class="cosmosBlock evidenceBox">
+        <div class="eyebrow">Evidence & confidence</div>
+        <p>${escapeHtml(causalPresentation.evidence_note)}</p>
+        <p>
+          This item is currently classified as
+          <strong>AI-generated scenario intelligence</strong> and is not verified reporting.
+        </p>
+      </section>
 
       <div class="chips">
         ${entityLinks}
@@ -2027,9 +2309,11 @@ async function main() {
     const id = cleanString(item.development_id || item.id);
     if (!id) continue;
 
+    const causalNarrative = findCausalNarrativeForItem(item, knowledgeDir);
+
     writeFile(
       path.join(articlesDir, `${id}.html`),
-      renderArticleHtml({ siteOrigin, item, payload })
+      renderArticleHtml({ siteOrigin, item, payload, causalNarrative })
     );
   }
 
