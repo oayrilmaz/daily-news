@@ -3321,3 +3321,83 @@ jobs:
             "Repository files were not modified by the isolated test."
           );
           NODE
+
+      - name: Check Cosmos Article Presentation v0.1 source
+        run: |
+          test -f scripts/cosmos_article_presentation_test_v0.1.mjs
+          node --check scripts/cosmos_article_presentation_test_v0.1.mjs
+          node --check scripts/generate_ai_news.js
+
+      - name: Test Cosmos Article Presentation v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_article_presentation_test_v0.1.mjs \
+            --generator scripts/generate_ai_news.js \
+            --out "$TMP_DIR/article-presentation-test-v0.1.html" \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" "$TMP_DIR/article-presentation-test-v0.1.html" <<'NODE'
+          const fs = require("fs");
+
+          const result = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const html = fs.readFileSync(process.argv[3], "utf8");
+
+          const fail = (message) => {
+            console.error(message);
+            process.exit(1);
+          };
+
+          if (result.status !== "article_presentation_resolved") {
+            fail("Article presentation status did not resolve");
+          }
+
+          const requiredSections = [
+            "signal_headline_present",
+            "why_cosmos_noticed_today_present",
+            "drivers_present",
+            "readable_article_present",
+            "why_it_matters_present",
+            "butterfly_effect_present",
+            "direct_second_third_order_present",
+            "follow_the_ripple_present",
+            "change_conditions_present",
+            "evidence_and_confidence_present"
+          ];
+
+          for (const key of requiredSections) {
+            if (result.section_contract?.[key] !== true) {
+              fail(`Missing article section contract: ${key}`);
+            }
+          }
+
+          if (result.causal_contract?.causal_distance_confidence_non_increasing !== true) {
+            fail("Causal-distance confidence contract failed");
+          }
+
+          if (result.causal_contract?.deeper_paths_remain_qualified !== true) {
+            fail("Deeper-path qualification contract failed");
+          }
+
+          if (result.causal_contract?.candidate_only_consequence_preserved !== true) {
+            fail("Candidate-only consequence preservation failed");
+          }
+
+          const safeguards = result.safeguards || {};
+          if (
+            safeguards.performs_external_search !== false ||
+            safeguards.calls_openai_or_external_api !== false ||
+            safeguards.mutates_graph !== false ||
+            safeguards.promotes_scenario_to_fact !== false
+          ) {
+            fail("Article presentation safeguards failed");
+          }
+
+          if (!html.includes("🦋 Butterfly Effect")) {
+            fail("Rendered HTML is missing Butterfly Effect");
+          }
+
+          console.log("Cosmos Article Presentation v0.1 isolated test passed.");
+          NODE
