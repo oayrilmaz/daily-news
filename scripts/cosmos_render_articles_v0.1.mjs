@@ -112,7 +112,7 @@ function focalIds(narrative) {
     narrative?.focal_signal?.id,
     narrative?.development_id,
     narrative?.signal_id
-  ].map(cleanString).filter(Boolean);
+  ].map((value) => cleanString(value)).filter(Boolean);
 }
 
 function focalTitle(narrative) {
@@ -126,7 +126,7 @@ function focalTitle(narrative) {
 function matchNarrative(item, entries) {
   const itemIds = new Set(
     [item?.development_id, item?.id, item?.signal_id]
-      .map(cleanString)
+      .map((value) => cleanString(value))
       .filter(Boolean)
   );
 
@@ -298,4 +298,3 @@ const manifest = {
 
 writeJson(manifestPath, manifest);
 console.log(JSON.stringify(manifest, null, 2));
-
