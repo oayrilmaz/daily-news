@@ -108,6 +108,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_article_presentation_test:
+        description: "Write controlled Cosmos Article Presentation v0.1 HTML test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -4691,3 +4696,39 @@ jobs:
             echo "Upload the newly generated output file(s) to ChatGPT for inspection before production integration."
           fi
           echo "======================================================"
+
+      - name: Write Cosmos Article Presentation v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_article_presentation_test }}
+        run: |
+          set -euo pipefail
+          mkdir -p knowledge/cosmos
+
+          node scripts/cosmos_article_presentation_test_v0.1.mjs \
+            --generator scripts/generate_ai_news.js \
+            --out knowledge/cosmos/article-presentation-test-v0.1.html \
+            > knowledge/cosmos/article-presentation-test-v0.1.json
+
+          git add \
+            knowledge/cosmos/article-presentation-test-v0.1.html \
+            knowledge/cosmos/article-presentation-test-v0.1.json
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Article Presentation test output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos article presentation v0.1 output"
+
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                break
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo "Push failed after 3 attempts."
+                exit 1
+              fi
+              sleep 3
+            done
+          fi
