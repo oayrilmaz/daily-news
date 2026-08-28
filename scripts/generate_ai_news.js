@@ -1481,7 +1481,7 @@ function readJsonIfExistsSafe(filePath, fallback = null) {
   return readJsonIfExists(filePath, fallback);
 }
 
-function findCausalNarrativeForItem(item, knowledgeDir = "knowledge") {
+export function findCausalNarrativeForItem(item, knowledgeDir = "knowledge") {
   const candidates = [
     path.join(knowledgeDir, "cosmos", "causal-narrative-current.json"),
     path.join(knowledgeDir, "cosmos", "causal-narrative-test-v0.1.json")
