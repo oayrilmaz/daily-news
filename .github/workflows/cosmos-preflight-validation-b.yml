@@ -3474,3 +3474,75 @@ jobs:
 
           console.log("Cosmos Production Article Integration v0.1 isolated test passed.");
           NODE
+
+      - name: Check Cosmos Dimensionless Projection v0.1 source
+        run: |
+          test -f scripts/cosmos_dimensionless_projection_v0.1.mjs
+          test -f scripts/cosmos_dimensionless_projection_test_v0.1.mjs
+          node --check scripts/cosmos_dimensionless_projection_v0.1.mjs
+          node --check scripts/cosmos_dimensionless_projection_test_v0.1.mjs
+
+      - name: Test Cosmos Dimensionless Projection v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_dimensionless_projection_test_v0.1.mjs \
+            --engine scripts/cosmos_dimensionless_projection_v0.1.mjs \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs = require("fs");
+
+          const result = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+
+          const fail = (message) => {
+            console.error(message);
+            process.exit(1);
+          };
+
+          if (result.status !== "dimensionless_projection_test_passed") {
+            fail("Dimensionless Projection test did not pass");
+          }
+
+          if (!Array.isArray(result.projections_tested) || result.projections_tested.length !== 3) {
+            fail("Expected exactly three recentered projections");
+          }
+
+          const contracts = result.contracts || {};
+          const requiredContracts = [
+            "observer_defines_center",
+            "projection_distance_relative_to_center",
+            "surrounding_node_relationships_preserved",
+            "recentering_requires_no_graph_mutation",
+            "hidden_cosmos_not_deleted",
+            "backward_forward_lateral_supported",
+            "feedback_relationships_supported",
+            "confidence_preserved_on_edges",
+            "evidence_lineage_preserved_on_edges",
+            "temporal_state_preserved",
+            "geography_scope_preserved"
+          ];
+
+          for (const key of requiredContracts) {
+            if (contracts[key] !== true) {
+              fail(`Dimensionless Projection contract failed: ${key}`);
+            }
+          }
+
+          const safeguards = result.safeguards || {};
+          if (
+            safeguards.performs_external_search !== false ||
+            safeguards.calls_openai_or_external_api !== false ||
+            safeguards.mutates_graph !== false ||
+            safeguards.creates_new_facts !== false ||
+            safeguards.deletes_hidden_nodes !== false ||
+            safeguards.rewrites_edge_confidence !== false ||
+            safeguards.collapses_epistemic_status !== false
+          ) {
+            fail("Dimensionless Projection safeguards failed");
+          }
+
+          console.log("Cosmos Dimensionless Projection v0.1 isolated test passed.");
+          NODE
