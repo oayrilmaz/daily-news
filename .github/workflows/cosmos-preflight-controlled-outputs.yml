@@ -123,6 +123,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_butterfly_grid_contract_test:
+        description: "Write controlled Cosmos Butterfly Grid Contract v0.1 test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -4937,3 +4942,81 @@ jobs:
           echo "Observer recentering does not mutate the underlying Cosmos graph."
           echo "No OpenAI generation is performed by this layer."
           echo "======================================================"
+
+      - name: Write Cosmos Butterfly Grid Contract v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_butterfly_grid_contract_test }}
+        run: |
+          set -euo pipefail
+
+          SOURCE_DIR="knowledge/cosmos/dimensionless-projection-test-v0.1"
+          OUTPUT_DIR="knowledge/cosmos/butterfly-grid-contract-test-v0.1"
+
+          test -f "$SOURCE_DIR/projection-signal.json"
+          test -f "$SOURCE_DIR/projection-transformers.json"
+          test -f "$SOURCE_DIR/projection-materials.json"
+
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          node scripts/cosmos_butterfly_grid_contract_v0.1.mjs \
+            --projection "$SOURCE_DIR/projection-signal.json" \
+            --max-initial-nodes 8 \
+            --max-initial-edges 14 \
+            --out "$OUTPUT_DIR/grid-signal.json" \
+            > /dev/null
+
+          node scripts/cosmos_butterfly_grid_contract_v0.1.mjs \
+            --projection "$SOURCE_DIR/projection-transformers.json" \
+            --max-initial-nodes 8 \
+            --max-initial-edges 14 \
+            --out "$OUTPUT_DIR/grid-transformers.json" \
+            > /dev/null
+
+          node scripts/cosmos_butterfly_grid_contract_v0.1.mjs \
+            --projection "$SOURCE_DIR/projection-materials.json" \
+            --max-initial-nodes 8 \
+            --max-initial-edges 14 \
+            --out "$OUTPUT_DIR/grid-materials.json" \
+            > /dev/null
+
+          node scripts/cosmos_butterfly_grid_contract_test_v0.1.mjs \
+            --engine scripts/cosmos_butterfly_grid_contract_v0.1.mjs \
+            --signal "$SOURCE_DIR/projection-signal.json" \
+            --transformers "$SOURCE_DIR/projection-transformers.json" \
+            --materials "$SOURCE_DIR/projection-materials.json" \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Butterfly Grid Contract output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos butterfly grid contract v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push controlled Butterfly Grid Contract output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Butterfly Grid Contract output generated."
+          echo "No OpenAI generation was executed."
