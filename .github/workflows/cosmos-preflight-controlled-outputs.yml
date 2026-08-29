@@ -118,6 +118,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_dimensionless_projection_test:
+        description: "Write controlled Cosmos Dimensionless Projection v0.1 test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -4807,4 +4812,128 @@ jobs:
             echo "Article integration ran in isolated-validation mode only."
           fi
           echo "No OpenAI generation is performed by the article integration tests."
+          echo "======================================================"
+
+      - name: Write Cosmos Dimensionless Projection v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_dimensionless_projection_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/dimensionless-projection-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/fixture-graph.json" <<'JSON'
+          {
+            "schema_version": "fixture-0.1",
+            "nodes": [
+              {"id":"signal","label":"Today's Signal","type":"signal"},
+              {"id":"transformers","label":"Transformers","type":"infrastructure"},
+              {"id":"substations","label":"Substations","type":"infrastructure"},
+              {"id":"procurement","label":"Procurement","type":"process"},
+              {"id":"oem","label":"OEM Load","type":"market"},
+              {"id":"capex","label":"Grid CapEx","type":"market"},
+              {"id":"lead","label":"Lead Times","type":"process"},
+              {"id":"materials","label":"Materials","type":"material"},
+              {"id":"projects","label":"Projects","type":"project"},
+              {"id":"schedule","label":"Schedule","type":"project"},
+              {"id":"emergence","label":"Emergence","type":"concept"}
+            ],
+            "edges": [
+              {"id":"e1","from":"signal","to":"transformers","relationship":"increases demand for","confidence":0.90,"evidence_ids":["ev1","ev2"],"temporal_state":"current","epistemic_status":"supported"},
+              {"id":"e2","from":"signal","to":"substations","relationship":"increases pressure on","confidence":0.88,"evidence_ids":["ev3"]},
+              {"id":"e3","from":"signal","to":"procurement","relationship":"changes","confidence":0.80,"evidence_ids":["ev4"]},
+              {"id":"e4","from":"transformers","to":"oem","relationship":"increases","confidence":0.84,"evidence_ids":["ev5"]},
+              {"id":"e5","from":"substations","to":"capex","relationship":"influences","confidence":0.81,"evidence_ids":["ev6"]},
+              {"id":"e6","from":"procurement","to":"lead","relationship":"affects","confidence":0.79,"evidence_ids":["ev7"]},
+              {"id":"e7","from":"lead","to":"procurement","relationship":"changes strategy for","confidence":0.72,"evidence_ids":["ev8"]},
+              {"id":"e8","from":"oem","to":"materials","relationship":"increases demand for","confidence":0.76,"evidence_ids":["ev9"]},
+              {"id":"e9","from":"capex","to":"projects","relationship":"funds","confidence":0.82,"evidence_ids":["ev10"]},
+              {"id":"e10","from":"projects","to":"schedule","relationship":"affects","confidence":0.78,"evidence_ids":["ev11"]},
+              {"id":"e11","from":"lead","to":"schedule","relationship":"extends","confidence":0.74,"evidence_ids":["ev12"]},
+              {"id":"e12","from":"materials","to":"projects","relationship":"constrains","confidence":0.68,"evidence_ids":["ev13"]},
+              {"id":"e13","from":"projects","to":"substations","relationship":"creates requirements for","confidence":0.71,"evidence_ids":["ev14"]},
+              {"id":"e14","from":"schedule","to":"emergence","relationship":"may contribute to","confidence":0.46,"evidence_ids":["ev15"],"epistemic_status":"scenario"}
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_dimensionless_projection_v0.1.mjs \
+            --graph "$OUTPUT_DIR/fixture-graph.json" \
+            --focus-id signal \
+            --focus-type signal \
+            --max-nodes 11 \
+            --max-distance 4 \
+            --out "$OUTPUT_DIR/projection-signal.json" \
+            > /dev/null
+
+          node scripts/cosmos_dimensionless_projection_v0.1.mjs \
+            --graph "$OUTPUT_DIR/fixture-graph.json" \
+            --focus-id transformers \
+            --focus-type entity \
+            --max-nodes 11 \
+            --max-distance 4 \
+            --out "$OUTPUT_DIR/projection-transformers.json" \
+            > /dev/null
+
+          node scripts/cosmos_dimensionless_projection_v0.1.mjs \
+            --graph "$OUTPUT_DIR/fixture-graph.json" \
+            --focus-id materials \
+            --focus-type material \
+            --max-nodes 11 \
+            --max-distance 4 \
+            --out "$OUTPUT_DIR/projection-materials.json" \
+            > /dev/null
+
+          node scripts/cosmos_dimensionless_projection_test_v0.1.mjs \
+            --engine scripts/cosmos_dimensionless_projection_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Dimensionless Projection test output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos dimensionless projection v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push controlled Dimensionless Projection output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Dimensionless Projection output generated."
+          echo "No OpenAI generation was executed."
+
+      - name: Cosmos Dimensionless Projection Summary
+        if: ${{ always() }}
+        run: |
+          echo "======================================================"
+          echo "COSMOS DIMENSIONLESS PROJECTION SUMMARY"
+          if [ "${{ inputs.write_cosmos_dimensionless_projection_test }}" = "true" ]; then
+            echo "Controlled Dimensionless Projection output was requested."
+          else
+            echo "Dimensionless Projection ran in isolated-validation mode only."
+          fi
+          echo "Observer recentering does not mutate the underlying Cosmos graph."
+          echo "No OpenAI generation is performed by this layer."
           echo "======================================================"
