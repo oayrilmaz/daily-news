@@ -3546,3 +3546,101 @@ jobs:
 
           console.log("Cosmos Dimensionless Projection v0.1 isolated test passed.");
           NODE
+
+      - name: Check Cosmos Butterfly Grid Contract v0.1 source
+        run: |
+          test -f scripts/cosmos_butterfly_grid_contract_v0.1.mjs
+          test -f scripts/cosmos_butterfly_grid_contract_test_v0.1.mjs
+          node --check scripts/cosmos_butterfly_grid_contract_v0.1.mjs
+          node --check scripts/cosmos_butterfly_grid_contract_test_v0.1.mjs
+
+      - name: Test Cosmos Butterfly Grid Contract v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+
+          TEST_DIR="knowledge/cosmos/dimensionless-projection-test-v0.1"
+
+          test -f "$TEST_DIR/projection-signal.json"
+          test -f "$TEST_DIR/projection-transformers.json"
+          test -f "$TEST_DIR/projection-materials.json"
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_butterfly_grid_contract_test_v0.1.mjs \
+            --engine scripts/cosmos_butterfly_grid_contract_v0.1.mjs \
+            --signal "$TEST_DIR/projection-signal.json" \
+            --transformers "$TEST_DIR/projection-transformers.json" \
+            --materials "$TEST_DIR/projection-materials.json" \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs = require("fs");
+          const result = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+
+          const fail = (message) => {
+            console.error(message);
+            process.exit(1);
+          };
+
+          if (result.status !== "butterfly_grid_contract_test_passed") {
+            fail("Butterfly Grid Contract test did not pass");
+          }
+
+          if (!Array.isArray(result.centers_tested) || result.centers_tested.length !== 3) {
+            fail("Expected exactly three observer centers");
+          }
+
+          const visual = result.visual_semantics || {};
+          if (
+            visual.renderer_agnostic !== true ||
+            visual.fixed_xy_coordinates_provided !== false ||
+            visual.fixed_radial_layout_required !== false ||
+            visual.center_is_observer_relative !== true ||
+            visual.distance_is_semantic_not_pixel_distance !== true ||
+            visual.cross_links_must_remain_visible_when_selected !== true ||
+            visual.feedback_loops_must_remain_distinguishable !== true ||
+            visual.confidence_must_be_inspectable !== true
+          ) {
+            fail("Butterfly Grid visual semantics failed");
+          }
+
+          const nav = result.navigation_contract || {};
+          if (
+            nav.node_click_action !== "recenter_projection" ||
+            nav.edge_follow_action !== "recenter_or_expand_from_relationship" ||
+            nav.confidence_click_action !== "show_confidence_lineage" ||
+            nav.expand_action !== "request_next_bounded_projection" ||
+            nav.history_should_be_reversible !== true ||
+            nav.back_navigation_should_restore_previous_observer !== true
+          ) {
+            fail("Butterfly Grid navigation contract failed");
+          }
+
+          const article = result.article_integration_contract || {};
+          if (
+            article.standalone_follow_the_ripple_section_required !== false ||
+            article.butterfly_card_follow_link_required !== true ||
+            article.explore_cosmos_link_required !== true ||
+            article.relationship_deep_link_supported !== true ||
+            article.confidence_inspection_supported !== true
+          ) {
+            fail("Butterfly Grid article integration contract failed");
+          }
+
+          const safe = result.safeguards || {};
+          if (
+            safe.performs_external_search !== false ||
+            safe.calls_openai_or_external_api !== false ||
+            safe.mutates_graph !== false ||
+            safe.creates_new_facts !== false ||
+            safe.fabricates_confidence_components !== false ||
+            safe.forces_tree_structure !== false ||
+            safe.forces_fixed_layout !== false ||
+            safe.deletes_hidden_cosmos !== false
+          ) {
+            fail("Butterfly Grid safeguards failed");
+          }
+
+          console.log("Cosmos Butterfly Grid Contract v0.1 isolated test passed.");
+          NODE
