@@ -128,6 +128,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_universal_object_model_test:
+        description: "Write controlled Cosmos Universal Object Model v0.1 test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -5020,3 +5025,34 @@ jobs:
 
           echo "Controlled Butterfly Grid Contract output generated."
           echo "No OpenAI generation was executed."
+      - name: Write Cosmos Universal Object Model v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_universal_object_model_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/universal-object-model-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+          cat > "$OUTPUT_DIR/fixture.json" <<'JSON'
+          {"schema_version":"fixture-0.1","objects":[{"id":"video-1","label":"Humanoid Robots Explained","kind":"content","domains":["media","robotics"],"representations":[{"id":"rep-youtube","media_type":"video/youtube","role":"primary","locator":{"scheme":"youtube","value":"fixture-video-id"}}],"epistemic_status":"observed"},{"id":"person-1","label":"Researcher","kind":"person"},{"id":"model-1","label":"AI Model","kind":"model"},{"id":"company-1","label":"Robotics Company","kind":"organization"},{"id":"concept-1","label":"Humanoid Robotics","kind":"concept"},{"id":"question-1","label":"What changes next?","kind":"question"},{"id":"relationship-focus","label":"AI Model accelerates Humanoid Robotics","kind":"relationship"}],"relationships":[{"id":"r1","from":"video-1","to":"concept-1","predicate":"discusses","confidence":92,"epistemic_status":"supported"},{"id":"r2","from":"person-1","to":"video-1","predicate":"appears_in","confidence":88,"epistemic_status":"supported"},{"id":"r3","from":"model-1","to":"concept-1","predicate":"enables","confidence":76,"epistemic_status":"scenario"},{"id":"r4","from":"company-1","to":"concept-1","predicate":"develops","confidence":82,"epistemic_status":"supported"},{"id":"r5","from":"question-1","to":"concept-1","predicate":"asks_about"},{"id":"r6","from":"relationship-focus","to":"model-1","predicate":"references"}]}
+          JSON
+          node scripts/cosmos_universal_object_model_v0.1.mjs --input "$OUTPUT_DIR/fixture.json" --out "$OUTPUT_DIR/object-model.json" > /dev/null
+          node scripts/cosmos_universal_object_model_test_v0.1.mjs --engine scripts/cosmos_universal_object_model_v0.1.mjs > "$OUTPUT_DIR/test-result.json"
+          git add "$OUTPUT_DIR"
+          if git diff --cached --quiet; then
+            echo "No Cosmos Universal Object Model output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos universal object model v0.1 output"
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+              sleep $((attempt * 2))
+            done
+            if [ "$pushed" != "true" ]; then echo "ERROR: Could not push Universal Object Model output after 3 attempts."; exit 1; fi
+          fi
+          echo "Controlled Universal Object Model output generated."
+          echo "No OpenAI generation was executed."
+
