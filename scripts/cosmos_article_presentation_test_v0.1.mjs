@@ -171,6 +171,9 @@ const causalNarrative = {
   downstream_consequences: [
     {
       depth: 1,
+      relationship_id: "rel_article_direct",
+      evidence_ids: ["ev-article-1","ev-article-2"],
+      epistemic_status: "scenario",
       from: "Substation capacity pressure",
       relation: "increases",
       to: "Transformer capacity demand",
@@ -179,6 +182,9 @@ const causalNarrative = {
     },
     {
       depth: 2,
+      relationship_id: "rel_article_second",
+      evidence_ids: ["ev-article-3"],
+      epistemic_status: "scenario",
       from: "Transformer capacity demand",
       relation: "increases",
       to: "OEM manufacturing capacity pressure",
@@ -187,6 +193,9 @@ const causalNarrative = {
     },
     {
       depth: 3,
+      relationship_id: "rel_article_third",
+      evidence_ids: ["ev-article-4"],
+      epistemic_status: "scenario",
       from: "OEM manufacturing capacity pressure",
       relation: "extends",
       to: "Transformer lead-time pressure",
@@ -195,6 +204,9 @@ const causalNarrative = {
     },
     {
       depth: 4,
+      relationship_id: "rel_article_fourth",
+      evidence_ids: ["ev-article-5"],
+      epistemic_status: "scenario",
       from: "Transformer lead-time pressure",
       relation: "increases",
       to: "Project schedule pressure",
@@ -203,6 +215,9 @@ const causalNarrative = {
     },
     {
       depth: 5,
+      relationship_id: "rel_article_fifth",
+      evidence_ids: ["ev-article-6"],
+      epistemic_status: "scenario",
       from: "Project schedule pressure",
       relation: "may influence",
       to: "Potential geographic investment relocation",
@@ -250,7 +265,9 @@ const requiredText = [
   "Direct",
   "2nd-order",
   "3rd-order",
-  "Follow the ripple",
+  "Follow this ripple →",
+  "Explore Cosmos →",
+  "Why this confidence?",
   "What could change this path?",
   "Evidence & confidence",
   "AI-generated scenario intelligence"
@@ -266,7 +283,8 @@ const sequence = [
   "Substation capacity pressure is the focal signal",
   "Why it matters",
   "🦋 Butterfly Effect",
-  "Follow the ripple",
+  "Follow this ripple →",
+  "Explore Cosmos →",
   "What could change this path?",
   "Evidence & confidence"
 ];
@@ -295,6 +313,28 @@ assert(
 );
 
 assert(
+  !html.includes("<h2>Follow the ripple</h2>"),
+  "Duplicate standalone Follow the ripple section must be removed"
+);
+
+assert(
+  html.includes("relationship_id=rel_article_direct") &&
+  html.includes("relationship_id=rel_article_second"),
+  "Butterfly relationship deep links must preserve relationship IDs"
+);
+
+assert(
+  html.includes("ev-article-1") &&
+  html.includes("ev-article-3"),
+  "Confidence inspector must expose preserved evidence lineage when available"
+);
+
+assert(
+  html.includes("inherited from the Cosmos relationship / causal output"),
+  "Confidence inspector must explain that presentation does not invent confidence arithmetic"
+);
+
+assert(
   !html.includes("verified reporting.</strong>"),
   "Presentation must not imply verified reporting"
 );
@@ -314,7 +354,12 @@ const result = {
     why_it_matters_present: true,
     butterfly_effect_present: true,
     direct_second_third_order_present: true,
-    follow_the_ripple_present: true,
+    duplicate_follow_the_ripple_removed: true,
+    relationship_follow_action_present: true,
+    explore_cosmos_action_present: true,
+    confidence_inspector_present: true,
+    relationship_deep_link_present: true,
+    evidence_lineage_exposed_when_available: true,
     change_conditions_present: true,
     evidence_and_confidence_present: true
   },
@@ -328,7 +373,8 @@ const result = {
     calls_openai_or_external_api: false,
     mutates_graph: false,
     promotes_scenario_to_fact: false,
-    removes_uncertainty_language: false
+    removes_uncertainty_language: false,
+    fabricates_confidence_arithmetic: false
   }
 };
 
