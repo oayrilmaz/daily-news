@@ -3701,3 +3701,57 @@ jobs:
           console.log("Cosmos Universal Object Model v0.1 isolated test passed.");
           NODE
 
+      - name: Check Cosmos Web Renderer v0.1 source
+        run: |
+          test -f cosmos.html
+          test -f scripts/cosmos_web_renderer_test_v0.1.mjs
+          node --check scripts/cosmos_web_renderer_test_v0.1.mjs
+
+      - name: Test Cosmos Web Renderer v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_web_renderer_test_v0.1.mjs \
+            --html cosmos.html \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const result=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(result.status!=="cosmos_web_renderer_test_passed"){
+            fail("Cosmos Web Renderer test failed");
+          }
+
+          const c=result.contracts||{};
+          if(
+            c.observer_center_is_temporary!==true ||
+            c.development_deep_link_supported!==true ||
+            c.relationship_deep_link_supported!==true ||
+            c.entity_recenter_supported!==true ||
+            c.expand_one_layer_supported!==true ||
+            c.reversible_observer_history_supported!==true ||
+            c.deterministic_layout!==true ||
+            c.cross_links_rendered!==true ||
+            c.feedback_detection_supported!==true ||
+            c.epistemic_state_visualized!==true ||
+            c.confidence_inspection_supported!==true ||
+            c.evidence_lineage_display_supported!==true ||
+            c.mobile_first_svg_renderer!==true
+          ) fail("Cosmos Web Renderer contracts failed");
+
+          const s=result.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.recalculates_confidence!==false ||
+            s.forces_tree_ontology!==false ||
+            s.uses_random_layout!==false
+          ) fail("Cosmos Web Renderer safeguards failed");
+
+          console.log("Cosmos Web Renderer v0.1 isolated test passed.");
+          NODE
