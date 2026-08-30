@@ -3644,3 +3644,25 @@ jobs:
 
           console.log("Cosmos Butterfly Grid Contract v0.1 isolated test passed.");
           NODE
+      - name: Check Cosmos Universal Object Model v0.1 source
+        run: |
+          test -f scripts/cosmos_universal_object_model_v0.1.mjs
+          test -f scripts/cosmos_universal_object_model_test_v0.1.mjs
+          node --check scripts/cosmos_universal_object_model_v0.1.mjs
+          node --check scripts/cosmos_universal_object_model_test_v0.1.mjs
+
+      - name: Test Cosmos Universal Object Model v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          node scripts/cosmos_universal_object_model_test_v0.1.mjs --engine scripts/cosmos_universal_object_model_v0.1.mjs > "$TMP_DIR/result.json"
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));const fail=m=>{console.error(m);process.exit(1)};
+          if(r.status!=="universal_cosmos_object_model_test_passed")fail("Universal Object Model test failed");
+          if(r.object_count!==7||r.relationship_count!==6)fail("Unexpected counts");
+          const c=r.contracts||{};if(c.any_object_can_be_observer_center!==true||c.permanent_domain_silos_required!==false||c.object_kind_is_extensible!==true||c.media_is_representation_or_object_not_navigation_silo!==true||c.youtube_can_be_content_source_representation_or_evidence!==true||c.relationship_can_be_observer_focus!==true||c.multiple_representations_supported!==true||c.multiple_roles_supported!==true||c.temporal_dimension_supported!==true||c.geography_dimension_supported!==true||c.epistemic_state_supported!==true||c.evidence_lineage_supported!==true)fail("Universal Object Model contracts failed");
+          const s=r.safeguards||{};if(s.performs_external_search!==false||s.calls_openai_or_external_api!==false||s.mutates_source_graph!==false||s.invents_missing_evidence!==false||s.forces_power_industry_ontology!==false||s.forces_media_silo!==false||s.forces_fixed_hierarchy!==false||s.collapses_object_to_single_role!==false)fail("Universal Object Model safeguards failed");
+          console.log("Cosmos Universal Object Model v0.1 isolated test passed.");
+          NODE
+
