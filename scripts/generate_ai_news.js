@@ -2,6 +2,7 @@
 
 
 
+
 // scripts/generate_ai_news.js
 // PTD Today — Transitional Intelligence Generator for the new PTDToday.com
 //
@@ -1521,6 +1522,9 @@ function buildFallbackCausalPresentation(item) {
 
   const downstream = relationships.slice(0, 4).map((relationship, index) => ({
     depth: index + 1,
+    relationship_id: cleanString(relationship.relationship_id),
+    from_id: cleanString(relationship.from_entity_id),
+    to_id: cleanString(relationship.to_entity_id),
     from: entityById.get(relationship.from_entity_id) || "Signal",
     relation: cleanString(
       relationship.label ||
@@ -1532,7 +1536,18 @@ function buildFallbackCausalPresentation(item) {
       Number.isFinite(Number(relationship.confidence))
         ? Math.round(Number(relationship.confidence) * 100)
         : null,
-    qualification: "scenario relationship from article knowledge graph"
+    qualification: "scenario relationship from article knowledge graph",
+    epistemic_status: cleanString(
+      relationship.epistemic_status ||
+      relationship.evidence_mode ||
+      "scenario"
+    ),
+    evidence_ids: cleanStringArray(
+      relationship.evidence_ids ||
+      relationship.evidence_development_ids ||
+      relationship.source_ids,
+      50
+    )
   }));
 
   return {
@@ -1616,6 +1631,21 @@ export function buildCausalPresentation(item, causalNarrative = null) {
     })),
     consequences: consequences.slice(0, 6).map((row, index) => ({
       depth: Number(row?.depth || row?.butterfly_distance || index + 1),
+      relationship_id: cleanString(
+        row?.relationship_id ||
+        row?.edge_id ||
+        row?.id
+      ),
+      from_id: cleanString(
+        row?.from_entity_id ||
+        row?.from_id ||
+        row?.origin_id
+      ),
+      to_id: cleanString(
+        row?.to_entity_id ||
+        row?.to_id ||
+        row?.target_id
+      ),
       from: cleanString(row?.from || row?.from_name || row?.origin || ""),
       relation: cleanString(
         row?.relation ||
@@ -1641,6 +1671,18 @@ export function buildCausalPresentation(item, causalNarrative = null) {
         row?.epistemic_status ||
         row?.claim_class ||
         "scenario"
+      ),
+      epistemic_status: cleanString(
+        row?.epistemic_status ||
+        row?.claim_class ||
+        row?.qualification ||
+        "scenario"
+      ),
+      evidence_ids: cleanStringArray(
+        row?.evidence_ids ||
+        row?.evidence_development_ids ||
+        row?.source_ids,
+        50
       )
     })),
     change_conditions: changeConditions,
@@ -1653,7 +1695,71 @@ export function buildCausalPresentation(item, causalNarrative = null) {
   };
 }
 
-function renderCausalSections(presentation) {
+function buildCosmosRelationshipHref(row, articleId) {
+  const relationshipId = cleanString(
+    row?.relationship_id,
+    stableId(
+      "ripple",
+      [
+        cleanString(articleId),
+        cleanString(row?.from),
+        cleanString(row?.relation),
+        cleanString(row?.to)
+      ].join("::")
+    )
+  );
+
+  const params = new URLSearchParams({
+    focus: "relationship",
+    relationship_id: relationshipId,
+    article_id: cleanString(articleId),
+    from: cleanString(row?.from),
+    relation: cleanString(row?.relation),
+    to: cleanString(row?.to)
+  });
+
+  if (row?.from_id) params.set("from_id", cleanString(row.from_id));
+  if (row?.to_id) params.set("to_id", cleanString(row.to_id));
+
+  return `/cosmos.html?${params.toString()}`;
+}
+
+function renderConfidenceInspector(row) {
+  if (row?.confidence === null || row?.confidence === undefined) return "";
+
+  const evidenceIds = cleanStringArray(row?.evidence_ids, 50);
+  const evidenceText = evidenceIds.length
+    ? `${evidenceIds.length} evidence reference${evidenceIds.length === 1 ? "" : "s"} preserved: ${evidenceIds.join(", ")}`
+    : "No decomposed evidence references are exposed by this relationship output yet.";
+
+  const relationshipText = cleanString(row?.relationship_id)
+    ? `Relationship ID: ${cleanString(row.relationship_id)}.`
+    : "This displayed relationship does not yet expose a persistent graph relationship ID.";
+
+  const epistemicText = cleanString(
+    row?.epistemic_status ||
+    row?.qualification ||
+    "scenario"
+  );
+
+  return `
+    <details class="confidenceInspector">
+      <summary>${escapeHtml(String(row.confidence))}% effective confidence <span aria-hidden="true">ⓘ</span></summary>
+      <div class="confidencePanel">
+        <p><strong>Why this confidence?</strong></p>
+        <p>
+          This value is inherited from the Cosmos relationship / causal output used to render this article.
+          PTD Today does not invent a new confidence calculation in the presentation layer.
+        </p>
+        <p><strong>Epistemic state:</strong> ${escapeHtml(epistemicText)}</p>
+        <p>${escapeHtml(relationshipText)}</p>
+        <p>${escapeHtml(evidenceText)}</p>
+      </div>
+    </details>
+  `;
+}
+
+function renderCausalSections(presentation, articleId) {
   const esc = escapeHtml;
 
   const driversHtml = (presentation.drivers || [])
@@ -1676,6 +1782,7 @@ function renderCausalSections(presentation) {
         `Depth ${row.depth}`;
 
       const chain = [row.from, row.relation, row.to].filter(Boolean).join(" ");
+      const followHref = buildCosmosRelationshipHref(row, articleId);
 
       return `
         <div class="rippleRow">
@@ -1683,9 +1790,10 @@ function renderCausalSections(presentation) {
           <div class="rippleMain">
             <div class="rippleChain">${esc(chain)}</div>
             <div class="rippleMeta">
-              ${row.confidence !== null ? `${esc(String(row.confidence))}% effective confidence` : ""}
-              ${row.qualification ? `${row.confidence !== null ? " • " : ""}${esc(row.qualification)}` : ""}
+              ${renderConfidenceInspector(row)}
+              ${row.qualification ? `<span class="qualification">${esc(row.qualification)}</span>` : ""}
             </div>
+            <a class="followRipple" href="${esc(followHref)}">Follow this ripple →</a>
           </div>
         </div>
       `;
@@ -1695,6 +1803,11 @@ function renderCausalSections(presentation) {
   const changeHtml = (presentation.change_conditions || [])
     .map((item) => `<li>${esc(item)}</li>`)
     .join("");
+
+  const exploreParams = new URLSearchParams({
+    focus: "development",
+    id: cleanString(articleId)
+  });
 
   return {
     contextHtml: `
@@ -1717,9 +1830,14 @@ function renderCausalSections(presentation) {
       <section class="cosmosBlock butterfly">
         <div class="eyebrow">🦋 Butterfly Effect</div>
         <div class="butterflyIntro">
-          The signal may propagate through connected systems. Deeper paths carry lower confidence and remain scenario-qualified.
+          See how this signal connects through Cosmos. The relationships shown here remain evidence- and scenario-qualified; expanding the grid reveals additional connected paths.
         </div>
         <div class="rippleStack">${consequenceRows}</div>
+        <div class="cosmosExplore">
+          <a class="btn cosmosBtn" href="/cosmos.html?${esc(exploreParams.toString())}">
+            Explore Cosmos →
+          </a>
+        </div>
       </section>
     ` : "",
 
@@ -1750,7 +1868,7 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
   const url = `${base}/articles/${encodeURIComponent(id)}.html`;
   const ogImage = `${base}/assets/og-default.png`;
   const causalPresentation = buildCausalPresentation(item, causalNarrative);
-  const causalSections = renderCausalSections(causalPresentation);
+  const causalSections = renderCausalSections(causalPresentation, id);
 
   const bodyParagraphs = toTextParagraphs(body)
     .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
@@ -1760,20 +1878,6 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
     `<span class="chip">${escapeHtml(entity.name)}</span>`
   ).join("");
 
-  const relationshipRows = (item.relationships || []).slice(0, 8)
-    .map((relationship) => {
-      const from = (item.entities || []).find(
-        (entity) => entity.entity_id === relationship.from_entity_id
-      )?.name || "Entity";
-      const to = (item.entities || []).find(
-        (entity) => entity.entity_id === relationship.to_entity_id
-      )?.name || "Entity";
-
-      return `<li><strong>${escapeHtml(from)}</strong> ${escapeHtml(
-        relationship.label || relationship.relationship_type.toLowerCase().replace(/_/g, " ")
-      )} <strong>${escapeHtml(to)}</strong></li>`;
-    })
-    .join("");
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -1834,7 +1938,17 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
     .rippleRow{display:grid;grid-template-columns:90px 1fr;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
     .rippleDepth{font-size:12px;font-weight:800;color:#344054}
     .rippleChain{font-weight:700}
-    .rippleMeta{color:var(--muted);font-size:12px;margin-top:4px}
+    .rippleMeta{color:var(--muted);font-size:12px;margin-top:6px}
+    .qualification{display:block;margin-top:5px}
+    .confidenceInspector{margin:0}
+    .confidenceInspector summary{display:inline-flex;align-items:center;gap:4px;cursor:pointer;color:var(--muted);font-weight:700;list-style:none}
+    .confidenceInspector summary::-webkit-details-marker{display:none}
+    .confidencePanel{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);color:#475467;font-size:12px;line-height:1.5}
+    .confidencePanel p{margin:0 0 7px}.confidencePanel p:last-child{margin-bottom:0}
+    .followRipple{display:inline-flex;margin-top:10px;font-size:13px;font-weight:800;color:var(--accent);text-decoration:none}
+    .followRipple:hover{text-decoration:underline}
+    .cosmosExplore{display:flex;justify-content:flex-start;margin-top:16px}
+    .cosmosBtn{font-weight:800;border-color:#b2ccff;background:#eff4ff;color:#1849a9}
     .evidenceBox{background:#fcfcfd}
     .content p{margin:0 0 16px}
     h2{font-size:20px;margin:28px 0 10px}
@@ -1877,11 +1991,6 @@ export function renderArticleHtml({ siteOrigin, item, payload, causalNarrative =
       </section>
 
       ${causalSections.butterflyHtml}
-
-      ${relationshipRows ? `
-        <h2>Follow the ripple</h2>
-        <ul>${relationshipRows}</ul>
-      ` : ""}
 
       ${causalSections.changeHtml}
 
