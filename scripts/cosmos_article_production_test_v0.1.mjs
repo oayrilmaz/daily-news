@@ -111,6 +111,9 @@ const narrative = {
   downstream_consequences: [
     {
       depth: 1,
+      relationship_id: "rel_direct",
+      evidence_ids: ["ev-direct-1", "ev-direct-2"],
+      epistemic_status: "scenario",
       from: "Matched production signal",
       relation: "increases",
       to: "Direct consequence",
@@ -119,6 +122,9 @@ const narrative = {
     },
     {
       depth: 2,
+      relationship_id: "rel_second",
+      evidence_ids: ["ev-second-1"],
+      epistemic_status: "scenario",
       from: "Direct consequence",
       relation: "may influence",
       to: "Second-order consequence",
@@ -208,6 +214,33 @@ assert(
   "Matched article did not preserve causal confidence"
 );
 assert(
+  matchedHtml.includes("Follow this ripple →"),
+  "Matched article is missing relationship-level Follow this ripple action"
+);
+assert(
+  matchedHtml.includes("Explore Cosmos →"),
+  "Matched article is missing Explore Cosmos entry point"
+);
+assert(
+  matchedHtml.includes("Why this confidence?") &&
+  matchedHtml.includes("inherited from the Cosmos relationship / causal output"),
+  "Matched article is missing non-fabricated confidence inspector"
+);
+assert(
+  matchedHtml.includes("relationship_id=rel_direct") &&
+  matchedHtml.includes("relationship_id=rel_second"),
+  "Matched article did not preserve relationship deep-link IDs"
+);
+assert(
+  matchedHtml.includes("ev-direct-1") &&
+  matchedHtml.includes("ev-second-1"),
+  "Matched article confidence inspector did not expose preserved evidence lineage"
+);
+assert(
+  !matchedHtml.includes("<h2>Follow the ripple</h2>"),
+  "Matched article still contains the duplicate standalone Follow the ripple section"
+);
+assert(
   !fallbackHtml.includes("Fixture-only reason"),
   "Fallback article incorrectly consumed controlled test narrative"
 );
@@ -249,6 +282,14 @@ console.log(JSON.stringify({
   causal_narrative_count: manifest.causal_narrative_count,
   fallback_count: manifest.fallback_count,
   production_contract: manifest.production_contract,
+  butterfly_ui_contract: {
+    duplicate_follow_the_ripple_removed: true,
+    relationship_follow_action_present: true,
+    explore_cosmos_action_present: true,
+    confidence_inspector_present: true,
+    confidence_arithmetic_not_fabricated: true,
+    relationship_deep_link_present: true,
+    evidence_lineage_exposed_when_available: true
+  },
   safeguards: manifest.safeguards
 }, null, 2));
-
