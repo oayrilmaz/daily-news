@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Cosmos — PTD Today</title>
+  <meta name="description" content="Explore connected intelligence through Cosmos." />
+  <style>
+    :root{
+      --bg:#07111f;--panel:#0d1726;--panel2:#111d2f;--ink:#f5f7fb;--muted:#9ca9bc;
+      --line:#26364d;--accent:#7aa2ff;--accent2:#9dd6ff;--warn:#f6c66b;--soft:#17243a;
+      --good:#8cd7b5;--danger:#ff9b9b;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 35%,#10264a 0,#07111f 45%,#030812 100%);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{min-height:100vh;overflow-x:hidden}
+    a{color:inherit}
+    button{font:inherit}
+    .shell{min-height:100vh;display:flex;flex-direction:column}
+    .topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:rgba(3,8,18,.76);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08)}
+    .brand{font-weight:800;letter-spacing:.08em;text-decoration:none}
+    .observer{min-width:0;text-align:center;flex:1}
+    .observer .kicker{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+    .observer .label{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .iconBtn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);border-radius:999px;min-width:42px;height:42px;padding:0 13px;cursor:pointer}
+    .main{width:min(1180px,100%);margin:0 auto;padding:18px 12px 36px;flex:1}
+    .intro{text-align:center;max-width:720px;margin:2px auto 14px}
+    .intro h1{font-size:clamp(28px,6vw,54px);margin:0 0 8px;letter-spacing:-.04em}
+    .intro p{margin:0;color:var(--muted);font-size:14px}
+    .canvasWrap{position:relative;border:1px solid rgba(255,255,255,.09);border-radius:24px;overflow:hidden;background:rgba(8,18,33,.58);box-shadow:0 30px 100px rgba(0,0,0,.34)}
+    #cosmosCanvas{display:block;width:100%;height:min(68vh,720px);min-height:520px;touch-action:manipulation}
+    .legend{position:absolute;left:12px;top:12px;display:flex;gap:6px;flex-wrap:wrap;max-width:70%;pointer-events:none}
+    .legend span{padding:5px 8px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(3,8,18,.68);font-size:10px;color:var(--muted)}
+    .status{position:absolute;right:12px;top:12px;padding:6px 9px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(3,8,18,.68);font-size:10px;color:var(--muted)}
+    .toolbar{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+    .action{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:10px 14px;cursor:pointer;text-decoration:none;font-weight:700}
+    .action.primary{background:linear-gradient(135deg,#2857d9,#327ed9);border-color:#4d77e3}
+    .action[disabled]{opacity:.4;cursor:not-allowed}
+    .detail{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}
+    .card{border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(13,23,38,.76);padding:16px}
+    .card h2{font-size:14px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.1em;color:#c4d0e3}
+    .card p{margin:7px 0;color:var(--muted);line-height:1.55}
+    .edgeFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .fact{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.025)}
+    .fact b{display:block;font-size:11px;color:#cbd7e8;margin-bottom:3px}
+    .fact span{font-size:12px;color:var(--muted);word-break:break-word}
+    .empty{display:none;text-align:center;padding:50px 20px;color:var(--muted)}
+    .error{color:var(--danger)}
+    .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
+    @media (min-width:800px){
+      .main{padding:22px 20px 44px}
+      .detail{grid-template-columns:1.1fr .9fr}
+      #cosmosCanvas{height:min(72vh,760px)}
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <button class="iconBtn" id="backBtn" aria-label="Back">←</button>
+    <div class="observer">
+      <div class="kicker">Current observer</div>
+      <div class="label" id="observerLabel">Cosmos</div>
+    </div>
+    <a class="iconBtn" href="/" aria-label="PTD Today home" style="display:grid;place-items:center;text-decoration:none">⌂</a>
+  </header>
+
+  <main class="main">
+    <section class="intro">
+      <h1>Cosmos</h1>
+      <p>There is no absolute center. Select anything and the universe is projected around it.</p>
+    </section>
+
+    <section class="canvasWrap" aria-label="Cosmos Butterfly Effect Grid">
+      <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos relationship grid"></svg>
+      <div class="legend">
+        <span>solid → supported/current</span>
+        <span>dashed → scenario/qualified</span>
+        <span>↔ feedback</span>
+      </div>
+      <div class="status" id="status">loading</div>
+      <div class="empty" id="emptyState">No connected Cosmos objects were found for this observer.</div>
+    </section>
+
+    <div class="toolbar">
+      <button class="action" id="expandBtn">Expand one layer +</button>
+      <button class="action" id="resetBtn">Return to entry observer</button>
+      <a class="action primary" href="/" id="articleBtn">Back to PTD Today</a>
+    </div>
+
+    <section class="detail">
+      <div class="card">
+        <h2>Selected relationship</h2>
+        <div id="edgeDetail">
+          <p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Observer state</h2>
+        <div id="observerDetail">
+          <p>Cosmos is resolving the current observer.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer">PTD Today · Cosmos</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const MAX_INITIAL_NODES = 10;
+  const MAX_EXPANDED_NODES = 18;
+  const MAX_DISTANCE = 4;
+
+  const svg = document.getElementById("cosmosCanvas");
+  const statusEl = document.getElementById("status");
+  const emptyEl = document.getElementById("emptyState");
+  const observerLabel = document.getElementById("observerLabel");
+  const observerDetail = document.getElementById("observerDetail");
+  const edgeDetail = document.getElementById("edgeDetail");
+  const expandBtn = document.getElementById("expandBtn");
+  const resetBtn = document.getElementById("resetBtn");
+  const backBtn = document.getElementById("backBtn");
+  const articleBtn = document.getElementById("articleBtn");
+
+  const params = new URLSearchParams(location.search);
+  const entry = {
+    focus: params.get("focus") || "development",
+    id: params.get("id") || "",
+    relationship_id: params.get("relationship_id") || "",
+    article_id: params.get("article_id") || params.get("id") || "",
+    from: params.get("from") || "",
+    to: params.get("to") || "",
+    relation: params.get("relation") || "",
+    from_id: params.get("from_id") || "",
+    to_id: params.get("to_id") || ""
+  };
+
+  const state = {
+    entities: new Map(),
+    relationships: [],
+    developments: new Map(),
+    observer: null,
+    history: [],
+    expanded: false,
+    entryObserver: null
+  };
+
+  const esc = (value) => String(value ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+
+  const confidencePercent = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n <= 1 ? n * 100 : n);
+  };
+
+  const entityLabel = (id) => state.entities.get(id)?.name || state.entities.get(id)?.label || id;
+
+  function relationshipLabel(rel){
+    return rel.label ||
+      String(rel.relationship_type || rel.predicate || "related to")
+        .toLowerCase().replace(/_/g," ");
+  }
+
+  function normalizePayload(payload, key){
+    if (!payload || typeof payload !== "object") return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload[key])) return payload[key];
+    return [];
+  }
+
+  async function fetchJson(path){
+    const response = await fetch(path,{cache:"no-store"});
+    if(!response.ok) throw new Error(`${path}: ${response.status}`);
+    return response.json();
+  }
+
+  async function loadKnowledge(){
+    statusEl.textContent = "loading knowledge";
+    const [entitiesPayload, relationshipsPayload, developmentsPayload] = await Promise.all([
+      fetchJson("/knowledge/entities.json"),
+      fetchJson("/knowledge/relationships.json"),
+      fetchJson("/knowledge/developments.json")
+    ]);
+
+    for(const entity of normalizePayload(entitiesPayload,"entities")){
+      if(entity?.entity_id) state.entities.set(entity.entity_id,entity);
+    }
+    state.relationships = normalizePayload(relationshipsPayload,"relationships")
+      .filter(r => r?.from_entity_id && r?.to_entity_id);
+
+    for(const development of normalizePayload(developmentsPayload,"developments")){
+      if(development?.development_id) state.developments.set(development.development_id,development);
+    }
+
+    statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships`;
+  }
+
+  function syntheticRelationshipObserver(){
+    return {
+      kind:"relationship",
+      id:entry.relationship_id || `query:${entry.from}:${entry.relation}:${entry.to}`,
+      label:[entry.from,entry.relation,entry.to].filter(Boolean).join(" ") || "Selected relationship",
+      relationship_id:entry.relationship_id,
+      from_id:entry.from_id,
+      to_id:entry.to_id,
+      from:entry.from,
+      to:entry.to,
+      relation:entry.relation,
+      article_id:entry.article_id
+    };
+  }
+
+  function resolveEntryObserver(){
+    if(entry.focus === "relationship"){
+      const rel = state.relationships.find(r => r.relationship_id === entry.relationship_id);
+      if(rel){
+        return {
+          kind:"relationship",
+          id:rel.relationship_id,
+          label:`${entityLabel(rel.from_entity_id)} ${relationshipLabel(rel)} ${entityLabel(rel.to_entity_id)}`,
+          relationship_id:rel.relationship_id,
+          from_id:rel.from_entity_id,
+          to_id:rel.to_entity_id,
+          article_id:entry.article_id,
+          rel
+        };
+      }
+      return syntheticRelationshipObserver();
+    }
+
+    const development = state.developments.get(entry.id || entry.article_id);
+    if(development){
+      return {
+        kind:"development",
+        id:development.development_id,
+        label:development.title || development.development_id,
+        development,
+        article_id:development.development_id
+      };
+    }
+
+    if(entry.id && state.entities.has(entry.id)){
+      const entity = state.entities.get(entry.id);
+      return {kind:"entity",id:entry.id,label:entity.name || entry.id,entity,article_id:entry.article_id};
+    }
+
+    const first = [...state.entities.values()][0];
+    return first
+      ? {kind:"entity",id:first.entity_id,label:first.name || first.entity_id,entity:first,article_id:entry.article_id}
+      : {kind:"unknown",id:"cosmos",label:"Cosmos",article_id:entry.article_id};
+  }
+
+  function incident(entityId){
+    return state.relationships.filter(r => r.from_entity_id === entityId || r.to_entity_id === entityId);
+  }
+
+  function neighbors(seedIds,maxDistance){
+    const distance = new Map();
+    const queue = [];
+    for(const id of seedIds){
+      if(!id) continue;
+      distance.set(id,0); queue.push(id);
+    }
+    while(queue.length){
+      const current = queue.shift();
+      const d = distance.get(current);
+      if(d >= maxDistance) continue;
+      for(const rel of incident(current)){
+        const other = rel.from_entity_id === current ? rel.to_entity_id : rel.from_entity_id;
+        if(!distance.has(other)){
+          distance.set(other,d+1); queue.push(other);
+        }
+      }
+    }
+    return distance;
+  }
+
+  function seedEntityIds(observer){
+    if(observer.kind === "entity") return [observer.id];
+    if(observer.kind === "relationship"){
+      const rel = observer.rel;
+      return [
+        rel?.from_entity_id || observer.from_id,
+        rel?.to_entity_id || observer.to_id
+      ].filter(Boolean);
+    }
+    if(observer.kind === "development"){
+      const ids = (observer.development?.entities || [])
+        .map(e => e.entity_id)
+        .filter(Boolean);
+      if(ids.length) return ids;
+      return state.relationships
+        .filter(r => (r.evidence_development_ids || []).includes(observer.id))
+        .flatMap(r => [r.from_entity_id,r.to_entity_id])
+        .filter(Boolean);
+    }
+    return [];
+  }
+
+  function scoreEntity(id,distance){
+    const rels = incident(id);
+    const maxConfidence = Math.max(0,...rels.map(r => confidencePercent(r.confidence) || 0));
+    return 1000 - distance*170 + maxConfidence + Math.min(rels.length,20)*2;
+  }
+
+  function project(observer){
+    const seeds = seedEntityIds(observer);
+    const dist = neighbors(seeds,MAX_DISTANCE);
+    const limit = state.expanded ? MAX_EXPANDED_NODES : MAX_INITIAL_NODES;
+
+    let candidateIds = [...dist.keys()].sort((a,b)=>{
+      const da=dist.get(a),db=dist.get(b);
+      return da-db || scoreEntity(b,db)-scoreEntity(a,da) || entityLabel(a).localeCompare(entityLabel(b));
+    }).slice(0,limit);
+
+    for(const seed of seeds){
+      if(seed && !candidateIds.includes(seed)) candidateIds.unshift(seed);
+    }
+    candidateIds = [...new Set(candidateIds)].slice(0,limit);
+
+    const selected = new Set(candidateIds);
+    const edges = state.relationships
+      .filter(r => selected.has(r.from_entity_id) && selected.has(r.to_entity_id))
+      .sort((a,b)=>(confidencePercent(b.confidence)||0)-(confidencePercent(a.confidence)||0));
+
+    const nodes = candidateIds.map(id=>({
+      id,label:entityLabel(id),distance:dist.get(id) ?? 0,
+      type:state.entities.get(id)?.type || "Object",
+      isSeed:seeds.includes(id)
+    }));
+
+    return {nodes,edges,seeds};
+  }
+
+  function svgEl(name,attrs={}){
+    const el=document.createElementNS("http://www.w3.org/2000/svg",name);
+    for(const [k,v] of Object.entries(attrs)) el.setAttribute(k,String(v));
+    return el;
+  }
+
+  function layout(nodes,width,height){
+    const center={x:width/2,y:height/2};
+    const grouped=new Map();
+    for(const node of nodes){
+      const d=Math.max(0,Number(node.distance)||0);
+      if(!grouped.has(d)) grouped.set(d,[]);
+      grouped.get(d).push(node);
+    }
+    const positions=new Map();
+
+    // Observer is always absolute visual center; seed entities occupy first semantic band.
+    positions.set("__observer__",center);
+
+    for(const [distance,list] of [...grouped.entries()].sort((a,b)=>a[0]-b[0])){
+      const ring = distance + 1;
+      const radius = Math.min(Math.min(width,height)*0.12*ring, Math.min(width,height)*0.43);
+      const sorted=[...list].sort((a,b)=>a.label.localeCompare(b.label));
+      sorted.forEach((node,index)=>{
+        const offset = ring % 2 ? -Math.PI/2 : -Math.PI/2 + Math.PI/Math.max(2,sorted.length);
+        const angle = offset + index*(Math.PI*2/Math.max(1,sorted.length));
+        positions.set(node.id,{
+          x:center.x+Math.cos(angle)*radius,
+          y:center.y+Math.sin(angle)*radius
+        });
+      });
+    }
+    return positions;
+  }
+
+  function observerDisplayLabel(observer){
+    return observer?.label || "Cosmos";
+  }
+
+  function renderObserverDetails(observer,projection){
+    const type = observer.kind || "object";
+    const source = observer.article_id
+      ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
+    observerDetail.innerHTML = `
+      <p><strong>${esc(observerDisplayLabel(observer))}</strong></p>
+      <p>Observer type: ${esc(type)}</p>
+      <p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>
+      ${source}
+      <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>
+    `;
+  }
+
+  function render(){
+    const observer=state.observer;
+    observerLabel.textContent=observerDisplayLabel(observer);
+    if(observer.article_id){
+      articleBtn.href=`/articles/${encodeURIComponent(observer.article_id)}.html`;
+      articleBtn.textContent="Back to article";
+    }else{
+      articleBtn.href="/"; articleBtn.textContent="Back to PTD Today";
+    }
+
+    const projection=project(observer);
+    renderObserverDetails(observer,projection);
+    emptyEl.style.display=projection.nodes.length ? "none":"block";
+    expandBtn.disabled=state.expanded || projection.nodes.length>=MAX_EXPANDED_NODES;
+    expandBtn.textContent=state.expanded ? "Expanded" : "Expand one layer +";
+
+    const rect=svg.getBoundingClientRect();
+    const width=Math.max(360,Math.round(rect.width||800));
+    const height=Math.max(520,Math.round(rect.height||650));
+    svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
+    svg.innerHTML="";
+
+    const positions=layout(projection.nodes,width,height);
+    const center=positions.get("__observer__");
+
+    const defs=svgEl("defs");
+    const marker=svgEl("marker",{id:"arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"5",markerHeight:"5",orient:"auto-start-reverse"});
+    marker.appendChild(svgEl("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#617896"}));
+    defs.appendChild(marker); svg.appendChild(defs);
+
+    const reverseKeys=new Set(projection.edges.map(r=>`${r.from_entity_id}|${r.to_entity_id}`));
+
+    for(const rel of projection.edges){
+      const a=positions.get(rel.from_entity_id),b=positions.get(rel.to_entity_id);
+      if(!a||!b) continue;
+      const epistemic=String(rel.epistemic_status || rel.evidence_mode || "").toLowerCase();
+      const scenario=epistemic.includes("scenario") || epistemic.includes("candidate") || epistemic.includes("unverified");
+      const feedback=reverseKeys.has(`${rel.to_entity_id}|${rel.from_entity_id}`);
+      const line=svgEl("line",{
+        x1:a.x,y1:a.y,x2:b.x,y2:b.y,
+        stroke:feedback?"#f6c66b":"#617896",
+        "stroke-width":feedback?2.4:1.5,
+        "stroke-dasharray":scenario?"7 6":"",
+        opacity:.82,
+        "marker-end":"url(#arrow)"
+      });
+      line.style.cursor="pointer";
+      line.addEventListener("click",()=>showEdge(rel,feedback));
+      svg.appendChild(line);
+    }
+
+    // Semantic spokes connect observer to initial seeds. They are navigation affordances, not graph facts.
+    for(const seed of projection.seeds){
+      const p=positions.get(seed); if(!p) continue;
+      svg.appendChild(svgEl("line",{
+        x1:center.x,y1:center.y,x2:p.x,y2:p.y,
+        stroke:"#36578c","stroke-width":1,"stroke-dasharray":"2 7",opacity:.6
+      }));
+    }
+
+    for(const node of projection.nodes){
+      const p=positions.get(node.id); if(!p) continue;
+      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`});
+      g.style.cursor="pointer";
+      const radius=node.isSeed?34:27;
+      const circle=svgEl("circle",{r:radius,fill:node.isSeed?"#173c7a":"#142338",stroke:node.isSeed?"#7aa2ff":"#36506f","stroke-width":node.isSeed?2.5:1.4});
+      g.appendChild(circle);
+      const label=svgEl("text",{"text-anchor":"middle",fill:"#f5f7fb","font-size":node.isSeed?11:10,"font-weight":700});
+      const words=node.label.split(/\s+/);
+      const lines=[];
+      let current="";
+      for(const word of words){
+        if((current+" "+word).trim().length>16 && current){lines.push(current);current=word}else current=(current+" "+word).trim();
+      }
+      if(current)lines.push(current);
+      lines.slice(0,3).forEach((line,i)=>{
+        const t=svgEl("tspan",{x:0,dy:i===0?`${-(Math.min(lines.length,3)-1)*6}px`:"12px"});
+        t.textContent=line; label.appendChild(t);
+      });
+      g.appendChild(label);
+      g.addEventListener("click",()=>recenterEntity(node.id));
+      svg.appendChild(g);
+    }
+
+    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`});
+    const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5});
+    const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3});
+    og.appendChild(ring);og.appendChild(inner);
+    const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
+    const label=observerDisplayLabel(observer);
+    const chunks=label.match(/.{1,18}(?:\s|$)/g) || [label];
+    chunks.slice(0,4).forEach((line,i)=>{
+      const t=svgEl("tspan",{x:0,dy:i===0?`${-(Math.min(chunks.length,4)-1)*7}px`:"14px"});
+      t.textContent=line.trim();ot.appendChild(t);
+    });
+    og.appendChild(ot);svg.appendChild(og);
+  }
+
+  function recenterEntity(id){
+    const entity=state.entities.get(id);
+    if(!entity) return;
+    state.history.push(state.observer);
+    state.observer={kind:"entity",id,label:entity.name||id,entity,article_id:state.observer?.article_id||entry.article_id};
+    state.expanded=false;
+    edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
+    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}`);
+    render();
+  }
+
+  function showEdge(rel,feedback){
+    const confidence=confidencePercent(rel.confidence);
+    const evidence=(rel.evidence_ids || rel.evidence_development_ids || rel.source_ids || []);
+    edgeDetail.innerHTML=`
+      <p><strong>${esc(entityLabel(rel.from_entity_id))} ${esc(relationshipLabel(rel))} ${esc(entityLabel(rel.to_entity_id))}</strong></p>
+      <div class="edgeFacts">
+        <div class="fact"><b>Confidence</b><span>${confidence===null?"Not supplied":esc(confidence+"%")}</span></div>
+        <div class="fact"><b>Epistemic state</b><span>${esc(rel.epistemic_status || rel.evidence_mode || "unqualified")}</span></div>
+        <div class="fact"><b>Relationship ID</b><span>${esc(rel.relationship_id || "not exposed")}</span></div>
+        <div class="fact"><b>Feedback</b><span>${feedback?"Yes — reverse edge also exists":"No reverse edge in current projection"}</span></div>
+        <div class="fact"><b>Time</b><span>${esc(rel.temporal_state || rel.valid_from || "not specified")}</span></div>
+        <div class="fact"><b>Geography</b><span>${esc(rel.geography_scope || "not specified")}</span></div>
+      </div>
+      <p><strong>Evidence:</strong> ${evidence.length?esc(evidence.join(", ")):"No exposed evidence references on this edge."}</p>
+      <p>Confidence is displayed from the stored relationship. The browser does not recalculate it.</p>
+    `;
+  }
+
+  expandBtn.addEventListener("click",()=>{state.expanded=true;render()});
+  resetBtn.addEventListener("click",()=>{
+    if(!state.entryObserver)return;
+    state.history.push(state.observer);
+    state.observer=state.entryObserver;
+    state.expanded=false;
+    history.pushState({cosmos:true},"",location.pathname+location.search);
+    render();
+  });
+  backBtn.addEventListener("click",()=>{
+    const previous=state.history.pop();
+    if(previous){state.observer=previous;state.expanded=false;render()}
+    else history.back();
+  });
+  window.addEventListener("resize",()=>requestAnimationFrame(render));
+
+  loadKnowledge().then(()=>{
+    state.observer=resolveEntryObserver();
+    state.entryObserver=state.observer;
+    render();
+  }).catch(error=>{
+    console.error(error);
+    statusEl.textContent="knowledge unavailable";
+    emptyEl.style.display="block";
+    emptyEl.innerHTML=`<span class="error">Cosmos knowledge could not be loaded.</span><br>${esc(error.message)}`;
+    state.observer=syntheticRelationshipObserver();
+    state.entryObserver=state.observer;
+    observerLabel.textContent=observerDisplayLabel(state.observer);
+    observerDetail.innerHTML="<p>The observer deep-link was preserved, but the knowledge files were unavailable.</p>";
+  });
+})();
+</script>
+</body>
+</html>
