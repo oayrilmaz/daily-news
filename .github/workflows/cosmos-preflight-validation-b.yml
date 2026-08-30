@@ -3362,7 +3362,12 @@ jobs:
             "why_it_matters_present",
             "butterfly_effect_present",
             "direct_second_third_order_present",
-            "follow_the_ripple_present",
+            "duplicate_follow_the_ripple_removed",
+            "relationship_follow_action_present",
+            "explore_cosmos_action_present",
+            "confidence_inspector_present",
+            "relationship_deep_link_present",
+            "evidence_lineage_exposed_when_available",
             "change_conditions_present",
             "evidence_and_confidence_present"
           ];
@@ -3390,13 +3395,30 @@ jobs:
             safeguards.performs_external_search !== false ||
             safeguards.calls_openai_or_external_api !== false ||
             safeguards.mutates_graph !== false ||
-            safeguards.promotes_scenario_to_fact !== false
+            safeguards.promotes_scenario_to_fact !== false ||
+            safeguards.fabricates_confidence_arithmetic !== false
           ) {
             fail("Article presentation safeguards failed");
           }
 
           if (!html.includes("🦋 Butterfly Effect")) {
             fail("Rendered HTML is missing Butterfly Effect");
+          }
+
+          if (!html.includes("Follow this ripple →")) {
+            fail("Rendered HTML is missing relationship-level Follow this ripple action");
+          }
+
+          if (!html.includes("Explore Cosmos →")) {
+            fail("Rendered HTML is missing Explore Cosmos action");
+          }
+
+          if (!html.includes("Why this confidence?")) {
+            fail("Rendered HTML is missing confidence inspector");
+          }
+
+          if (html.includes("<h2>Follow the ripple</h2>")) {
+            fail("Rendered HTML still contains duplicate standalone Follow the ripple section");
           }
 
           console.log("Cosmos Article Presentation v0.1 isolated test passed.");
@@ -3678,5 +3700,4 @@ jobs:
           const s=r.safeguards||{};if(s.performs_external_search!==false||s.calls_openai_or_external_api!==false||s.mutates_source_graph!==false||s.invents_missing_evidence!==false||s.forces_power_industry_ontology!==false||s.forces_media_silo!==false||s.forces_fixed_hierarchy!==false||s.collapses_object_to_single_role!==false)fail("Universal Object Model safeguards failed");
           console.log("Cosmos Universal Object Model v0.1 isolated test passed.");
           NODE
-
 
