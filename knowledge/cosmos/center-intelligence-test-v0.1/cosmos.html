@@ -147,6 +147,7 @@
 </div>
 
 <script>
+  // Cosmos Question Understanding / Answer Resolver live integration v0.1
 (function(){
   "use strict";
 
@@ -203,6 +204,7 @@
     relationships: [],
     developments: new Map(),
     dailyBrief: [],
+    dailyBriefDate: "",
     response: null,
     observer: null,
     history: [],
@@ -264,6 +266,10 @@
     state.dailyBrief = Array.isArray(dailyBriefPayload)
       ? dailyBriefPayload
       : (dailyBriefPayload?.items || dailyBriefPayload?.daily_items || dailyBriefPayload?.briefing || dailyBriefPayload?.developments || dailyBriefPayload?.signals || []);
+
+    state.dailyBriefDate = Array.isArray(dailyBriefPayload) ? "" :
+      (dailyBriefPayload?.date_utc || dailyBriefPayload?.generated_at ||
+       dailyBriefPayload?.briefing_date || dailyBriefPayload?.date || "");
 
     statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships`;
   }
@@ -327,19 +333,34 @@
       };
     }
     if(intent.id==="topic"){
-      const resolved=resolveQuestionToEntity(question);
+      const semantic=buildSemanticQuestionAnswer(question);
       const ranked=rankDailyItems(question).slice(0,5);
-      const entity=resolved?.entity || null;
-      const description=entity?.summary || entity?.description || entity?.definition || "";
-      const answerParts=[];
-      if(description) answerParts.push(description);
-      if(ranked.length) answerParts.push(`${ranked.length} current intelligence item${ranked.length===1?"":"s"} in today's briefing relate to this subject.`);
+      const subject=semantic.subject;
+
       return {
         id:`response:topic:${normalizeSubject(question).replace(/\s+/g,"-")}`,
-        label:resolved?.label || question,response_type:"topic",question,
-        answer:answerParts.join(" ") || "Cosmos found the subject, but the current deterministic data does not yet contain enough information for a descriptive answer.",
-        bullets:ranked.map(({item,index})=>({id:dailyItemId(item,index),title:dailyItemTitle(item),summary:dailyItemSummary(item),seed_ids:seedIdsFromDailyItem(item)})),
-        projection_seed_ids:[resolved?.id,...ranked.flatMap(({item})=>seedIdsFromDailyItem(item))].filter(Boolean),source_label:"PTD Today knowledge + daily briefing",resolved_entity:resolved
+        label:question,
+        response_type:"topic",
+        question,
+        answer:semantic.answer,
+        answer_items:semantic.answer_items,
+        classification:semantic.classification,
+        subject_match:subject,
+        question_remains_primary_observer:true,
+        bullets:ranked.map(({item,index})=>({
+          id:dailyItemId(item,index),
+          title:dailyItemTitle(item),
+          summary:dailyItemSummary(item),
+          date:item?.published_at || item?.created_at || item?.date_utc || item?.date || state.dailyBriefDate || "",
+          article_id:item?.article_id || item?.development_id || item?.signal_id || item?.id || "",
+          seed_ids:seedIdsFromDailyItem(item)
+        })),
+        projection_seed_ids:[
+          ...semantic.projection_seed_ids,
+          ...ranked.flatMap(({item})=>seedIdsFromDailyItem(item))
+        ].filter(Boolean),
+        source_label:"PTD Today knowledge + daily briefing",
+        resolved_entity:subject
       };
     }
     const materialized={media:"Media",geography:"Global Intelligence",market:"Market Pulse & Outlook"}[intent.id] || intent.label;
@@ -374,37 +395,180 @@
     return normalizeSubject(value).split(/\s+/).filter(Boolean);
   }
 
-  function resolveQuestionToEntity(question){
-    const q = normalizeSubject(question);
-    if(!q) return null;
-    const qTokens = subjectTokens(q);
-    const ranked = [...state.entities.values()].map(entity => {
-      const label = entity.name || entity.label || entity.entity_id || "";
-      const normalized = normalizeSubject(label);
-      const tokens = subjectTokens(normalized);
-      let score = 0;
-      if(normalized === q) score += 1000;
-      if(normalized.startsWith(q) || q.startsWith(normalized)) score += 420;
-      if(normalized.includes(q) || q.includes(normalized)) score += 260;
-      const overlap = qTokens.filter(token => tokens.includes(token)).length;
-      score += overlap * 95;
-      score -= Math.max(0,tokens.length-qTokens.length)*3;
-      return {entity,label,score};
-    }).filter(row => row.score > 0)
+  const QUESTION_STOPWORDS = new Set([
+    "what","are","is","the","a","an","which","list","show","provide","give","me",
+    "of","for","in","on","with","and","or","to","do","does","about","equipment",
+    "equipments","components","component","parts","part","systems","system"
+  ]);
+
+  const EQUIPMENT_LEXICAL_CUES = [
+    "transformer","circuit breaker","breaker","disconnect","disconnector",
+    "switchgear","gis","ais","instrument transformer","current transformer",
+    "voltage transformer","ct","vt","surge arrester","arrester","busbar","bus bar",
+    "protection","control system","station service","reactor","capacitor",
+    "facts","statcom","svc","fsc","series capacitor"
+  ];
+
+  function normalizedQuestionTokens(question){
+    return subjectTokens(question).filter(token=>!QUESTION_STOPWORDS.has(token));
+  }
+
+  function questionClassification(question){
+    const q=normalizeSubject(question);
+    if(
+      /\bwhat are\b/.test(q) || /\bwhich\b/.test(q) || /\blist\b/.test(q) ||
+      /\bequipment\b/.test(q) || /\bcomponents?\b/.test(q)
+    ) return {type:"enumeration",subtype:"equipment_list"};
+    if(/\bwhy\b/.test(q)) return {type:"explanation",subtype:"why"};
+    if(/\btoday\b|\blatest\b|\bcurrent\b|\bwhat changed\b/.test(q)) return {type:"current_intelligence",subtype:"latest"};
+    if(/\bwhat is\b/.test(q)) return {type:"definition",subtype:"what_is"};
+    return {type:"topic",subtype:"general"};
+  }
+
+  function semanticEntityScore(question,entity){
+    const label=entity?.name || entity?.label || entity?.entity_id || "";
+    const normalized=normalizeSubject(label);
+    if(!normalized) return 0;
+
+    const q=normalizeSubject(question);
+    const core=normalizedQuestionTokens(question);
+    const labelTokens=subjectTokens(label);
+
+    let score=0;
+    if(q.includes(normalized)) score+=520;
+    if(normalized.includes(core.join(" ")) && core.length) score+=420;
+
+    for(const token of core){
+      if(labelTokens.includes(token)) score+=125;
+      else if(normalized.includes(token)) score+=70;
+    }
+
+    const asksHv = core.includes("hv") || (core.includes("high") && core.includes("voltage"));
+    const entityHv = /\bhv\b|\bhigh voltage\b/.test(normalized);
+    if(asksHv && entityHv) score+=240;
+
+    const distracting = ["aging","fleet","shortage","market","capacity","demand","supply","lead time","bottleneck"];
+    for(const word of distracting){
+      if(normalized.includes(word) && !q.includes(word)) score-=180;
+    }
+
+    return score;
+  }
+
+  function resolveQuestionSubject(question){
+    const ranked=[...state.entities.values()]
+      .map(entity=>({
+        entity,
+        label:entity.name || entity.label || entity.entity_id || "",
+        score:semanticEntityScore(question,entity)
+      }))
+      .filter(row=>row.score>0)
       .sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label));
 
     if(!ranked.length) return null;
-    const best = ranked[0];
+    const best=ranked[0];
     return {
-      id: best.entity.entity_id,
-      label: best.label,
-      entity: best.entity,
-      score: best.score,
-      alternatives: ranked.filter(row => row.score >= best.score * .72).slice(1,4).map(row => ({
-        id: row.entity.entity_id,
-        label: row.label,
-        score: row.score
+      id:best.entity.entity_id,
+      label:best.label,
+      entity:best.entity,
+      score:best.score,
+      alternatives:ranked.slice(1,4).map(row=>({
+        id:row.entity.entity_id,label:row.label,score:row.score
       }))
+    };
+  }
+
+  function isEquipmentLikeEntity(entity){
+    const label=normalizeSubject(entity?.name || entity?.label || entity?.entity_id || "");
+    if(!label) return false;
+    return EQUIPMENT_LEXICAL_CUES.some(cue=>label.includes(cue));
+  }
+
+  function relationshipSuggestsMembership(rel){
+    const label=normalizeSubject(relationshipLabel(rel));
+    return [
+      "contain","include","component","part of","equipment","installed","uses",
+      "comprise","consist","subsystem","associated with","connected to"
+    ].some(term=>label.includes(term));
+  }
+
+  function equipmentCandidatesForSubject(subject){
+    if(!subject?.entity) return [];
+
+    const explicit=entityMemberLabels(subject.entity);
+    const out=new Map();
+
+    for(const label of explicit){
+      out.set(normalizeSubject(label),{label,score:1000,id:""});
+    }
+
+    for(const rel of incident(subject.id)){
+      const otherId=rel.from_entity_id===subject.id ? rel.to_entity_id : rel.from_entity_id;
+      const entity=state.entities.get(otherId);
+      if(!entity) continue;
+
+      const membership=relationshipSuggestsMembership(rel);
+      const equipmentLike=isEquipmentLikeEntity(entity);
+      if(!membership && !equipmentLike) continue;
+
+      const label=entity.name || entity.label || otherId;
+      let score=(membership?360:0)+(equipmentLike?260:0)+(confidencePercent(rel.confidence)||0);
+      out.set(normalizeSubject(label),{label,id:otherId,score});
+    }
+
+    if(/\bsubstation\b/.test(normalizeSubject(subject.label))){
+      for(const entity of state.entities.values()){
+        if(!isEquipmentLikeEntity(entity)) continue;
+        const label=entity.name || entity.label || entity.entity_id;
+        const key=normalizeSubject(label);
+        if(!out.has(key)) out.set(key,{label,id:entity.entity_id,score:120});
+      }
+    }
+
+    return [...out.values()]
+      .sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label))
+      .slice(0,18);
+  }
+
+  function resolveQuestionToEntity(question){
+    return resolveQuestionSubject(question);
+  }
+
+  function buildSemanticQuestionAnswer(question){
+    const classification=questionClassification(question);
+    const subject=resolveQuestionSubject(question);
+    const entity=subject?.entity || null;
+    const description=entity?.summary || entity?.description || entity?.definition || "";
+    const equipment=classification.subtype==="equipment_list"
+      ? equipmentCandidatesForSubject(subject)
+      : [];
+
+    let answer="";
+    if(classification.subtype==="equipment_list"){
+      if(equipment.length){
+        answer=`${description ? `${description} ` : ""}Key equipment includes ${equipment.map(x=>x.label).join(", ")}.`;
+      }else if(subject){
+        answer=`Cosmos identified ${subject.label} as the subject, but the current knowledge graph does not yet contain a sufficiently supported structured equipment list for it.`;
+      }else{
+        answer="Cosmos could not yet resolve a sufficiently supported subject from the current knowledge graph.";
+      }
+    }else{
+      answer=description ||
+        (subject
+          ? `Cosmos identified ${subject.label}, but the current knowledge record does not yet contain enough descriptive information for a direct answer.`
+          : "Cosmos could not yet resolve a sufficiently supported subject from the current knowledge graph.");
+    }
+
+    return {
+      classification,
+      subject,
+      answer,
+      answer_items:equipment,
+      question_remains_primary_observer:true,
+      projection_seed_ids:[
+        subject?.id,
+        ...equipment.map(x=>x.id)
+      ].filter(Boolean)
     };
   }
 
@@ -435,7 +599,16 @@
     if(entry.focus === "question" && entry.question){
       const response=buildQuestionResponse(entry.question);
       state.response=response;
-      return {kind:"response",id:response.id,label:response.label,response,question:entry.question,article_id:entry.article_id};
+      return {
+        kind:"response",
+        id:response.id,
+        label:entry.question,
+        response,
+        question:entry.question,
+        semantic_subject_id:response?.subject_match?.id || "",
+        semantic_subject_label:response?.subject_match?.label || "",
+        article_id:entry.article_id
+      };
     }
 
     if(entry.focus === "relationship"){
@@ -713,8 +886,9 @@
 
 
   function answerFirstItemDate(item){
-    return item?.published_at || item?.created_at || item?.newest_signal_at ||
-      item?.date || item?.updated_at || item?.timestamp || "";
+    return item?.published_at || item?.created_at || item?.date_utc ||
+      item?.newest_signal_at || item?.date || item?.updated_at ||
+      item?.timestamp || state.dailyBriefDate || "";
   }
 
   function answerFirstDisplayDate(value){
@@ -777,7 +951,9 @@
   function answerFirstRelevantItems(observer){
     const query=observer?.question || entry.question || observerDisplayLabel(observer);
     const label=observerDisplayLabel(observer);
-    const entityId=observer?.kind==="entity" ? observer.id : observer?.response?.resolved_entity?.id || "";
+    const entityId=observer?.kind==="entity"
+      ? observer.id
+      : (observer?.response?.subject_match?.id || observer?.response?.resolved_entity?.id || "");
 
     function score(item){
       let s=0;
@@ -847,6 +1023,11 @@
 
     const answerText=directAnswer ||
       "Cosmos found this subject in PTD Today knowledge, but the current knowledge record does not yet contain enough descriptive information to answer the question directly.";
+
+    const semanticSubject = observer?.response?.subject_match?.label || observer?.semantic_subject_label || "";
+    const answerBasis = semanticSubject
+      ? `<div class="answerBasis">Resolved subject: ${esc(semanticSubject)} · Question remains the observer</div>`
+      : "";
 
     const cards=items.map((item,index)=>`
       <div class="datedIntelCard">
