@@ -3907,3 +3907,61 @@ jobs:
 
           console.log("Cosmos Entry UI v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1 source
+        run: |
+          test -f cosmos-entry-v0.1.html
+          test -f cosmos.html
+          test -f scripts/cosmos_subject_observer_heartbeat_test_v0.1.mjs
+          node --check scripts/cosmos_subject_observer_heartbeat_test_v0.1.mjs
+
+      - name: Test Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_subject_observer_heartbeat_test_v0.1.mjs \
+            --entry cosmos-entry-v0.1.html \
+            --cosmos cosmos.html \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_subject_observer_heartbeat_test_passed"){
+            fail("Cosmos Subject/Observer/Heartbeat test failed");
+          }
+
+          const c=r.contracts||{};
+          if(
+            c.typed_subject_resolves_against_cosmos_objects!==true ||
+            c.ambiguity_alternatives_preserved!==true ||
+            c.original_question_preserved!==true ||
+            c.previous_observer_preserved!==true ||
+            c.observer_trail_persisted_in_session!==true ||
+            c.return_to_entry_observer_supported!==true ||
+            c.center_information_panel_present!==true ||
+            c.unresolved_center_information_explicit!==true ||
+            c.expanded_layout_collision_relaxation_present!==true ||
+            c.expanded_canvas_grows!==true ||
+            c.dormant_breathing_present!==true ||
+            c.engaged_heartbeat_present!==true ||
+            c.resolving_heartbeat_present!==true ||
+            c.recentering_preserves_question_context!==true
+          ) fail("Cosmos Subject/Observer/Heartbeat contracts failed");
+
+          const s=r.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.invents_center_summary!==false ||
+            s.randomizes_layout!==false ||
+            s.deletes_observer_history!==false
+          ) fail("Cosmos Subject/Observer/Heartbeat safeguards failed");
+
+          console.log("Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1 passed.");
+          NODE
