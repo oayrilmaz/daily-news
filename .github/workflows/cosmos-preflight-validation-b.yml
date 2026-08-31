@@ -4433,3 +4433,38 @@ jobs:
 
           console.log("Cosmos Semantic Knowledge Completion v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Knowledge Completion Orchestrator v0.1 source
+        run: |
+          test -f scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_orchestrator_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_orchestrator_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Orchestrator v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          node scripts/cosmos_knowledge_completion_orchestrator_test_v0.1.mjs             --engine scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs             > "$TMP_DIR/result.json"
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          if(r.status!=="cosmos_knowledge_completion_orchestrator_test_passed") fail("Orchestrator test failed");
+          if(r.pipeline?.stage_count!==10) fail("Expected 10 stages");
+          if(r.pipeline?.final_status!=="knowledge_completion_completed") fail("Pipeline did not complete");
+          if(r.pipeline?.answer_ready!==true) fail("Answer not ready after completion");
+          if(r.pipeline?.projection_release!==true) fail("Projection not released after completion");
+          if(r.blocked_case?.status!=="knowledge_completion_blocked") fail("Blocked evidence case did not block");
+          if(r.blocked_case?.projection_release!==false) fail("Blocked case released projection");
+          if(!Object.values(r.contracts||{}).every(Boolean)) fail("Contracts failed");
+          if(!Object.values(r.safeguards||{}).every(v=>v===false)) fail("Safeguards failed");
+          console.log("Cosmos Knowledge Completion Orchestrator v0.1 passed.");
+          NODE
+
+      - name: Test Cosmos Semantic Knowledge Completion live integration v0.1
+        run: |
+          test -f scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs
+          node --check scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs
+          node scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs --html cosmos.html
