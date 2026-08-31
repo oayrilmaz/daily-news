@@ -5857,3 +5857,160 @@ jobs:
 
           echo "Controlled Cosmos Question Understanding / Answer Resolver v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Semantic Knowledge Completion v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/semantic-knowledge-completion-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/missing-knowledge.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "classification": {
+              "type": "enumeration",
+              "subtype": "equipment_list"
+            },
+            "subject_match": {
+              "id": "hv_substations",
+              "label": "HV Substations",
+              "score": 710
+            },
+            "entities": [
+              {
+                "entity_id": "hv_substations",
+                "name": "HV Substations",
+                "description": "High-voltage substations transform, switch, measure and protect electric power."
+              },
+              {
+                "entity_id": "developers",
+                "name": "Developers"
+              },
+              {
+                "entity_id": "manufacturing",
+                "name": "Manufacturing"
+              },
+              {
+                "entity_id": "power_transformers",
+                "name": "Power Transformers"
+              },
+              {
+                "entity_id": "circuit_breakers",
+                "name": "Circuit Breakers"
+              }
+            ],
+            "relationships": [
+              {
+                "relationship_id": "r1",
+                "from_entity_id": "hv_substations",
+                "to_entity_id": "developers",
+                "relationship_type": "associated with"
+              },
+              {
+                "relationship_id": "r2",
+                "from_entity_id": "hv_substations",
+                "to_entity_id": "manufacturing",
+                "relationship_type": "affected by"
+              }
+            ]
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/supported-knowledge.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "classification": {
+              "type": "enumeration",
+              "subtype": "equipment_list"
+            },
+            "subject_match": {
+              "id": "hv_substations",
+              "label": "HV Substations",
+              "score": 710
+            },
+            "entities": [
+              {
+                "entity_id": "hv_substations",
+                "name": "HV Substations",
+                "description": "High-voltage substations transform, switch, measure and protect electric power."
+              },
+              {
+                "entity_id": "power_transformers",
+                "name": "Power Transformers"
+              },
+              {
+                "entity_id": "circuit_breakers",
+                "name": "Circuit Breakers"
+              }
+            ],
+            "relationships": [
+              {
+                "relationship_id": "r3",
+                "from_entity_id": "hv_substations",
+                "to_entity_id": "power_transformers",
+                "relationship_type": "includes equipment",
+                "confidence": 0.95,
+                "evidence_ids": ["ev1"]
+              },
+              {
+                "relationship_id": "r4",
+                "from_entity_id": "hv_substations",
+                "to_entity_id": "circuit_breakers",
+                "relationship_type": "includes equipment",
+                "confidence": 0.94,
+                "evidence_ids": ["ev2"]
+              }
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_semantic_knowledge_completion_v0.1.mjs \
+            --input "$OUTPUT_DIR/missing-knowledge.json" \
+            --out "$OUTPUT_DIR/missing-plan.json"
+
+          node scripts/cosmos_semantic_knowledge_completion_v0.1.mjs \
+            --input "$OUTPUT_DIR/supported-knowledge.json" \
+            --out "$OUTPUT_DIR/supported-plan.json"
+
+          node scripts/cosmos_semantic_knowledge_completion_test_v0.1.mjs \
+            --engine scripts/cosmos_semantic_knowledge_completion_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          test -f "$OUTPUT_DIR/missing-plan.json"
+          test -f "$OUTPUT_DIR/supported-plan.json"
+          test -f "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Semantic Knowledge Completion output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos semantic knowledge completion v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Semantic Knowledge Completion output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Semantic Knowledge Completion v0.1 output generated."
+          echo "No OpenAI generation was executed."
