@@ -5600,3 +5600,50 @@ jobs:
 
           echo "Controlled Cosmos Fresh Entry Routing v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Center Intelligence v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/center-intelligence-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          node scripts/cosmos_center_intelligence_test_v0.1.mjs \
+            --engine scripts/cosmos_center_intelligence_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          cp cosmos.html "$OUTPUT_DIR/cosmos.html"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Center Intelligence output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos center intelligence v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Center Intelligence output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Center Intelligence v0.1 output generated."
+          echo "No OpenAI generation was executed."
