@@ -252,3 +252,4 @@ if(inputFile){
     fs.writeFileSync(outFile,text);
   }else process.stdout.write(text);
 }
+
