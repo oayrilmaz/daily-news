@@ -70,6 +70,11 @@
     .answerFirst{display:grid;gap:12px}
     .answerHero{border:1px solid rgba(122,162,255,.30);border-radius:16px;background:linear-gradient(180deg,rgba(22,45,82,.82),rgba(10,25,48,.78));padding:14px}
     .answerEyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#91a7c9}
+    .answerBasis{margin-top:10px;font-size:11px;color:#8190a8}
+    .knowledgeGap{margin:0;padding:16px;border:1px solid #3e5f96;border-radius:16px;background:rgba(29,61,112,.18)}
+    .knowledgeGap p{margin:8px 0;color:#c8d2e2;line-height:1.55}
+    .knowledgeGap ol{margin:12px 0 0 18px;padding:0;color:#9eacc0;line-height:1.6}
+    .knowledgeGap li{margin:4px 0}
     .answerHero h3{margin:6px 0 8px;font-size:22px;line-height:1.2}
     .answerHero p{margin:0;color:#eef4ff;font-size:15px;line-height:1.6}
     .datedIntel{display:grid;gap:9px}
@@ -147,7 +152,7 @@
 </div>
 
 <script>
-  // Cosmos Question Understanding / Answer Resolver live integration v0.1
+  // Cosmos Semantic Knowledge Completion live integration v0.1
 (function(){
   "use strict";
 
@@ -334,7 +339,8 @@
     }
     if(intent.id==="topic"){
       const semantic=buildSemanticQuestionAnswer(question);
-      const ranked=rankDailyItems(question).slice(0,5);
+      const completion=semantic.knowledge_completion;
+      const ranked=completion.answer_ready ? rankDailyItems(question).slice(0,5) : [];
       const subject=semantic.subject;
 
       return {
@@ -346,6 +352,7 @@
         answer_items:semantic.answer_items,
         classification:semantic.classification,
         subject_match:subject,
+        knowledge_completion:completion,
         question_remains_primary_observer:true,
         bullets:ranked.map(({item,index})=>({
           id:dailyItemId(item,index),
@@ -355,10 +362,12 @@
           article_id:item?.article_id || item?.development_id || item?.signal_id || item?.id || "",
           seed_ids:seedIdsFromDailyItem(item)
         })),
-        projection_seed_ids:[
-          ...semantic.projection_seed_ids,
-          ...ranked.flatMap(({item})=>seedIdsFromDailyItem(item))
-        ].filter(Boolean),
+        projection_seed_ids:completion.answer_ready
+          ? [
+              ...semantic.projection_seed_ids,
+              ...ranked.flatMap(({item})=>seedIdsFromDailyItem(item))
+            ].filter(Boolean)
+          : semantic.projection_seed_ids,
         source_label:"PTD Today knowledge + daily briefing",
         resolved_entity:subject
       };
@@ -515,16 +524,6 @@
       let score=(membership?360:0)+(equipmentLike?260:0)+(confidencePercent(rel.confidence)||0);
       out.set(normalizeSubject(label),{label,id:otherId,score});
     }
-
-    if(/\bsubstation\b/.test(normalizeSubject(subject.label))){
-      for(const entity of state.entities.values()){
-        if(!isEquipmentLikeEntity(entity)) continue;
-        const label=entity.name || entity.label || entity.entity_id;
-        const key=normalizeSubject(label);
-        if(!out.has(key)) out.set(key,{label,id:entity.entity_id,score:120});
-      }
-    }
-
     return [...out.values()]
       .sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label))
       .slice(0,18);
@@ -532,6 +531,80 @@
 
   function resolveQuestionToEntity(question){
     return resolveQuestionSubject(question);
+  }
+
+  function semanticKnowledgeContract(classification){
+    if(classification?.subtype==="equipment_list"){
+      return {
+        contract_id:"component_membership",
+        minimum_supported_members:2,
+        required_relationship_semantics:[
+          "contains","includes","component","equipment","part of","comprise","consist"
+        ]
+      };
+    }
+    if(classification?.type==="definition"){
+      return {contract_id:"definition",minimum_supported_members:0,required_relationship_semantics:["description"]};
+    }
+    if(classification?.type==="explanation"){
+      return {contract_id:"causal_support",minimum_supported_members:1,required_relationship_semantics:["cause","drive","influence","contribute"]};
+    }
+    return {contract_id:"topic_support",minimum_supported_members:1,required_relationship_semantics:["related"]};
+  }
+
+  function semanticKnowledgeCompletion(question,classification,subject,equipment){
+    const contract=semanticKnowledgeContract(classification);
+
+    if(!subject){
+      return {
+        knowledge_status:"unresolved_subject",
+        answer_ready:false,
+        completion_required:true,
+        supported_member_count:0,
+        contract,
+        completion_tasks:["Resolve a supported subject before completing missing knowledge."],
+        projection_policy:{
+          keep_question_as_observer:true,
+          suppress_broad_intelligence_projection_until_answer_supported:true,
+          allow_current_intelligence_after_direct_answer:false,
+          allow_butterfly_expansion_after_direct_answer:false
+        }
+      };
+    }
+
+    let knowledgeStatus="sufficient";
+    if(contract.contract_id==="component_membership"){
+      knowledgeStatus=equipment.length>=contract.minimum_supported_members
+        ? "sufficient"
+        : (equipment.length ? "partial" : "insufficient");
+    }else if(contract.contract_id==="definition"){
+      const entity=subject.entity||{};
+      knowledgeStatus=(entity.summary||entity.description||entity.definition)
+        ? "sufficient"
+        : "insufficient";
+    }
+
+    const ready=knowledgeStatus==="sufficient";
+
+    return {
+      knowledge_status:knowledgeStatus,
+      answer_ready:ready,
+      completion_required:!ready,
+      supported_member_count:equipment.length,
+      contract,
+      completion_tasks:ready?[]:[
+        "Discover candidate Cosmos objects for the missing knowledge contract.",
+        "Validate each subject-to-candidate relationship with evidence and lineage.",
+        "Admit only validated objects and relationships through Cosmos Knowledge Admission.",
+        "Rebuild the direct answer before releasing Current Intelligence and Butterfly expansion."
+      ],
+      projection_policy:{
+        keep_question_as_observer:true,
+        suppress_broad_intelligence_projection_until_answer_supported:!ready,
+        allow_current_intelligence_after_direct_answer:ready,
+        allow_butterfly_expansion_after_direct_answer:ready
+      }
+    };
   }
 
   function buildSemanticQuestionAnswer(question){
@@ -543,19 +616,23 @@
       ? equipmentCandidatesForSubject(subject)
       : [];
 
+    const knowledge_completion=semanticKnowledgeCompletion(
+      question,classification,subject,equipment
+    );
+
     let answer="";
     if(classification.subtype==="equipment_list"){
-      if(equipment.length){
+      if(knowledge_completion.answer_ready){
         answer=`${description ? `${description} ` : ""}Key equipment includes ${equipment.map(x=>x.label).join(", ")}.`;
       }else if(subject){
-        answer=`Cosmos identified ${subject.label} as the subject, but the current knowledge graph does not yet contain a sufficiently supported structured equipment list for it.`;
+        answer=`Cosmos understands ${subject.label} as the subject, but it has not yet admitted enough validated component relationships to answer this equipment question reliably.`;
       }else{
         answer="Cosmos could not yet resolve a sufficiently supported subject from the current knowledge graph.";
       }
     }else{
       answer=description ||
         (subject
-          ? `Cosmos identified ${subject.label}, but the current knowledge record does not yet contain enough descriptive information for a direct answer.`
+          ? `Cosmos identified ${subject.label}, but the current knowledge record does not yet contain enough validated information for a direct answer.`
           : "Cosmos could not yet resolve a sufficiently supported subject from the current knowledge graph.");
     }
 
@@ -564,11 +641,11 @@
       subject,
       answer,
       answer_items:equipment,
+      knowledge_completion,
       question_remains_primary_observer:true,
-      projection_seed_ids:[
-        subject?.id,
-        ...equipment.map(x=>x.id)
-      ].filter(Boolean)
+      projection_seed_ids:knowledge_completion.answer_ready
+        ? [subject?.id,...equipment.map(x=>x.id)].filter(Boolean)
+        : [subject?.id].filter(Boolean)
     };
   }
 
@@ -949,6 +1026,11 @@
   }
 
   function answerFirstRelevantItems(observer){
+    if(
+      observer?.kind==="response" &&
+      observer?.response?.knowledge_completion?.completion_required===true
+    ) return [];
+
     const query=observer?.question || entry.question || observerDisplayLabel(observer);
     const label=observerDisplayLabel(observer);
     const entityId=observer?.kind==="entity"
@@ -1000,14 +1082,21 @@
   function renderAnswerFirst(observer,projection){
     const directAnswer=buildDirectAnswerForObserver(observer);
     const intelligence=answerFirstRelevantItems(observer);
+    const completion=observer?.response?.knowledge_completion || null;
+    const completionRequired=completion?.completion_required===true;
 
-    // If a response observer already has richer bullets, merge them ahead of matched briefing items.
-    const responseItems=(observer?.kind==="response" && Array.isArray(observer.response?.bullets))
+    const responseItems=(
+      !completionRequired &&
+      observer?.kind==="response" &&
+      Array.isArray(observer.response?.bullets)
+    )
       ? observer.response.bullets.map((item,index)=>({
           id:item.id||`response-item-${index+1}`,
           title:item.title||`Result ${index+1}`,
           summary:item.summary||"",
-          date_display:item.date_display || answerFirstDisplayDate(item.date || item.published_at || item.created_at),
+          date_display:item.date_display || answerFirstDisplayDate(
+            item.date || item.published_at || item.created_at
+          ),
           article_id:item.article_id || item.id || "",
           seed_ids:item.seed_ids||[]
         }))
@@ -1024,8 +1113,12 @@
     const answerText=directAnswer ||
       "Cosmos found this subject in PTD Today knowledge, but the current knowledge record does not yet contain enough descriptive information to answer the question directly.";
 
-    const semanticSubject = observer?.response?.subject_match?.label || observer?.semantic_subject_label || "";
-    const answerBasis = semanticSubject
+    const semanticSubject =
+      observer?.response?.subject_match?.label ||
+      observer?.semantic_subject_label ||
+      "";
+
+    const answerBasis=semanticSubject
       ? `<div class="answerBasis">Resolved subject: ${esc(semanticSubject)} · Question remains the observer</div>`
       : "";
 
@@ -1041,21 +1134,55 @@
       </div>
     `).join("");
 
-    const whyText=items.length
-      ? `${items.length} current PTD Today intelligence item${items.length===1?"":"s"} are connected to this answer.`
-      : "No current intelligence item has been resolved for this answer yet.";
+    const whyText=completionRequired
+      ? "Current Intelligence is intentionally held back until Cosmos has enough validated knowledge to support the direct answer."
+      : (
+          items.length
+            ? `${items.length} current PTD Today intelligence item${items.length===1?"":"s"} are connected to this answer.`
+            : "No current intelligence item has been resolved for this answer yet."
+        );
+
+    const knowledgeGap=completionRequired ? `
+      <div class="knowledgeGap">
+        <div class="answerEyebrow">Knowledge completion required</div>
+        <p><strong>${
+          esc(completion.knowledge_status==="partial"
+            ? "Partial structured knowledge"
+            : "Structured knowledge gap detected")
+        }</strong></p>
+        <p>Cosmos understood the subject, but it will not use broad associations as a substitute for the answer.</p>
+        <ol>
+          ${(completion.completion_tasks||[])
+            .map(task=>`<li>${esc(task)}</li>`)
+            .join("")}
+        </ol>
+        <div class="answerBasis">
+          Required contract: ${esc(completion.contract?.contract_id||"supported knowledge")}
+          · Supported members: ${esc(completion.supported_member_count??0)}
+        </div>
+      </div>
+    ` : "";
 
     return `
       <div class="answerFirst">
         <div class="answerHero">
           <div class="answerEyebrow">Answer</div>
-          <h3>${esc(observerDisplayLabel(observer))}</h3>
+          <h3>${esc(observer?.question || entry.question || observerDisplayLabel(observer))}</h3>
           <p>${esc(answerText)}</p>
+          ${answerBasis}
         </div>
+
+        ${knowledgeGap}
 
         <div class="intelBlock">
           <div class="intelLabel">Current intelligence</div>
-          ${cards?`<div class="datedIntel">${cards}</div>`:`<p class="intelText">No current intelligence item has been resolved yet.</p>`}
+          ${
+            completionRequired
+              ? `<p class="intelText">Held back until the direct answer is supported by validated Cosmos knowledge.</p>`
+              : (cards
+                  ? `<div class="datedIntel">${cards}</div>`
+                  : `<p class="intelText">No current intelligence item has been resolved yet.</p>`)
+          }
         </div>
 
         <div class="answerWhy">
@@ -1065,7 +1192,11 @@
 
         <div class="intelBlock">
           <div class="intelLabel">Explore in Cosmos</div>
-          <p class="intelText">${projection.nodes.length} connected objects · ${projection.edges.length} connected relationships. Select a node, expand one layer, or follow a ripple from an intelligence item.</p>
+          <p class="intelText">${
+            completionRequired
+              ? "Broad exploration is intentionally gated. Only the resolved subject and validated answer-support objects should appear until knowledge completion is finished."
+              : `${projection.nodes.length} connected objects · ${projection.edges.length} connected relationships. Select a node, expand one layer, or follow a ripple from an intelligence item.`
+          }</p>
         </div>
       </div>
     `;
@@ -1126,8 +1257,18 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     emptyEl.style.display=projection.nodes.length ? "none":"block";
-    expandBtn.disabled=state.expanded || projection.nodes.length>=MAX_EXPANDED_NODES;
-    expandBtn.textContent=state.expanded ? "Expanded" : "Expand one layer +";
+    const completionBlocked =
+      observer?.kind==="response" &&
+      observer?.response?.knowledge_completion?.completion_required===true;
+
+    expandBtn.disabled=
+      completionBlocked ||
+      state.expanded ||
+      projection.nodes.length>=MAX_EXPANDED_NODES;
+
+    expandBtn.textContent=completionBlocked
+      ? "Knowledge completion required"
+      : (state.expanded ? "Expanded" : "Expand one layer +");
 
     const rect=svg.getBoundingClientRect();
     const width=Math.max(360,Math.round(rect.width||800));
