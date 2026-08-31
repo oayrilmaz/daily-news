@@ -3798,3 +3798,62 @@ jobs:
           ) fail("Live integration safeguards failed");
           console.log("Cosmos Live Site Integration v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Entry Experience v0.1 source
+        run: |
+          test -f scripts/cosmos_entry_experience_v0.1.mjs
+          test -f scripts/cosmos_entry_experience_test_v0.1.mjs
+          node --check scripts/cosmos_entry_experience_v0.1.mjs
+          node --check scripts/cosmos_entry_experience_test_v0.1.mjs
+
+      - name: Test Cosmos Entry Experience v0.1 In Isolated Workspace
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_entry_experience_test_v0.1.mjs \
+            --engine scripts/cosmos_entry_experience_v0.1.mjs \
+            --out "$TMP_DIR/test-result.json" \
+            > /dev/null
+
+          node - "$TMP_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_entry_experience_test_passed"){
+            fail("Cosmos Entry Experience test failed");
+          }
+
+          const c=r.contracts||{};
+          if(
+            c.cosmos_is_root_entry_experience!==true ||
+            c.cosmos_is_only_initial_centerpiece!==true ||
+            c.no_permanent_home_media_groups_navigation!==true ||
+            c.ask_cosmos_is_primary_interaction!==true ||
+            c.views_materialize_from_user_intent!==true ||
+            c.legacy_surfaces_preserved_not_deleted!==true ||
+            c.original_question_preserved!==true ||
+            c.entry_observer_recoverable!==true ||
+            c.current_observer_has_intelligence_contract!==true ||
+            c.center_information_not_invented_when_missing!==true ||
+            c.projection_requires_collision_safe_layout!==true ||
+            c.observer_defines_center!==true ||
+            c.display_is_not_fixed_hierarchy!==true
+          ) fail("Cosmos Entry Experience contracts failed");
+
+          const s=r.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.deletes_legacy_surfaces!==false ||
+            s.creates_new_facts!==false ||
+            s.invents_center_summary!==false ||
+            s.rewrites_confidence!==false ||
+            s.promotes_scenario_to_fact!==false
+          ) fail("Cosmos Entry Experience safeguards failed");
+
+          console.log("Cosmos Entry Experience v0.1 isolated test passed.");
+          NODE
