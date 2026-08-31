@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Cosmos — PTD Today</title>
+  <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
   <style>
     :root{
@@ -51,6 +52,21 @@
     .responseItem span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
     .responseMeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
     .responseMeta span{font-size:10px;padding:5px 7px;border:1px solid var(--line);border-radius:999px;color:#9dafc9}
+    #cosmosHomeLink{color:inherit;text-decoration:none}
+    .centerIntel{display:grid;gap:12px}
+    .intelBlock{border-top:1px solid var(--line);padding-top:12px}
+    .intelBlock:first-child{border-top:0;padding-top:0}
+    .intelLabel{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#91a7c9;margin-bottom:6px}
+    .intelText{margin:0;color:#c5d0e2;line-height:1.58}
+    .intelList{margin:6px 0 0;padding-left:18px;color:#c5d0e2}
+    .intelList li{margin:7px 0;line-height:1.45}
+    .articleGrid{display:grid;gap:9px;margin-top:8px}
+    .articleCard{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025);padding:11px}
+    .articleCard strong{display:block;color:#eef4ff;font-size:13px;line-height:1.4}
+    .articleCard p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.45}
+    .articleCard a{display:inline-block;margin-top:8px;color:#8eb6ff;text-decoration:none;font-size:12px;font-weight:700}
+    .curiosityPaths{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
+    .curiosityPaths button{border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.035);color:#dfe8f7;padding:7px 10px;font-size:11px}
     .edgeFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .fact{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.025)}
     .fact b{display:block;font-size:11px;color:#cbd7e8;margin-bottom:3px}
@@ -78,7 +94,7 @@
 
   <main class="main">
     <section class="intro">
-      <h1>Cosmos</h1>
+      <h1><a id="cosmosHomeLink" href="/cosmos.html" aria-label="Return to fresh Cosmos">Cosmos</a></h1>
       <p>There is no absolute center. Select anything and the universe is projected around it.</p>
     </section>
 
@@ -120,6 +136,24 @@
 <script>
 (function(){
   "use strict";
+
+  const entryParams = new URLSearchParams(location.search);
+  const hasExplicitObserver =
+    entryParams.has("focus") ||
+    entryParams.has("id") ||
+    entryParams.has("relationship_id") ||
+    entryParams.has("question") ||
+    entryParams.has("observer") ||
+    entryParams.has("article_id") ||
+    entryParams.has("from_id") ||
+    entryParams.has("to_id");
+
+  // Fresh Cosmos visits always begin at the living Ask Cosmos entry.
+  // Only explicit observer/deep-link requests bypass the entry experience.
+  if (!hasExplicitObserver) {
+    location.replace("/cosmos-entry-v0.1.html");
+    return;
+  }
 
   const MAX_INITIAL_NODES = 10;
   const MAX_EXPANDED_NODES = 18;
@@ -592,6 +626,78 @@
     return observer?.label || "Cosmos";
   }
 
+
+  function centerRecordEntityIds(record){
+    const ids=new Set(Array.isArray(record?.entity_ids)?record.entity_ids.filter(Boolean):[]);
+    for(const e of (Array.isArray(record?.entities)?record.entities:[])){
+      const id=typeof e==="string"?e:e?.entity_id;
+      if(id)ids.add(id);
+    }
+    return [...ids];
+  }
+  function centerRecordTitle(r){return r?.title||r?.headline||r?.name||r?.signal||""}
+  function centerRecordSummary(r){return r?.summary||r?.description||r?.analysis||r?.why_it_matters||""}
+  function centerRecordWhy(r){return r?.why_it_matters||r?.impact||r?.importance||""}
+  function centerArticleId(r){return r?.article_id||r?.development_id||r?.signal_id||r?.id||""}
+  function centerScore(entityId,label,record){
+    const hay=normalizeSubject([centerRecordTitle(record),centerRecordSummary(record),centerRecordWhy(record),...(Array.isArray(record?.tags)?record.tags:[]),...(Array.isArray(record?.topics)?record.topics:[])].join(" "));
+    let score=centerRecordEntityIds(record).includes(entityId)?1000:0;
+    if(normalizeSubject(label)&&hay.includes(normalizeSubject(label)))score+=220;
+    for(const t of subjectTokens(label))if(hay.includes(t))score+=35;
+    return score;
+  }
+  function buildCenterIntelligence(entityId){
+    const entity=state.entities.get(entityId);
+    if(!entity)return null;
+    const label=entity.name||entity.label||entity.entity_id||entityId;
+    const description=entity.summary||entity.description||entity.definition||"";
+    const rows=[
+      ...(state.dailyBrief||[]).map((record,index)=>({record,current:true,score:centerScore(entityId,label,record)+500,index})).filter(x=>x.score>500),
+      ...[...state.developments.values()].map((record,index)=>({record,current:false,score:centerScore(entityId,label,record),index})).filter(x=>x.score>0)
+    ].sort((a,b)=>b.score-a.score||a.index-b.index);
+    const seen=new Set(),unique=[];
+    for(const row of rows){
+      const key=centerArticleId(row.record)||centerRecordTitle(row.record);
+      if(!key||seen.has(key))continue;
+      seen.add(key);unique.push(row);
+    }
+    const articles=unique.filter(x=>centerArticleId(x.record)).slice(0,6).map(x=>({
+      article_id:centerArticleId(x.record),title:centerRecordTitle(x.record)||label,summary:centerRecordSummary(x.record),current:x.current
+    }));
+    const related=new Map();
+    for(const row of unique.slice(0,12)){
+      for(const id of centerRecordEntityIds(row.record)){
+        if(!id||id===entityId||!state.entities.has(id))continue;
+        related.set(id,(related.get(id)||0)+1);
+      }
+    }
+    return {
+      label,description,
+      related_record_count:unique.length,
+      current_record_count:unique.filter(x=>x.current).length,
+      current_state:unique.slice(0,3).map(x=>centerRecordSummary(x.record)||centerRecordTitle(x.record)).filter(Boolean),
+      latest_movement:unique.slice(0,4).map(x=>({title:centerRecordTitle(x.record),summary:centerRecordSummary(x.record),current:x.current})),
+      why_it_matters:unique.map(x=>centerRecordWhy(x.record)).find(Boolean)||"",
+      article_cards:articles,
+      curiosity_paths:[...related.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).slice(0,7).map(([id])=>({id,label:state.entities.get(id)?.name||state.entities.get(id)?.label||id}))
+    };
+  }
+  function renderCenterIntelligence(i){
+    if(!i)return "";
+    const latest=(i.latest_movement||[]).map(x=>`<li><strong>${esc(x.title||"Development")}</strong>${x.summary?` — ${esc(x.summary)}`:""}${x.current?` <span style="color:#8eb6ff">Today</span>`:""}</li>`).join("");
+    const articles=(i.article_cards||[]).map(x=>`<div class="articleCard"><strong>${esc(x.title)}</strong>${x.summary?`<p>${esc(x.summary)}</p>`:""}<a href="/articles/${encodeURIComponent(x.article_id)}.html">Read article → Butterfly Effect → Follow this ripple</a></div>`).join("");
+    const curiosity=(i.curiosity_paths||[]).map(x=>`<button type="button" data-curiosity-id="${esc(x.id)}">${esc(x.label)}</button>`).join("");
+    return `<div class="centerIntel">
+      <div class="intelBlock"><div class="intelLabel">What is this?</div><p class="intelText">${i.description?esc(i.description):"Cosmos does not yet have a stable descriptive brief for this object."}</p></div>
+      <div class="intelBlock"><div class="intelLabel">What Cosmos has seen</div><p class="intelText">${i.related_record_count} related PTD Today record${i.related_record_count===1?"":"s"}${i.current_record_count?` · ${i.current_record_count} from the current briefing`:""}.</p></div>
+      <div class="intelBlock"><div class="intelLabel">Current state</div><p class="intelText">${i.current_state.length?esc(i.current_state.join(" ")):"No current-state summary has been resolved yet."}</p></div>
+      <div class="intelBlock"><div class="intelLabel">Latest movement</div>${latest?`<ul class="intelList">${latest}</ul>`:`<p class="intelText">No recent movement has been resolved yet.</p>`}</div>
+      <div class="intelBlock"><div class="intelLabel">Why it matters</div><p class="intelText">${i.why_it_matters?esc(i.why_it_matters):"Why-it-matters has not yet been explicitly supported by the related PTD Today records."}</p></div>
+      <div class="intelBlock"><div class="intelLabel">Explore the evidence</div>${articles?`<div class="articleGrid">${articles}</div>`:`<p class="intelText">No linked article is available yet.</p>`}</div>
+      <div class="intelBlock"><div class="intelLabel">Where curiosity can take you next</div>${curiosity?`<div class="curiosityPaths">${curiosity}</div>`:`<p class="intelText">Explore the surrounding relationships in the Cosmos grid.</p>`}</div>
+    </div>`;
+  }
+
   function renderObserverDetails(observer,projection){
     const type = observer.kind || "object";
     const source = observer.article_id ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
@@ -604,8 +710,7 @@
             <strong>${esc(item.title||`Result ${index+1}`)}</strong>
             ${item.summary?`<span>${esc(item.summary)}</span>`:""}
           </button>
-        </li>
-      `).join("");
+        </li>`).join("");
       observerDetail.innerHTML = `
         <div class="responseCard">
           <div class="eyebrow">Cosmos response</div>
@@ -615,8 +720,7 @@
           <div class="responseMeta"><span>${esc(response.source_label||"PTD Today")}</span><span>${projection.nodes.length} connected objects</span><span>${projection.edges.length} connected relationships</span></div>
         </div>
         <p><strong>Entry question:</strong> ${esc(observer.question||response.question||"")}</p>
-        <p>The answer is a temporary observer built from existing PTD Today data. It does not mutate the underlying Cosmos graph.</p>
-      `;
+        <p>The answer is a temporary observer built from existing PTD Today data. It does not mutate the underlying Cosmos graph.</p>`;
       observerDetail.querySelectorAll("[data-response-index]").forEach(button=>{
         button.addEventListener("click",()=>{
           const item=response.bullets?.[Number(button.dataset.responseIndex)];
@@ -627,12 +731,22 @@
       return;
     }
 
-    const entity = observer.kind==="entity" ? state.entities.get(observer.id) : null;
-    const summary = entity?.summary || entity?.description || entity?.definition || "";
     const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
     const arrivedFrom = observer.from_observer_label ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}</p>` : "";
-    const meaning = summary ? `<p><strong>What is this?</strong> ${esc(summary)}</p>` : `<p><strong>What is this?</strong> Cosmos has not yet resolved a descriptive brief for this object. The relationships shown are still available for exploration.</p>`;
-    observerDetail.innerHTML = `<p><strong>${esc(observerDisplayLabel(observer))}</strong></p><p>Observer type: ${esc(type)}</p>${meaning}${question}${arrivedFrom}<p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>${source}<p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>`;
+    const intelligence = observer.kind==="entity" ? buildCenterIntelligence(observer.id) : null;
+
+    observerDetail.innerHTML = `
+      <p><strong>${esc(observerDisplayLabel(observer))}</strong></p>
+      <p>Observer type: ${esc(type)}</p>
+      ${question}${arrivedFrom}
+      ${intelligence ? renderCenterIntelligence(intelligence) : ""}
+      <p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>
+      ${source}
+      <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>`;
+
+    observerDetail.querySelectorAll("[data-curiosity-id]").forEach(button=>{
+      button.addEventListener("click",()=>recenterEntity(button.dataset.curiosityId));
+    });
   }
 
   function render(){
