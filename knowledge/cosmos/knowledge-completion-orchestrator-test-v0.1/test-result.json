@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.1",
+  "status": "cosmos_knowledge_completion_orchestrator_test_passed",
+  "question": "What are the HV substation equipment?",
+  "subject": {
+    "id": "hv_substations",
+    "label": "HV Substations"
+  },
+  "pipeline": {
+    "stage_count": 10,
+    "stage_order": [
+      "acquisition",
+      "acquisition_applicability",
+      "decomposition",
+      "candidate_validation",
+      "evidence_strategy",
+      "evidence_execution",
+      "evidence_validation",
+      "knowledge_admission",
+      "graph_writer",
+      "answer_rebuild"
+    ],
+    "final_status": "knowledge_completion_completed",
+    "answer_ready": true,
+    "projection_release": true
+  },
+  "blocked_case": {
+    "status": "knowledge_completion_blocked",
+    "stage": "evidence_validation",
+    "reason": "evidence_validation_requires_decisions",
+    "projection_release": false
+  },
+  "contracts": {
+    "uses_existing_acquisition_pipeline": true,
+    "evidence_required_before_admission": true,
+    "admission_required_before_graph_write": true,
+    "graph_write_required_before_answer_rebuild": true,
+    "question_remains_primary_observer": true,
+    "broad_projection_released_only_after_supported_answer": true
+  },
+  "safeguards": {
+    "performs_external_search": false,
+    "calls_openai_or_external_api": false,
+    "invents_missing_facts": false,
+    "auto_admits_candidates": false,
+    "mutates_graph_directly": false,
+    "skips_evidence_validation": false,
+    "promotes_scenario_to_fact": false
+  }
+}
