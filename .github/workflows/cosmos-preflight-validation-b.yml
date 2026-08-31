@@ -3755,3 +3755,46 @@ jobs:
 
           console.log("Cosmos Web Renderer v0.1 isolated test passed.");
           NODE
+
+      - name: Check Cosmos Live Site Integration v0.1 source
+        run: |
+          test -f scripts/cosmos_live_site_integration_test_v0.1.mjs
+          node --check scripts/cosmos_live_site_integration_test_v0.1.mjs
+
+      - name: Test Cosmos Live Site Integration v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_live_site_integration_test_v0.1.mjs \
+            --root . \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          if(r.status!=="cosmos_live_site_integration_test_passed") fail("Live integration test failed");
+          const c=r.integration_contract||{};
+          if(
+            c.cosmos_page_at_site_root!==true ||
+            c.production_knowledge_files_available!==true ||
+            c.article_relationship_deep_link_wired!==true ||
+            c.article_development_deep_link_wired!==true ||
+            c.entity_recenter_deep_link_wired!==true ||
+            c.return_to_article_wired!==true ||
+            c.duplicate_follow_the_ripple_removed!==true ||
+            c.production_graph_consumed_by_browser!==true ||
+            c.confidence_preserved_not_recalculated!==true
+          ) fail("Live integration contracts failed");
+          const s=r.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.rewrites_daily_brief!==false ||
+            s.recalculates_confidence!==false
+          ) fail("Live integration safeguards failed");
+          console.log("Cosmos Live Site Integration v0.1 passed.");
+          NODE
