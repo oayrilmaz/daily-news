@@ -4159,3 +4159,92 @@ jobs:
 
           console.log("Cosmos Center Intelligence v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Answer-First v0.1 source
+        run: |
+          test -f scripts/cosmos_answer_first_v0.1.mjs
+          test -f scripts/cosmos_answer_first_test_v0.1.mjs
+          node --check scripts/cosmos_answer_first_v0.1.mjs
+          node --check scripts/cosmos_answer_first_test_v0.1.mjs
+
+      - name: Test Cosmos Answer-First v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cp scripts/cosmos_answer_first_v0.1.mjs "$TMP_DIR/cosmos_answer_first_v0.1.mjs"
+          cp scripts/cosmos_answer_first_test_v0.1.mjs "$TMP_DIR/cosmos_answer_first_test_v0.1.mjs"
+
+          (
+            cd "$TMP_DIR"
+            node cosmos_answer_first_test_v0.1.mjs \
+              --out-dir "$TMP_DIR/output" \
+              > "$TMP_DIR/test-result-stdout.json"
+          )
+
+          test -f "$TMP_DIR/output/test-result.json"
+          test -f "$TMP_DIR/output/answer-first-hv-substation.json"
+
+          node - "$TMP_DIR/output/test-result.json" "$TMP_DIR/output/answer-first-hv-substation.json" <<'NODE'
+          const fs=require("fs");
+          const test=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const resolved=JSON.parse(fs.readFileSync(process.argv[3],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(test.status!=="cosmos_answer_first_test_passed"){
+            fail("Cosmos Answer-First test failed");
+          }
+
+          if(resolved.status!=="cosmos_answer_first_resolved"){
+            fail("Cosmos Answer-First resolved output failed");
+          }
+
+          if(resolved.presentation_order?.[0]!=="answer"){
+            fail("Direct answer is not first");
+          }
+
+          if(!String(resolved.answer?.text||"").includes("Power Transformers")){
+            fail("HV substation direct answer does not include expected equipment");
+          }
+
+          const items=resolved.current_intelligence?.items||[];
+          if(items.length!==3){
+            fail(`Expected 3 intelligence items; got ${items.length}`);
+          }
+
+          if(!items.some(item=>item.date_display==="Date unavailable")){
+            fail("Missing source dates must be explicitly marked Date unavailable");
+          }
+
+          if(!items.some(item=>item.date_display!=="Date unavailable")){
+            fail("Available source dates must be preserved and displayed");
+          }
+
+          if(!items.every(item=>item.follow_the_ripple?.enabled===true)){
+            fail("Every intelligence item must preserve Follow the ripple");
+          }
+
+          const c=test.contracts||{};
+          if(
+            c.direct_answer_precedes_intelligence!==true ||
+            c.article_dates_preserved_when_available!==true ||
+            c.missing_dates_are_explicit!==true ||
+            c.intelligence_does_not_replace_answer!==true ||
+            c.follow_the_ripple_available_per_intelligence_item!==true ||
+            c.observer_remains_explorable!==true ||
+            c.source_content_not_rewritten_as_fact!==true
+          ) fail("Cosmos Answer-First contracts failed");
+
+          const s=test.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.invents_missing_dates!==false ||
+            s.promotes_scenario_to_fact!==false ||
+            s.rewrites_source_confidence!==false
+          ) fail("Cosmos Answer-First safeguards failed");
+
+          console.log("Cosmos Answer-First v0.1 passed.");
+          NODE
