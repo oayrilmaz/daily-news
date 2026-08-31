@@ -5393,3 +5393,52 @@ jobs:
 
           echo "Controlled Cosmos Entry UI v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/subject-observer-heartbeat-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cp cosmos-entry-v0.1.html "$OUTPUT_DIR/cosmos-entry-v0.1.html"
+          cp cosmos.html "$OUTPUT_DIR/cosmos.html"
+
+          node scripts/cosmos_subject_observer_heartbeat_test_v0.1.mjs \
+            --entry cosmos-entry-v0.1.html \
+            --cosmos cosmos.html \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Subject/Observer/Heartbeat output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos subject observer heartbeat v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Subject/Observer/Heartbeat output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1 output generated."
+          echo "No OpenAI generation was executed."
