@@ -5442,3 +5442,84 @@ jobs:
 
           echo "Controlled Cosmos Subject Resolution + Observer Restoration + Heartbeat v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Response Resolver v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/response-resolver-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/today-news-question.json" <<'JSON'
+          {
+            "question": "Provide today news"
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/data-centers-question.json" <<'JSON'
+          {
+            "question": "Data Centers"
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/media-question.json" <<'JSON'
+          {
+            "question": "Show me videos about transformers"
+          }
+          JSON
+
+          node scripts/cosmos_response_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/today-news-question.json" \
+            --brief briefs/daily-ai.json \
+            --entities knowledge/entities.json \
+            --out "$OUTPUT_DIR/resolved-today-news.json"
+
+          node scripts/cosmos_response_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/data-centers-question.json" \
+            --brief briefs/daily-ai.json \
+            --entities knowledge/entities.json \
+            --out "$OUTPUT_DIR/resolved-data-centers.json"
+
+          node scripts/cosmos_response_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/media-question.json" \
+            --brief briefs/daily-ai.json \
+            --entities knowledge/entities.json \
+            --out "$OUTPUT_DIR/resolved-media.json"
+
+          node scripts/cosmos_response_resolver_test_v0.1.mjs \
+            --engine scripts/cosmos_response_resolver_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Response Resolver output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos response resolver v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Response Resolver output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Response Resolver v0.1 output generated."
+          echo "No OpenAI generation was executed."
