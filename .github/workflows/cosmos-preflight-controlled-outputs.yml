@@ -4810,8 +4810,10 @@ jobs:
             throw new Error("Production rerender generated no articles");
           }
 
-          const articleFiles = fs.readdirSync("articles")
-            .filter(name => name.endsWith(".html"));
+          const articleFiles = (manifest.records || [])
+            .map(record => record.article_path)
+            .filter(Boolean)
+            .map(filePath => path.resolve(filePath));
 
           let butterflyArticleCount = 0;
           let followActionCount = 0;
@@ -4819,9 +4821,15 @@ jobs:
           let confidenceInspectorCount = 0;
           const legacyDuplicates = [];
 
-          for (const file of articleFiles) {
-            const filePath = path.join("articles", file);
+          for (const filePath of articleFiles) {
+            if (!fs.existsSync(filePath)) {
+              throw new Error(
+                `Manifest article file does not exist: ${filePath}`
+              );
+            }
+
             const html = fs.readFileSync(filePath, "utf8");
+            const file = path.basename(filePath);
 
             if (html.includes("🦋 Butterfly Effect")) {
               butterflyArticleCount += 1;
@@ -4878,6 +4886,7 @@ jobs:
           console.log(`Explore actions verified:   ${exploreActionCount}`);
           console.log(`Confidence inspectors:      ${confidenceInspectorCount}`);
           console.log("Legacy Follow the ripple:   0");
+          console.log("Validation scope:           current manifest records only");
           NODE
 
           # 4) Commit BOTH the controlled evidence and the actual production articles.
