@@ -135,7 +135,9 @@
     to: params.get("to") || "",
     relation: params.get("relation") || "",
     from_id: params.get("from_id") || "",
-    to_id: params.get("to_id") || ""
+    to_id: params.get("to_id") || "",
+    question: params.get("question") || "",
+    view: params.get("view") || ""
   };
 
   const state = {
@@ -145,7 +147,8 @@
     observer: null,
     history: [],
     expanded: false,
-    entryObserver: null
+    entryObserver: null,
+    trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1"
   };
 
   const esc = (value) => String(value ?? "")
@@ -215,7 +218,99 @@
     };
   }
 
+
+  function normalizeSubject(value){
+    return String(value || "")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^\p{L}\p{N}]+/gu," ")
+      .trim();
+  }
+
+  function subjectTokens(value){
+    return normalizeSubject(value).split(/\s+/).filter(Boolean);
+  }
+
+  function resolveQuestionToEntity(question){
+    const q = normalizeSubject(question);
+    if(!q) return null;
+    const qTokens = subjectTokens(q);
+    const ranked = [...state.entities.values()].map(entity => {
+      const label = entity.name || entity.label || entity.entity_id || "";
+      const normalized = normalizeSubject(label);
+      const tokens = subjectTokens(normalized);
+      let score = 0;
+      if(normalized === q) score += 1000;
+      if(normalized.startsWith(q) || q.startsWith(normalized)) score += 420;
+      if(normalized.includes(q) || q.includes(normalized)) score += 260;
+      const overlap = qTokens.filter(token => tokens.includes(token)).length;
+      score += overlap * 95;
+      score -= Math.max(0,tokens.length-qTokens.length)*3;
+      return {entity,label,score};
+    }).filter(row => row.score > 0)
+      .sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label));
+
+    if(!ranked.length) return null;
+    const best = ranked[0];
+    return {
+      id: best.entity.entity_id,
+      label: best.label,
+      entity: best.entity,
+      score: best.score,
+      alternatives: ranked.filter(row => row.score >= best.score * .72).slice(1,4).map(row => ({
+        id: row.entity.entity_id,
+        label: row.label,
+        score: row.score
+      }))
+    };
+  }
+
+  function observerSnapshot(observer){
+    if(!observer) return null;
+    return {
+      kind: observer.kind,
+      id: observer.id,
+      label: observer.label,
+      article_id: observer.article_id || "",
+      question: observer.question || "",
+      from_observer_id: observer.from_observer_id || "",
+      from_observer_label: observer.from_observer_label || ""
+    };
+  }
+
+  function saveTrail(){
+    try{
+      sessionStorage.setItem(state.trailStorageKey,JSON.stringify({
+        entryObserver: observerSnapshot(state.entryObserver),
+        currentObserver: observerSnapshot(state.observer),
+        history: state.history.map(observerSnapshot).filter(Boolean)
+      }));
+    }catch{}
+  }
+
   function resolveEntryObserver(){
+    if(entry.focus === "question" && entry.question){
+      const resolved = resolveQuestionToEntity(entry.question);
+      if(resolved){
+        return {
+          kind:"entity",
+          id:resolved.id,
+          label:resolved.label,
+          entity:resolved.entity,
+          article_id:entry.article_id,
+          question:entry.question,
+          resolution:{source:"entry_question",score:resolved.score,alternatives:resolved.alternatives}
+        };
+      }
+      return {
+        kind:"question",
+        id:`question:${normalizeSubject(entry.question).replace(/\s+/g,"-")}`,
+        label:entry.question,
+        question:entry.question,
+        article_id:entry.article_id
+      };
+    }
+
     if(entry.focus === "relationship"){
       const rel = state.relationships.find(r => r.relationship_id === entry.relationship_id);
       if(rel){
@@ -289,6 +384,10 @@
         rel?.to_entity_id || observer.to_id
       ].filter(Boolean);
     }
+    if(observer.kind === "question"){
+      const resolved = resolveQuestionToEntity(observer.question || observer.label);
+      return resolved ? [resolved.id] : [];
+    }
     if(observer.kind === "development"){
       const ids = (observer.development?.entities || [])
         .map(e => e.entity_id)
@@ -345,29 +444,63 @@
 
   function layout(nodes,width,height){
     const center={x:width/2,y:height/2};
+    const positions=new Map();
+    positions.set("__observer__",center);
     const grouped=new Map();
+
     for(const node of nodes){
       const d=Math.max(0,Number(node.distance)||0);
       if(!grouped.has(d)) grouped.set(d,[]);
       grouped.get(d).push(node);
     }
-    const positions=new Map();
 
-    // Observer is always absolute visual center; seed entities occupy first semantic band.
-    positions.set("__observer__",center);
+    const margin=54;
+    const maxRadius=Math.max(110,Math.min(width,height)/2-margin);
 
     for(const [distance,list] of [...grouped.entries()].sort((a,b)=>a[0]-b[0])){
-      const ring = distance + 1;
-      const radius = Math.min(Math.min(width,height)*0.12*ring, Math.min(width,height)*0.43);
       const sorted=[...list].sort((a,b)=>a.label.localeCompare(b.label));
+      const ringIndex=distance+1;
+      const minNodeGap=76;
+      const circumferenceNeed=Math.max(minNodeGap*sorted.length,180);
+      const capacityRadius=circumferenceNeed/(Math.PI*2);
+      const semanticRadius=78+ringIndex*72;
+      const radius=Math.min(maxRadius,Math.max(capacityRadius,semanticRadius));
+
       sorted.forEach((node,index)=>{
-        const offset = ring % 2 ? -Math.PI/2 : -Math.PI/2 + Math.PI/Math.max(2,sorted.length);
-        const angle = offset + index*(Math.PI*2/Math.max(1,sorted.length));
+        const angleOffset=-Math.PI/2+(ringIndex%2?0:Math.PI/Math.max(3,sorted.length));
+        const angle=angleOffset+index*(Math.PI*2/Math.max(1,sorted.length));
         positions.set(node.id,{
           x:center.x+Math.cos(angle)*radius,
           y:center.y+Math.sin(angle)*radius
         });
       });
+    }
+
+    // Deterministic collision relaxation.
+    const ids=nodes.map(n=>n.id);
+    const minGap=68;
+    for(let pass=0;pass<18;pass++){
+      let moved=false;
+      for(let i=0;i<ids.length;i++){
+        for(let j=i+1;j<ids.length;j++){
+          const a=positions.get(ids[i]),b=positions.get(ids[j]);
+          if(!a||!b) continue;
+          let dx=b.x-a.x,dy=b.y-a.y;
+          let dist=Math.hypot(dx,dy);
+          if(dist>=minGap) continue;
+          if(dist===0){ dx=1;dy=0;dist=1; }
+          const push=(minGap-dist)/2+.5;
+          const ux=dx/dist,uy=dy/dist;
+          a.x-=ux*push;a.y-=uy*push;
+          b.x+=ux*push;b.y+=uy*push;
+          for(const p of [a,b]){
+            p.x=Math.max(margin,Math.min(width-margin,p.x));
+            p.y=Math.max(margin,Math.min(height-margin,p.y));
+          }
+          moved=true;
+        }
+      }
+      if(!moved) break;
     }
     return positions;
   }
@@ -380,9 +513,20 @@
     const type = observer.kind || "object";
     const source = observer.article_id
       ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
+    const entity = observer.kind==="entity" ? state.entities.get(observer.id) : null;
+    const summary = entity?.summary || entity?.description || entity?.definition || "";
+    const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
+    const arrivedFrom = observer.from_observer_label ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}</p>` : "";
+    const meaning = summary
+      ? `<p><strong>What is this?</strong> ${esc(summary)}</p>`
+      : `<p><strong>What is this?</strong> Cosmos has not yet resolved a descriptive brief for this object. The relationships shown are still available for exploration.</p>`;
+
     observerDetail.innerHTML = `
       <p><strong>${esc(observerDisplayLabel(observer))}</strong></p>
       <p>Observer type: ${esc(type)}</p>
+      ${meaning}
+      ${question}
+      ${arrivedFrom}
       <p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>
       ${source}
       <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>
@@ -407,7 +551,9 @@
 
     const rect=svg.getBoundingClientRect();
     const width=Math.max(360,Math.round(rect.width||800));
-    const height=Math.max(520,Math.round(rect.height||650));
+    const baseHeight=Math.max(520,Math.round(rect.height||650));
+    const height=state.expanded ? Math.max(baseHeight,780) : baseHeight;
+    svg.style.height=state.expanded ? "780px" : "";
     svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
     svg.innerHTML="";
 
@@ -490,11 +636,22 @@
   function recenterEntity(id){
     const entity=state.entities.get(id);
     if(!entity) return;
-    state.history.push(state.observer);
-    state.observer={kind:"entity",id,label:entity.name||id,entity,article_id:state.observer?.article_id||entry.article_id};
+    const previous=state.observer;
+    state.history.push(previous);
+    state.observer={
+      kind:"entity",
+      id,
+      label:entity.name||entity.label||id,
+      entity,
+      article_id:previous?.article_id||entry.article_id,
+      question:previous?.question||entry.question||"",
+      from_observer_id:previous?.id||"",
+      from_observer_label:previous?.label||""
+    };
     state.expanded=false;
     edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
-    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}`);
+    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}${state.observer.question?`&question=${encodeURIComponent(state.observer.question)}`:""}`);
+    saveTrail();
     render();
   }
 
@@ -522,12 +679,13 @@
     state.history.push(state.observer);
     state.observer=state.entryObserver;
     state.expanded=false;
+    saveTrail();
     history.pushState({cosmos:true},"",location.pathname+location.search);
     render();
   });
   backBtn.addEventListener("click",()=>{
     const previous=state.history.pop();
-    if(previous){state.observer=previous;state.expanded=false;render()}
+    if(previous){state.observer=previous;state.expanded=false;saveTrail();render()}
     else history.back();
   });
   window.addEventListener("resize",()=>requestAnimationFrame(render));
@@ -535,6 +693,7 @@
   loadKnowledge().then(()=>{
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
+    saveTrail();
     render();
   }).catch(error=>{
     console.error(error);
