@@ -4363,3 +4363,73 @@ jobs:
             s.promotes_scenario_to_fact!==false
           ) fail("Cosmos Question Understanding / Answer Resolver safeguards failed");
           NODE
+
+      - name: Check Cosmos Semantic Knowledge Completion v0.1 source
+        run: |
+          test -f scripts/cosmos_semantic_knowledge_completion_v0.1.mjs
+          test -f scripts/cosmos_semantic_knowledge_completion_test_v0.1.mjs
+          node --check scripts/cosmos_semantic_knowledge_completion_v0.1.mjs
+          node --check scripts/cosmos_semantic_knowledge_completion_test_v0.1.mjs
+
+      - name: Test Cosmos Semantic Knowledge Completion v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_semantic_knowledge_completion_test_v0.1.mjs \
+            --engine scripts/cosmos_semantic_knowledge_completion_v0.1.mjs \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_semantic_knowledge_completion_test_passed"){
+            fail("Cosmos Semantic Knowledge Completion test failed");
+          }
+
+          if(r.missing_case?.knowledge_status!=="insufficient"){
+            fail(`Expected missing case to be insufficient; got ${r.missing_case?.knowledge_status}`);
+          }
+
+          if(Number(r.missing_case?.supported_members)!==0){
+            fail("Missing case should not invent supported equipment members");
+          }
+
+          if(Number(r.missing_case?.completion_task_count)!==4){
+            fail(`Expected 4 completion tasks; got ${r.missing_case?.completion_task_count}`);
+          }
+
+          if(r.missing_case?.broad_projection_suppressed!==true){
+            fail("Broad projection must be suppressed while the answer is unsupported");
+          }
+
+          if(r.supported_case?.knowledge_status!=="sufficient"){
+            fail("Supported case should be sufficient");
+          }
+
+          const members=r.supported_case?.supported_members||[];
+          if(!members.includes("Power Transformers") || !members.includes("Circuit Breakers")){
+            fail("Supported case must preserve validated equipment relationships");
+          }
+
+          if(r.supported_case?.answer_ready!==true){
+            fail("Supported case must be answer-ready");
+          }
+
+          if(r.supported_case?.current_intelligence_allowed!==true){
+            fail("Current intelligence should be allowed only after direct-answer support");
+          }
+
+          if(!Object.values(r.contracts||{}).every(Boolean)){
+            fail("Semantic Knowledge Completion contracts failed");
+          }
+
+          if(!Object.values(r.safeguards||{}).every(v=>v===false)){
+            fail("Semantic Knowledge Completion safeguards failed");
+          }
+
+          console.log("Cosmos Semantic Knowledge Completion v0.1 passed.");
+          NODE
