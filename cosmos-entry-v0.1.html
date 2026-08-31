@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Cosmos — PTD Today</title>
+  <meta name="description" content="Ask. Explore. Discover. Everything is connected through Cosmos." />
+  <style>
+    :root{
+      --bg:#020711;
+      --ink:#f7f9fc;
+      --muted:#a6b0c2;
+      --line:rgba(255,255,255,.12);
+      --panel:rgba(9,19,35,.72);
+      --panel2:rgba(15,29,51,.76);
+      --blue:#6ea8ff;
+      --violet:#9a79ff;
+      --gold:#ffd18a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{min-height:100svh;overflow:hidden}
+    button,input{font:inherit}
+    .shell{position:relative;min-height:100svh;display:grid;place-items:center;overflow:hidden;background:
+      radial-gradient(circle at 50% 45%,rgba(47,102,210,.20),transparent 28%),
+      radial-gradient(circle at 72% 33%,rgba(106,66,188,.12),transparent 24%),
+      radial-gradient(circle at 20% 72%,rgba(137,74,209,.10),transparent 24%),
+      linear-gradient(180deg,#030814 0%,#020610 54%,#01040b 100%)}
+    .stars,.stars:before,.stars:after{position:absolute;inset:0;content:"";pointer-events:none}
+    .stars{background-image:
+      radial-gradient(circle at 10% 20%,rgba(255,255,255,.8) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 35% 12%,rgba(115,166,255,.8) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 74% 15%,rgba(255,209,138,.85) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 84% 40%,rgba(255,255,255,.7) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 23% 63%,rgba(154,121,255,.8) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 62% 78%,rgba(110,168,255,.7) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 91% 84%,rgba(255,209,138,.65) 0 1px,transparent 1.5px);
+      opacity:.75}
+    .stars:before{background-image:
+      radial-gradient(circle at 18% 33%,rgba(110,168,255,.5) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 54% 8%,rgba(255,255,255,.6) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 68% 55%,rgba(154,121,255,.6) 0 1px,transparent 1.5px),
+      radial-gradient(circle at 38% 83%,rgba(255,255,255,.5) 0 1px,transparent 1.5px)}
+    .topline{position:fixed;top:0;left:0;right:0;z-index:10;padding:calc(14px + env(safe-area-inset-top)) 18px 14px;display:flex;justify-content:center;align-items:center;border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(2,7,17,.82),rgba(2,7,17,0));backdrop-filter:blur(8px)}
+    .domain{font-size:14px;letter-spacing:.04em;color:#d9e2f1}
+    .stage{position:relative;z-index:2;width:min(940px,100%);min-height:100svh;padding:calc(64px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));display:grid;align-content:center;gap:22px}
+    .orbWrap{display:grid;place-items:center;min-height:390px;position:relative}
+    .orbHalo{position:absolute;width:min(76vw,590px);aspect-ratio:1;border-radius:50%;
+      background:
+        radial-gradient(circle,rgba(44,105,231,.24) 0 28%,rgba(92,86,230,.14) 40%,rgba(82,36,153,.06) 58%,transparent 72%);
+      filter:blur(6px);animation:pulse 5s ease-in-out infinite}
+    .orbit{position:absolute;width:min(72vw,560px);aspect-ratio:1;border-radius:50%;
+      border:1px solid rgba(110,168,255,.28);box-shadow:
+        0 0 28px rgba(75,119,255,.24),
+        inset 0 0 28px rgba(154,121,255,.10);
+      animation:spin 28s linear infinite}
+    .orbit:before,.orbit:after{content:"";position:absolute;inset:7%;border-radius:50%;border:1px solid rgba(154,121,255,.24);transform:rotate(21deg)}
+    .orbit:after{inset:15%;border-color:rgba(255,209,138,.20);transform:rotate(-31deg)}
+    .orb{position:relative;width:min(56vw,430px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;text-align:center;padding:34px;
+      background:
+        radial-gradient(circle at 50% 50%,#061223 0 45%,#071a33 70%,#0a1730 100%);
+      border:1px solid rgba(124,169,255,.42);
+      box-shadow:
+        0 0 0 16px rgba(53,106,219,.05),
+        0 0 42px rgba(73,127,255,.35),
+        0 0 110px rgba(88,75,209,.23),
+        inset 0 0 50px rgba(68,116,237,.15)}
+    .orb h1{margin:0;font-size:clamp(44px,10vw,82px);font-weight:450;letter-spacing:-.045em}
+    .orb p{margin:12px 0 0;color:#c3cbda;font-size:clamp(13px,3.6vw,18px);line-height:1.5}
+    .ask{width:min(800px,100%);margin:0 auto;border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(15,29,51,.82),rgba(7,15,29,.86));box-shadow:0 18px 55px rgba(0,0,0,.28);padding:10px}
+    .askRow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center}
+    .ask input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font-size:16px;padding:15px 12px}
+    .ask input::placeholder{color:#8591a6}
+    .ask button{width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#dce6f5;cursor:pointer}
+    .ask button.primary{background:linear-gradient(135deg,#426de1,#7180d8);border-color:rgba(145,175,255,.38);font-size:22px}
+    .hint{text-align:center;color:#77839a;font-size:12px;min-height:18px}
+    .emergence{width:min(800px,100%);margin:0 auto;display:none}
+    .emergence.active{display:block}
+    .emergenceCard{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:14px 16px;backdrop-filter:blur(16px)}
+    .emergenceCard .eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:10px;color:#90a1bd}
+    .emergenceCard strong{display:block;margin-top:5px;font-size:17px}
+    .emergenceCard p{margin:7px 0 0;color:#aab6c8;font-size:13px;line-height:1.5}
+    .hiddenLegacy{display:none!important}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes pulse{0%,100%{transform:scale(.96);opacity:.76}50%{transform:scale(1.04);opacity:1}}
+    @media (max-width:640px){
+      .stage{gap:16px}
+      .orbWrap{min-height:330px}
+      .orb{width:min(70vw,330px)}
+      .orbit{width:min(86vw,410px)}
+      .orbHalo{width:min(90vw,430px)}
+      .ask input{font-size:15px}
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="stars"></div>
+    <div class="topline"><div class="domain">ptdtoday.com</div></div>
+
+    <main class="stage">
+      <section class="orbWrap" aria-label="Cosmos">
+        <div class="orbHalo"></div>
+        <div class="orbit"></div>
+        <div class="orb">
+          <div>
+            <h1>Cosmos</h1>
+            <p>Everything is connected.<br>Ask anything. Explore everything.</p>
+          </div>
+        </div>
+      </section>
+
+      <form class="ask" id="askForm">
+        <div class="askRow">
+          <input id="askInput" autocomplete="off" placeholder="Ask Cosmos…" aria-label="Ask Cosmos" />
+          <button type="button" id="voiceButton" aria-label="Voice input" title="Voice input">◉</button>
+          <button class="primary" type="submit" aria-label="Ask">↑</button>
+        </div>
+      </form>
+
+      <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
+
+      <section class="emergence" id="emergence" aria-live="polite">
+        <div class="emergenceCard">
+          <div class="eyebrow">Cosmos is resolving your intent</div>
+          <strong id="resolvedLabel">Cosmos</strong>
+          <p id="resolvedText">Preparing the relevant observer and intelligence view…</p>
+        </div>
+      </section>
+
+      <!-- Existing PTD Today surfaces are deliberately preserved elsewhere.
+           Nothing below is permanent navigation on the Cosmos entry. -->
+      <nav class="hiddenLegacy" aria-hidden="true">
+        <a href="/legacy-home.html">Daily Intelligence</a>
+        <a href="/media.html">Media</a>
+        <a href="/groups.html">Groups</a>
+      </nav>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const form = document.getElementById("askForm");
+      const input = document.getElementById("askInput");
+      const voiceButton = document.getElementById("voiceButton");
+      const emergence = document.getElementById("emergence");
+      const resolvedLabel = document.getElementById("resolvedLabel");
+      const resolvedText = document.getElementById("resolvedText");
+      const hint = document.getElementById("hint");
+
+      function resolveView(question) {
+        const q = String(question || "").trim();
+        const lower = q.toLowerCase();
+
+        if (!q) return { view: "cosmos_entry", label: "Cosmos" };
+        if (/\b(video|videos|media|watch|youtube)\b/i.test(q)) {
+          return { view: "media", label: "Media" };
+        }
+        if (/\b(map|country|countries|geograph\w*|region|where|united states|u\.?s\.?|usa)\b/i.test(q)) {
+          return { view: "global_intelligence_map", label: "Global Intelligence" };
+        }
+        if (/\b(group|groups|community|communities|linkedin)\b/i.test(q)) {
+          return { view: "communities", label: "Professional Communities" };
+        }
+        if (/\b(market|markets|stock|stocks|outlook|investment|price|prices)\b/i.test(q)) {
+          return { view: "market_pulse", label: "Market Pulse & Outlook" };
+        }
+        if (/\b(today'?s?|daily|latest|new|changed|happened)\b.*\b(intelligence|brief|briefing|signals?|news|developments?)\b/i.test(q) ||
+            /\bwhat changed\b/i.test(q) || /\bwhat happened\b/i.test(q)) {
+          return { view: "daily_intelligence", label: "Daily Intelligence" };
+        }
+
+        return { view: "cosmos_projection", label: q };
+      }
+
+      function cosmosUrl(question, resolved) {
+        const params = new URLSearchParams({
+          focus: "question",
+          view: resolved.view,
+          question
+        });
+        return `/cosmos.html?${params.toString()}`;
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const question = input.value.trim();
+        if (!question) {
+          input.focus();
+          return;
+        }
+
+        const resolved = resolveView(question);
+        emergence.classList.add("active");
+        resolvedLabel.textContent = resolved.label;
+        resolvedText.textContent =
+          resolved.view === "cosmos_projection"
+            ? "Creating a Cosmos observer around your question…"
+            : `Materializing ${resolved.label} from your request…`;
+        hint.textContent = "Your question becomes the temporary center.";
+
+        window.setTimeout(() => {
+          location.href = cosmosUrl(question, resolved);
+        }, 280);
+      });
+
+      voiceButton.addEventListener("click", () => {
+        if (!("webkitSpeechRecognition" in window || "SpeechRecognition" in window)) {
+          hint.textContent = "Voice input is not available in this browser yet. Type your question instead.";
+          input.focus();
+          return;
+        }
+
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new Recognition();
+        recognition.lang = navigator.language || "en-US";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        hint.textContent = "Listening…";
+        recognition.onresult = (event) => {
+          const transcript = event.results?.[0]?.[0]?.transcript || "";
+          input.value = transcript;
+          hint.textContent = "Voice captured. Ask Cosmos when ready.";
+        };
+        recognition.onerror = () => {
+          hint.textContent = "I couldn't capture that. Try again or type your question.";
+        };
+        recognition.onend = () => {
+          if (!input.value.trim()) hint.textContent = "Type a question or a subject. Cosmos will build the experience around you.";
+        };
+        recognition.start();
+      });
+    })();
+  </script>
+</body>
+</html>
