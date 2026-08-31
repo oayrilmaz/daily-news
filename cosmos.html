@@ -40,6 +40,17 @@
     .card{border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(13,23,38,.76);padding:16px}
     .card h2{font-size:14px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.1em;color:#c4d0e3}
     .card p{margin:7px 0;color:var(--muted);line-height:1.55}
+    .responseCard{margin-bottom:12px;border:1px solid rgba(122,162,255,.28);border-radius:16px;background:linear-gradient(180deg,rgba(19,39,71,.75),rgba(11,24,45,.72));padding:14px}
+    .responseCard .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#91a7c9}
+    .responseCard h3{margin:6px 0 8px;font-size:20px}
+    .responseCard p{margin:0;color:#c2cde0;line-height:1.55}
+    .responseList{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+    .responseItem{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025);padding:10px 11px}
+    .responseItem button{all:unset;display:block;width:100%;cursor:pointer}
+    .responseItem strong{display:block;font-size:13px;color:#edf3ff}
+    .responseItem span{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.45}
+    .responseMeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .responseMeta span{font-size:10px;padding:5px 7px;border:1px solid var(--line);border-radius:999px;color:#9dafc9}
     .edgeFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .fact{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.025)}
     .fact b{display:block;font-size:11px;color:#cbd7e8;margin-bottom:3px}
@@ -144,6 +155,8 @@
     entities: new Map(),
     relationships: [],
     developments: new Map(),
+    dailyBrief: [],
+    response: null,
     observer: null,
     history: [],
     expanded: false,
@@ -184,10 +197,11 @@
 
   async function loadKnowledge(){
     statusEl.textContent = "loading knowledge";
-    const [entitiesPayload, relationshipsPayload, developmentsPayload] = await Promise.all([
+    const [entitiesPayload, relationshipsPayload, developmentsPayload, dailyBriefPayload] = await Promise.all([
       fetchJson("/knowledge/entities.json"),
       fetchJson("/knowledge/relationships.json"),
-      fetchJson("/knowledge/developments.json")
+      fetchJson("/knowledge/developments.json"),
+      fetchJson("/briefs/daily-ai.json")
     ]);
 
     for(const entity of normalizePayload(entitiesPayload,"entities")){
@@ -199,6 +213,10 @@
     for(const development of normalizePayload(developmentsPayload,"developments")){
       if(development?.development_id) state.developments.set(development.development_id,development);
     }
+
+    state.dailyBrief = Array.isArray(dailyBriefPayload)
+      ? dailyBriefPayload
+      : (dailyBriefPayload?.items || dailyBriefPayload?.daily_items || dailyBriefPayload?.briefing || dailyBriefPayload?.developments || dailyBriefPayload?.signals || []);
 
     statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships`;
   }
@@ -218,6 +236,84 @@
     };
   }
 
+
+  function resolveQuestionIntent(question){
+    const q=String(question||"").trim();
+    if(
+      /\b(today'?s?|daily|latest|new|current)\b.*\b(news|brief|briefing|intelligence|signals?|developments?)\b/i.test(q) ||
+      /\b(provide|show|give)\b.*\b(today'?s?|daily|latest)\b.*\b(news|brief|intelligence|signals?)\b/i.test(q) ||
+      /\bwhat changed\b/i.test(q) || /\bwhat happened today\b/i.test(q)
+    ) return {id:"daily_intelligence",label:"Today's Intelligence"};
+    if(/\b(video|videos|media|youtube|watch)\b/i.test(q)) return {id:"media",label:"Media"};
+    if(/\b(map|country|countries|geograph\w*|region|united states|usa|u\.?s\.?)\b/i.test(q)) return {id:"geography",label:"Global Intelligence"};
+    if(/\b(market|markets|stock|stocks|outlook|price|prices|investment)\b/i.test(q)) return {id:"market",label:"Market Pulse & Outlook"};
+    return {id:"topic",label:q||"Cosmos"};
+  }
+
+  function dailyItemTitle(item){ return item?.title || item?.headline || item?.name || item?.signal || item?.summary || ""; }
+  function dailyItemSummary(item){ return item?.summary || item?.why_it_matters || item?.description || item?.analysis || ""; }
+  function dailyItemId(item,index){ return item?.development_id || item?.signal_id || item?.id || `daily-item-${index+1}`; }
+
+  function rankDailyItems(question){
+    const qTokens=subjectTokens(question);
+    return state.dailyBrief.map((item,index)=>{
+      const hay=normalizeSubject([dailyItemTitle(item),dailyItemSummary(item),...(Array.isArray(item?.tags)?item.tags:[]),...(Array.isArray(item?.topics)?item.topics:[]),...(Array.isArray(item?.countries)?item.countries:[])].join(" "));
+      const score=qTokens.reduce((sum,token)=>sum+(hay.includes(token)?1:0),0);
+      return {item,index,score};
+    }).filter(row=>row.score>0).sort((a,b)=>b.score-a.score||a.index-b.index);
+  }
+
+  function seedIdsFromDailyItem(item){
+    return [item?.development_id,item?.signal_id,...(Array.isArray(item?.entity_ids)?item.entity_ids:[])].filter(Boolean);
+  }
+
+  function buildQuestionResponse(question){
+    const intent=resolveQuestionIntent(question);
+    if(intent.id==="daily_intelligence"){
+      const selected=state.dailyBrief.slice(0,6);
+      return {
+        id:`response:daily:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+        label:"Today's Intelligence",response_type:"daily_intelligence",question,
+        answer:selected.length?`Here are ${selected.length} current PTD Today intelligence items available from today's briefing.`:"Today's briefing is available, but no intelligence items were found in the current data.",
+        bullets:selected.map((item,index)=>({id:dailyItemId(item,index),title:dailyItemTitle(item)||`Intelligence item ${index+1}`,summary:dailyItemSummary(item),seed_ids:seedIdsFromDailyItem(item)})),
+        projection_seed_ids:selected.flatMap(seedIdsFromDailyItem),source_label:"PTD Today daily briefing"
+      };
+    }
+    if(intent.id==="topic"){
+      const resolved=resolveQuestionToEntity(question);
+      const ranked=rankDailyItems(question).slice(0,5);
+      const entity=resolved?.entity || null;
+      const description=entity?.summary || entity?.description || entity?.definition || "";
+      const answerParts=[];
+      if(description) answerParts.push(description);
+      if(ranked.length) answerParts.push(`${ranked.length} current intelligence item${ranked.length===1?"":"s"} in today's briefing relate to this subject.`);
+      return {
+        id:`response:topic:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+        label:resolved?.label || question,response_type:"topic",question,
+        answer:answerParts.join(" ") || "Cosmos found the subject, but the current deterministic data does not yet contain enough information for a descriptive answer.",
+        bullets:ranked.map(({item,index})=>({id:dailyItemId(item,index),title:dailyItemTitle(item),summary:dailyItemSummary(item),seed_ids:seedIdsFromDailyItem(item)})),
+        projection_seed_ids:[resolved?.id,...ranked.flatMap(({item})=>seedIdsFromDailyItem(item))].filter(Boolean),source_label:"PTD Today knowledge + daily briefing",resolved_entity:resolved
+      };
+    }
+    const materialized={media:"Media",geography:"Global Intelligence",market:"Market Pulse & Outlook"}[intent.id] || intent.label;
+    return {id:`response:${intent.id}:${normalizeSubject(question).replace(/\s+/g,"-")}`,label:materialized,response_type:intent.id,question,answer:`${materialized} is available as an on-demand PTD Today view. This response is ready to materialize that experience inside Cosmos.`,bullets:[],projection_seed_ids:[],source_label:"PTD Today surface"};
+  }
+
+  function entitySeedsFromProjectionIds(ids){
+    const out=new Set();
+    for(const id of ids||[]){
+      if(state.entities.has(id)){ out.add(id); continue; }
+      const development=state.developments.get(id);
+      if(development){
+        for(const entity of (development.entities||[])){
+          const entityId=typeof entity==="string"?entity:entity?.entity_id;
+          if(entityId&&state.entities.has(entityId)) out.add(entityId);
+        }
+        for(const entityId of (development.entity_ids||[])) if(state.entities.has(entityId)) out.add(entityId);
+      }
+    }
+    return [...out];
+  }
 
   function normalizeSubject(value){
     return String(value || "")
@@ -290,25 +386,9 @@
 
   function resolveEntryObserver(){
     if(entry.focus === "question" && entry.question){
-      const resolved = resolveQuestionToEntity(entry.question);
-      if(resolved){
-        return {
-          kind:"entity",
-          id:resolved.id,
-          label:resolved.label,
-          entity:resolved.entity,
-          article_id:entry.article_id,
-          question:entry.question,
-          resolution:{source:"entry_question",score:resolved.score,alternatives:resolved.alternatives}
-        };
-      }
-      return {
-        kind:"question",
-        id:`question:${normalizeSubject(entry.question).replace(/\s+/g,"-")}`,
-        label:entry.question,
-        question:entry.question,
-        article_id:entry.article_id
-      };
+      const response=buildQuestionResponse(entry.question);
+      state.response=response;
+      return {kind:"response",id:response.id,label:response.label,response,question:entry.question,article_id:entry.article_id};
     }
 
     if(entry.focus === "relationship"){
@@ -383,6 +463,9 @@
         rel?.from_entity_id || observer.from_id,
         rel?.to_entity_id || observer.to_id
       ].filter(Boolean);
+    }
+    if(observer.kind === "response"){
+      return entitySeedsFromProjectionIds(observer.response?.projection_seed_ids || []);
     }
     if(observer.kind === "question"){
       const resolved = resolveQuestionToEntity(observer.question || observer.label);
@@ -511,26 +594,45 @@
 
   function renderObserverDetails(observer,projection){
     const type = observer.kind || "object";
-    const source = observer.article_id
-      ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
+    const source = observer.article_id ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
+
+    if(observer.kind==="response" && observer.response){
+      const response=observer.response;
+      const bullets=(response.bullets||[]).map((item,index)=>`
+        <li class="responseItem">
+          <button type="button" data-response-index="${index}">
+            <strong>${esc(item.title||`Result ${index+1}`)}</strong>
+            ${item.summary?`<span>${esc(item.summary)}</span>`:""}
+          </button>
+        </li>
+      `).join("");
+      observerDetail.innerHTML = `
+        <div class="responseCard">
+          <div class="eyebrow">Cosmos response</div>
+          <h3>${esc(response.label)}</h3>
+          <p>${esc(response.answer)}</p>
+          ${bullets?`<ul class="responseList">${bullets}</ul>`:""}
+          <div class="responseMeta"><span>${esc(response.source_label||"PTD Today")}</span><span>${projection.nodes.length} connected objects</span><span>${projection.edges.length} connected relationships</span></div>
+        </div>
+        <p><strong>Entry question:</strong> ${esc(observer.question||response.question||"")}</p>
+        <p>The answer is a temporary observer built from existing PTD Today data. It does not mutate the underlying Cosmos graph.</p>
+      `;
+      observerDetail.querySelectorAll("[data-response-index]").forEach(button=>{
+        button.addEventListener("click",()=>{
+          const item=response.bullets?.[Number(button.dataset.responseIndex)];
+          const entityIds=entitySeedsFromProjectionIds(item?.seed_ids||[]);
+          if(entityIds.length) recenterEntity(entityIds[0]);
+        });
+      });
+      return;
+    }
+
     const entity = observer.kind==="entity" ? state.entities.get(observer.id) : null;
     const summary = entity?.summary || entity?.description || entity?.definition || "";
     const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
     const arrivedFrom = observer.from_observer_label ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}</p>` : "";
-    const meaning = summary
-      ? `<p><strong>What is this?</strong> ${esc(summary)}</p>`
-      : `<p><strong>What is this?</strong> Cosmos has not yet resolved a descriptive brief for this object. The relationships shown are still available for exploration.</p>`;
-
-    observerDetail.innerHTML = `
-      <p><strong>${esc(observerDisplayLabel(observer))}</strong></p>
-      <p>Observer type: ${esc(type)}</p>
-      ${meaning}
-      ${question}
-      ${arrivedFrom}
-      <p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>
-      ${source}
-      <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>
-    `;
+    const meaning = summary ? `<p><strong>What is this?</strong> ${esc(summary)}</p>` : `<p><strong>What is this?</strong> Cosmos has not yet resolved a descriptive brief for this object. The relationships shown are still available for exploration.</p>`;
+    observerDetail.innerHTML = `<p><strong>${esc(observerDisplayLabel(observer))}</strong></p><p>Observer type: ${esc(type)}</p>${meaning}${question}${arrivedFrom}<p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>${source}<p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>`;
   }
 
   function render(){
