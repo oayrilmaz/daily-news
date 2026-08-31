@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Cosmos — PTD Today</title>
+  <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
   <style>
     :root{
@@ -120,6 +121,24 @@
 <script>
 (function(){
   "use strict";
+
+  const entryParams = new URLSearchParams(location.search);
+  const hasExplicitObserver =
+    entryParams.has("focus") ||
+    entryParams.has("id") ||
+    entryParams.has("relationship_id") ||
+    entryParams.has("question") ||
+    entryParams.has("observer") ||
+    entryParams.has("article_id") ||
+    entryParams.has("from_id") ||
+    entryParams.has("to_id");
+
+  // Fresh Cosmos visits always begin at the living Ask Cosmos entry.
+  // Only explicit observer/deep-link requests bypass the entry experience.
+  if (!hasExplicitObserver) {
+    location.replace("/cosmos-entry-v0.1.html");
+    return;
+  }
 
   const MAX_INITIAL_NODES = 10;
   const MAX_EXPANDED_NODES = 18;
