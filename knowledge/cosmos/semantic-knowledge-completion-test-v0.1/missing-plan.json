@@ -1,0 +1,94 @@
+{
+  "schema_version": "0.1",
+  "status": "cosmos_semantic_knowledge_completion_planned",
+  "question": "What are the HV substation equipment?",
+  "classification": {
+    "type": "enumeration",
+    "subtype": "equipment_list"
+  },
+  "subject_match": {
+    "id": "hv_substations",
+    "label": "HV Substations",
+    "score": 710
+  },
+  "knowledge_contract": {
+    "contract_id": "component_membership",
+    "required_relationship_semantics": [
+      "contains",
+      "includes",
+      "has component",
+      "component of",
+      "equipment of",
+      "part of"
+    ],
+    "answer_shape": "structured_list",
+    "minimum_supported_members": 2
+  },
+  "knowledge_status": "insufficient",
+  "supported_members": [],
+  "answer_ready": false,
+  "completion_required": true,
+  "completion_tasks": [
+    {
+      "task_id": "discover_supported_candidates",
+      "action": "discover_candidates",
+      "subject_id": "hv_substations",
+      "subject_label": "HV Substations",
+      "knowledge_contract": "component_membership",
+      "instruction": "Find candidate Cosmos objects that could satisfy the component_membership contract for HV Substations. Candidates must come from existing Cosmos knowledge or a separately admitted evidence workflow; do not invent candidates from the question alone."
+    },
+    {
+      "task_id": "validate_relationship_evidence",
+      "action": "validate_evidence",
+      "subject_id": "hv_substations",
+      "subject_label": "HV Substations",
+      "required_relationship_semantics": [
+        "contains",
+        "includes",
+        "has component",
+        "component of",
+        "equipment of",
+        "part of"
+      ],
+      "instruction": "Require evidence that supports the specific relationship between the subject and each candidate object. Preserve source lineage, time, geography, confidence and epistemic state."
+    },
+    {
+      "task_id": "admit_or_reject",
+      "action": "knowledge_admission",
+      "subject_id": "hv_substations",
+      "instruction": "Send validated candidates through the existing Cosmos Knowledge Admission boundary. Admit only supported object/relationship records; otherwise reject or keep unresolved."
+    },
+    {
+      "task_id": "rebuild_answer",
+      "action": "rebuild_answer",
+      "question": "What are the HV substation equipment?",
+      "subject_id": "hv_substations",
+      "instruction": "After admission, rerun the Question/Answer Resolver. Do not replace the question observer before the direct answer is rebuilt."
+    }
+  ],
+  "projection_policy": {
+    "keep_question_as_observer": true,
+    "suppress_broad_intelligence_projection_until_answer_supported": true,
+    "allow_subject_and_verified_support_objects": true,
+    "allow_current_intelligence_after_direct_answer": false,
+    "allow_butterfly_expansion_after_direct_answer": false
+  },
+  "contracts": {
+    "detects_semantic_knowledge_gap": true,
+    "does_not_invent_missing_objects": true,
+    "does_not_invent_missing_relationships": true,
+    "routes_missing_knowledge_to_completion_workflow": true,
+    "preserves_question_observer_until_answer": true,
+    "gates_broad_projection_when_answer_unsupported": true,
+    "reuses_existing_knowledge_admission_boundary": true
+  },
+  "safeguards": {
+    "performs_external_search": false,
+    "calls_openai_or_external_api": false,
+    "mutates_graph": false,
+    "invents_candidate_objects": false,
+    "invents_relationship_evidence": false,
+    "admits_unvalidated_knowledge": false,
+    "promotes_scenario_to_fact": false
+  }
+}
