@@ -4759,23 +4759,139 @@ jobs:
           set -euo pipefail
 
           OUTPUT_DIR="knowledge/cosmos/article-production-integration-test-v0.1"
+          PROD_MANIFEST="knowledge/cosmos/article-production-manifest-v0.1.json"
+
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR"
 
+          # 1) Controlled deterministic integration test.
           node scripts/cosmos_article_production_test_v0.1.mjs \
             --generator scripts/generate_ai_news.js \
             --renderer scripts/cosmos_render_articles_v0.1.mjs \
             --output-dir "$OUTPUT_DIR" \
             > "$OUTPUT_DIR/test-result.json"
 
-          git add "$OUTPUT_DIR"
+          # 2) Apply the already-validated renderer to the REAL current daily brief.
+          #    This performs no OpenAI call. It only re-renders article HTML from
+          #    existing brief + knowledge + causal narrative data.
+          node scripts/cosmos_render_articles_v0.1.mjs \
+            --generator scripts/generate_ai_news.js \
+            --brief briefs/daily-ai.json \
+            --knowledge-dir knowledge \
+            --articles-dir articles \
+            --manifest "$PROD_MANIFEST" \
+            --site-origin "https://ptdtoday.com" \
+            > /tmp/cosmos-production-article-rerender.json
+
+          # 3) Production UI assertions.
+          node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+
+          const manifestPath =
+            "knowledge/cosmos/article-production-manifest-v0.1.json";
+
+          if (!fs.existsSync(manifestPath)) {
+            throw new Error("Production article manifest was not generated");
+          }
+
+          const manifest = JSON.parse(
+            fs.readFileSync(manifestPath, "utf8")
+          );
+
+          if (manifest.status !== "article_production_integration_resolved") {
+            throw new Error(
+              `Unexpected production manifest status: ${manifest.status}`
+            );
+          }
+
+          if (!Number.isInteger(manifest.article_count) ||
+              manifest.article_count < 1) {
+            throw new Error("Production rerender generated no articles");
+          }
+
+          const articleFiles = fs.readdirSync("articles")
+            .filter(name => name.endsWith(".html"));
+
+          let butterflyArticleCount = 0;
+          let followActionCount = 0;
+          let exploreActionCount = 0;
+          let confidenceInspectorCount = 0;
+          const legacyDuplicates = [];
+
+          for (const file of articleFiles) {
+            const filePath = path.join("articles", file);
+            const html = fs.readFileSync(filePath, "utf8");
+
+            if (html.includes("🦋 Butterfly Effect")) {
+              butterflyArticleCount += 1;
+
+              if (html.includes("Follow this ripple →")) {
+                followActionCount += 1;
+              }
+
+              if (html.includes("Explore Cosmos →")) {
+                exploreActionCount += 1;
+              }
+
+              if (html.includes("Why this confidence?")) {
+                confidenceInspectorCount += 1;
+              }
+            }
+
+            if (html.includes("<h2>Follow the ripple</h2>")) {
+              legacyDuplicates.push(file);
+            }
+          }
+
+          if (legacyDuplicates.length) {
+            throw new Error(
+              `Legacy standalone Follow the ripple remains in: ${legacyDuplicates.join(", ")}`
+            );
+          }
+
+          if (butterflyArticleCount > 0) {
+            if (followActionCount !== butterflyArticleCount) {
+              throw new Error(
+                `Only ${followActionCount}/${butterflyArticleCount} Butterfly articles contain Follow this ripple`
+              );
+            }
+
+            if (exploreActionCount !== butterflyArticleCount) {
+              throw new Error(
+                `Only ${exploreActionCount}/${butterflyArticleCount} Butterfly articles contain Explore Cosmos`
+              );
+            }
+
+            if (confidenceInspectorCount !== butterflyArticleCount) {
+              throw new Error(
+                `Only ${confidenceInspectorCount}/${butterflyArticleCount} Butterfly articles contain confidence inspection`
+              );
+            }
+          }
+
+          console.log("");
+          console.log("Production article rerender validation passed.");
+          console.log(`Articles rendered:          ${manifest.article_count}`);
+          console.log(`Butterfly articles:         ${butterflyArticleCount}`);
+          console.log(`Follow actions verified:    ${followActionCount}`);
+          console.log(`Explore actions verified:   ${exploreActionCount}`);
+          console.log(`Confidence inspectors:      ${confidenceInspectorCount}`);
+          console.log("Legacy Follow the ripple:   0");
+          NODE
+
+          # 4) Commit BOTH the controlled evidence and the actual production articles.
+          git add \
+            "$OUTPUT_DIR" \
+            "$PROD_MANIFEST" \
+            articles
 
           if git diff --cached --quiet; then
-            echo "No Cosmos Production Article Integration test output changes to commit."
+            echo "No Cosmos Production Article Integration changes to commit."
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "test: write Cosmos production article integration v0.1 output"
+            git commit -m "feat: apply Cosmos article-to-grid production integration"
 
             pushed=false
             for attempt in 1 2 3; do
@@ -4783,7 +4899,7 @@ jobs:
               git fetch origin "${GITHUB_REF_NAME}"
 
               if ! git rebase "origin/${GITHUB_REF_NAME}"; then
-                echo "ERROR: Could not rebase controlled article output onto latest ${GITHUB_REF_NAME}."
+                echo "ERROR: Could not rebase production article integration onto latest ${GITHUB_REF_NAME}."
                 git rebase --abort || true
                 exit 1
               fi
@@ -4798,14 +4914,14 @@ jobs:
             done
 
             if [ "$pushed" != "true" ]; then
-              echo "ERROR: Could not push after 3 synchronization attempts."
+              echo "ERROR: Could not push production article integration after 3 synchronization attempts."
               exit 1
             fi
           fi
 
           echo "Controlled Production Article Integration output generated."
+          echo "Current production articles were deterministically re-rendered."
           echo "No OpenAI generation was executed."
-
       - name: Cosmos Article Integration Summary
         if: ${{ always() }}
         run: |
