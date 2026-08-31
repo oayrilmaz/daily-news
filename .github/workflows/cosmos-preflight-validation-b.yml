@@ -4042,3 +4042,54 @@ jobs:
           if(s.calls_openai_or_external_api!==false||s.performs_external_search!==false||s.mutates_graph!==false||s.invents_source_evidence!==false||s.randomizes_layout!==false) fail("Live response safeguards failed");
           console.log("Cosmos Live Response Experience v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Fresh Entry Routing v0.1 source
+        run: |
+          test -f cosmos.html
+          test -f cosmos-entry-v0.1.html
+          test -f scripts/cosmos_fresh_entry_routing_test_v0.1.mjs
+          node --check scripts/cosmos_fresh_entry_routing_test_v0.1.mjs
+
+      - name: Test Cosmos Fresh Entry Routing v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_fresh_entry_routing_test_v0.1.mjs \
+            --cosmos cosmos.html \
+            --entry cosmos-entry-v0.1.html \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_fresh_entry_routing_test_passed"){
+            fail("Cosmos Fresh Entry Routing test failed");
+          }
+
+          const c=r.contracts||{};
+          if(
+            c.fresh_cosmos_visit_redirects_to_living_entry!==true ||
+            c.explicit_question_bypasses_entry!==true ||
+            c.explicit_relationship_bypasses_entry!==true ||
+            c.explicit_development_bypasses_entry!==true ||
+            c.heartbeat_entry_preserved!==true ||
+            c.ask_cosmos_preserved!==true ||
+            c.explorer_deep_links_preserved!==true ||
+            c.browser_refresh_on_explicit_observer_preserves_explorer!==true
+          ) fail("Cosmos Fresh Entry Routing contracts failed");
+
+          const s=r.safeguards||{};
+          if(
+            s.calls_openai_or_external_api!==false ||
+            s.performs_external_search!==false ||
+            s.mutates_graph!==false ||
+            s.deletes_entry_experience!==false ||
+            s.breaks_article_deep_links!==false
+          ) fail("Cosmos Fresh Entry Routing safeguards failed");
+
+          console.log("Cosmos Fresh Entry Routing v0.1 passed.");
+          NODE
