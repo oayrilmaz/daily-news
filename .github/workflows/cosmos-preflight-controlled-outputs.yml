@@ -5751,3 +5751,109 @@ jobs:
 
           echo "Controlled Cosmos Answer-First Live Integration v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Question Understanding / Answer Resolver v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/question-answer-resolver-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/hv-substation-question.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "entities": [
+              {
+                "entity_id": "hv_substation_equipment",
+                "name": "HV Substation Equipment",
+                "description": "High-voltage substations combine primary equipment, protection, control and auxiliary systems.",
+                "equipment": [
+                  "Power Transformers",
+                  "Circuit Breakers",
+                  "Disconnect Switches",
+                  "Gas-Insulated Switchgear",
+                  "Instrument Transformers",
+                  "Surge Arresters",
+                  "Busbars",
+                  "Protection & Control Systems",
+                  "Station Service Systems"
+                ]
+              },
+              {
+                "entity_id": "aging_substation_fleet",
+                "name": "Aging Substation Fleet",
+                "description": "Existing substations with legacy equipment reaching end-of-life."
+              }
+            ],
+            "intelligence": [
+              {
+                "development_id": "dev1",
+                "title": "Transformer manufacturing capacity stressed by critical-minerals and component bottlenecks",
+                "summary": "Lead-times remain elevated.",
+                "created_at": "2026-08-31T05:00:00Z",
+                "entity_ids": ["hv_substation_equipment"],
+                "tags": ["transformers", "substations"]
+              },
+              {
+                "development_id": "dev2",
+                "title": "Prefabricated modular substations shorten commissioning",
+                "summary": "Standardized interfaces remain important.",
+                "published_at": "2026-08-29T12:00:00Z",
+                "entity_ids": ["hv_substation_equipment"],
+                "tags": ["substations"]
+              },
+              {
+                "development_id": "dev3",
+                "title": "Substation monitoring expands",
+                "summary": "Predictive maintenance grows.",
+                "entity_ids": ["hv_substation_equipment"],
+                "tags": ["substations"]
+              }
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_question_answer_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/hv-substation-question.json" \
+            --out "$OUTPUT_DIR/resolved-hv-substation-answer.json"
+
+          node scripts/cosmos_question_answer_resolver_test_v0.1.mjs \
+            --engine scripts/cosmos_question_answer_resolver_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          test -f "$OUTPUT_DIR/resolved-hv-substation-answer.json"
+          test -f "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Question/Answer Resolver output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos question answer resolver v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Question/Answer Resolver output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Question Understanding / Answer Resolver v0.1 output generated."
+          echo "No OpenAI generation was executed."
