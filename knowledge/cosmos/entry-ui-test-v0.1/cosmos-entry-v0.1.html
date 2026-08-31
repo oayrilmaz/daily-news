@@ -54,6 +54,11 @@
         0 0 28px rgba(75,119,255,.24),
         inset 0 0 28px rgba(154,121,255,.10);
       animation:spin 28s linear infinite}
+    .orbWrap[data-state="dormant"] .orb{animation:cosmosBreath 5.8s ease-in-out infinite}
+    .orbWrap[data-state="engaged"] .orb{animation:cosmosBeat 1.65s ease-in-out infinite}
+    .orbWrap[data-state="resolving"] .orb{animation:cosmosHeartbeat .92s ease-in-out infinite}
+    .orbWrap[data-state="resolving"] .orbit{animation:spin 9s linear infinite,cosmosWave .92s ease-out infinite}
+    .orbWrap[data-state="resolving"] .orbHalo{animation:cosmosHaloBeat .92s ease-out infinite}
     .orbit:before,.orbit:after{content:"";position:absolute;inset:7%;border-radius:50%;border:1px solid rgba(154,121,255,.24);transform:rotate(21deg)}
     .orbit:after{inset:15%;border-color:rgba(255,209,138,.20);transform:rotate(-31deg)}
     .orb{position:relative;width:min(56vw,430px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;text-align:center;padding:34px;
@@ -83,6 +88,11 @@
     .hiddenLegacy{display:none!important}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes pulse{0%,100%{transform:scale(.96);opacity:.76}50%{transform:scale(1.04);opacity:1}}
+    @keyframes cosmosBreath{0%,100%{transform:scale(.985)}50%{transform:scale(1.015)}}
+    @keyframes cosmosBeat{0%,62%,100%{transform:scale(1)}68%{transform:scale(1.035)}74%{transform:scale(1)}80%{transform:scale(1.018)}87%{transform:scale(1)}}
+    @keyframes cosmosHeartbeat{0%,42%,100%{transform:scale(1)}50%{transform:scale(1.055)}58%{transform:scale(.995)}66%{transform:scale(1.032)}76%{transform:scale(1)}}
+    @keyframes cosmosHaloBeat{0%,100%{transform:scale(.98);opacity:.72}52%{transform:scale(1.09);opacity:1}70%{transform:scale(1.03);opacity:.88}}
+    @keyframes cosmosWave{0%{box-shadow:0 0 0 0 rgba(110,168,255,.22),inset 0 0 28px rgba(154,121,255,.10)}100%{box-shadow:0 0 0 34px rgba(110,168,255,0),inset 0 0 28px rgba(154,121,255,.10)}}
     @media (max-width:640px){
       .stage{gap:16px}
       .orbWrap{min-height:330px}
@@ -99,7 +109,7 @@
     <div class="topline"><div class="domain">ptdtoday.com</div></div>
 
     <main class="stage">
-      <section class="orbWrap" aria-label="Cosmos">
+      <section class="orbWrap" id="orbWrap" data-state="dormant" aria-label="Cosmos">
         <div class="orbHalo"></div>
         <div class="orbit"></div>
         <div class="orb">
@@ -143,6 +153,7 @@
       "use strict";
 
       const form = document.getElementById("askForm");
+      const orbWrap = document.getElementById("orbWrap");
       const input = document.getElementById("askInput");
       const voiceButton = document.getElementById("voiceButton");
       const emergence = document.getElementById("emergence");
@@ -184,6 +195,16 @@
         return `/cosmos.html?${params.toString()}`;
       }
 
+      input.addEventListener("focus", () => {
+        if (orbWrap.dataset.state !== "resolving") orbWrap.dataset.state = "engaged";
+      });
+      input.addEventListener("input", () => {
+        if (orbWrap.dataset.state !== "resolving") orbWrap.dataset.state = input.value.trim() ? "engaged" : "dormant";
+      });
+      input.addEventListener("blur", () => {
+        if (!input.value.trim() && orbWrap.dataset.state !== "resolving") orbWrap.dataset.state = "dormant";
+      });
+
       form.addEventListener("submit", (event) => {
         event.preventDefault();
         const question = input.value.trim();
@@ -193,6 +214,7 @@
         }
 
         const resolved = resolveView(question);
+        orbWrap.dataset.state = "resolving";
         emergence.classList.add("active");
         resolvedLabel.textContent = resolved.label;
         resolvedText.textContent =
