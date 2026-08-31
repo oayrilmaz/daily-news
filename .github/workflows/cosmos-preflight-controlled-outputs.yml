@@ -133,6 +133,11 @@ on:
         required: false
         default: false
         type: boolean
+      write_cosmos_entry_experience_test:
+        description: "Write controlled Cosmos Entry Experience v0.1 test output"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -5226,4 +5231,115 @@ jobs:
           fi
 
           echo "Cosmos Web Renderer v0.1 controlled output generated."
+          echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Entry Experience v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/entry-experience-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/dormant-entry.json" <<'JSON'
+          {}
+          JSON
+
+          cat > "$OUTPUT_DIR/causal-question.json" <<'JSON'
+          {
+            "question": "Why are transformer lead times increasing?",
+            "center_intelligence": {
+              "id": "transformer-lead-times",
+              "label": "Transformer Lead Times",
+              "type": "signal",
+              "summary": "Controlled fixture summary.",
+              "why_it_matters": "Controlled fixture importance.",
+              "evidence_ids": ["fixture-evidence-1"],
+              "epistemic_status": "scenario"
+            }
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/media-question.json" <<'JSON'
+          {
+            "question": "Show me videos about transformers"
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/geography-question.json" <<'JSON'
+          {
+            "question": "What is going on in the United States?"
+          }
+          JSON
+
+          cat > "$OUTPUT_DIR/unresolved-center.json" <<'JSON'
+          {
+            "question": "EPC Contractors"
+          }
+          JSON
+
+          node scripts/cosmos_entry_experience_v0.1.mjs \
+            --input "$OUTPUT_DIR/dormant-entry.json" \
+            --out "$OUTPUT_DIR/resolved-dormant-entry.json" \
+            > /dev/null
+
+          node scripts/cosmos_entry_experience_v0.1.mjs \
+            --input "$OUTPUT_DIR/causal-question.json" \
+            --out "$OUTPUT_DIR/resolved-causal-question.json" \
+            > /dev/null
+
+          node scripts/cosmos_entry_experience_v0.1.mjs \
+            --input "$OUTPUT_DIR/media-question.json" \
+            --out "$OUTPUT_DIR/resolved-media-question.json" \
+            > /dev/null
+
+          node scripts/cosmos_entry_experience_v0.1.mjs \
+            --input "$OUTPUT_DIR/geography-question.json" \
+            --out "$OUTPUT_DIR/resolved-geography-question.json" \
+            > /dev/null
+
+          node scripts/cosmos_entry_experience_v0.1.mjs \
+            --input "$OUTPUT_DIR/unresolved-center.json" \
+            --out "$OUTPUT_DIR/resolved-unresolved-center.json" \
+            > /dev/null
+
+          node scripts/cosmos_entry_experience_test_v0.1.mjs \
+            --engine scripts/cosmos_entry_experience_v0.1.mjs \
+            --out "$OUTPUT_DIR/test-result.json" \
+            > /dev/null
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Entry Experience output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos entry experience v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Entry Experience output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Entry Experience v0.1 output generated."
           echo "No OpenAI generation was executed."
