@@ -5523,3 +5523,31 @@ jobs:
 
           echo "Controlled Cosmos Response Resolver v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Live Response Experience v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/live-response-experience-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+          cp cosmos.html "$OUTPUT_DIR/cosmos.html"
+          node scripts/cosmos_live_response_experience_test_v0.1.mjs --cosmos cosmos.html > "$OUTPUT_DIR/test-result.json"
+          git add "$OUTPUT_DIR"
+          if git diff --cached --quiet; then
+            echo "No Cosmos Live Response Experience output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos live response experience v0.1 output"
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+              sleep $((attempt * 2))
+            done
+            if [ "$pushed" != "true" ]; then echo "ERROR: Could not push Cosmos Live Response Experience output."; exit 1; fi
+          fi
+          echo "Controlled Cosmos Live Response Experience v0.1 output generated."
+          echo "No OpenAI generation was executed."
