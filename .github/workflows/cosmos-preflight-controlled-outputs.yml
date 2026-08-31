@@ -5647,3 +5647,60 @@ jobs:
 
           echo "Controlled Cosmos Center Intelligence v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Answer-First v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/answer-first-test-v0.1"
+          OUTPUT_DIR_ABS="${GITHUB_WORKSPACE}/${OUTPUT_DIR}"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cp scripts/cosmos_answer_first_v0.1.mjs "$TMP_DIR/cosmos_answer_first_v0.1.mjs"
+          cp scripts/cosmos_answer_first_test_v0.1.mjs "$TMP_DIR/cosmos_answer_first_test_v0.1.mjs"
+
+          (
+            cd "$TMP_DIR"
+            node cosmos_answer_first_test_v0.1.mjs \
+              --out-dir "$OUTPUT_DIR_ABS"
+          )
+
+          test -f "$OUTPUT_DIR/test-result.json"
+          test -f "$OUTPUT_DIR/answer-first-hv-substation.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Answer-First output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos answer-first v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Answer-First output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Answer-First v0.1 output generated."
+          echo "No OpenAI generation was executed."
