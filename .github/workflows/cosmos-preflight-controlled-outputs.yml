@@ -6067,3 +6067,151 @@ jobs:
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
           echo "No OpenAI generation or external evidence acquisition was executed."
+
+      - name: Write Cosmos Knowledge Completion Acquisition Handoff v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-acquisition-handoff-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "subject_match": {
+              "id": "hv_substations",
+              "label": "HV Substations"
+            },
+            "knowledge_completion": {
+              "knowledge_status": "insufficient",
+              "completion_required": true,
+              "answer_ready": false,
+              "broad_projection_suppressed": true,
+              "knowledge_contract": {
+                "contract_id": "component_membership",
+                "answer_shape": "structured_list",
+                "minimum_supported_members": 2,
+                "required_relationship_semantics": [
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$OUTPUT_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$OUTPUT_DIR/completion-request.json" \
+            --out "$OUTPUT_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$OUTPUT_DIR/acquisition-handoff.json" \
+            --out "$OUTPUT_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_integration_test_v0.1.mjs \
+            > "$OUTPUT_DIR/test-result.json"
+
+          node - "$OUTPUT_DIR/completion-request.json" \
+                 "$OUTPUT_DIR/acquisition-handoff.json" \
+                 "$OUTPUT_DIR/acquisition-plan.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [requestFile,handoffFile,acquisitionFile,testFile]=process.argv.slice(2);
+          const request=JSON.parse(fs.readFileSync(requestFile,"utf8"));
+          const handoff=JSON.parse(fs.readFileSync(handoffFile,"utf8"));
+          const acquisition=JSON.parse(fs.readFileSync(acquisitionFile,"utf8"));
+          const test=JSON.parse(fs.readFileSync(testFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(request.status!=="knowledge_completion_request_ready"){
+            fail(`Completion request invalid: ${request.status}`);
+          }
+          if(request.next_action!=="acquisition"){
+            fail(`Completion request did not route to acquisition: ${request.next_action}`);
+          }
+          if(request.execution_plan?.external_execution_enabled!==false ||
+             request.execution_plan?.graph_write_enabled!==false){
+            fail("Completion request opened protected execution boundaries.");
+          }
+
+          if(handoff.status!=="discovery_targets_resolved"){
+            fail(`Acquisition handoff invalid: ${handoff.status}`);
+          }
+          const targets=handoff.discovery_targets?.items||[];
+          if(targets.length!==1 || targets[0].discovery_action!=="identify_components"){
+            fail("Expected one focused identify_components knowledge request.");
+          }
+          if(targets[0].epistemic_status!=="knowledge_request"){
+            fail("Acquisition target crossed the epistemic boundary.");
+          }
+
+          if(acquisition.status!=="acquisition_plans_resolved"){
+            fail(`Real Acquisition planner rejected handoff: ${acquisition.status}`);
+          }
+          const plans=acquisition.acquisition_plans||[];
+          if(plans.length<1){
+            fail("Real Acquisition planner generated no plans.");
+          }
+          if(acquisition.acquisition_state?.execution_mode!=="planned_only" ||
+             acquisition.acquisition_state?.external_execution_connected!==false ||
+             acquisition.acquisition_state?.evidence_validation_required_before_graph_admission!==true){
+            fail("Real Acquisition planner safeguards failed.");
+          }
+          if(plans.some(x=>x.execution?.network_execution_performed!==false ||
+                          x.execution?.executor_status!=="not_connected")){
+            fail("Acquisition performed or connected external execution.");
+          }
+          if(plans.some(x=>x.evidence_contract?.evidence_is_not_knowledge_until_validated!==true ||
+                          x.evidence_contract?.knowledge_admission_status!=="not_evaluated")){
+            fail("Acquisition bypassed the evidence/admission boundary.");
+          }
+
+          if(test.status!=="cosmos_knowledge_completion_acquisition_integration_test_passed"){
+            fail(`Integration test failed: ${test.status}`);
+          }
+
+          console.log("Knowledge Completion -> real Acquisition planner controlled path passed.");
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Knowledge Completion Acquisition Handoff output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion acquisition handoff v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Knowledge Completion Acquisition Handoff output."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled semantic-gap -> Acquisition planning path generated."
+          echo "No external search, OpenAI call, evidence execution, knowledge admission or graph mutation was performed."
