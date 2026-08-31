@@ -6014,3 +6014,56 @@ jobs:
 
           echo "Controlled Cosmos Semantic Knowledge Completion v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Knowledge Completion Orchestrator v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-orchestrator-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/input.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "subject_match": {"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion": {
+              "completion_required": true,
+              "knowledge_contract": {
+                "contract_id": "component_membership",
+                "answer_shape": "structured_list",
+                "minimum_supported_members": 2,
+                "required_relationship_semantics": ["contains","includes","component","equipment","part of"]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs             --input "$OUTPUT_DIR/input.json"             --out "$OUTPUT_DIR/planned-run.json"
+
+          node scripts/cosmos_knowledge_completion_orchestrator_test_v0.1.mjs             --engine scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs             > "$OUTPUT_DIR/test-result.json"
+
+          node - "$OUTPUT_DIR/planned-run.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          if(r.status!=="knowledge_completion_planned") fail("Expected planned state");
+          if(r.current_stage!=="acquisition") fail("Expected acquisition first");
+          if(r.answer_ready!==false || r.projection_release!==false) fail("Planned run must hold answer/projection");
+          if(r.external_execution_enabled!==false) fail("External execution must default false");
+          if(r.graph_mutation_enabled!==false) fail("Graph mutation must default false");
+          console.log("Controlled orchestrator plan passed.");
+          NODE
+
+          git add "$OUTPUT_DIR"
+          if git diff --cached --quiet; then
+            echo "No orchestrator output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion orchestrator v0.1 output"
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          echo "No OpenAI generation or external evidence acquisition was executed."
