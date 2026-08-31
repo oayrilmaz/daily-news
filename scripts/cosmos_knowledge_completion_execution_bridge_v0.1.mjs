@@ -1,97 +1,257 @@
 #!/usr/bin/env node
+/**
+ * Cosmos Knowledge Completion Execution Bridge v0.1
+ *
+ * Connects Knowledge Completion Orchestrator stage names to the existing
+ * Cosmos executable stage files and their established CLI contracts.
+ *
+ * Default mode is PLAN ONLY.
+ * It performs no external search, no OpenAI calls, no graph mutation,
+ * and no production writes unless explicit execution inputs are supplied.
+ */
+
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import {pathToFileURL} from "node:url";
+import {spawnSync} from "node:child_process";
 
-const arg=(n,d="")=>{const i=process.argv.indexOf(n);return i>=0&&process.argv[i+1]?process.argv[i+1]:d};
-const assert=(v,m)=>{if(!v)throw new Error(m)};
-
-const mod=await import(pathToFileURL(path.resolve(
-  arg("--engine","scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs")
-)).href);
-
-const run={
-  schema_version:"0.1",
-  run_id:"kc:hv_substations:component_membership",
-  question:"What are the HV substation equipment?",
-  subject:{id:"hv_substations",label:"HV Substations"},
-  stage_order:[
-    "acquisition",
-    "acquisition_applicability",
-    "decomposition",
-    "candidate_validation",
-    "evidence_strategy",
-    "evidence_execution",
-    "evidence_validation",
-    "knowledge_admission",
-    "graph_writer",
-    "answer_rebuild"
-  ]
+const clean=v=>typeof v==="string"?v.trim():"";
+const exists=f=>fs.existsSync(path.resolve(f));
+const read=f=>JSON.parse(fs.readFileSync(path.resolve(f),"utf8"));
+const write=(f,v)=>{
+  const p=path.resolve(f);
+  fs.mkdirSync(path.dirname(p),{recursive:true});
+  fs.writeFileSync(p,JSON.stringify(v,null,2)+"\n");
 };
 
-const plan=mod.buildExecutionPlan(run);
-
-assert(plan.status==="knowledge_completion_execution_plan_ready","plan ready");
-assert(plan.mode==="plan_only","plan-only default");
-assert(plan.stage_count===9,"nine executable existing stages");
-assert(plan.external_execution_enabled===false,"external disabled");
-assert(plan.graph_write_enabled===false,"graph write disabled");
-
-const evidence=plan.stages.find(x=>x.stage==="evidence_execution");
-const writer=plan.stages.find(x=>x.stage==="graph_writer");
-
-assert(evidence.execution_state==="gated","evidence execution gated");
-assert(evidence.gated_reason==="external_execution_disabled","external gate reason");
-assert(writer.execution_state==="gated","writer gated");
-assert(writer.gated_reason==="graph_write_disabled","writer gate reason");
-
-assert(plan.contracts.reuses_existing_cosmos_stage_scripts===true,"reuse scripts");
-assert(plan.contracts.preserves_existing_cli_boundaries===true,"preserve CLI");
-assert(plan.contracts.graph_writer_remains_only_mutation_boundary===true,"writer boundary");
-assert(Object.values(plan.safeguards).every(v=>v===false),"safeguards false");
-
-const enabled=mod.buildExecutionPlan(run,{
-  mode:"controlled_execute",
-  external_execution_enabled:true,
-  graph_write_enabled:true
-});
-assert(enabled.stages.find(x=>x.stage==="evidence_execution").execution_state==="ready_for_input","evidence can be explicitly enabled");
-assert(enabled.stages.find(x=>x.stage==="graph_writer").execution_state==="ready_for_input","writer can be explicitly enabled");
-
-let externalBlocked=false;
-try{
-  mod.executeStage("evidence_execution",{strategy:"missing",adapter_results:"missing",out:"x.json"});
-}catch(e){
-  externalBlocked=String(e.message).includes("external_execution_enabled");
-}
-assert(externalBlocked,"runtime external gate");
-
-let writerBlocked=false;
-try{
-  mod.executeStage("graph_writer",{admission:"missing",graph:"missing",out:"x.json",report:"r.json"});
-}catch(e){
-  writerBlocked=String(e.message).includes("graph_write_enabled");
-}
-assert(writerBlocked,"runtime graph-write gate");
-
-console.log(JSON.stringify({
-  schema_version:"0.1",
-  status:"cosmos_knowledge_completion_execution_bridge_test_passed",
-  question:run.question,
-  subject:run.subject,
-  plan:{
-    mode:plan.mode,
-    executable_stage_count:plan.stage_count,
-    external_execution_enabled:plan.external_execution_enabled,
-    graph_write_enabled:plan.graph_write_enabled,
-    evidence_execution_state:evidence.execution_state,
-    graph_writer_state:writer.execution_state
+const STAGES={
+  acquisition:{
+    script:"scripts/cosmos_acquisition.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
   },
-  explicitly_enabled_case:{
-    evidence_execution_state:enabled.stages.find(x=>x.stage==="evidence_execution").execution_state,
-    graph_writer_state:enabled.stages.find(x=>x.stage==="graph_writer").execution_state
+  acquisition_applicability:{
+    script:"scripts/cosmos_acquisition_applicability.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
   },
-  contracts:plan.contracts,
-  safeguards:plan.safeguards
-},null,2));
+  decomposition:{
+    script:"scripts/cosmos_decomposition.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
+  },
+  candidate_validation:{
+    script:"scripts/cosmos_candidate_validation.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
+  },
+  evidence_strategy:{
+    script:"scripts/cosmos_evidence_strategy.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
+  },
+  evidence_execution:{
+    script:"scripts/cosmos_evidence_executor.cjs",
+    args:({strategy,adapter_results,out})=>[
+      "--strategy",strategy,
+      "--adapter-results",adapter_results,
+      "--out",out
+    ],
+    external:true,
+    mutates_graph:false
+  },
+  evidence_validation:{
+    script:"scripts/cosmos_evidence_validator.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
+  },
+  knowledge_admission:{
+    script:"scripts/cosmos_knowledge_admission.cjs",
+    args:({input,out})=>["--input",input,"--out",out],
+    external:false,
+    mutates_graph:false
+  },
+  graph_writer:{
+    script:"scripts/cosmos_graph_writer.cjs",
+    args:({admission,graph,out,report})=>[
+      "--admission",admission,
+      "--graph",graph,
+      "--out",out,
+      "--report",report
+    ],
+    external:false,
+    mutates_graph:true
+  }
+};
+
+export function buildExecutionPlan(orchestratorRun, options={}){
+  const mode=clean(options.mode)||"plan_only";
+  if(!["plan_only","controlled_execute"].includes(mode)){
+    throw new Error(`Unsupported execution mode: ${mode}`);
+  }
+
+  const externalEnabled=options.external_execution_enabled===true;
+  const graphWriteEnabled=options.graph_write_enabled===true;
+
+  const stages=(orchestratorRun?.stage_order||[])
+    .filter(stage=>STAGES[stage])
+    .map(stage=>{
+      const spec=STAGES[stage];
+      let state="ready_for_input";
+      let reason=null;
+
+      if(spec.external && !externalEnabled){
+        state="gated";
+        reason="external_execution_disabled";
+      }
+      if(spec.mutates_graph && !graphWriteEnabled){
+        state="gated";
+        reason="graph_write_disabled";
+      }
+
+      return {
+        stage,
+        script:spec.script,
+        execution_state:state,
+        gated_reason:reason,
+        performs_external_work:spec.external,
+        graph_mutation_boundary:spec.mutates_graph
+      };
+    });
+
+  return {
+    schema_version:"0.1",
+    status:"knowledge_completion_execution_plan_ready",
+    run_id:orchestratorRun?.run_id||null,
+    question:orchestratorRun?.question||null,
+    subject:orchestratorRun?.subject||null,
+    mode,
+    external_execution_enabled:externalEnabled,
+    graph_write_enabled:graphWriteEnabled,
+    stage_count:stages.length,
+    stages,
+    contracts:{
+      reuses_existing_cosmos_stage_scripts:true,
+      preserves_existing_cli_boundaries:true,
+      external_evidence_execution_requires_explicit_enable:true,
+      graph_writer_requires_explicit_enable:true,
+      graph_writer_remains_only_mutation_boundary:true,
+      plan_only_is_default:true
+    },
+    safeguards:{
+      performs_external_search:false,
+      calls_openai_or_external_api:false,
+      mutates_graph:false,
+      invents_stage_output:false,
+      bypasses_evidence_validation:false,
+      bypasses_knowledge_admission:false
+    }
+  };
+}
+
+export function validateEnvironment(plan){
+  const checks=plan.stages.map(s=>({
+    stage:s.stage,
+    script:s.script,
+    exists:exists(s.script)
+  }));
+  return {
+    schema_version:"0.1",
+    status:checks.every(x=>x.exists)
+      ?"knowledge_completion_execution_environment_ready"
+      :"knowledge_completion_execution_environment_incomplete",
+    checks,
+    ready:checks.every(x=>x.exists)
+  };
+}
+
+function requireFile(name,value){
+  if(!clean(value)) throw new Error(`Missing ${name}`);
+  if(!exists(value)) throw new Error(`${name} file does not exist: ${value}`);
+}
+
+export function executeStage(stage, params={}, options={}){
+  if(!STAGES[stage]) throw new Error(`Unsupported stage: ${stage}`);
+
+  const spec=STAGES[stage];
+  if(spec.external && options.external_execution_enabled!==true){
+    throw new Error("Evidence execution is gated: external_execution_enabled must be true.");
+  }
+  if(spec.mutates_graph && options.graph_write_enabled!==true){
+    throw new Error("Graph Writer is gated: graph_write_enabled must be true.");
+  }
+
+  if(stage==="evidence_execution"){
+    requireFile("strategy",params.strategy);
+    requireFile("adapter_results",params.adapter_results);
+  }else if(stage==="graph_writer"){
+    requireFile("admission",params.admission);
+    requireFile("graph",params.graph);
+  }else{
+    requireFile("input",params.input);
+  }
+
+  if(!clean(params.out)) throw new Error("Missing out");
+  if(stage==="graph_writer" && !clean(params.report)) throw new Error("Missing report");
+
+  if(!exists(spec.script)) throw new Error(`Missing stage script: ${spec.script}`);
+
+  const args=spec.args(params);
+  fs.mkdirSync(path.dirname(path.resolve(params.out)),{recursive:true});
+  if(params.report) fs.mkdirSync(path.dirname(path.resolve(params.report)),{recursive:true});
+
+  const result=spawnSync(process.execPath,[spec.script,...args],{
+    cwd:process.cwd(),
+    encoding:"utf8"
+  });
+
+  if(result.status!==0){
+    throw new Error(
+      `Stage ${stage} failed (${result.status}).\n${result.stderr||result.stdout||""}`
+    );
+  }
+
+  if(!exists(params.out)) throw new Error(`Stage ${stage} did not create ${params.out}`);
+
+  return {
+    schema_version:"0.1",
+    status:"knowledge_completion_stage_executed",
+    stage,
+    script:spec.script,
+    output_file:params.out,
+    report_file:params.report||null,
+    external_execution_used:spec.external,
+    graph_mutation_boundary_used:spec.mutates_graph
+  };
+}
+
+function arg(name,fallback=""){
+  const i=process.argv.indexOf(name);
+  return i>=0&&process.argv[i+1]?process.argv[i+1]:fallback;
+}
+
+const orchestratorFile=arg("--orchestrator");
+const out=arg("--out");
+const mode=arg("--mode","plan_only");
+
+if(orchestratorFile){
+  const run=read(orchestratorFile);
+  const plan=buildExecutionPlan(run,{
+    mode,
+    external_execution_enabled:process.argv.includes("--enable-external"),
+    graph_write_enabled:process.argv.includes("--enable-graph-write")
+  });
+
+  const payload={
+    ...plan,
+    environment:validateEnvironment(plan)
+  };
+
+  if(out) write(out,payload);
+  else process.stdout.write(JSON.stringify(payload,null,2)+"\n");
+}
