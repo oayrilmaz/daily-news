@@ -5551,3 +5551,52 @@ jobs:
           fi
           echo "Controlled Cosmos Live Response Experience v0.1 output generated."
           echo "No OpenAI generation was executed."
+
+      - name: Write Cosmos Fresh Entry Routing v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/fresh-entry-routing-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cp cosmos.html "$OUTPUT_DIR/cosmos.html"
+          cp cosmos-entry-v0.1.html "$OUTPUT_DIR/cosmos-entry-v0.1.html"
+
+          node scripts/cosmos_fresh_entry_routing_test_v0.1.mjs \
+            --cosmos cosmos.html \
+            --entry cosmos-entry-v0.1.html \
+            > "$OUTPUT_DIR/test-result.json"
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Cosmos Fresh Entry Routing output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos fresh entry routing v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Cosmos Fresh Entry Routing output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled Cosmos Fresh Entry Routing v0.1 output generated."
+          echo "No OpenAI generation was executed."
