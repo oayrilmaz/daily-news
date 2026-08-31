@@ -4299,3 +4299,67 @@ jobs:
 
           console.log("Cosmos Answer-First Live Integration v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Question Understanding / Answer Resolver v0.1 source
+        run: |
+          test -f scripts/cosmos_question_answer_resolver_v0.1.mjs
+          test -f scripts/cosmos_question_answer_resolver_test_v0.1.mjs
+          node --check scripts/cosmos_question_answer_resolver_v0.1.mjs
+          node --check scripts/cosmos_question_answer_resolver_test_v0.1.mjs
+
+      - name: Test Cosmos Question Understanding / Answer Resolver v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_question_answer_resolver_test_v0.1.mjs \
+            --engine scripts/cosmos_question_answer_resolver_v0.1.mjs \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_question_answer_resolver_test_passed"){
+            fail("Cosmos Question Understanding / Answer Resolver test failed");
+          }
+          if(r.subject_match?.id!=="hv_substation_equipment"){
+            fail(`Unexpected subject match: ${r.subject_match?.id || "none"}`);
+          }
+          if(!String(r.answer_preview||"").includes("Power Transformers")){
+            fail("Direct HV substation equipment answer is missing expected equipment");
+          }
+          if(Number(r.answer_item_count)!==9){
+            fail(`Expected 9 structured answer items; got ${r.answer_item_count}`);
+          }
+          if(Number(r.intelligence_count)!==3){
+            fail(`Expected 3 related intelligence items; got ${r.intelligence_count}`);
+          }
+          if(Number(r.dated_items)!==2 || Number(r.undated_items)!==1){
+            fail(`Unexpected date preservation result: dated=${r.dated_items}, undated=${r.undated_items}`);
+          }
+
+          const c=r.contracts||{};
+          if(
+            c.question_not_replaced_by_nearest_graph_object!==true ||
+            c.direct_answer_built_before_exploration!==true ||
+            c.enumeration_questions_return_structured_items!==true ||
+            c.evidence_context_attached_after_answer!==true ||
+            c.dates_preserved_when_available!==true ||
+            c.missing_dates_explicit!==true ||
+            c.follow_the_ripple_preserved!==true ||
+            c.unsupported_answer_not_invented!==true
+          ) fail("Cosmos Question Understanding / Answer Resolver contracts failed");
+
+          const s=r.safeguards||{};
+          if(
+            s.performs_external_search!==false ||
+            s.calls_openai_or_external_api!==false ||
+            s.mutates_graph!==false ||
+            s.invents_equipment_list!==false ||
+            s.invents_missing_dates!==false ||
+            s.promotes_scenario_to_fact!==false
+          ) fail("Cosmos Question Understanding / Answer Resolver safeguards failed");
+          NODE
