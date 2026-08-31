@@ -4468,3 +4468,44 @@ jobs:
           test -f scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs
           node --check scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs
           node scripts/cosmos_semantic_knowledge_completion_live_test_v0.1.mjs --html cosmos.html
+
+      - name: Check Cosmos Knowledge Completion bridge/adapters v0.1
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_execution_bridge_test_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_request_adapter_test_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_handoff_test_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_integration_test_v0.1.mjs
+
+          node --check scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_execution_bridge_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_request_adapter_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_handoff_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_integration_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Execution Bridge v0.1
+        run: |
+          node scripts/cosmos_knowledge_completion_execution_bridge_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Request Adapter v0.1
+        run: |
+          node scripts/cosmos_knowledge_completion_request_adapter_test_v0.1.mjs \
+            --adapter scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Acquisition Handoff v0.1
+        run: |
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs
+
+      - name: Test Semantic Gap to Real Acquisition Planner v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_acquisition_integration_test_v0.1.mjs
