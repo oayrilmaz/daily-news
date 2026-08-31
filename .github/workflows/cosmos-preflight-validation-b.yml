@@ -4093,3 +4093,69 @@ jobs:
 
           console.log("Cosmos Fresh Entry Routing v0.1 passed.");
           NODE
+
+      - name: Check Cosmos Center Intelligence v0.1 source
+        run: |
+          test -f cosmos.html
+          test -f scripts/cosmos_center_intelligence_v0.1.mjs
+          test -f scripts/cosmos_center_intelligence_test_v0.1.mjs
+          node --check scripts/cosmos_center_intelligence_v0.1.mjs
+          node --check scripts/cosmos_center_intelligence_test_v0.1.mjs
+
+      - name: Test Cosmos Center Intelligence v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          node scripts/cosmos_center_intelligence_test_v0.1.mjs \
+            --engine scripts/cosmos_center_intelligence_v0.1.mjs \
+            > "$TMP_DIR/result.json"
+
+          node - "$TMP_DIR/result.json" <<'NODE'
+          const fs=require("fs");
+          const r=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(r.status!=="cosmos_center_intelligence_test_passed"){
+            fail("Cosmos Center Intelligence test failed");
+          }
+
+          const c=r.contracts||{};
+          if(
+            c.every_center_returns_reader_value!==true ||
+            c.current_and_historical_records_combined!==true ||
+            c.current_briefing_weighted!==true ||
+            c.linked_articles_preserved!==true ||
+            c.article_to_butterfly_path_preserved!==true ||
+            c.curiosity_paths_derived_from_related_entities!==true ||
+            c.missing_supported_text_not_invented!==true
+          ) fail("Cosmos Center Intelligence contracts failed");
+
+          const s=r.safeguards||{};
+          if(
+            s.calls_openai_or_external_api!==false ||
+            s.performs_external_search!==false ||
+            s.mutates_graph!==false ||
+            s.invents_article_summary!==false ||
+            s.invents_why_it_matters!==false ||
+            s.deletes_history!==false
+          ) fail("Cosmos Center Intelligence safeguards failed");
+
+          const html=fs.readFileSync("cosmos.html","utf8");
+          for(const token of [
+            'id="cosmosHomeLink" href="/cosmos.html"',
+            "buildCenterIntelligence",
+            "What Cosmos has seen",
+            "Current state",
+            "Latest movement",
+            "Why it matters",
+            "Explore the evidence",
+            "Where curiosity can take you next",
+            "Read article → Butterfly Effect → Follow this ripple"
+          ]){
+            if(!html.includes(token)) fail(`cosmos.html missing Center Intelligence UI contract: ${token}`);
+          }
+
+          console.log("Cosmos Center Intelligence v0.1 passed.");
+          NODE
