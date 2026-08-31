@@ -67,6 +67,19 @@
     .articleCard a{display:inline-block;margin-top:8px;color:#8eb6ff;text-decoration:none;font-size:12px;font-weight:700}
     .curiosityPaths{display:flex;flex-wrap:wrap;gap:7px;margin-top:8px}
     .curiosityPaths button{border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.035);color:#dfe8f7;padding:7px 10px;font-size:11px}
+    .answerFirst{display:grid;gap:12px}
+    .answerHero{border:1px solid rgba(122,162,255,.30);border-radius:16px;background:linear-gradient(180deg,rgba(22,45,82,.82),rgba(10,25,48,.78));padding:14px}
+    .answerEyebrow{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#91a7c9}
+    .answerHero h3{margin:6px 0 8px;font-size:22px;line-height:1.2}
+    .answerHero p{margin:0;color:#eef4ff;font-size:15px;line-height:1.6}
+    .datedIntel{display:grid;gap:9px}
+    .datedIntelCard{border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.025);padding:11px}
+    .datedIntelDate{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#8fb1e6;margin-bottom:5px}
+    .datedIntelCard strong{display:block;color:#eef4ff;font-size:13px;line-height:1.42}
+    .datedIntelCard p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.48}
+    .datedIntelActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+    .datedIntelActions a,.datedIntelActions button{border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.035);color:#9dc0ff;padding:7px 10px;font-size:11px;font-weight:700;text-decoration:none}
+    .answerWhy{border-top:1px solid var(--line);padding-top:12px}
     .edgeFacts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .fact{border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(255,255,255,.025)}
     .fact b{display:block;font-size:11px;color:#cbd7e8;margin-bottom:3px}
@@ -698,51 +711,221 @@
     </div>`;
   }
 
+
+  function answerFirstItemDate(item){
+    return item?.published_at || item?.created_at || item?.newest_signal_at ||
+      item?.date || item?.updated_at || item?.timestamp || "";
+  }
+
+  function answerFirstDisplayDate(value){
+    const raw=String(value||"").trim();
+    if(!raw) return "Date unavailable";
+    const d=new Date(raw);
+    if(Number.isNaN(d.getTime())) return "Date unavailable";
+    return new Intl.DateTimeFormat("en-US",{
+      month:"short",day:"numeric",year:"numeric",timeZone:"UTC"
+    }).format(d);
+  }
+
+  function isDirectListQuestion(question){
+    const q=normalizeSubject(question);
+    return /\bwhat (are|is) the\b/.test(q) ||
+      /\bwhich\b/.test(q) ||
+      /\blist\b/.test(q) ||
+      /\bwhat equipment\b/.test(q) ||
+      /\bwhat components\b/.test(q);
+  }
+
+  function entityMemberLabels(entity){
+    const values=[
+      ...(Array.isArray(entity?.members)?entity.members:[]),
+      ...(Array.isArray(entity?.components)?entity.components:[]),
+      ...(Array.isArray(entity?.equipment)?entity.equipment:[])
+    ];
+    return [...new Set(values.map(value=>{
+      if(typeof value==="string") return value.trim();
+      return String(value?.label||value?.name||"").trim();
+    }).filter(Boolean))];
+  }
+
+  function buildDirectAnswerForObserver(observer){
+    const question=observer?.question || entry.question || "";
+    const entity=observer?.kind==="entity" ? state.entities.get(observer.id) : null;
+
+    if(observer?.kind==="response" && observer.response?.answer){
+      return observer.response.answer;
+    }
+
+    if(!entity){
+      return "";
+    }
+
+    const explicit=entity.direct_answer || entity.answer || "";
+    if(String(explicit).trim()) return String(explicit).trim();
+
+    const description=entity.summary || entity.description || entity.definition || "";
+    const members=entityMemberLabels(entity);
+
+    if(isDirectListQuestion(question) && members.length){
+      const prefix=description ? `${description} ` : "";
+      return `${prefix}Key items include ${members.slice(0,14).join(", ")}.`;
+    }
+
+    return description || "";
+  }
+
+  function answerFirstRelevantItems(observer){
+    const query=observer?.question || entry.question || observerDisplayLabel(observer);
+    const label=observerDisplayLabel(observer);
+    const entityId=observer?.kind==="entity" ? observer.id : observer?.response?.resolved_entity?.id || "";
+
+    function score(item){
+      let s=0;
+      const hay=normalizeSubject([
+        dailyItemTitle(item),
+        dailyItemSummary(item),
+        ...(Array.isArray(item?.tags)?item.tags:[]),
+        ...(Array.isArray(item?.topics)?item.topics:[]),
+        ...(Array.isArray(item?.countries)?item.countries:[])
+      ].join(" "));
+
+      for(const token of subjectTokens(query)){
+        if(hay.includes(token)) s+=35;
+      }
+      for(const token of subjectTokens(label)){
+        if(hay.includes(token)) s+=25;
+      }
+
+      const ids=[
+        item?.development_id,
+        item?.signal_id,
+        ...(Array.isArray(item?.entity_ids)?item.entity_ids:[])
+      ].filter(Boolean);
+      if(entityId && ids.includes(entityId)) s+=1000;
+
+      return s;
+    }
+
+    return (state.dailyBrief||[])
+      .map((item,index)=>({item,index,score:score(item)}))
+      .filter(row=>row.score>0)
+      .sort((a,b)=>b.score-a.score||a.index-b.index)
+      .slice(0,5)
+      .map(({item,index})=>({
+        id:dailyItemId(item,index),
+        title:dailyItemTitle(item)||`Intelligence item ${index+1}`,
+        summary:dailyItemSummary(item),
+        date_display:answerFirstDisplayDate(answerFirstItemDate(item)),
+        article_id:item?.article_id || item?.development_id || item?.signal_id || item?.id || "",
+        seed_ids:seedIdsFromDailyItem(item)
+      }));
+  }
+
+  function renderAnswerFirst(observer,projection){
+    const directAnswer=buildDirectAnswerForObserver(observer);
+    const intelligence=answerFirstRelevantItems(observer);
+
+    // If a response observer already has richer bullets, merge them ahead of matched briefing items.
+    const responseItems=(observer?.kind==="response" && Array.isArray(observer.response?.bullets))
+      ? observer.response.bullets.map((item,index)=>({
+          id:item.id||`response-item-${index+1}`,
+          title:item.title||`Result ${index+1}`,
+          summary:item.summary||"",
+          date_display:item.date_display || answerFirstDisplayDate(item.date || item.published_at || item.created_at),
+          article_id:item.article_id || item.id || "",
+          seed_ids:item.seed_ids||[]
+        }))
+      : [];
+
+    const seen=new Set();
+    const items=[...responseItems,...intelligence].filter(item=>{
+      const key=item.article_id||item.id||item.title;
+      if(!key||seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0,5);
+
+    const answerText=directAnswer ||
+      "Cosmos found this subject in PTD Today knowledge, but the current knowledge record does not yet contain enough descriptive information to answer the question directly.";
+
+    const cards=items.map((item,index)=>`
+      <div class="datedIntelCard">
+        <div class="datedIntelDate">${esc(item.date_display||"Date unavailable")}</div>
+        <strong>${esc(item.title)}</strong>
+        ${item.summary?`<p>${esc(item.summary)}</p>`:""}
+        <div class="datedIntelActions">
+          ${item.article_id?`<a href="/articles/${encodeURIComponent(item.article_id)}.html">Read article →</a>`:""}
+          <button type="button" data-answer-ripple-index="${index}">Follow the ripple →</button>
+        </div>
+      </div>
+    `).join("");
+
+    const whyText=items.length
+      ? `${items.length} current PTD Today intelligence item${items.length===1?"":"s"} are connected to this answer.`
+      : "No current intelligence item has been resolved for this answer yet.";
+
+    return `
+      <div class="answerFirst">
+        <div class="answerHero">
+          <div class="answerEyebrow">Answer</div>
+          <h3>${esc(observerDisplayLabel(observer))}</h3>
+          <p>${esc(answerText)}</p>
+        </div>
+
+        <div class="intelBlock">
+          <div class="intelLabel">Current intelligence</div>
+          ${cards?`<div class="datedIntel">${cards}</div>`:`<p class="intelText">No current intelligence item has been resolved yet.</p>`}
+        </div>
+
+        <div class="answerWhy">
+          <div class="intelLabel">Why it matters now</div>
+          <p class="intelText">${esc(whyText)}</p>
+        </div>
+
+        <div class="intelBlock">
+          <div class="intelLabel">Explore in Cosmos</div>
+          <p class="intelText">${projection.nodes.length} connected objects · ${projection.edges.length} connected relationships. Select a node, expand one layer, or follow a ripple from an intelligence item.</p>
+        </div>
+      </div>
+    `;
+  }
+
   function renderObserverDetails(observer,projection){
     const type = observer.kind || "object";
     const source = observer.article_id ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
-
-    if(observer.kind==="response" && observer.response){
-      const response=observer.response;
-      const bullets=(response.bullets||[]).map((item,index)=>`
-        <li class="responseItem">
-          <button type="button" data-response-index="${index}">
-            <strong>${esc(item.title||`Result ${index+1}`)}</strong>
-            ${item.summary?`<span>${esc(item.summary)}</span>`:""}
-          </button>
-        </li>`).join("");
-      observerDetail.innerHTML = `
-        <div class="responseCard">
-          <div class="eyebrow">Cosmos response</div>
-          <h3>${esc(response.label)}</h3>
-          <p>${esc(response.answer)}</p>
-          ${bullets?`<ul class="responseList">${bullets}</ul>`:""}
-          <div class="responseMeta"><span>${esc(response.source_label||"PTD Today")}</span><span>${projection.nodes.length} connected objects</span><span>${projection.edges.length} connected relationships</span></div>
-        </div>
-        <p><strong>Entry question:</strong> ${esc(observer.question||response.question||"")}</p>
-        <p>The answer is a temporary observer built from existing PTD Today data. It does not mutate the underlying Cosmos graph.</p>`;
-      observerDetail.querySelectorAll("[data-response-index]").forEach(button=>{
-        button.addEventListener("click",()=>{
-          const item=response.bullets?.[Number(button.dataset.responseIndex)];
-          const entityIds=entitySeedsFromProjectionIds(item?.seed_ids||[]);
-          if(entityIds.length) recenterEntity(entityIds[0]);
-        });
-      });
-      return;
-    }
-
     const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
     const arrivedFrom = observer.from_observer_label ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}</p>` : "";
     const intelligence = observer.kind==="entity" ? buildCenterIntelligence(observer.id) : null;
 
     observerDetail.innerHTML = `
-      <p><strong>${esc(observerDisplayLabel(observer))}</strong></p>
-      <p>Observer type: ${esc(type)}</p>
-      ${question}${arrivedFrom}
-      ${intelligence ? renderCenterIntelligence(intelligence) : ""}
+      ${renderAnswerFirst(observer,projection)}
+      ${question}
+      ${arrivedFrom}
+      ${intelligence ? `
+        <div class="intelBlock" style="margin-top:14px">
+          <div class="intelLabel">Center intelligence</div>
+          ${renderCenterIntelligence(intelligence)}
+        </div>
+      ` : ""}
       <p>${projection.nodes.length} visible objects · ${projection.edges.length} visible relationships</p>
       ${source}
-      <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>`;
+      <p>The display is a temporary projection. Re-centering does not mutate the underlying Cosmos graph.</p>
+    `;
+
+    observerDetail.querySelectorAll("[data-answer-ripple-index]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        const items=answerFirstRelevantItems(observer);
+        const item=items[Number(button.dataset.answerRippleIndex)];
+        const entityIds=entitySeedsFromProjectionIds(item?.seed_ids||[]);
+        if(entityIds.length){
+          recenterEntity(entityIds[0]);
+          return;
+        }
+        if(item?.article_id){
+          location.href=`/articles/${encodeURIComponent(item.article_id)}.html`;
+        }
+      });
+    });
 
     observerDetail.querySelectorAll("[data-curiosity-id]").forEach(button=>{
       button.addEventListener("click",()=>recenterEntity(button.dataset.curiosityId));
