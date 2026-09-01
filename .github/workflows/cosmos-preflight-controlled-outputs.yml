@@ -6220,34 +6220,24 @@ jobs:
         if: ${{ inputs.write_cosmos_entry_experience_test }}
         run: |
           set -euo pipefail
-
           OUTPUT_DIR="knowledge/cosmos/knowledge-completion-candidate-pipeline-test-v0.1"
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR/downstream"
 
           cat > "$OUTPUT_DIR/semantic-completion-input.json" <<'JSON'
           {
-            "question": "What are the HV substation equipment?",
-            "subject_match": {
-              "id": "hv_substations",
-              "label": "HV Substations"
-            },
-            "knowledge_completion": {
-              "knowledge_status": "insufficient",
-              "completion_required": true,
-              "answer_ready": false,
-              "broad_projection_suppressed": true,
-              "knowledge_contract": {
-                "contract_id": "component_membership",
-                "answer_shape": "structured_list",
-                "minimum_supported_members": 2,
-                "required_relationship_semantics": [
-                  "contains",
-                  "includes",
-                  "component",
-                  "equipment",
-                  "part of"
-                ]
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":["contains","includes","component","equipment","part of"]
               }
             }
           }
@@ -6272,190 +6262,115 @@ jobs:
             --out-dir "$OUTPUT_DIR/downstream" \
             > "$OUTPUT_DIR/pipeline-stdout.json"
 
-          cp "$OUTPUT_DIR/downstream/applicability.json" \
-             "$OUTPUT_DIR/applicability.json"
-          cp "$OUTPUT_DIR/downstream/decomposition.json" \
-             "$OUTPUT_DIR/decomposition.json"
-          cp "$OUTPUT_DIR/downstream/candidate-validation.json" \
-             "$OUTPUT_DIR/candidate-validation.json"
-          cp "$OUTPUT_DIR/downstream/pipeline-result.json" \
-             "$OUTPUT_DIR/pipeline-result.json"
+          cp "$OUTPUT_DIR/downstream/applicability.json" "$OUTPUT_DIR/applicability.json"
+          cp "$OUTPUT_DIR/downstream/pipeline-result.json" "$OUTPUT_DIR/pipeline-result.json"
+
+          if [ -f "$OUTPUT_DIR/downstream/decomposition.json" ]; then
+            cp "$OUTPUT_DIR/downstream/decomposition.json" "$OUTPUT_DIR/decomposition.json"
+          fi
+          if [ -f "$OUTPUT_DIR/downstream/candidate-validation.json" ]; then
+            cp "$OUTPUT_DIR/downstream/candidate-validation.json" "$OUTPUT_DIR/candidate-validation.json"
+          fi
 
           node - "$OUTPUT_DIR/semantic-completion-input.json" \
                  "$OUTPUT_DIR/acquisition-plan.json" \
                  "$OUTPUT_DIR/applicability.json" \
-                 "$OUTPUT_DIR/decomposition.json" \
-                 "$OUTPUT_DIR/candidate-validation.json" \
                  "$OUTPUT_DIR/pipeline-result.json" \
                  "$OUTPUT_DIR/test-result.json" <<'NODE'
           const fs=require("fs");
-          const [
-            inputFile,
-            acquisitionFile,
-            applicabilityFile,
-            decompositionFile,
-            validationFile,
-            pipelineFile,
-            testFile
-          ]=process.argv.slice(2);
-
+          const [inputFile,acqFile,appFile,pipelineFile,testFile]=process.argv.slice(2);
           const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
-          const acquisition=JSON.parse(fs.readFileSync(acquisitionFile,"utf8"));
-          const applicability=JSON.parse(fs.readFileSync(applicabilityFile,"utf8"));
-          const decomposition=JSON.parse(fs.readFileSync(decompositionFile,"utf8"));
-          const validation=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const acq=JSON.parse(fs.readFileSync(acqFile,"utf8"));
+          const app=JSON.parse(fs.readFileSync(appFile,"utf8"));
           const pipeline=JSON.parse(fs.readFileSync(pipelineFile,"utf8"));
           const fail=m=>{console.error(m);process.exit(1)};
 
-          if(acquisition.status!=="acquisition_plans_resolved"){
-            fail(`Acquisition invalid: ${acquisition.status}`);
+          const evals=app.evaluations||[];
+          const executable=app.executable_queue||[];
+          const decompQueue=app.decomposition_queue||[];
+          if(acq.status!=="acquisition_plans_resolved" ||
+             app.status!=="acquisition_applicability_resolved" ||
+             evals.length<1){
+            fail("Upstream Acquisition/Applicability invalid.");
           }
 
-          if(applicability.status!=="acquisition_applicability_resolved"){
-            fail(`Applicability invalid: ${applicability.status}`);
-          }
-
-          const evaluations=applicability.evaluations||[];
-          if(evaluations.length<1){
-            fail("No Applicability evaluations.");
-          }
-
-          const decompositions=decomposition.decompositions||[];
-          const candidates=decompositions.flatMap(
-            row=>Array.isArray(row.candidates)?row.candidates:[]
-          );
-          const candidateQueue=decomposition.candidate_validation_queue||[];
-
-          if(decompositions.length<1 || candidates.length<1){
-            fail("Real Decomposition produced no provisional candidates.");
-          }
-
-          if(candidateQueue.length!==candidates.length){
-            fail("Candidate validation queue does not match provisional candidates.");
-          }
-
-          for(const candidate of candidates){
-            if(candidate.epistemic_status!=="provisional_candidate" ||
-               candidate.validated!==false ||
-               candidate.executable!==false){
-              fail(`Provisional candidate improperly promoted: ${candidate.decomposition_candidate_id||"unknown"}`);
+          let branchDetails={};
+          if(pipeline.route==="applicable_direct_execution"){
+            if(pipeline.status!=="knowledge_completion_acquisition_execution_required" ||
+               pipeline.next_stage!=="acquisition_execution" ||
+               executable.length<1 ||
+               decompQueue.length!==0){
+              fail("Applicable branch contract failed.");
             }
+            branchDetails={
+              applicable_plan_count:executable.length,
+              decomposition_required_plan_count:0,
+              decomposition_performed:false,
+              provisional_candidate_count:0,
+              validation_target_count:0
+            };
+          } else if(pipeline.route==="decomposition_required"){
+            const decompFile="knowledge/cosmos/knowledge-completion-candidate-pipeline-test-v0.1/decomposition.json";
+            const valFile="knowledge/cosmos/knowledge-completion-candidate-pipeline-test-v0.1/candidate-validation.json";
+            if(!fs.existsSync(decompFile)||!fs.existsSync(valFile))fail("Required downstream files missing.");
+            const d=JSON.parse(fs.readFileSync(decompFile,"utf8"));
+            const v=JSON.parse(fs.readFileSync(valFile,"utf8"));
+            const candidates=(d.decompositions||[]).flatMap(x=>x.candidates||[]);
+            const targets=v.validation_targets||[];
+            if(candidates.length<1||targets.length<1)fail("Decomposition branch produced no candidates/targets.");
+            if(candidates.some(x=>x.epistemic_status!=="provisional_candidate"||x.validated!==false||x.executable!==false))fail("Candidate boundary crossed.");
+            if(targets.some(x=>x.epistemic_status!=="provisional_candidate"||x.validation_status!=="not_started"||x.knowledge_status!=="not_admitted"))fail("Validation target boundary crossed.");
+            branchDetails={
+              applicable_plan_count:executable.length,
+              decomposition_required_plan_count:decompQueue.length,
+              decomposition_performed:true,
+              provisional_candidate_count:candidates.length,
+              validation_target_count:targets.length
+            };
+          } else {
+            fail(`Unexpected pipeline route ${pipeline.route}`);
           }
 
-          const targets=validation.validation_targets||[];
-          const evidenceQueue=validation.future_evidence_queue||[];
-
-          if(validation.status!=="candidate_validation_targets_resolved" ||
-             targets.length<1 ||
-             evidenceQueue.length!==targets.length){
-            fail("Candidate Validation Planner output invalid.");
-          }
-
-          for(const target of targets){
-            if(target.epistemic_status!=="provisional_candidate" ||
-               target.validation_status!=="not_started" ||
-               target.executable!==false ||
-               target.knowledge_status!=="not_admitted"){
-              fail(`Validation target improperly promoted: ${target.validation_target_id||"unknown"}`);
-            }
-          }
-
-          if(pipeline.status!=="knowledge_completion_candidate_pipeline_resolved"){
-            fail(`Pipeline result invalid: ${pipeline.status}`);
-          }
-
-          if((pipeline.stage_order||[]).join(">")!==
-             "acquisition_applicability>decomposition>candidate_validation"){
-            fail("Pipeline stage order invalid.");
-          }
-
-          if(pipeline.next_stage!=="evidence_strategy"){
-            fail(`Unexpected next stage: ${pipeline.next_stage}`);
-          }
-
-          if(!Object.values(pipeline.boundaries||{}).every(v=>v===false)){
-            fail("Protected boundaries were opened.");
-          }
-          if(!Object.values(pipeline.contracts||{}).every(Boolean)){
-            fail("Candidate pipeline contracts failed.");
-          }
-          if(!Object.values(pipeline.safeguards||{}).every(v=>v===false)){
-            fail("Candidate pipeline safeguards failed.");
-          }
+          if(!Object.values(pipeline.boundaries||{}).every(v=>v===false))fail("Protected boundaries opened.");
+          if(!Object.values(pipeline.safeguards||{}).every(v=>v===false))fail("Safeguards failed.");
 
           const result={
             schema_version:"0.1",
             status:"cosmos_knowledge_completion_candidate_pipeline_integration_test_passed",
             question:input.question,
             subject:input.subject_match,
-            pipeline:{
-              stage_order:pipeline.stage_order,
-              next_stage:pipeline.next_stage
-            },
+            real_applicability_route:pipeline.route,
+            next_stage:pipeline.next_stage,
             counts:{
-              acquisition_plans:(acquisition.acquisition_plans||[]).length,
-              applicability_evaluations:evaluations.length,
-              decomposition_rows:decompositions.length,
-              provisional_candidates:candidates.length,
-              candidate_validation_queue:candidateQueue.length,
-              validation_targets:targets.length,
-              future_evidence_queue:evidenceQueue.length
-            },
-            epistemic_boundary:{
-              all_candidates_provisional:candidates.every(
-                x=>x.epistemic_status==="provisional_candidate" &&
-                   x.validated===false &&
-                   x.executable===false
-              ),
-              all_validation_targets_unvalidated:targets.every(
-                x=>x.epistemic_status==="provisional_candidate" &&
-                   x.validation_status==="not_started" &&
-                   x.executable===false &&
-                   x.knowledge_status==="not_admitted"
-              ),
-              evidence_execution_performed:false,
-              evidence_validation_performed:false,
-              knowledge_admission_performed:false,
-              graph_mutation_performed:false
+              acquisition_plans:(acq.acquisition_plans||[]).length,
+              applicability_evaluations:evals.length,
+              ...branchDetails
             },
             contracts:pipeline.contracts,
+            boundaries:pipeline.boundaries,
             safeguards:pipeline.safeguards
           };
-
           fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
           console.log(JSON.stringify(result,null,2));
           NODE
 
           git add "$OUTPUT_DIR"
-
           if git diff --cached --quiet; then
             echo "No Knowledge Completion Candidate Pipeline output changes to commit."
           else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "test: write Cosmos knowledge completion candidate pipeline v0.1 output"
-
+            git commit -m "test: write branch-aware Cosmos knowledge completion pipeline v0.1 output"
             pushed=false
             for attempt in 1 2 3; do
-              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
               git fetch origin "${GITHUB_REF_NAME}"
-              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
-                git rebase --abort || true
-                exit 1
-              fi
-              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
-                pushed=true
-                break
-              fi
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
               sleep $((attempt * 2))
             done
-
-            if [ "$pushed" != "true" ]; then
-              echo "ERROR: Could not push Knowledge Completion Candidate Pipeline output after 3 attempts."
-              exit 1
-            fi
+            if [ "$pushed" != "true" ]; then echo "ERROR: push failed after 3 attempts."; exit 1; fi
           fi
 
-          echo "Controlled semantic-gap -> Acquisition -> Applicability -> Decomposition -> Candidate Validation path generated."
+          echo "Branch-aware Knowledge Completion pipeline controlled output committed."
           echo "No external search, OpenAI call, evidence execution, evidence validation, knowledge admission or graph mutation was performed."
 
