@@ -4509,3 +4509,161 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/cosmos_knowledge_completion_acquisition_integration_test_v0.1.mjs
+
+      - name: Check Cosmos Knowledge Completion Candidate Pipeline v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_candidate_pipeline_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_candidate_pipeline_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Candidate Pipeline v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs
+
+      - name: Test Semantic Gap through real Applicability Decomposition and Candidate Validation v0.1
+        run: |
+          set -euo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          mkdir -p "$TMP_DIR/downstream"
+
+          cat > "$TMP_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question": "What are the HV substation equipment?",
+            "subject_match": {
+              "id": "hv_substations",
+              "label": "HV Substations"
+            },
+            "knowledge_completion": {
+              "knowledge_status": "insufficient",
+              "completion_required": true,
+              "answer_ready": false,
+              "broad_projection_suppressed": true,
+              "knowledge_contract": {
+                "contract_id": "component_membership",
+                "answer_shape": "structured_list",
+                "minimum_supported_members": 2,
+                "required_relationship_semantics": [
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$TMP_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$TMP_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$TMP_DIR/completion-request.json" \
+            --out "$TMP_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$TMP_DIR/acquisition-handoff.json" \
+            --out "$TMP_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out-dir "$TMP_DIR/downstream" \
+            > "$TMP_DIR/pipeline-stdout.json"
+
+          node - "$TMP_DIR/downstream/pipeline-result.json" \
+                 "$TMP_DIR/downstream/applicability.json" \
+                 "$TMP_DIR/downstream/decomposition.json" \
+                 "$TMP_DIR/downstream/candidate-validation.json" <<'NODE'
+          const fs=require("fs");
+          const [resultFile,appFile,decompFile,validationFile]=process.argv.slice(2);
+          const result=JSON.parse(fs.readFileSync(resultFile,"utf8"));
+          const applicability=JSON.parse(fs.readFileSync(appFile,"utf8"));
+          const decomposition=JSON.parse(fs.readFileSync(decompFile,"utf8"));
+          const validation=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(result.status!=="knowledge_completion_candidate_pipeline_resolved"){
+            fail(`Candidate pipeline failed: ${result.status}`);
+          }
+
+          if((result.stage_order||[]).join(">")!==
+             "acquisition_applicability>decomposition>candidate_validation"){
+            fail("Candidate pipeline stage order changed.");
+          }
+
+          if(result.next_stage!=="evidence_strategy"){
+            fail(`Expected evidence_strategy next; got ${result.next_stage}`);
+          }
+
+          if(applicability.status!=="acquisition_applicability_resolved"){
+            fail(`Applicability failed: ${applicability.status}`);
+          }
+
+          const evaluations=applicability.evaluations||[];
+          if(evaluations.length<1){
+            fail("Applicability produced no evaluations.");
+          }
+
+          const decompositions=decomposition.decompositions||[];
+          const candidates=decompositions.flatMap(
+            row=>Array.isArray(row.candidates)?row.candidates:[]
+          );
+          if(decompositions.length<1 || candidates.length<1){
+            fail("Real Decomposition produced no provisional candidates.");
+          }
+
+          for(const candidate of candidates){
+            if(candidate.epistemic_status!=="provisional_candidate" ||
+               candidate.validated!==false ||
+               candidate.executable!==false){
+              fail(`Candidate crossed epistemic boundary: ${candidate.decomposition_candidate_id||"unknown"}`);
+            }
+          }
+
+          const targets=validation.validation_targets||[];
+          const queue=validation.future_evidence_queue||[];
+          if(validation.status!=="candidate_validation_targets_resolved" ||
+             targets.length<1 ||
+             queue.length!==targets.length){
+            fail("Real Candidate Validation Planner output invalid.");
+          }
+
+          for(const target of targets){
+            if(target.epistemic_status!=="provisional_candidate" ||
+               target.validation_status!=="not_started" ||
+               target.executable!==false ||
+               target.knowledge_status!=="not_admitted"){
+              fail(`Validation target crossed epistemic boundary: ${target.validation_target_id||"unknown"}`);
+            }
+          }
+
+          if(!Object.values(result.boundaries||{}).every(v=>v===false)){
+            fail("Protected completion boundaries were opened.");
+          }
+
+          if(!Object.values(result.contracts||{}).every(Boolean)){
+            fail("Candidate pipeline contracts failed.");
+          }
+
+          if(!Object.values(result.safeguards||{}).every(v=>v===false)){
+            fail("Candidate pipeline safeguards failed.");
+          }
+
+          console.log("");
+          console.log("Semantic gap -> real Applicability -> Decomposition -> Candidate Validation passed.");
+          console.log(`Applicability evaluations: ${evaluations.length}`);
+          console.log(`Provisional candidates:    ${candidates.length}`);
+          console.log(`Validation targets:        ${targets.length}`);
+          console.log("Next stage:                evidence_strategy");
+          console.log("No external evidence execution, validation, admission or graph mutation occurred.");
+          NODE
+
