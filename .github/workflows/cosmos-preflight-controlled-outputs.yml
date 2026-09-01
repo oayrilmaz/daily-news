@@ -6595,4 +6595,234 @@ jobs:
           echo "External adapter remains disconnected."
           echo "No external search, OpenAI call, network execution, evidence validation, knowledge admission or graph mutation was performed."
 
+      - name: Write Cosmos Knowledge Completion Acquisition Source Strategy Resolver v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-acquisition-source-strategy-resolver-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR/downstream"
+
+          cat > "$OUTPUT_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$OUTPUT_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$OUTPUT_DIR/completion-request.json" \
+            --out "$OUTPUT_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$OUTPUT_DIR/acquisition-handoff.json" \
+            --out "$OUTPUT_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out-dir "$OUTPUT_DIR/downstream" \
+            > "$OUTPUT_DIR/candidate-pipeline-stdout.json"
+
+          cp "$OUTPUT_DIR/downstream/applicability.json" \
+             "$OUTPUT_DIR/applicability.json"
+          cp "$OUTPUT_DIR/downstream/pipeline-result.json" \
+             "$OUTPUT_DIR/pipeline-result.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$OUTPUT_DIR/pipeline-result.json" \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out "$OUTPUT_DIR/acquisition-execution-plan.json" \
+            > "$OUTPUT_DIR/acquisition-execution-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/acquisition-execution-plan.json" \
+            --out "$OUTPUT_DIR/source-strategy-resolved.json" \
+            > "$OUTPUT_DIR/source-strategy-stdout.json"
+
+          node - "$OUTPUT_DIR/semantic-completion-input.json" \
+                 "$OUTPUT_DIR/acquisition-plan.json" \
+                 "$OUTPUT_DIR/acquisition-execution-plan.json" \
+                 "$OUTPUT_DIR/source-strategy-resolved.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [inputFile,acqFile,execFile,resolvedFile,testFile]=process.argv.slice(2);
+
+          const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
+          const acquisition=JSON.parse(fs.readFileSync(acqFile,"utf8"));
+          const execution=JSON.parse(fs.readFileSync(execFile,"utf8"));
+          const resolved=JSON.parse(fs.readFileSync(resolvedFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(execution.status!=="knowledge_completion_source_strategy_required" ||
+             execution.next_stage!=="acquisition_source_strategy_resolver"){
+            fail("Acquisition Execution did not expose source-strategy gap.");
+          }
+
+          const requests=resolved.execution_requests||[];
+          const adapterQueue=resolved.future_adapter_queue||[];
+          const state=resolved.resolution_state||{};
+
+          if(resolved.status!=="knowledge_completion_source_strategy_resolved" ||
+             resolved.next_stage!=="external_acquisition_adapter" ||
+             requests.length<1 ||
+             adapterQueue.length!==requests.length){
+            fail("Source Strategy Resolver output invalid.");
+          }
+
+          const sourceTypes=new Set();
+          const sourceRows=[];
+
+          for(const request of requests){
+            const strategy=request.source_strategy||[];
+            if(strategy.length<1){
+              fail("Resolved request contains empty source strategy.");
+            }
+
+            let previous=Infinity;
+            for(const source of strategy){
+              sourceTypes.add(source.source_type);
+              sourceRows.push({
+                execution_request_id:request.execution_request_id,
+                source_rank:source.source_rank,
+                source_type:source.source_type,
+                authority_score:source.authority_score,
+                priority:source.priority,
+                acquisition_status:source.acquisition_status,
+                execution_adapter:source.execution_adapter,
+                search_status:source.search_status
+              });
+
+              if(!Number.isFinite(Number(source.authority_score)) ||
+                 Number(source.authority_score)>previous+1e-9 ||
+                 source.acquisition_status!=="planned" ||
+                 source.execution_adapter!=="unassigned" ||
+                 source.search_status!=="not_started"){
+                fail("Source strategy row violates planning boundary.");
+              }
+              previous=Number(source.authority_score);
+            }
+          }
+
+          for(const required of [
+            "manufacturer_or_oem_technical_document",
+            "utility_or_owner_engineering_standard",
+            "regulatory_or_government_document",
+            "industry_body_or_research_institution"
+          ]){
+            if(!sourceTypes.has(required)){
+              fail(`Controlled source strategy missing ${required}`);
+            }
+          }
+
+          if(state.resolved_count!==requests.length ||
+             state.unresolved_count!==0 ||
+             state.external_execution_connected!==false ||
+             state.network_execution_performed!==false ||
+             Number(state.evidence_validation_count)!==0 ||
+             Number(state.knowledge_admission_count)!==0 ||
+             Number(state.graph_write_count)!==0){
+            fail("Source Strategy Resolver crossed protected boundary.");
+          }
+
+          if(!Object.values(resolved.contracts||{}).every(Boolean)){
+            fail("Source Strategy Resolver contracts failed.");
+          }
+          if(!Object.values(resolved.safeguards||{}).every(v=>v===false)){
+            fail("Source Strategy Resolver safeguards failed.");
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_acquisition_source_strategy_resolver_integration_test_passed",
+            question:input.question,
+            subject:input.subject_match,
+            acquisition:{
+              status:acquisition.status,
+              plan_count:(acquisition.acquisition_plans||[]).length
+            },
+            acquisition_execution:{
+              status:execution.status,
+              next_stage:execution.next_stage,
+              source_strategy_unresolved_count:execution.execution_state?.source_strategy_unresolved_count
+            },
+            source_strategy_resolution:{
+              status:resolved.status,
+              resolved_request_count:requests.length,
+              source_strategy_row_count:sourceRows.length,
+              next_stage:resolved.next_stage,
+              external_adapter_queue_count:adapterQueue.length,
+              external_execution_connected:state.external_execution_connected,
+              network_execution_performed:state.network_execution_performed
+            },
+            source_strategy:sourceRows,
+            contracts:resolved.contracts,
+            safeguards:resolved.safeguards,
+            protected_boundaries:{
+              evidence_validation_count:state.evidence_validation_count,
+              knowledge_admission_count:state.knowledge_admission_count,
+              graph_write_count:state.graph_write_count
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Acquisition Source Strategy Resolver output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos acquisition source strategy resolver v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Source Strategy Resolver output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled HV Substations Source Strategy Resolver output committed."
+          echo "Source strategy is planned only."
+          echo "No external search, OpenAI/API call, evidence validation, knowledge admission or graph mutation was performed."
 
