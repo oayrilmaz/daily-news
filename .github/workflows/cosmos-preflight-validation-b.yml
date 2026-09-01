@@ -6211,3 +6211,36 @@ jobs:
           console.log("No graph mutation was performed; Graph Writer remains the next boundary.");
           NODE
 
+      - name: Test Knowledge Completion Graph Writer integration v0.1
+        run: |
+          set -euo pipefail
+          D="$(mktemp -d)"
+          trap 'rm -rf "$D"' EXIT
+          cat > "$D/admission.json" <<'JSON'
+          {"schema_version":"0.1","status":"knowledge_admission_resolved","admission_state":{"validation_count":2,"reviewed_count":2,"graph_write_eligible_count":2,"graph_write_count":0,"conceptual_distance_limit":null,"continuation_possible":true},"admissions":[
+          {"knowledge_admission_id":"knowledge_admission_pt","evidence_validation_id":"evidence_validation_power_transformer","validation_target_id":"validation_power_transformer","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","decision":"admit","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],"qualification":{"contradiction_present":false,"must_preserve_contradiction":false,"confidence_must_be_preserved":true,"source_lineage_must_be_preserved":true},"graph_write_eligibility":true,"graph_write_status":"not_started"},
+          {"knowledge_admission_id":"knowledge_admission_cb","evidence_validation_id":"evidence_validation_circuit_breaker","validation_target_id":"validation_circuit_breaker","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","decision":"admit","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],"qualification":{"contradiction_present":false,"must_preserve_contradiction":false,"confidence_must_be_preserved":true,"source_lineage_must_be_preserved":true},"graph_write_eligibility":true,"graph_write_status":"not_started"}],
+          "graph_write_queue":[
+          {"graph_write_rank":1,"knowledge_admission_id":"knowledge_admission_pt","evidence_validation_id":"evidence_validation_power_transformer","validation_target_id":"validation_power_transformer","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","confidence_score":75,"evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],"graph_write_status":"not_started"},
+          {"graph_write_rank":2,"knowledge_admission_id":"knowledge_admission_cb","evidence_validation_id":"evidence_validation_circuit_breaker","validation_target_id":"validation_circuit_breaker","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","confidence_score":75,"evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],"graph_write_status":"not_started"}]}
+          JSON
+          cat > "$D/before.json" <<'JSON'
+          {"schema_version":"0.1","generated_at":null,"status":"cosmos_graph_snapshot","knowledge_records":[],"audit_log":[]}
+          JSON
+          H1="$(sha256sum "$D/before.json"|awk '{print $1}')"
+          node scripts/cosmos_graph_writer.cjs --admission "$D/admission.json" --graph "$D/before.json" --out "$D/after.json" --report "$D/report.json"
+          H2="$(sha256sum "$D/before.json"|awk '{print $1}')"
+          test "$H1" = "$H2"
+          node scripts/cosmos_graph_writer.cjs --admission "$D/admission.json" --graph "$D/after.json" --out "$D/second.json" --report "$D/report2.json"
+          node - "$D/after.json" "$D/report.json" "$D/second.json" "$D/report2.json" <<'NODE'
+          const fs=require("fs"),[g1,r1,g2,r2]=process.argv.slice(2).map(f=>JSON.parse(fs.readFileSync(f,"utf8")));
+          const fail=m=>{console.error(m);process.exit(1)};
+          if(r1.status!=="graph_write_resolved"||r1.graph_write_state?.written_count!==2||r1.graph_write_state?.error_count!==0) fail("First Graph Writer run invalid");
+          if(g1.knowledge_records?.length!==2||g1.audit_log?.length!==2) fail("Persistent snapshot counts invalid");
+          for(const r of g1.knowledge_records||[]) if(r.validation_disposition!=="supported"||Number(r.confidence_score)!==75||r.evidence_record_ids?.length!==2||r.reversibility?.reversible!==true) fail("Persistent record lost lineage/confidence/reversibility");
+          if(r2.graph_write_state?.written_count!==0||r2.graph_write_state?.idempotent_skip_count!==2||g2.knowledge_records?.length!==2||g2.audit_log?.length!==2) fail("Graph Writer idempotency invalid");
+          const s=r1.safeguards||{};
+          if(s.mutates_input_graph_in_place!==false||s.writes_only_explicit_output_snapshot!==true||s.requires_graph_write_eligibility!==true||s.preserves_confidence!==true||s.preserves_evidence_lineage!==true||s.idempotent_by_knowledge_admission_id!==true||s.audit_log_required!==true||s.graph_records_reversible!==true) fail("Graph Writer safeguards invalid");
+          console.log("Knowledge Completion → Graph Writer integration PASS.");
+          NODE
+
