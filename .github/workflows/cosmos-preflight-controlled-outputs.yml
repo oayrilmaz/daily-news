@@ -6470,10 +6470,8 @@ jobs:
           const requests=execution.execution_requests||[];
           const adapterQueue=execution.future_adapter_queue||[];
 
-          if(execution.status!=="knowledge_completion_acquisition_execution_planned" ||
-             requests.length<1 ||
-             adapterQueue.length!==requests.length ||
-             execution.next_stage!=="external_acquisition_adapter"){
+          if(!["knowledge_completion_source_strategy_required","knowledge_completion_acquisition_execution_planned"].includes(execution.status) ||
+             requests.length<1){
             fail("Acquisition Execution output invalid.");
           }
 
@@ -6481,8 +6479,7 @@ jobs:
             if(!Array.isArray(request.query_templates) ||
                request.query_templates.length<1 ||
                !Array.isArray(request.source_strategy) ||
-               request.source_strategy.length<1 ||
-               request.execution?.mode!=="adapter_required" ||
+               !["adapter_required","source_strategy_required"].includes(request.execution?.mode) ||
                request.execution?.executor_status!=="not_connected" ||
                request.execution?.network_execution_performed!==false ||
                request.epistemic_boundary?.results_are_observations_not_facts!==true ||
@@ -6502,6 +6499,21 @@ jobs:
              Number(state.knowledge_admission_count)!==0 ||
              Number(state.graph_write_count)!==0){
             fail("Acquisition Execution crossed protected boundary.");
+          }
+
+          if(state.source_strategy_unresolved_count>0){
+            if(execution.status!=="knowledge_completion_source_strategy_required" ||
+               execution.next_stage!=="acquisition_source_strategy_resolver" ||
+               (execution.source_strategy_resolution_queue||[]).length!==state.source_strategy_unresolved_count ||
+               adapterQueue.length!==0){
+              fail("Unresolved source strategy must route to resolver and block adapter.");
+            }
+          } else {
+            if(execution.status!=="knowledge_completion_acquisition_execution_planned" ||
+               execution.next_stage!=="external_acquisition_adapter" ||
+               adapterQueue.length!==requests.length){
+              fail("Resolved source strategy must route to external adapter.");
+            }
           }
 
           if(!Object.values(execution.contracts||{}).every(Boolean)){
