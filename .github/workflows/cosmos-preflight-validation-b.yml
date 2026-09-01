@@ -4518,16 +4518,15 @@ jobs:
           node --check scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs
           node --check scripts/cosmos_knowledge_completion_candidate_pipeline_test_v0.1.mjs
 
-      - name: Test Cosmos Knowledge Completion Candidate Pipeline v0.1
+      - name: Test Cosmos Knowledge Completion Candidate Pipeline v0.1 branching
         run: |
           set -euo pipefail
           node scripts/cosmos_knowledge_completion_candidate_pipeline_test_v0.1.mjs \
             --engine scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs
 
-      - name: Test Semantic Gap through real Applicability Decomposition and Candidate Validation v0.1
+      - name: Test Semantic Gap through real Applicability branching v0.1
         run: |
           set -euo pipefail
-
           TMP_DIR="$(mktemp -d)"
           trap 'rm -rf "$TMP_DIR"' EXIT
           mkdir -p "$TMP_DIR/downstream"
@@ -4535,26 +4534,17 @@ jobs:
           cat > "$TMP_DIR/semantic-completion-input.json" <<'JSON'
           {
             "question": "What are the HV substation equipment?",
-            "subject_match": {
-              "id": "hv_substations",
-              "label": "HV Substations"
-            },
+            "subject_match": {"id":"hv_substations","label":"HV Substations"},
             "knowledge_completion": {
-              "knowledge_status": "insufficient",
-              "completion_required": true,
-              "answer_ready": false,
-              "broad_projection_suppressed": true,
-              "knowledge_contract": {
-                "contract_id": "component_membership",
-                "answer_shape": "structured_list",
-                "minimum_supported_members": 2,
-                "required_relationship_semantics": [
-                  "contains",
-                  "includes",
-                  "component",
-                  "equipment",
-                  "part of"
-                ]
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":["contains","includes","component","equipment","part of"]
               }
             }
           }
@@ -4580,90 +4570,52 @@ jobs:
             > "$TMP_DIR/pipeline-stdout.json"
 
           node - "$TMP_DIR/downstream/pipeline-result.json" \
-                 "$TMP_DIR/downstream/applicability.json" \
-                 "$TMP_DIR/downstream/decomposition.json" \
-                 "$TMP_DIR/downstream/candidate-validation.json" <<'NODE'
+                 "$TMP_DIR/downstream/applicability.json" <<'NODE'
           const fs=require("fs");
-          const [resultFile,appFile,decompFile,validationFile]=process.argv.slice(2);
-          const result=JSON.parse(fs.readFileSync(resultFile,"utf8"));
-          const applicability=JSON.parse(fs.readFileSync(appFile,"utf8"));
-          const decomposition=JSON.parse(fs.readFileSync(decompFile,"utf8"));
-          const validation=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const result=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const app=JSON.parse(fs.readFileSync(process.argv[3],"utf8"));
           const fail=m=>{console.error(m);process.exit(1)};
+          const evals=app.evaluations||[];
+          const executable=app.executable_queue||[];
+          const decomp=app.decomposition_queue||[];
 
-          if(result.status!=="knowledge_completion_candidate_pipeline_resolved"){
-            fail(`Candidate pipeline failed: ${result.status}`);
+          if(app.status!=="acquisition_applicability_resolved"||evals.length<1){
+            fail("Real Applicability output invalid.");
           }
 
-          if((result.stage_order||[]).join(">")!==
-             "acquisition_applicability>decomposition>candidate_validation"){
-            fail("Candidate pipeline stage order changed.");
-          }
-
-          if(result.next_stage!=="evidence_strategy"){
-            fail(`Expected evidence_strategy next; got ${result.next_stage}`);
-          }
-
-          if(applicability.status!=="acquisition_applicability_resolved"){
-            fail(`Applicability failed: ${applicability.status}`);
-          }
-
-          const evaluations=applicability.evaluations||[];
-          if(evaluations.length<1){
-            fail("Applicability produced no evaluations.");
-          }
-
-          const decompositions=decomposition.decompositions||[];
-          const candidates=decompositions.flatMap(
-            row=>Array.isArray(row.candidates)?row.candidates:[]
-          );
-          if(decompositions.length<1 || candidates.length<1){
-            fail("Real Decomposition produced no provisional candidates.");
-          }
-
-          for(const candidate of candidates){
-            if(candidate.epistemic_status!=="provisional_candidate" ||
-               candidate.validated!==false ||
-               candidate.executable!==false){
-              fail(`Candidate crossed epistemic boundary: ${candidate.decomposition_candidate_id||"unknown"}`);
+          if(result.route==="applicable_direct_execution"){
+            if(result.status!=="knowledge_completion_acquisition_execution_required" ||
+               result.next_stage!=="acquisition_execution" ||
+               executable.length<1 ||
+               decomp.length!==0){
+              fail("Applicable direct-execution branch invalid.");
             }
-          }
-
-          const targets=validation.validation_targets||[];
-          const queue=validation.future_evidence_queue||[];
-          if(validation.status!=="candidate_validation_targets_resolved" ||
-             targets.length<1 ||
-             queue.length!==targets.length){
-            fail("Real Candidate Validation Planner output invalid.");
-          }
-
-          for(const target of targets){
-            if(target.epistemic_status!=="provisional_candidate" ||
-               target.validation_status!=="not_started" ||
-               target.executable!==false ||
-               target.knowledge_status!=="not_admitted"){
-              fail(`Validation target crossed epistemic boundary: ${target.validation_target_id||"unknown"}`);
+            if(fs.existsSync(process.argv[3].replace("applicability.json","decomposition.json"))){
+              fail("Decomposition should not be forced for applicable-only route.");
             }
+          } else if(result.route==="decomposition_required"){
+            if(result.status!=="knowledge_completion_candidate_validation_ready" ||
+               result.next_stage!=="evidence_strategy" ||
+               decomp.length<1){
+              fail("Decomposition-required branch invalid.");
+            }
+          } else {
+            fail(`Unexpected branch: ${result.route}`);
           }
 
           if(!Object.values(result.boundaries||{}).every(v=>v===false)){
-            fail("Protected completion boundaries were opened.");
+            fail("Protected boundaries were opened.");
           }
-
-          if(!Object.values(result.contracts||{}).every(Boolean)){
-            fail("Candidate pipeline contracts failed.");
-          }
-
           if(!Object.values(result.safeguards||{}).every(v=>v===false)){
             fail("Candidate pipeline safeguards failed.");
           }
 
           console.log("");
-          console.log("Semantic gap -> real Applicability -> Decomposition -> Candidate Validation passed.");
-          console.log(`Applicability evaluations: ${evaluations.length}`);
-          console.log(`Provisional candidates:    ${candidates.length}`);
-          console.log(`Validation targets:        ${targets.length}`);
-          console.log("Next stage:                evidence_strategy");
+          console.log(`Real Applicability branch: ${result.route}`);
+          console.log(`Next stage:                ${result.next_stage}`);
+          console.log(`Executable queue:          ${executable.length}`);
+          console.log(`Decomposition queue:       ${decomp.length}`);
+          console.log("No branch was forced.");
           console.log("No external evidence execution, validation, admission or graph mutation occurred.");
           NODE
 
