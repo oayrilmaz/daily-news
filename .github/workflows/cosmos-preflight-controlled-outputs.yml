@@ -7396,3 +7396,170 @@ jobs:
             fi
           fi
 
+      - name: Write Knowledge Completion Evidence Strategy integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-evidence-strategy-integration-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/normalized-observations.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/normalized-observations.json" \
+            --out "$OUTPUT_DIR/observation-candidates.json" \
+            > "$OUTPUT_DIR/observation-candidate-stdout.json"
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input "$OUTPUT_DIR/observation-candidates.json" \
+            --out "$OUTPUT_DIR/candidate-validation.json"
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$OUTPUT_DIR/candidate-validation.json" \
+            --out "$OUTPUT_DIR/evidence-strategy.json"
+
+          node - "$OUTPUT_DIR/candidate-validation.json" \
+                 "$OUTPUT_DIR/evidence-strategy.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [validationFile,strategyFile,testFile]=process.argv.slice(2);
+          const validation=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const payload=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          const targets=validation.validation_targets||[];
+          const tasks=payload.evidence_tasks||[];
+          const queue=payload.future_executor_queue||[];
+          const state=payload.evidence_state||{};
+
+          if(payload.status!=="evidence_strategy_resolved" ||
+             targets.length!==6 ||
+             tasks.length!==6 ||
+             queue.length!==6){
+            fail("Knowledge Completion Evidence Strategy integration invalid.");
+          }
+
+          for(const task of tasks){
+            if(Number(task.sufficiency_contract?.minimum_total_sources)!==2 ||
+               Number(task.sufficiency_contract?.minimum_independent_sources)!==2 ||
+               task.sufficiency_contract?.contradiction_search_required!==true ||
+               task.validation_boundary?.evidence_collected!==false ||
+               task.validation_boundary?.validation_decision_made!==false ||
+               task.validation_boundary?.knowledge_admitted!==false ||
+               task.execution?.mode!=="planned_only" ||
+               task.execution?.external_search_performed!==false){
+              fail("Evidence Strategy task crossed protected boundary.");
+            }
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_evidence_strategy_integration_test_passed",
+            question:"What are the HV substation equipment?",
+            subject:"HV Substations",
+            candidate_validation:{
+              validation_target_count:targets.length,
+              validated_target_count:validation.validation_state?.validated_target_count
+            },
+            evidence_strategy:{
+              status:payload.status,
+              validation_target_count:state.validation_target_count,
+              evidence_task_count:state.evidence_task_count,
+              future_executor_queue_count:queue.length,
+              external_execution_connected:state.external_execution_connected
+            },
+            evidence_tasks:tasks.map(t=>({
+              evidence_task_id:t.evidence_task_id,
+              validation_target_id:t.validation_target_id,
+              candidate_label:t.candidate_label,
+              candidate_class:t.candidate_class,
+              evidence_question_count:(t.evidence_questions||[]).length,
+              query_intent_count:(t.query_intents||[]).length,
+              source_strategy_count:(t.source_strategy||[]).length,
+              minimum_total_sources:t.sufficiency_contract?.minimum_total_sources,
+              minimum_independent_sources:t.sufficiency_contract?.minimum_independent_sources,
+              contradiction_search_required:t.sufficiency_contract?.contradiction_search_required,
+              execution_mode:t.execution?.mode,
+              external_search_performed:t.execution?.external_search_performed,
+              knowledge_admitted:t.validation_boundary?.knowledge_admitted
+            })),
+            safeguards:payload.safeguards,
+            architecture:{
+              cosmos_first:true,
+              admitted_sufficient_knowledge_skips_completion:true,
+              missing_knowledge_requires_evidence_plan:true,
+              independent_corroboration_required:true,
+              contradiction_search_required:true,
+              next_stage:"evidence_execution"
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Evidence Strategy integration controlled-output changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion evidence strategy integration"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Evidence Strategy integration output after 3 attempts."
+              exit 1
+            fi
+          fi
+
