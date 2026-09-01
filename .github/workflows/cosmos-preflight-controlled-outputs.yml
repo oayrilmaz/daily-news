@@ -7313,6 +7313,19 @@ jobs:
             }
           }
 
+          for(let i=0;i<queue.length;i++){
+            const row=queue[i];
+            if(Number(row.evidence_rank)!==i+1 ||
+               row.execution_status!=="not_connected" ||
+               row.validation_status!=="not_started" ||
+               !row.validation_objective ||
+               !Array.isArray(row.validation_requirements) ||
+               !row.evidence_contract ||
+               !Array.isArray(row.proposed_investigation_types)){
+              fail("Future evidence queue boundary or planning fields invalid.");
+            }
+          }
+
           const result={
             schema_version:"0.1",
             status:"cosmos_knowledge_completion_candidate_validation_integration_test_passed",
