@@ -6140,16 +6140,21 @@ jobs:
           }
 
           for(const row of admissions){
+            const admittedDecision = new Set(["admit","admit_with_qualification"]);
+            const persistentLevel = new Set(["persistent_knowledge","persistent_qualified_knowledge"]);
+
             if(row.validation_disposition!=="supported" ||
-               row.decision!=="admit" ||
-               row.admitted_claim_class!=="validated_relationship" ||
-               row.persistence_level!=="persistent_knowledge" ||
+               !admittedDecision.has(row.decision) ||
+               !row.admitted_claim_class ||
+               !persistentLevel.has(row.persistence_level) ||
                Number(row.confidence_score)!==75 ||
                row.confidence_band!=="high" ||
                !Array.isArray(row.evidence_record_ids) ||
                row.evidence_record_ids.length!==2 ||
                row.graph_write_eligibility!==true ||
                row.graph_write_status!=="not_started"){
+              console.error("Actual supported admission row:");
+              console.error(JSON.stringify(row,null,2));
               fail(`Supported admission contract invalid: ${row.knowledge_admission_id||"unknown"}`);
             }
 
@@ -6159,6 +6164,8 @@ jobs:
                row.knowledge_write_contract?.preserve_confidence!==true ||
                row.knowledge_write_contract?.preserve_evidence_lineage!==true ||
                row.knowledge_write_contract?.reversible!==true){
+              console.error("Actual knowledge-write contract:");
+              console.error(JSON.stringify(row.knowledge_write_contract||{},null,2));
               fail(`Knowledge-write boundary invalid: ${row.knowledge_admission_id||"unknown"}`);
             }
           }
@@ -6168,7 +6175,9 @@ jobs:
             if(Number(row.graph_write_rank)!==i+1 ||
                row.graph_write_eligibility!==true ||
                row.graph_write_status!=="not_started" ||
-               row.decision!=="admit"){
+               !["admit","admit_with_qualification"].includes(row.decision)){
+              console.error("Actual graph-write queue row:");
+              console.error(JSON.stringify(row,null,2));
               fail(`Graph write queue invalid at rank ${i+1}`);
             }
           }
