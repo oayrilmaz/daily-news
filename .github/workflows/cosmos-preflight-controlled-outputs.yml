@@ -6374,3 +6374,212 @@ jobs:
           echo "Branch-aware Knowledge Completion pipeline controlled output committed."
           echo "No external search, OpenAI call, evidence execution, evidence validation, knowledge admission or graph mutation was performed."
 
+      - name: Write Cosmos Knowledge Completion Acquisition Execution v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-acquisition-execution-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR/downstream"
+
+          cat > "$OUTPUT_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$OUTPUT_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$OUTPUT_DIR/completion-request.json" \
+            --out "$OUTPUT_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$OUTPUT_DIR/acquisition-handoff.json" \
+            --out "$OUTPUT_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out-dir "$OUTPUT_DIR/downstream" \
+            > "$OUTPUT_DIR/candidate-pipeline-stdout.json"
+
+          cp "$OUTPUT_DIR/downstream/applicability.json" \
+             "$OUTPUT_DIR/applicability.json"
+          cp "$OUTPUT_DIR/downstream/pipeline-result.json" \
+             "$OUTPUT_DIR/pipeline-result.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$OUTPUT_DIR/pipeline-result.json" \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out "$OUTPUT_DIR/acquisition-execution-plan.json" \
+            > "$OUTPUT_DIR/acquisition-execution-stdout.json"
+
+          node - "$OUTPUT_DIR/semantic-completion-input.json" \
+                 "$OUTPUT_DIR/acquisition-plan.json" \
+                 "$OUTPUT_DIR/applicability.json" \
+                 "$OUTPUT_DIR/pipeline-result.json" \
+                 "$OUTPUT_DIR/acquisition-execution-plan.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [
+            inputFile,
+            acqFile,
+            appFile,
+            pipelineFile,
+            execFile,
+            testFile
+          ]=process.argv.slice(2);
+
+          const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
+          const acquisition=JSON.parse(fs.readFileSync(acqFile,"utf8"));
+          const applicability=JSON.parse(fs.readFileSync(appFile,"utf8"));
+          const pipeline=JSON.parse(fs.readFileSync(pipelineFile,"utf8"));
+          const execution=JSON.parse(fs.readFileSync(execFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(pipeline.route!=="applicable_direct_execution" ||
+             pipeline.status!=="knowledge_completion_acquisition_execution_required" ||
+             pipeline.next_stage!=="acquisition_execution"){
+            fail("Real HV Substations route did not remain applicable_direct_execution.");
+          }
+
+          const requests=execution.execution_requests||[];
+          const adapterQueue=execution.future_adapter_queue||[];
+
+          if(execution.status!=="knowledge_completion_acquisition_execution_planned" ||
+             requests.length<1 ||
+             adapterQueue.length!==requests.length ||
+             execution.next_stage!=="external_acquisition_adapter"){
+            fail("Acquisition Execution output invalid.");
+          }
+
+          for(const request of requests){
+            if(!Array.isArray(request.query_templates) ||
+               request.query_templates.length<1 ||
+               !Array.isArray(request.source_strategy) ||
+               request.source_strategy.length<1 ||
+               request.execution?.mode!=="adapter_required" ||
+               request.execution?.executor_status!=="not_connected" ||
+               request.execution?.network_execution_performed!==false ||
+               request.epistemic_boundary?.results_are_observations_not_facts!==true ||
+               request.epistemic_boundary?.candidate_validation_required!==true ||
+               request.epistemic_boundary?.evidence_validation_required!==true ||
+               request.epistemic_boundary?.knowledge_admission_required!==true){
+              fail(`Execution request boundary invalid: ${request.execution_request_id||"unknown"}`);
+            }
+          }
+
+          const state=execution.execution_state||{};
+          if(state.external_execution_connected!==false ||
+             state.network_execution_performed!==false ||
+             Number(state.normalized_observation_count)!==0 ||
+             Number(state.candidate_validation_count)!==0 ||
+             Number(state.evidence_validation_count)!==0 ||
+             Number(state.knowledge_admission_count)!==0 ||
+             Number(state.graph_write_count)!==0){
+            fail("Acquisition Execution crossed protected boundary.");
+          }
+
+          if(!Object.values(execution.contracts||{}).every(Boolean)){
+            fail("Execution contracts failed.");
+          }
+          if(!Object.values(execution.safeguards||{}).every(v=>v===false)){
+            fail("Execution safeguards failed.");
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_acquisition_execution_integration_test_passed",
+            question:input.question,
+            subject:input.subject_match,
+            applicability:{
+              status:applicability.status,
+              route:pipeline.route,
+              next_stage:pipeline.next_stage
+            },
+            acquisition:{
+              status:acquisition.status,
+              plan_count:(acquisition.acquisition_plans||[]).length
+            },
+            acquisition_execution:{
+              status:execution.status,
+              execution_request_count:requests.length,
+              adapter_queue_count:adapterQueue.length,
+              next_stage:execution.next_stage,
+              execution_mode:state.execution_mode,
+              external_execution_connected:state.external_execution_connected,
+              network_execution_performed:state.network_execution_performed
+            },
+            contracts:execution.contracts,
+            safeguards:execution.safeguards,
+            protected_boundaries:{
+              normalized_observation_count:state.normalized_observation_count,
+              candidate_validation_count:state.candidate_validation_count,
+              evidence_validation_count:state.evidence_validation_count,
+              knowledge_admission_count:state.knowledge_admission_count,
+              graph_write_count:state.graph_write_count
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Knowledge Completion Acquisition Execution output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion acquisition execution v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              echo "Synchronizing with origin/${GITHUB_REF_NAME} before push (attempt ${attempt}/3)..."
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Acquisition Execution output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled real HV Substations -> applicable_direct_execution -> Acquisition Execution plan committed."
+          echo "External adapter remains disconnected."
+          echo "No external search, OpenAI call, network execution, evidence validation, knowledge admission or graph mutation was performed."
+
