@@ -6826,3 +6826,268 @@ jobs:
           echo "Source strategy is planned only."
           echo "No external search, OpenAI/API call, evidence validation, knowledge admission or graph mutation was performed."
 
+      - name: Write Cosmos Knowledge Completion External Provider Connector v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-external-provider-connector-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR/downstream"
+
+          cat > "$OUTPUT_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$OUTPUT_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$OUTPUT_DIR/completion-request.json" \
+            --out "$OUTPUT_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$OUTPUT_DIR/acquisition-handoff.json" \
+            --out "$OUTPUT_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out-dir "$OUTPUT_DIR/downstream" \
+            > "$OUTPUT_DIR/candidate-pipeline-stdout.json"
+
+          cp "$OUTPUT_DIR/downstream/applicability.json" \
+             "$OUTPUT_DIR/applicability.json"
+          cp "$OUTPUT_DIR/downstream/pipeline-result.json" \
+             "$OUTPUT_DIR/pipeline-result.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$OUTPUT_DIR/pipeline-result.json" \
+            --acquisition "$OUTPUT_DIR/acquisition-plan.json" \
+            --out "$OUTPUT_DIR/acquisition-execution-plan.json" \
+            > "$OUTPUT_DIR/acquisition-execution-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs \
+            --input "$OUTPUT_DIR/acquisition-execution-plan.json" \
+            --out "$OUTPUT_DIR/source-strategy-resolved.json" \
+            > "$OUTPUT_DIR/source-strategy-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/source-strategy-resolved.json" \
+            --out "$OUTPUT_DIR/external-acquisition-requests.json" \
+            > "$OUTPUT_DIR/external-acquisition-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_provider_connector_v0.1.mjs \
+            --input "$OUTPUT_DIR/external-acquisition-requests.json" \
+            --provider fixture \
+            --out "$OUTPUT_DIR/provider-results.json" \
+            > "$OUTPUT_DIR/provider-connector-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/source-strategy-resolved.json" \
+            --provider-results "$OUTPUT_DIR/provider-results.json" \
+            --out "$OUTPUT_DIR/normalized-observations.json" \
+            > "$OUTPUT_DIR/normalization-stdout.json"
+
+          node - "$OUTPUT_DIR/semantic-completion-input.json" \
+                 "$OUTPUT_DIR/source-strategy-resolved.json" \
+                 "$OUTPUT_DIR/external-acquisition-requests.json" \
+                 "$OUTPUT_DIR/provider-results.json" \
+                 "$OUTPUT_DIR/normalized-observations.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [
+            inputFile,
+            strategyFile,
+            requestFile,
+            providerFile,
+            normalizedFile,
+            testFile
+          ]=process.argv.slice(2);
+
+          const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const requests=JSON.parse(fs.readFileSync(requestFile,"utf8"));
+          const provider=JSON.parse(fs.readFileSync(providerFile,"utf8"));
+          const normalized=JSON.parse(fs.readFileSync(normalizedFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(strategy.status!=="knowledge_completion_source_strategy_resolved" ||
+             strategy.next_stage!=="external_acquisition_adapter"){
+            fail("Source Strategy was not adapter-ready.");
+          }
+
+          const providerRequests=requests.provider_requests||[];
+          const providerResults=provider.results||[];
+          const observations=normalized.acquisition_observations||[];
+          const pstate=provider.execution_state||{};
+          const nstate=normalized.adapter_state||{};
+
+          if(requests.status!=="knowledge_completion_external_acquisition_requests_ready" ||
+             requests.next_stage!=="external_provider_execution" ||
+             providerRequests.length<1){
+            fail("Provider requests invalid.");
+          }
+
+          if(provider.status!=="external_provider_results_ready" ||
+             provider.provider_name!=="fixture" ||
+             provider.provider_mode!=="deterministic_fixture" ||
+             pstate.external_provider_connected!==false ||
+             pstate.network_execution_performed!==false){
+            fail("Fixture Provider Connector execution invalid.");
+          }
+
+          if(providerResults.length<1){
+            fail("Fixture Provider Connector returned no results.");
+          }
+
+          for(const row of providerResults){
+            if(row.source_type!=="unclassified_external_web_result" ||
+               Number(row.authority_score)!==0 ||
+               row.supports_or_contradicts!=="context_only" ||
+               !row.requested_source_type){
+              fail("Provider result was treated as authoritative evidence.");
+            }
+          }
+
+          if(normalized.status!=="knowledge_completion_external_acquisition_results_normalized" ||
+             normalized.next_stage!=="acquisition_observation_candidate_adapter" ||
+             observations.length<1){
+            fail("External result normalization failed.");
+          }
+
+          for(const obs of observations){
+            if(obs.epistemic_status!=="external_acquisition_observation" ||
+               obs.validation_status!=="not_started" ||
+               obs.knowledge_status!=="not_admitted" ||
+               obs.executable!==false){
+              fail("Normalized observation crossed protected boundary.");
+            }
+          }
+
+          if(nstate.validation_performed!==false ||
+             nstate.knowledge_admission_performed!==false ||
+             nstate.graph_write_performed!==false){
+            fail("Normalization crossed protected boundary.");
+          }
+
+          if(!Object.values(provider.contracts||{}).every(Boolean) ||
+             !Object.values(normalized.contracts||{}).every(Boolean)){
+            fail("Connector/normalization contracts failed.");
+          }
+
+          if(!Object.values(provider.safeguards||{}).every(v=>v===false) ||
+             !Object.values(normalized.safeguards||{}).every(v=>v===false)){
+            fail("Connector/normalization safeguards failed.");
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_external_provider_connector_integration_test_passed",
+            question:input.question,
+            subject:input.subject_match,
+            source_strategy:{
+              status:strategy.status,
+              resolved_request_count:strategy.resolution_state?.resolved_count,
+              next_stage:strategy.next_stage
+            },
+            external_acquisition_adapter:{
+              status:requests.status,
+              provider_request_count:providerRequests.length,
+              next_stage:requests.next_stage
+            },
+            external_provider_connector:{
+              status:provider.status,
+              provider_name:provider.provider_name,
+              provider_mode:provider.provider_mode,
+              provider_result_count:providerResults.length,
+              external_provider_connected:pstate.external_provider_connected,
+              network_execution_performed:pstate.network_execution_performed,
+              next_stage:provider.next_stage
+            },
+            normalization:{
+              status:normalized.status,
+              normalized_observation_count:observations.length,
+              rejected_result_count:(normalized.rejected_results||[]).length,
+              next_stage:normalized.next_stage
+            },
+            contracts:{
+              provider_request_lineage_preserved:provider.contracts?.provider_request_lineage_preserved,
+              requested_source_constraint_preserved_separately:provider.contracts?.requested_source_constraint_preserved_separately,
+              returned_source_type_not_assumed_from_request:provider.contracts?.returned_source_type_not_assumed_from_request,
+              returned_authority_not_assumed_from_request:provider.contracts?.returned_authority_not_assumed_from_request,
+              provider_results_preserved_as_unvalidated_observations:normalized.contracts?.provider_results_preserved_as_unvalidated_observations,
+              validation_required_before_admission:normalized.contracts?.validation_required_before_admission
+            },
+            safeguards:{
+              connector:provider.safeguards,
+              normalization:normalized.safeguards
+            },
+            protected_boundaries:{
+              provider_network_execution_performed:pstate.network_execution_performed,
+              validation_performed:nstate.validation_performed,
+              knowledge_admission_performed:nstate.knowledge_admission_performed,
+              graph_write_performed:nstate.graph_write_performed
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No External Provider Connector controlled-output changes to commit."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos external provider connector v0.1 fixture output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push External Provider Connector output after 3 attempts."
+              exit 1
+            fi
+          fi
+
+          echo "Controlled HV Substations External Provider Connector fixture output committed."
+          echo "Fixture mode only: no network execution and no API key used."
+          echo "No validation, knowledge admission, answer rebuild or graph mutation was performed."
+
