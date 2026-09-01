@@ -7792,3 +7792,242 @@ jobs:
             fi
           fi
 
+      - name: Write Knowledge Completion Evidence Validation integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-evidence-validation-integration-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/candidate-validation.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"candidate_validation_targets_resolved",
+            "source_decomposition":{"schema_version":"0.1","status":"decomposition_candidates_resolved"},
+            "validation_state":{
+              "raw_candidate_count":2,
+              "unique_validation_target_count":2,
+              "duplicate_candidate_count":0,
+              "validated_target_count":0,
+              "executable_target_count":0,
+              "external_execution_connected":false,
+              "conceptual_distance_limit":null,
+              "continuation_possible":true
+            },
+            "validation_targets":[
+              {
+                "validation_target_id":"validation_power_transformer",
+                "candidate_label":"Power Transformer",
+                "candidate_class":"component_or_equipment",
+                "epistemic_status":"provisional_candidate",
+                "validation_status":"not_started",
+                "executable":false,
+                "knowledge_status":"not_admitted",
+                "validation_objective":"Determine whether Power Transformer is equipment/component of HV Substations.",
+                "validation_requirements":["Confirm requested relationship","Capture contradictory evidence"],
+                "proposed_investigation_types":["identify_components"],
+                "evidence_contract":{
+                  "minimum_independent_sources":2,
+                  "preferred_source_characteristic":"primary_or_authoritative_where_available",
+                  "contradiction_capture_required":true,
+                  "provenance_required":true
+                },
+                "post_validation_fanout":{"if_supported":["knowledge_admission"]}
+              },
+              {
+                "validation_target_id":"validation_circuit_breaker",
+                "candidate_label":"Circuit Breaker",
+                "candidate_class":"component_or_equipment",
+                "epistemic_status":"provisional_candidate",
+                "validation_status":"not_started",
+                "executable":false,
+                "knowledge_status":"not_admitted",
+                "validation_objective":"Determine whether Circuit Breaker is equipment/component of HV Substations.",
+                "validation_requirements":["Confirm requested relationship","Capture contradictory evidence"],
+                "proposed_investigation_types":["identify_components"],
+                "evidence_contract":{
+                  "minimum_independent_sources":2,
+                  "preferred_source_characteristic":"primary_or_authoritative_where_available",
+                  "contradiction_capture_required":true,
+                  "provenance_required":true
+                },
+                "post_validation_fanout":{"if_supported":["knowledge_admission"]}
+              }
+            ],
+            "future_evidence_queue":[]
+          }
+          JSON
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$OUTPUT_DIR/candidate-validation.json" \
+            --out "$OUTPUT_DIR/evidence-strategy.json"
+
+          node - "$OUTPUT_DIR/evidence-strategy.json" "$OUTPUT_DIR/adapter-results.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,outFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const now="2026-09-01T12:00:00Z";
+          const results=[];
+          for(const task of strategy.evidence_tasks||[]){
+            const label=task.candidate_label;
+            const safe=String(label).toLowerCase().replace(/[^a-z0-9]+/g,"-");
+            results.push(
+              {
+                evidence_task_id:task.evidence_task_id,
+                source_url_or_identifier:`fixture://oem/${safe}`,
+                source_type:"manufacturer_or_oem_technical_document",
+                source_title:`OEM technical documentation for ${label}`,
+                source_publisher_or_owner:`Fixture OEM ${safe}`,
+                source_date_or_event_date:"2026-08-15",
+                retrieved_at:now,
+                extracted_fact:`${label} is identified as equipment used in an HV substation.`,
+                supports_or_contradicts:"supports",
+                directness:"direct",
+                authority_score:100,
+                independence_group:`oem-${safe}`,
+                geography_scope:"global",
+                temporal_scope:"current",
+                entity_ids:[],
+                relationship_ids:[],
+                query_used:`${label} HV substation`,
+                source_rank:1
+              },
+              {
+                evidence_task_id:task.evidence_task_id,
+                source_url_or_identifier:`fixture://utility/${safe}`,
+                source_type:"utility_or_owner_engineering_standard",
+                source_title:`Utility engineering standard for ${label}`,
+                source_publisher_or_owner:`Fixture Utility ${safe}`,
+                source_date_or_event_date:"2026-08-20",
+                retrieved_at:now,
+                extracted_fact:`Independent utility engineering documentation includes ${label} in HV substation equipment.`,
+                supports_or_contradicts:"supports",
+                directness:"direct",
+                authority_score:96,
+                independence_group:`utility-${safe}`,
+                geography_scope:"global",
+                temporal_scope:"current",
+                entity_ids:[],
+                relationship_ids:[],
+                query_used:`${label} substation engineering standard`,
+                source_rank:2
+              }
+            );
+          }
+          fs.writeFileSync(outFile,JSON.stringify({
+            schema_version:"0.1-fixture",
+            generated_at:now,
+            status:"adapter_results_ready",
+            adapter_name:"cosmos_evidence_validation_fixture",
+            adapter_mode:"deterministic_fixture",
+            results
+          },null,2)+"\n");
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy "$OUTPUT_DIR/evidence-strategy.json" \
+            --adapter-results "$OUTPUT_DIR/adapter-results.json" \
+            --out "$OUTPUT_DIR/evidence-executor.json"
+
+          node scripts/cosmos_evidence_validator.cjs \
+            --input "$OUTPUT_DIR/evidence-executor.json" \
+            --out "$OUTPUT_DIR/evidence-validator.json"
+
+          node - "$OUTPUT_DIR/evidence-validator.json" "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [validatorFile,testFile]=process.argv.slice(2);
+          const payload=JSON.parse(fs.readFileSync(validatorFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          const state=payload.validation_state||{};
+          const validations=payload.validations||[];
+          const queue=payload.knowledge_admission_queue||[];
+
+          if(payload.status!=="evidence_validation_resolved" ||
+             validations.length!==2 ||
+             Number(state.completed_validation_count)!==2 ||
+             Number(state.knowledge_admission_count)!==0 ||
+             queue.length<1){
+            fail("Knowledge Completion Evidence Validation controlled output invalid.");
+          }
+
+          for(const row of validations){
+            if(row.validation_status!=="completed" ||
+               row.knowledge_admission_status!=="not_started" ||
+               Number(row.evidence_record_count)!==2 ||
+               Number(row.evidence_balance?.independent_source_groups)!==2){
+              fail("Evidence validation row invalid.");
+            }
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_evidence_validation_integration_test_passed",
+            question:"What are the HV substation equipment?",
+            subject:"HV Substations",
+            evidence_validation:{
+              status:payload.status,
+              validation_target_count:state.validation_target_count,
+              completed_validation_count:state.completed_validation_count,
+              knowledge_admission_count:state.knowledge_admission_count,
+              by_disposition:state.by_disposition,
+              knowledge_admission_queue_count:queue.length
+            },
+            validations:validations.map(v=>({
+              evidence_validation_id:v.evidence_validation_id,
+              validation_target_id:v.validation_target_id,
+              disposition:v.disposition,
+              confidence_score:v.confidence_score,
+              confidence_band:v.confidence_band,
+              evidence_record_count:v.evidence_record_count,
+              independent_source_groups:v.evidence_balance?.independent_source_groups,
+              total_source_threshold_met:v.sufficiency_observation?.total_source_threshold_met,
+              independent_source_threshold_met:v.sufficiency_observation?.independent_source_threshold_met,
+              validation_status:v.validation_status,
+              knowledge_admission_status:v.knowledge_admission_status,
+              executable_for_knowledge_admission:v.executable_for_knowledge_admission
+            })),
+            knowledge_admission_queue:queue,
+            safeguards:payload.safeguards,
+            architecture:{
+              cosmos_first:true,
+              evidence_validation_is_not_learning:true,
+              knowledge_admission_is_next_boundary:true,
+              persistent_reuse_begins_only_after_admission_and_graph_write:true,
+              next_stage:"knowledge_admission"
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Evidence Validation integration controlled-output changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion evidence validation integration"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Evidence Validation integration output after 3 attempts."
+              exit 1
+            fi
+          fi
+
