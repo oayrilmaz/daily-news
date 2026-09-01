@@ -4619,3 +4619,167 @@ jobs:
           console.log("No external evidence execution, validation, admission or graph mutation occurred.");
           NODE
 
+      - name: Check Cosmos Knowledge Completion Acquisition Execution v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_execution_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_execution_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Acquisition Execution v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_acquisition_execution_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs
+
+      - name: Test real HV Substations applicable route into Acquisition Execution v0.1
+        run: |
+          set -euo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          mkdir -p "$TMP_DIR/downstream"
+
+          cat > "$TMP_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$TMP_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$TMP_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$TMP_DIR/completion-request.json" \
+            --out "$TMP_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$TMP_DIR/acquisition-handoff.json" \
+            --out "$TMP_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out-dir "$TMP_DIR/downstream" \
+            > "$TMP_DIR/candidate-pipeline-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$TMP_DIR/downstream/pipeline-result.json" \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out "$TMP_DIR/acquisition-execution-plan.json" \
+            > "$TMP_DIR/acquisition-execution-stdout.json"
+
+          node - "$TMP_DIR/semantic-completion-input.json" \
+                 "$TMP_DIR/downstream/pipeline-result.json" \
+                 "$TMP_DIR/acquisition-plan.json" \
+                 "$TMP_DIR/acquisition-execution-plan.json" <<'NODE'
+          const fs=require("fs");
+          const [inputFile,pipelineFile,acqFile,execFile]=process.argv.slice(2);
+          const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
+          const pipeline=JSON.parse(fs.readFileSync(pipelineFile,"utf8"));
+          const acquisition=JSON.parse(fs.readFileSync(acqFile,"utf8"));
+          const execution=JSON.parse(fs.readFileSync(execFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(input.question!=="What are the HV substation equipment?" ||
+             input.subject_match?.label!=="HV Substations"){
+            fail("Question/subject fixture changed.");
+          }
+
+          if(pipeline.route!=="applicable_direct_execution" ||
+             pipeline.status!=="knowledge_completion_acquisition_execution_required" ||
+             pipeline.next_stage!=="acquisition_execution"){
+            fail(`Real applicability route did not reach acquisition execution: ${pipeline.route} / ${pipeline.status} / ${pipeline.next_stage}`);
+          }
+
+          if(acquisition.status!=="acquisition_plans_resolved" ||
+             (acquisition.acquisition_plans||[]).length<1){
+            fail("Real Acquisition plan unavailable.");
+          }
+
+          if(execution.schema_version!=="0.1" ||
+             execution.status!=="knowledge_completion_acquisition_execution_planned"){
+            fail(`Acquisition Execution plan invalid: ${execution.schema_version} / ${execution.status}`);
+          }
+
+          const requests=execution.execution_requests||[];
+          const adapterQueue=execution.future_adapter_queue||[];
+
+          if(requests.length<1 || adapterQueue.length!==requests.length){
+            fail("Acquisition Execution request/adapter queue invalid.");
+          }
+
+          for(const request of requests){
+            if(!request.execution_request_id ||
+               !request.acquisition_plan_id ||
+               !Array.isArray(request.query_templates) ||
+               request.query_templates.length<1 ||
+               !Array.isArray(request.source_strategy) ||
+               request.source_strategy.length<1 ||
+               request.execution?.mode!=="adapter_required" ||
+               request.execution?.executor_status!=="not_connected" ||
+               request.execution?.network_execution_performed!==false ||
+               Number(request.execution?.result_count)!==0 ||
+               request.epistemic_boundary?.results_are_observations_not_facts!==true ||
+               request.epistemic_boundary?.candidate_validation_required!==true ||
+               request.epistemic_boundary?.evidence_validation_required!==true ||
+               request.epistemic_boundary?.knowledge_admission_required!==true){
+              fail(`Acquisition Execution request invalid: ${request.execution_request_id||"unknown"}`);
+            }
+          }
+
+          const state=execution.execution_state||{};
+          if(state.execution_mode!=="adapter_required" ||
+             state.external_execution_connected!==false ||
+             state.network_execution_performed!==false ||
+             Number(state.normalized_observation_count)!==0 ||
+             Number(state.candidate_validation_count)!==0 ||
+             Number(state.evidence_validation_count)!==0 ||
+             Number(state.knowledge_admission_count)!==0 ||
+             Number(state.graph_write_count)!==0){
+            fail("Acquisition Execution state crossed protected boundary.");
+          }
+
+          if(execution.next_stage!=="external_acquisition_adapter"){
+            fail(`Unexpected Acquisition Execution next stage: ${execution.next_stage}`);
+          }
+
+          if(!Object.values(execution.contracts||{}).every(Boolean)){
+            fail("Acquisition Execution contracts failed.");
+          }
+
+          if(!Object.values(execution.safeguards||{}).every(v=>v===false)){
+            fail("Acquisition Execution safeguards failed.");
+          }
+
+          console.log("");
+          console.log("Real HV Substations applicable route reached Acquisition Execution successfully.");
+          console.log(`Execution requests: ${requests.length}`);
+          console.log(`Adapter queue:      ${adapterQueue.length}`);
+          console.log(`Next stage:         ${execution.next_stage}`);
+          console.log("External adapter remains disconnected.");
+          console.log("No network execution, evidence validation, knowledge admission or graph mutation occurred.");
+          NODE
+
