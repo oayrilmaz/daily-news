@@ -8237,3 +8237,39 @@ jobs:
             fi
           fi
 
+      - name: Write Knowledge Completion Graph Writer integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          D="knowledge/cosmos/knowledge-completion-graph-writer-integration-test-v0.1"
+          rm -rf "$D"; mkdir -p "$D"
+          cat > "$D/admission.json" <<'JSON'
+          {"schema_version":"0.1","status":"knowledge_admission_resolved","admission_state":{"validation_count":2,"reviewed_count":2,"graph_write_eligible_count":2,"graph_write_count":0,"conceptual_distance_limit":null,"continuation_possible":true},"admissions":[
+          {"knowledge_admission_id":"knowledge_admission_pt","evidence_validation_id":"evidence_validation_power_transformer","validation_target_id":"validation_power_transformer","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","decision":"admit","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],"qualification":{"contradiction_present":false,"must_preserve_contradiction":false,"confidence_must_be_preserved":true,"source_lineage_must_be_preserved":true},"graph_write_eligibility":true,"graph_write_status":"not_started"},
+          {"knowledge_admission_id":"knowledge_admission_cb","evidence_validation_id":"evidence_validation_circuit_breaker","validation_target_id":"validation_circuit_breaker","admitted_claim_class":"validated_supported_relationship","validation_disposition":"supported","decision":"admit","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],"qualification":{"contradiction_present":false,"must_preserve_contradiction":false,"confidence_must_be_preserved":true,"source_lineage_must_be_preserved":true},"graph_write_eligibility":true,"graph_write_status":"not_started"}],"graph_write_queue":[]}
+          JSON
+          cat > "$D/before.json" <<'JSON'
+          {"schema_version":"0.1","generated_at":null,"status":"cosmos_graph_snapshot","knowledge_records":[],"audit_log":[]}
+          JSON
+          node scripts/cosmos_graph_writer.cjs --admission "$D/admission.json" --graph "$D/before.json" --out "$D/graph.json" --report "$D/report.json"
+          node scripts/cosmos_graph_writer.cjs --admission "$D/admission.json" --graph "$D/graph.json" --out "$D/graph-second.json" --report "$D/report-second.json"
+          node - "$D/graph.json" "$D/report.json" "$D/report-second.json" "$D/test-result.json" <<'NODE'
+          const fs=require("fs"),[gf,rf,r2f,out]=process.argv.slice(2),g=JSON.parse(fs.readFileSync(gf)),r=JSON.parse(fs.readFileSync(rf)),r2=JSON.parse(fs.readFileSync(r2f));
+          if(r.graph_write_state?.written_count!==2||g.knowledge_records?.length!==2||g.audit_log?.length!==2||r2.graph_write_state?.idempotent_skip_count!==2) throw Error("Graph Writer controlled output invalid");
+          const result={schema_version:"0.1",status:"cosmos_knowledge_completion_graph_writer_integration_test_passed",question:"What are the HV substation equipment?",subject:"HV Substations",graph_writer:{status:r.status,first_run_written_count:r.graph_write_state.written_count,persistent_knowledge_record_count:g.knowledge_records.length,audit_record_count:g.audit_log.length,second_run_written_count:r2.graph_write_state.written_count,second_run_idempotent_skip_count:r2.graph_write_state.idempotent_skip_count},persistent_records:g.knowledge_records.map(x=>({knowledge_admission_id:x.knowledge_admission_id,validation_target_id:x.validation_target_id,admitted_claim_class:x.admitted_claim_class,validation_disposition:x.validation_disposition,confidence_score:x.confidence_score,confidence_band:x.confidence_band,persistence_level:x.persistence_level,evidence_record_ids:x.evidence_record_ids,reversible:x.reversibility?.reversible})),safeguards:r.safeguards,architecture:{cosmos_first:true,validated_admitted_knowledge_materialized:true,graph_snapshot_is_explicit_output:true,input_graph_not_mutated_in_place:true,evidence_lineage_and_confidence_preserved:true,graph_records_reversible:true,graph_writer_idempotent:true,butterfly_trail_remains_ephemeral_observer_state:true,next_stage:"answer_rebuild_from_persistent_cosmos_knowledge"}};
+          fs.writeFileSync(out,JSON.stringify(result,null,2)+"\n"); console.log(JSON.stringify(result,null,2));
+          NODE
+          git add "$D"
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion graph writer integration"
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+              sleep $((attempt*2))
+            done
+            test "$pushed" = true
+          fi
+
