@@ -4984,3 +4984,196 @@ jobs:
           console.log("No search, OpenAI/API call, evidence validation, knowledge admission or graph mutation occurred.");
           NODE
 
+      - name: Check Cosmos Knowledge Completion External Acquisition Adapter v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_external_acquisition_adapter_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_external_acquisition_adapter_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion External Acquisition Adapter v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_external_acquisition_adapter_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs
+
+      - name: Check Cosmos Knowledge Completion External Provider Connector v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_external_provider_connector_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_external_provider_connector_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_external_provider_connector_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_external_provider_connector_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion External Provider Connector v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_external_provider_connector_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_external_provider_connector_v0.1.mjs
+
+      - name: Test real HV Substations route through fixture External Provider Connector v0.1
+        run: |
+          set -euo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          mkdir -p "$TMP_DIR/downstream"
+
+          cat > "$TMP_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$TMP_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$TMP_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$TMP_DIR/completion-request.json" \
+            --out "$TMP_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$TMP_DIR/acquisition-handoff.json" \
+            --out "$TMP_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out-dir "$TMP_DIR/downstream" \
+            > "$TMP_DIR/candidate-pipeline-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$TMP_DIR/downstream/pipeline-result.json" \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out "$TMP_DIR/acquisition-execution-plan.json" \
+            > "$TMP_DIR/acquisition-execution-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs \
+            --input "$TMP_DIR/acquisition-execution-plan.json" \
+            --out "$TMP_DIR/source-strategy-resolved.json" \
+            > "$TMP_DIR/source-strategy-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs \
+            --input "$TMP_DIR/source-strategy-resolved.json" \
+            --out "$TMP_DIR/external-acquisition-requests.json" \
+            > "$TMP_DIR/external-acquisition-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_provider_connector_v0.1.mjs \
+            --input "$TMP_DIR/external-acquisition-requests.json" \
+            --provider fixture \
+            --out "$TMP_DIR/provider-results.json" \
+            > "$TMP_DIR/provider-connector-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_external_acquisition_adapter_v0.1.mjs \
+            --input "$TMP_DIR/source-strategy-resolved.json" \
+            --provider-results "$TMP_DIR/provider-results.json" \
+            --out "$TMP_DIR/normalized-observations.json" \
+            > "$TMP_DIR/normalization-stdout.json"
+
+          node - "$TMP_DIR/external-acquisition-requests.json" \
+                 "$TMP_DIR/provider-results.json" \
+                 "$TMP_DIR/normalized-observations.json" <<'NODE'
+          const fs=require("fs");
+          const [requestFile,providerFile,normalizedFile]=process.argv.slice(2);
+          const requests=JSON.parse(fs.readFileSync(requestFile,"utf8"));
+          const provider=JSON.parse(fs.readFileSync(providerFile,"utf8"));
+          const normalized=JSON.parse(fs.readFileSync(normalizedFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(requests.status!=="knowledge_completion_external_acquisition_requests_ready" ||
+             requests.next_stage!=="external_provider_execution" ||
+             (requests.provider_requests||[]).length<1){
+            fail("External Acquisition Adapter did not create provider requests.");
+          }
+
+          if(provider.status!=="external_provider_results_ready" ||
+             provider.provider_name!=="fixture" ||
+             provider.provider_mode!=="deterministic_fixture"){
+            fail(`Fixture provider execution invalid: ${provider.status} / ${provider.provider_name} / ${provider.provider_mode}`);
+          }
+
+          const pstate=provider.execution_state||{};
+          if(pstate.external_provider_connected!==false ||
+             pstate.network_execution_performed!==false ||
+             pstate.validation_performed!==false ||
+             pstate.knowledge_admission_performed!==false ||
+             pstate.graph_write_performed!==false){
+            fail("Fixture provider crossed protected boundary.");
+          }
+
+          const providerResults=provider.results||[];
+          if(providerResults.length<1){
+            fail("Fixture provider returned no results.");
+          }
+
+          for(const row of providerResults){
+            if(row.source_type!=="unclassified_external_web_result" ||
+               Number(row.authority_score)!==0 ||
+               row.supports_or_contradicts!=="context_only" ||
+               !row.requested_source_type ||
+               !Number.isFinite(Number(row.requested_authority_score))){
+              fail("Fixture provider result improperly inherited source authority or fact status.");
+            }
+          }
+
+          if(normalized.status!=="knowledge_completion_external_acquisition_results_normalized" ||
+             normalized.next_stage!=="acquisition_observation_candidate_adapter"){
+            fail(`External acquisition normalization invalid: ${normalized.status} / ${normalized.next_stage}`);
+          }
+
+          const observations=normalized.acquisition_observations||[];
+          if(observations.length<1){
+            fail("No normalized external acquisition observations.");
+          }
+
+          for(const obs of observations){
+            if(obs.epistemic_status!=="external_acquisition_observation" ||
+               obs.validation_status!=="not_started" ||
+               obs.knowledge_status!=="not_admitted" ||
+               obs.executable!==false){
+              fail("External acquisition observation crossed epistemic boundary.");
+            }
+          }
+
+          if(!Object.values(provider.contracts||{}).every(Boolean) ||
+             !Object.values(normalized.contracts||{}).every(Boolean)){
+            fail("External provider/normalization contracts failed.");
+          }
+
+          if(!Object.values(provider.safeguards||{}).every(v=>v===false) ||
+             !Object.values(normalized.safeguards||{}).every(v=>v===false)){
+            fail("External provider/normalization safeguards failed.");
+          }
+
+          console.log("");
+          console.log("Real HV Substations path reached fixture External Provider Connector.");
+          console.log(`Provider requests:        ${(requests.provider_requests||[]).length}`);
+          console.log(`Fixture provider results: ${providerResults.length}`);
+          console.log(`Normalized observations:  ${observations.length}`);
+          console.log(`Next stage:               ${normalized.next_stage}`);
+          console.log("Fixture mode performed no network execution.");
+          console.log("No evidence validation, knowledge admission, answer rebuild or graph mutation occurred.");
+          NODE
+
