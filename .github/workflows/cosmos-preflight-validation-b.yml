@@ -5735,3 +5735,226 @@ jobs:
           console.log("Evidence remains unvalidated and not admitted.");
           NODE
 
+      - name: Test Knowledge Completion Evidence Validation integration v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cat > "$TMP_DIR/candidate-validation.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"candidate_validation_targets_resolved",
+            "source_decomposition":{"schema_version":"0.1","status":"decomposition_candidates_resolved"},
+            "validation_state":{
+              "raw_candidate_count":2,
+              "unique_validation_target_count":2,
+              "duplicate_candidate_count":0,
+              "validated_target_count":0,
+              "executable_target_count":0,
+              "external_execution_connected":false,
+              "conceptual_distance_limit":null,
+              "continuation_possible":true
+            },
+            "validation_targets":[
+              {
+                "validation_target_id":"validation_power_transformer",
+                "candidate_label":"Power Transformer",
+                "candidate_class":"component_or_equipment",
+                "epistemic_status":"provisional_candidate",
+                "validation_status":"not_started",
+                "executable":false,
+                "knowledge_status":"not_admitted",
+                "validation_objective":"Determine whether Power Transformer is equipment/component of HV Substations.",
+                "validation_requirements":["Confirm requested relationship","Capture contradictory evidence"],
+                "proposed_investigation_types":["identify_components"],
+                "evidence_contract":{
+                  "minimum_independent_sources":2,
+                  "preferred_source_characteristic":"primary_or_authoritative_where_available",
+                  "contradiction_capture_required":true,
+                  "provenance_required":true
+                },
+                "post_validation_fanout":{"if_supported":["knowledge_admission"]}
+              },
+              {
+                "validation_target_id":"validation_circuit_breaker",
+                "candidate_label":"Circuit Breaker",
+                "candidate_class":"component_or_equipment",
+                "epistemic_status":"provisional_candidate",
+                "validation_status":"not_started",
+                "executable":false,
+                "knowledge_status":"not_admitted",
+                "validation_objective":"Determine whether Circuit Breaker is equipment/component of HV Substations.",
+                "validation_requirements":["Confirm requested relationship","Capture contradictory evidence"],
+                "proposed_investigation_types":["identify_components"],
+                "evidence_contract":{
+                  "minimum_independent_sources":2,
+                  "preferred_source_characteristic":"primary_or_authoritative_where_available",
+                  "contradiction_capture_required":true,
+                  "provenance_required":true
+                },
+                "post_validation_fanout":{"if_supported":["knowledge_admission"]}
+              }
+            ],
+            "future_evidence_queue":[]
+          }
+          JSON
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$TMP_DIR/candidate-validation.json" \
+            --out "$TMP_DIR/evidence-strategy.json"
+
+          node - "$TMP_DIR/evidence-strategy.json" "$TMP_DIR/adapter-results.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,outFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const tasks=strategy.evidence_tasks||[];
+          if(tasks.length!==2) throw new Error(`Expected 2 evidence tasks; got ${tasks.length}`);
+          const now="2026-09-01T12:00:00Z";
+          const results=[];
+          for(const task of tasks){
+            const label=task.candidate_label;
+            const safe=String(label).toLowerCase().replace(/[^a-z0-9]+/g,"-");
+            results.push(
+              {
+                evidence_task_id:task.evidence_task_id,
+                source_url_or_identifier:`fixture://oem/${safe}`,
+                source_type:"manufacturer_or_oem_technical_document",
+                source_title:`OEM technical documentation for ${label}`,
+                source_publisher_or_owner:`Fixture OEM ${safe}`,
+                source_date_or_event_date:"2026-08-15",
+                retrieved_at:now,
+                extracted_fact:`${label} is identified as equipment used in an HV substation.`,
+                supports_or_contradicts:"supports",
+                directness:"direct",
+                authority_score:100,
+                independence_group:`oem-${safe}`,
+                geography_scope:"global",
+                temporal_scope:"current",
+                entity_ids:[],
+                relationship_ids:[],
+                query_used:`${label} HV substation`,
+                source_rank:1
+              },
+              {
+                evidence_task_id:task.evidence_task_id,
+                source_url_or_identifier:`fixture://utility/${safe}`,
+                source_type:"utility_or_owner_engineering_standard",
+                source_title:`Utility engineering standard for ${label}`,
+                source_publisher_or_owner:`Fixture Utility ${safe}`,
+                source_date_or_event_date:"2026-08-20",
+                retrieved_at:now,
+                extracted_fact:`Independent utility engineering documentation includes ${label} in HV substation equipment.`,
+                supports_or_contradicts:"supports",
+                directness:"direct",
+                authority_score:96,
+                independence_group:`utility-${safe}`,
+                geography_scope:"global",
+                temporal_scope:"current",
+                entity_ids:[],
+                relationship_ids:[],
+                query_used:`${label} substation engineering standard`,
+                source_rank:2
+              }
+            );
+          }
+          fs.writeFileSync(outFile,JSON.stringify({
+            schema_version:"0.1-fixture",
+            generated_at:now,
+            status:"adapter_results_ready",
+            adapter_name:"cosmos_evidence_validation_fixture",
+            adapter_mode:"deterministic_fixture",
+            results
+          },null,2)+"\n");
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy "$TMP_DIR/evidence-strategy.json" \
+            --adapter-results "$TMP_DIR/adapter-results.json" \
+            --out "$TMP_DIR/evidence-executor.json"
+
+          node scripts/cosmos_evidence_validator.cjs \
+            --input "$TMP_DIR/evidence-executor.json" \
+            --out "$TMP_DIR/evidence-validator.json"
+
+          node - "$TMP_DIR/evidence-validator.json" <<'NODE'
+          const fs=require("fs");
+          const payload=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          const state=payload.validation_state||{};
+          const validations=payload.validations||[];
+          const queue=payload.knowledge_admission_queue||[];
+          const allowed=new Set(["supported","partially_supported","contradicted","unresolved","insufficient_evidence"]);
+
+          if(payload.schema_version!=="0.1" ||
+             payload.status!=="evidence_validation_resolved" ||
+             payload.source_evidence_executor?.status!=="evidence_execution_normalized"){
+            fail("Evidence Validator did not consume Evidence Executor.");
+          }
+
+          if(validations.length!==2 ||
+             Number(state.validation_target_count)!==2 ||
+             Number(state.completed_validation_count)!==2 ||
+             Number(state.knowledge_admission_count)!==0){
+            fail("Evidence Validation counts invalid.");
+          }
+
+          for(const row of validations){
+            if(!row.evidence_validation_id ||
+               !row.evidence_task_id ||
+               !row.validation_target_id ||
+               !allowed.has(row.disposition) ||
+               !Number.isFinite(Number(row.confidence_score)) ||
+               Number(row.confidence_score)<0 ||
+               Number(row.confidence_score)>100 ||
+               !Array.isArray(row.evidence_record_ids) ||
+               !Array.isArray(row.record_assessments) ||
+               row.validation_status!=="completed" ||
+               row.knowledge_admission_status!=="not_started" ||
+               !String(row.epistemic_rule||"").includes("only Knowledge Admission")){
+              fail(`Evidence validation row invalid: ${row.evidence_validation_id||"unknown"}`);
+            }
+
+            if(Number(row.evidence_record_count)!==2 ||
+               Number(row.evidence_balance?.independent_source_groups)!==2 ||
+               row.sufficiency_observation?.total_source_threshold_met!==true ||
+               row.sufficiency_observation?.independent_source_threshold_met!==true){
+              fail(`Evidence sufficiency not established: ${row.evidence_validation_id}`);
+            }
+          }
+
+          if(queue.length<1){
+            fail("Strong controlled evidence produced no Knowledge Admission review queue.");
+          }
+
+          for(const row of queue){
+            if(!["supported","partially_supported"].includes(row.disposition) ||
+               row.admission_status!=="not_started" ||
+               !Array.isArray(row.evidence_record_ids) ||
+               row.evidence_record_ids.length<2){
+              fail("Knowledge Admission queue row invalid.");
+            }
+          }
+
+          const safeguards=payload.safeguards||{};
+          if(safeguards.performs_external_search!==false ||
+             safeguards.calls_openai_or_external_api!==false ||
+             safeguards.invents_evidence!==false ||
+             safeguards.preserves_contradictory_evidence!==true ||
+             safeguards.validation_uses_authority_directness_independence_and_completeness!==true ||
+             safeguards.validation_does_not_equal_knowledge_admission!==true ||
+             safeguards.writes_to_knowledge_graph!==false ||
+             safeguards.promotes_candidates_to_facts!==false ||
+             safeguards.unresolved_or_insufficient_targets_not_admission_eligible!==true ||
+             safeguards.source_lineage_preserved!==true ||
+             safeguards.unlimited_conceptual_continuation_preserved!==true){
+            fail("Evidence Validator safeguards invalid.");
+          }
+
+          console.log("Knowledge Completion → Evidence Validation integration PASS.");
+          console.log(`Validations completed: ${validations.length}`);
+          console.log(`Admission review queue: ${queue.length}`);
+          console.log(`Dispositions: ${JSON.stringify(state.by_disposition||{})}`);
+          console.log("Validation classified evidence but did not admit knowledge or write the graph.");
+          NODE
+
