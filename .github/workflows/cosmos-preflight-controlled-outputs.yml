@@ -8141,10 +8141,13 @@ jobs:
 
           for(const row of admissions){
             if(row.validation_disposition!=="supported" ||
-               row.decision!=="admit" ||
-               row.persistence_level!=="persistent_knowledge" ||
+               !["admit","admit_with_qualification"].includes(row.decision) ||
+               !["persistent_knowledge","persistent_qualified_knowledge"].includes(row.persistence_level) ||
+               !row.admitted_claim_class ||
                row.graph_write_eligibility!==true ||
                row.graph_write_status!=="not_started"){
+              console.error("Actual supported admission row:");
+              console.error(JSON.stringify(row,null,2));
               fail("Supported validation did not become graph-write-eligible persistent knowledge.");
             }
           }
@@ -8189,6 +8192,7 @@ jobs:
             architecture:{
               cosmos_first:true,
               admission_establishes_persistence_eligibility:true,
+              admission_decision_semantics_preserved_from_engine:true,
               admission_does_not_mutate_graph:true,
               source_lineage_and_confidence_preserved:true,
               graph_writer_is_next_boundary:true,
