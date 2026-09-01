@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.1",
+  "status": "cosmos_knowledge_completion_external_provider_connector_integration_test_passed",
+  "question": "What are the HV substation equipment?",
+  "subject": {
+    "id": "hv_substations",
+    "label": "HV Substations"
+  },
+  "source_strategy": {
+    "status": "knowledge_completion_source_strategy_resolved",
+    "resolved_request_count": 1,
+    "next_stage": "external_acquisition_adapter"
+  },
+  "external_acquisition_adapter": {
+    "status": "knowledge_completion_external_acquisition_requests_ready",
+    "provider_request_count": 8,
+    "next_stage": "external_provider_execution"
+  },
+  "external_provider_connector": {
+    "status": "external_provider_results_ready",
+    "provider_name": "fixture",
+    "provider_mode": "deterministic_fixture",
+    "provider_result_count": 2,
+    "external_provider_connected": false,
+    "network_execution_performed": false,
+    "next_stage": "external_acquisition_adapter_normalization"
+  },
+  "normalization": {
+    "status": "knowledge_completion_external_acquisition_results_normalized",
+    "normalized_observation_count": 2,
+    "rejected_result_count": 0,
+    "next_stage": "acquisition_observation_candidate_adapter"
+  },
+  "contracts": {
+    "provider_request_lineage_preserved": true,
+    "requested_source_constraint_preserved_separately": true,
+    "returned_source_type_not_assumed_from_request": true,
+    "returned_authority_not_assumed_from_request": true,
+    "provider_results_preserved_as_unvalidated_observations": true,
+    "validation_required_before_admission": true
+  },
+  "safeguards": {
+    "connector": {
+      "calls_openai": false,
+      "invents_provider_results": false,
+      "promotes_search_result_to_fact": false,
+      "assigns_requested_source_authority_to_result": false,
+      "validates_evidence": false,
+      "admits_knowledge": false,
+      "writes_graph": false
+    },
+    "normalization": {
+      "performs_external_search": false,
+      "calls_openai_or_external_api": false,
+      "invents_provider_results": false,
+      "invents_evidence": false,
+      "treats_provider_results_as_facts": false,
+      "validates_evidence": false,
+      "admits_knowledge": false,
+      "writes_graph": false
+    }
+  },
+  "protected_boundaries": {
+    "provider_network_execution_performed": false,
+    "validation_performed": false,
+    "knowledge_admission_performed": false,
+    "graph_write_performed": false
+  }
+}
