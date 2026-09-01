@@ -5534,3 +5534,204 @@ jobs:
           console.log("No evidence collected, no AI/API, no validation, no admission, no graph write.");
           NODE
 
+      - name: Test Knowledge Completion Evidence Execution integration v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cat > "$TMP_DIR/normalized.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$TMP_DIR/normalized.json" \
+            --out "$TMP_DIR/candidates.json" \
+            > "$TMP_DIR/candidate-stdout.json"
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input "$TMP_DIR/candidates.json" \
+            --out "$TMP_DIR/candidate-validation.json"
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$TMP_DIR/candidate-validation.json" \
+            --out "$TMP_DIR/evidence-strategy.json"
+
+          node - "$TMP_DIR/evidence-strategy.json" "$TMP_DIR/evidence-adapter-results.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,outFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const tasks=strategy.evidence_tasks||[];
+          if(tasks.length!==6) throw new Error(`Expected 6 evidence tasks; got ${tasks.length}`);
+
+          const now="2026-09-01T12:00:00Z";
+          const results=[];
+          tasks.forEach((task,i)=>{
+            const label=String(task.candidate_label||"candidate");
+            const safe=label.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+
+            results.push({
+              evidence_task_id:task.evidence_task_id,
+              source_url_or_identifier:`fixture://authority-a/${safe}`,
+              source_type:"manufacturer_or_oem_technical_document",
+              source_title:`Authoritative technical documentation for ${label}`,
+              source_publisher_or_owner:`Fixture Authority A ${i+1}`,
+              source_date_or_event_date:"2026-08-15",
+              retrieved_at:now,
+              extracted_fact:`The source explicitly identifies ${label} as equipment or a component used in HV substations.`,
+              supports_or_contradicts:"supports",
+              directness:"direct",
+              authority_score:100,
+              independence_group:`fixture-authority-a-${i+1}`,
+              geography_scope:"global",
+              temporal_scope:"current",
+              entity_ids:[],
+              relationship_ids:[],
+              query_used:(task.query_intents||[])[0]||`${label} HV Substations official`,
+              source_rank:1
+            });
+
+            results.push({
+              evidence_task_id:task.evidence_task_id,
+              source_url_or_identifier:`fixture://authority-b/${safe}`,
+              source_type:"utility_or_owner_engineering_standard",
+              source_title:`Independent engineering standard referencing ${label}`,
+              source_publisher_or_owner:`Fixture Authority B ${i+1}`,
+              source_date_or_event_date:"2026-08-20",
+              retrieved_at:now,
+              extracted_fact:`An independent engineering source also identifies ${label} within HV substation equipment.`,
+              supports_or_contradicts:"supports",
+              directness:"direct",
+              authority_score:96,
+              independence_group:`fixture-authority-b-${i+1}`,
+              geography_scope:"global",
+              temporal_scope:"current",
+              entity_ids:[],
+              relationship_ids:[],
+              query_used:(task.query_intents||[])[1]||(task.query_intents||[])[0]||`${label} HV Substations technical`,
+              source_rank:2
+            });
+          });
+
+          fs.writeFileSync(outFile,JSON.stringify({
+            schema_version:"0.1-fixture",
+            generated_at:now,
+            status:"adapter_results_ready",
+            adapter_name:"cosmos_knowledge_completion_evidence_fixture_adapter",
+            adapter_mode:"deterministic_fixture",
+            results
+          },null,2)+"\n");
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy "$TMP_DIR/evidence-strategy.json" \
+            --adapter-results "$TMP_DIR/evidence-adapter-results.json" \
+            --out "$TMP_DIR/evidence-executor.json"
+
+
+          node - "$TMP_DIR/evidence-strategy.json" "$TMP_DIR/evidence-executor.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,executorFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const payload=JSON.parse(fs.readFileSync(executorFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          const tasks=strategy.evidence_tasks||[];
+          const records=payload.evidence_records||[];
+          const queue=payload.validation_queue||[];
+          const orphans=payload.orphan_results||[];
+          const state=payload.execution_state||{};
+
+          if(payload.schema_version!=="0.1" ||
+             payload.status!=="evidence_execution_normalized" ||
+             payload.source_evidence_strategy?.status!=="evidence_strategy_resolved" ||
+             payload.source_adapter?.adapter_mode!=="deterministic_fixture"){
+            fail("Evidence Executor did not normalize the controlled adapter results.");
+          }
+
+          if(tasks.length!==6 ||
+             Number(state.evidence_task_count)!==6 ||
+             Number(state.adapter_result_count)!==12 ||
+             Number(state.normalized_evidence_record_count)!==12 ||
+             Number(state.orphan_result_count)!==0 ||
+             records.length!==12 ||
+             queue.length!==6 ||
+             orphans.length!==0){
+            fail(`Evidence Executor count mismatch: tasks=${tasks.length}, adapter=${state.adapter_result_count}, records=${records.length}, queue=${queue.length}, orphan=${orphans.length}`);
+          }
+
+          for(const record of records){
+            if(record.epistemic_status!=="collected_evidence" ||
+               record.validation_status!=="not_evaluated" ||
+               record.knowledge_status!=="not_admitted" ||
+               !record.evidence_task_id ||
+               !record.validation_target_id ||
+               !record.source_url_or_identifier ||
+               !record.extracted_fact ||
+               !record.independence_group){
+              fail(`Evidence record crossed boundary or lost provenance: ${record.evidence_record_id||"unknown"}`);
+            }
+          }
+
+          for(const row of queue){
+            if(row.validation_status!=="not_started" ||
+               row.knowledge_admission_status!=="not_started"){
+              fail(`Validation queue crossed boundary: ${row.evidence_task_id||"unknown"}`);
+            }
+          }
+
+          const safeguards=payload.safeguards||{};
+          if(safeguards.performs_external_search!==false ||
+             safeguards.calls_openai_or_external_api!==false ||
+             safeguards.adapter_results_are_treated_as_unvalidated_input!==true ||
+             safeguards.invents_evidence!==false ||
+             safeguards.validates_candidates!==false ||
+             safeguards.promotes_candidates_to_facts!==false ||
+             safeguards.writes_to_knowledge_graph!==false ||
+             safeguards.preserves_contradictory_evidence!==true ||
+             safeguards.preserves_orphan_adapter_results!==true ||
+             safeguards.source_lineage_preserved!==true ||
+             safeguards.validation_required_before_knowledge_admission!==true){
+            fail("Evidence Executor safeguards invalid.");
+          }
+
+          console.log("Knowledge Completion → Evidence Execution integration PASS.");
+          console.log(`Evidence tasks: ${tasks.length}`);
+          console.log(`Adapter fixture records supplied: ${state.adapter_result_count}`);
+          console.log(`Normalized evidence records: ${records.length}`);
+          console.log(`Validation queue: ${queue.length}`);
+          console.log("Evidence remains unvalidated and not admitted.");
+          NODE
+
