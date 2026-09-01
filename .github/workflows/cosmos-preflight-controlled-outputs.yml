@@ -7091,3 +7091,141 @@ jobs:
           echo "Fixture mode only: no network execution and no API key used."
           echo "No validation, knowledge admission, answer rebuild or graph mutation was performed."
 
+      - name: Write Cosmos Knowledge Completion Acquisition Observation Candidate Adapter v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-acquisition-observation-candidate-adapter-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/normalized-observations.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/normalized-observations.json" \
+            --out "$OUTPUT_DIR/observation-candidates.json" \
+            > "$OUTPUT_DIR/observation-candidate-stdout.json"
+
+          node - "$OUTPUT_DIR/observation-candidates.json" "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [candidateFile,testFile]=process.argv.slice(2);
+          const out=JSON.parse(fs.readFileSync(candidateFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          const rows=(out.decompositions||[]).flatMap(d=>d.candidates||[]);
+
+          if(out.status!=="decomposition_candidates_resolved" ||
+             out.next_stage!=="candidate_validation" ||
+             rows.length!==6){
+            fail("Observation Candidate Adapter controlled output invalid.");
+          }
+
+          for(const c of rows){
+            if(c.epistemic_status!=="provisional_candidate" ||
+               c.validated!==false ||
+               c.executable!==false ||
+               c.knowledge_status!=="not_admitted"){
+              fail("Candidate crossed protected boundary.");
+            }
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_acquisition_observation_candidate_adapter_integration_test_passed",
+            subject:"HV Substations",
+            question:"What are the HV substation equipment?",
+            candidate_adapter:{
+              status:out.status,
+              provisional_candidate_count:rows.length,
+              unresolved_observation_count:out.decomposition_state?.unresolved_observation_count,
+              validated_candidate_count:out.decomposition_state?.validated_candidate_count,
+              executable_candidate_count:out.decomposition_state?.executable_candidate_count,
+              next_stage:out.next_stage
+            },
+            candidates:rows.map(c=>({
+              candidate_label:c.candidate_label,
+              candidate_class:c.candidate_class,
+              relationship_semantic:c.relationship_semantic,
+              epistemic_status:c.epistemic_status,
+              validated:c.validated,
+              executable:c.executable,
+              knowledge_status:c.knowledge_status,
+              source_observation_count:c.source_observation_count
+            })),
+            contracts:out.contracts,
+            safeguards:out.safeguards,
+            architecture:{
+              cosmos_first:true,
+              knowledge_completion_only_when_cosmos_is_insufficient:true,
+              future_equivalent_questions_reuse_admitted_cosmos_knowledge:true,
+              ai_required_for_this_fixture:false
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Observation Candidate Adapter controlled-output changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos observation candidate adapter v0.1 output"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Observation Candidate Adapter output after 3 attempts."
+              exit 1
+            fi
+          fi
+
