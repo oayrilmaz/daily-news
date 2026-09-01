@@ -6173,9 +6173,15 @@ jobs:
           for(let i=0;i<graphQueue.length;i++){
             const row=graphQueue[i];
             if(Number(row.graph_write_rank)!==i+1 ||
-               row.graph_write_eligibility!==true ||
-               row.graph_write_status!=="not_started" ||
-               !["admit","admit_with_qualification"].includes(row.decision)){
+               !row.knowledge_admission_id ||
+               !row.evidence_validation_id ||
+               !row.validation_target_id ||
+               !row.admitted_claim_class ||
+               row.validation_disposition!=="supported" ||
+               !Number.isFinite(Number(row.confidence_score)) ||
+               !Array.isArray(row.evidence_record_ids) ||
+               row.evidence_record_ids.length!==2 ||
+               row.graph_write_status!=="not_started"){
               console.error("Actual graph-write queue row:");
               console.error(JSON.stringify(row,null,2));
               fail(`Graph write queue invalid at rank ${i+1}`);
