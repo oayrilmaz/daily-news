@@ -8372,3 +8372,38 @@ jobs:
             test "$pushed" = true
           fi
 
+      - name: Write Persistent Knowledge Answer Rebuild v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          D="knowledge/cosmos/persistent-knowledge-answer-rebuild-test-v0.1"
+          rm -rf "$D"; mkdir -p "$D"
+          cat > "$D/graph.json" <<'JSON'
+          {"schema_version":"0.1","status":"cosmos_graph_snapshot","knowledge_records":[
+          {"graph_record_id":"g_pt","knowledge_admission_id":"knowledge_admission_pt","validation_target_id":"validation_power_transformer","validation_disposition":"supported","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],"active":true,"reversibility":{"reversible":true},"semantic_claim":{"subject":{"id":"hv_substations","label":"HV Substations"},"predicate":{"type":"CONTAINS_COMPONENT","label":"contains equipment"},"object":{"id":"power_transformer","label":"Power Transformer","class":"component_or_equipment"},"answer_role":null,"semantic_status":"persistent_validated_semantic_claim"}},
+          {"graph_record_id":"g_cb","knowledge_admission_id":"knowledge_admission_cb","validation_target_id":"validation_circuit_breaker","validation_disposition":"supported","confidence_score":75,"confidence_band":"high","persistence_level":"persistent_knowledge","evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],"active":true,"reversibility":{"reversible":true},"semantic_claim":{"subject":{"id":"hv_substations","label":"HV Substations"},"predicate":{"type":"CONTAINS_COMPONENT","label":"contains equipment"},"object":{"id":"circuit_breaker","label":"Circuit Breaker","class":"component_or_equipment"},"answer_role":null,"semantic_status":"persistent_validated_semantic_claim"}}
+          ],"audit_log":[]}
+          JSON
+          node scripts/cosmos_persistent_knowledge_answer_rebuild_v0.1.mjs --graph "$D/graph.json" --question "What are the HV substation equipment?" --subject-id "hv_substations" --out "$D/answer.json"
+          node - "$D/answer.json" "$D/test-result.json" <<'NODE'
+          const fs=require("fs"); const [af,of]=process.argv.slice(2); const a=JSON.parse(fs.readFileSync(af));
+          if(a.status!=="persistent_knowledge_answer_rebuilt"||a.answer?.items?.length!==2) throw Error("Persistent answer rebuild invalid");
+          if(!a.routing?.answered_from_persistent_cosmos_knowledge||a.routing?.knowledge_completion_required||a.routing?.acquisition_requested||a.routing?.external_search_requested||a.routing?.ai_requested) throw Error("Cosmos-first routing invalid");
+          if(a.answer.primary_items.length||a.answer.secondary_items.length||a.answer.more_items.length||a.answer.unclassified_items.length!==2) throw Error("Unsupported answer role invented");
+          const result={schema_version:"0.1",status:"cosmos_persistent_knowledge_answer_rebuild_test_passed",question:a.question,subject:a.subject,direct_answer:a.answer.direct_answer,items:a.answer.items,classification:{primary_items:a.answer.primary_items,secondary_items:a.answer.secondary_items,more_items:a.answer.more_items,unclassified_items:a.answer.unclassified_items},routing:a.routing,safeguards:a.safeguards,architecture:{database_graph_first:true,known_answer_skips_knowledge_completion:true,known_answer_skips_acquisition:true,known_answer_skips_external_search:true,known_answer_skips_ai:true,answer_built_from_persistent_semantic_claims:true,unsupported_primary_secondary_taxonomy_not_invented:true,next_stage:"persistent_answer_resolver_integration"}};
+          fs.writeFileSync(of,JSON.stringify(result,null,2)+"\n"); console.log(JSON.stringify(result,null,2));
+          NODE
+          git add "$D"
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos persistent knowledge answer rebuild"
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi
+              sleep $((attempt*2))
+            done
+            test "$pushed" = true
+          fi
+
