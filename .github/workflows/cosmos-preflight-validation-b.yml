@@ -5269,3 +5269,132 @@ jobs:
           console.log("No AI/API, validation, admission or graph write.");
           NODE
 
+      - name: Test Knowledge Completion Candidate Validation integration v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cat > "$TMP_DIR/normalized.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$TMP_DIR/normalized.json" \
+            --out "$TMP_DIR/candidates.json" \
+            > "$TMP_DIR/candidate-stdout.json"
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input "$TMP_DIR/candidates.json" \
+            --out "$TMP_DIR/candidate-validation.json"
+
+          node - "$TMP_DIR/candidates.json" "$TMP_DIR/candidate-validation.json" <<'NODE'
+          const fs=require("fs");
+          const [candidateFile,validationFile]=process.argv.slice(2);
+          const source=JSON.parse(fs.readFileSync(candidateFile,"utf8"));
+          const payload=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          const sourceCandidates=(source.decompositions||[]).flatMap(d=>d.candidates||[]);
+          const targets=payload.validation_targets||[];
+          const queue=payload.future_evidence_queue||[];
+          const state=payload.validation_state||{};
+
+          if(payload.schema_version!=="0.1" ||
+             payload.status!=="candidate_validation_targets_resolved" ||
+             payload.source_decomposition?.schema_version!=="0.1"){
+            fail("Candidate Validation Planner did not consume Knowledge Completion candidates.");
+          }
+
+          if(sourceCandidates.length!==6 || targets.length!==6 || queue.length!==targets.length){
+            fail(`Candidate Validation count mismatch: source=${sourceCandidates.length}, targets=${targets.length}, queue=${queue.length}`);
+          }
+
+          if(Number(state.validated_target_count)!==0 ||
+             Number(state.executable_target_count)!==0 ||
+             state.external_execution_connected!==false){
+            fail("Candidate Validation crossed execution/validation boundary.");
+          }
+
+          for(const target of targets){
+            if(target.epistemic_status!=="provisional_candidate" ||
+               target.validation_status!=="not_started" ||
+               target.executable!==false ||
+               target.knowledge_status!=="not_admitted" ||
+               !target.validation_objective ||
+               !Array.isArray(target.validation_requirements) ||
+               target.validation_requirements.length<1 ||
+               !target.evidence_contract ||
+               !Array.isArray(target.post_validation_fanout?.if_supported)){
+              fail(`Candidate Validation target invalid: ${target.validation_target_id||"unknown"}`);
+            }
+
+            const contract=target.evidence_contract||{};
+            if(Number(contract.minimum_independent_sources)<1 ||
+               contract.preferred_source_characteristic!=="primary_or_authoritative_where_available" ||
+               contract.contradiction_capture_required!==true ||
+               contract.provenance_required!==true){
+              fail(`Evidence contract invalid: ${target.validation_target_id||"unknown"}`);
+            }
+          }
+
+          for(const row of queue){
+            if(row.epistemic_status!=="provisional_candidate" ||
+               row.validation_status!=="not_started" ||
+               row.executable!==false ||
+               row.knowledge_status!=="not_admitted"){
+              fail(`Future evidence queue crossed boundary: ${row.validation_target_id||"unknown"}`);
+            }
+          }
+
+          const safeguards=payload.safeguards||{};
+          if(safeguards.performs_external_search!==false ||
+             safeguards.calls_openai_or_external_api!==false ||
+             safeguards.validates_candidates!==false ||
+             safeguards.invents_evidence!==false ||
+             safeguards.writes_to_knowledge_graph!==false ||
+             safeguards.promotes_candidates_to_facts!==false ||
+             safeguards.evidence_required_before_validation!==true ||
+             safeguards.validation_required_before_execution!==true){
+            fail("Candidate Validation safeguards invalid.");
+          }
+
+          console.log("Knowledge Completion → Candidate Validation integration PASS.");
+          console.log(`Provisional candidates: ${sourceCandidates.length}`);
+          console.log(`Validation targets: ${targets.length}`);
+          console.log(`Future evidence tasks: ${queue.length}`);
+          console.log("No candidates validated or admitted yet.");
+          NODE
+
