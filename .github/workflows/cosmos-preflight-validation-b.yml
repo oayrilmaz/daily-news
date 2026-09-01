@@ -4727,8 +4727,21 @@ jobs:
           const requests=execution.execution_requests||[];
           const adapterQueue=execution.future_adapter_queue||[];
 
-          if(requests.length<1 || adapterQueue.length!==requests.length){
-            fail("Acquisition Execution request/adapter queue invalid.");
+          if(requests.length<1){
+            fail("Acquisition Execution produced no execution requests.");
+          }
+
+          // The adapter queue is intentionally empty while source strategy is unresolved.
+          // Only source-strategy-resolved requests may enter the external adapter queue.
+          const unresolvedCount=Number(execution.execution_state?.source_strategy_unresolved_count||0);
+          const resolvedCount=Number(execution.execution_state?.source_strategy_resolved_count||0);
+
+          if(unresolvedCount>0 && adapterQueue.length!==0){
+            fail("External adapter queue must remain empty while source strategy is unresolved.");
+          }
+
+          if(unresolvedCount===0 && adapterQueue.length!==resolvedCount){
+            fail("Resolved source-strategy requests do not match the external adapter queue.");
           }
 
           for(const request of requests){
@@ -4785,6 +4798,7 @@ jobs:
           console.log("Real HV Substations applicable route reached Acquisition Execution successfully.");
           console.log(`Execution requests: ${requests.length}`);
           console.log(`Adapter queue:      ${adapterQueue.length}`);
+          console.log(`Source strategy unresolved: ${state.source_strategy_unresolved_count}`);
           console.log(`Next stage:         ${execution.next_stage}`);
           console.log("External adapter remains disconnected.");
           console.log("No network execution, evidence validation, knowledge admission or graph mutation occurred.");
