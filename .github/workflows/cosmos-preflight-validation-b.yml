@@ -4720,7 +4720,7 @@ jobs:
           }
 
           if(execution.schema_version!=="0.1" ||
-             execution.status!=="knowledge_completion_acquisition_execution_planned"){
+             !["knowledge_completion_source_strategy_required","knowledge_completion_acquisition_execution_planned"].includes(execution.status)){
             fail(`Acquisition Execution plan invalid: ${execution.schema_version} / ${execution.status}`);
           }
 
@@ -4737,8 +4737,7 @@ jobs:
                !Array.isArray(request.query_templates) ||
                request.query_templates.length<1 ||
                !Array.isArray(request.source_strategy) ||
-               request.source_strategy.length<1 ||
-               request.execution?.mode!=="adapter_required" ||
+               !["adapter_required","source_strategy_required"].includes(request.execution?.mode) ||
                request.execution?.executor_status!=="not_connected" ||
                request.execution?.network_execution_performed!==false ||
                Number(request.execution?.result_count)!==0 ||
@@ -4751,7 +4750,7 @@ jobs:
           }
 
           const state=execution.execution_state||{};
-          if(state.execution_mode!=="adapter_required" ||
+          if(!["adapter_required","source_strategy_required"].includes(state.execution_mode) ||
              state.external_execution_connected!==false ||
              state.network_execution_performed!==false ||
              Number(state.normalized_observation_count)!==0 ||
@@ -4762,8 +4761,16 @@ jobs:
             fail("Acquisition Execution state crossed protected boundary.");
           }
 
-          if(execution.next_stage!=="external_acquisition_adapter"){
+          if(!["external_acquisition_adapter","acquisition_source_strategy_resolver"].includes(execution.next_stage)){
             fail(`Unexpected Acquisition Execution next stage: ${execution.next_stage}`);
+          }
+
+          if(state.source_strategy_unresolved_count>0){
+            if(execution.next_stage!=="acquisition_source_strategy_resolver" ||
+               (execution.source_strategy_resolution_queue||[]).length!==state.source_strategy_unresolved_count ||
+               (execution.future_adapter_queue||[]).length!==0){
+              fail("Unresolved source strategy must block external adapter.");
+            }
           }
 
           if(!Object.values(execution.contracts||{}).every(Boolean)){
