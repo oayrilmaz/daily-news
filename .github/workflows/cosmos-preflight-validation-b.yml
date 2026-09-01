@@ -5177,3 +5177,95 @@ jobs:
           console.log("No evidence validation, knowledge admission, answer rebuild or graph mutation occurred.");
           NODE
 
+      - name: Check Cosmos Knowledge Completion Acquisition Observation Candidate Adapter v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Acquisition Observation Candidate Adapter v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs
+
+      - name: Test fixture chain through Observation Candidate Adapter v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cat > "$TMP_DIR/normalized.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$TMP_DIR/normalized.json" \
+            --out "$TMP_DIR/candidates.json" \
+            > "$TMP_DIR/stdout.json"
+
+          node - "$TMP_DIR/candidates.json" <<'NODE'
+          const fs=require("fs");
+          const out=JSON.parse(fs.readFileSync(process.argv[2],"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          const rows=(out.decompositions||[]).flatMap(d=>d.candidates||[]);
+
+          if(out.status!=="decomposition_candidates_resolved") fail("Wrong adapter status.");
+          if(out.next_stage!=="candidate_validation") fail("Candidate Validation not released.");
+          if(rows.length!==6) fail(`Expected 6 provisional candidates, got ${rows.length}.`);
+
+          for(const c of rows){
+            if(c.epistemic_status!=="provisional_candidate" ||
+               c.validated!==false ||
+               c.executable!==false ||
+               c.knowledge_status!=="not_admitted"){
+              fail("Candidate crossed epistemic boundary.");
+            }
+            if(c.relationship_semantic!=="component_membership"){
+              fail("Equipment membership semantics lost.");
+            }
+          }
+
+          if(!Object.values(out.contracts||{}).every(Boolean)) fail("Contract failed.");
+          if(!Object.values(out.safeguards||{}).every(v=>v===false)) fail("Safeguard failed.");
+
+          console.log("Observation Candidate Adapter fixture integration PASS.");
+          console.log(`Provisional candidates: ${rows.length}`);
+          console.log(`Next stage: ${out.next_stage}`);
+          console.log("No AI/API, validation, admission or graph write.");
+          NODE
+
