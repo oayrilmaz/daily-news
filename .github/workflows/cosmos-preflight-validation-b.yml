@@ -4804,3 +4804,183 @@ jobs:
           console.log("No network execution, evidence validation, knowledge admission or graph mutation occurred.");
           NODE
 
+      - name: Check Cosmos Knowledge Completion Acquisition Source Strategy Resolver v0.1 source
+        run: |
+          set -euo pipefail
+          test -f scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs
+          test -f scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_test_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs
+          node --check scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_test_v0.1.mjs
+
+      - name: Test Cosmos Knowledge Completion Acquisition Source Strategy Resolver v0.1
+        run: |
+          set -euo pipefail
+          node scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_test_v0.1.mjs \
+            --engine scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs
+
+      - name: Test real HV Substations route through Source Strategy Resolver v0.1
+        run: |
+          set -euo pipefail
+
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          mkdir -p "$TMP_DIR/downstream"
+
+          cat > "$TMP_DIR/semantic-completion-input.json" <<'JSON'
+          {
+            "question":"What are the HV substation equipment?",
+            "subject_match":{"id":"hv_substations","label":"HV Substations"},
+            "knowledge_completion":{
+              "knowledge_status":"insufficient",
+              "completion_required":true,
+              "answer_ready":false,
+              "broad_projection_suppressed":true,
+              "knowledge_contract":{
+                "contract_id":"component_membership",
+                "answer_shape":"structured_list",
+                "minimum_supported_members":2,
+                "required_relationship_semantics":[
+                  "contains",
+                  "includes",
+                  "component",
+                  "equipment",
+                  "part of"
+                ]
+              }
+            }
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_request_adapter_v0.1.mjs \
+            --input "$TMP_DIR/semantic-completion-input.json" \
+            --orchestrator scripts/cosmos_knowledge_completion_orchestrator_v0.1.mjs \
+            --bridge scripts/cosmos_knowledge_completion_execution_bridge_v0.1.mjs \
+            --out "$TMP_DIR/completion-request.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_handoff_v0.1.mjs \
+            --input "$TMP_DIR/completion-request.json" \
+            --out "$TMP_DIR/acquisition-handoff.json"
+
+          node scripts/cosmos_acquisition.cjs \
+            --input "$TMP_DIR/acquisition-handoff.json" \
+            --out "$TMP_DIR/acquisition-plan.json"
+
+          node scripts/cosmos_knowledge_completion_candidate_pipeline_v0.1.mjs \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out-dir "$TMP_DIR/downstream" \
+            > "$TMP_DIR/candidate-pipeline-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_execution_v0.1.mjs \
+            --pipeline "$TMP_DIR/downstream/pipeline-result.json" \
+            --acquisition "$TMP_DIR/acquisition-plan.json" \
+            --out "$TMP_DIR/acquisition-execution-plan.json" \
+            > "$TMP_DIR/acquisition-execution-stdout.json"
+
+          node scripts/cosmos_knowledge_completion_acquisition_source_strategy_resolver_v0.1.mjs \
+            --input "$TMP_DIR/acquisition-execution-plan.json" \
+            --out "$TMP_DIR/source-strategy-resolved.json" \
+            > "$TMP_DIR/source-strategy-stdout.json"
+
+          node - "$TMP_DIR/semantic-completion-input.json" \
+                 "$TMP_DIR/acquisition-plan.json" \
+                 "$TMP_DIR/acquisition-execution-plan.json" \
+                 "$TMP_DIR/source-strategy-resolved.json" <<'NODE'
+          const fs=require("fs");
+          const [inputFile,acqFile,execFile,resolvedFile]=process.argv.slice(2);
+          const input=JSON.parse(fs.readFileSync(inputFile,"utf8"));
+          const acquisition=JSON.parse(fs.readFileSync(acqFile,"utf8"));
+          const execution=JSON.parse(fs.readFileSync(execFile,"utf8"));
+          const resolved=JSON.parse(fs.readFileSync(resolvedFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          if(input.question!=="What are the HV substation equipment?" ||
+             input.subject_match?.label!=="HV Substations"){
+            fail("Question/subject fixture changed.");
+          }
+
+          if(execution.status!=="knowledge_completion_source_strategy_required" ||
+             execution.next_stage!=="acquisition_source_strategy_resolver"){
+            fail(`Acquisition Execution did not stop at source strategy resolution: ${execution.status} / ${execution.next_stage}`);
+          }
+
+          if(resolved.schema_version!=="0.1" ||
+             resolved.status!=="knowledge_completion_source_strategy_resolved" ||
+             resolved.next_stage!=="external_acquisition_adapter"){
+            fail(`Source Strategy Resolver failed: ${resolved.schema_version} / ${resolved.status} / ${resolved.next_stage}`);
+          }
+
+          const requests=resolved.execution_requests||[];
+          const adapterQueue=resolved.future_adapter_queue||[];
+          const state=resolved.resolution_state||{};
+
+          if(requests.length<1 || adapterQueue.length!==requests.length){
+            fail("Resolved source strategy request/adapter queue invalid.");
+          }
+
+          for(const request of requests){
+            const strategy=request.source_strategy||[];
+            if(strategy.length<1){
+              fail(`Resolved request has no source strategy: ${request.execution_request_id||"unknown"}`);
+            }
+
+            let previous=Infinity;
+            for(const source of strategy){
+              if(!source.source_type ||
+                 !Number.isFinite(Number(source.authority_score)) ||
+                 !["primary","secondary","tertiary"].includes(source.priority) ||
+                 source.acquisition_status!=="planned" ||
+                 source.execution_adapter!=="unassigned" ||
+                 source.search_status!=="not_started"){
+                fail(`Invalid source strategy row for ${request.execution_request_id||"unknown"}`);
+              }
+
+              const score=Number(source.authority_score);
+              if(score>previous+1e-9){
+                fail("Source strategy is not authority-ranked.");
+              }
+              previous=score;
+            }
+
+            if(request.target_type==="identify_components"){
+              const types=new Set(strategy.map(x=>x.source_type));
+              for(const required of [
+                "manufacturer_or_oem_technical_document",
+                "utility_or_owner_engineering_standard",
+                "regulatory_or_government_document",
+                "industry_body_or_research_institution"
+              ]){
+                if(!types.has(required)){
+                  fail(`identify_components source strategy missing ${required}`);
+                }
+              }
+            }
+          }
+
+          if(state.resolved_count!==requests.length ||
+             state.unresolved_count!==0 ||
+             state.external_execution_connected!==false ||
+             state.network_execution_performed!==false ||
+             Number(state.evidence_validation_count)!==0 ||
+             Number(state.knowledge_admission_count)!==0 ||
+             Number(state.graph_write_count)!==0){
+            fail("Source Strategy Resolver crossed protected boundary.");
+          }
+
+          if(!Object.values(resolved.contracts||{}).every(Boolean)){
+            fail("Source Strategy Resolver contracts failed.");
+          }
+
+          if(!Object.values(resolved.safeguards||{}).every(v=>v===false)){
+            fail("Source Strategy Resolver safeguards failed.");
+          }
+
+          console.log("");
+          console.log("Real HV Substations route resolved source strategy successfully.");
+          console.log(`Acquisition plans:        ${(acquisition.acquisition_plans||[]).length}`);
+          console.log(`Resolved requests:        ${requests.length}`);
+          console.log(`External adapter queue:   ${adapterQueue.length}`);
+          console.log(`Next stage:               ${resolved.next_stage}`);
+          console.log("External execution remains disconnected.");
+          console.log("No search, OpenAI/API call, evidence validation, knowledge admission or graph mutation occurred.");
+          NODE
+
