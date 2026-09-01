@@ -1,0 +1,67 @@
+{
+  "schema_version": "0.1",
+  "status": "cosmos_knowledge_completion_graph_writer_integration_test_passed",
+  "question": "What are the HV substation equipment?",
+  "subject": "HV Substations",
+  "graph_writer": {
+    "status": "graph_write_resolved",
+    "first_run_written_count": 2,
+    "persistent_knowledge_record_count": 2,
+    "audit_record_count": 2,
+    "second_run_written_count": 0,
+    "second_run_idempotent_skip_count": 2
+  },
+  "persistent_records": [
+    {
+      "knowledge_admission_id": "knowledge_admission_pt",
+      "validation_target_id": "validation_power_transformer",
+      "validation_disposition": "supported",
+      "confidence_score": 75,
+      "confidence_band": "high",
+      "persistence_level": "persistent_knowledge",
+      "evidence_record_ids": [
+        "evidence_pt_oem",
+        "evidence_pt_utility"
+      ],
+      "reversible": true
+    },
+    {
+      "knowledge_admission_id": "knowledge_admission_cb",
+      "validation_target_id": "validation_circuit_breaker",
+      "validation_disposition": "supported",
+      "confidence_score": 75,
+      "confidence_band": "high",
+      "persistence_level": "persistent_knowledge",
+      "evidence_record_ids": [
+        "evidence_cb_oem",
+        "evidence_cb_utility"
+      ],
+      "reversible": true
+    }
+  ],
+  "safeguards": {
+    "mutates_input_graph_in_place": false,
+    "writes_only_explicit_output_snapshot": true,
+    "requires_graph_write_eligibility": true,
+    "preserves_qualification": true,
+    "preserves_contradiction": true,
+    "preserves_confidence": true,
+    "preserves_evidence_lineage": true,
+    "idempotent_by_knowledge_admission_id": true,
+    "audit_log_required": true,
+    "graph_records_reversible": true,
+    "rejected_admissions_not_written": true,
+    "unlimited_conceptual_continuation_preserved": true
+  },
+  "architecture": {
+    "cosmos_first": true,
+    "validated_admitted_knowledge_materialized": true,
+    "graph_snapshot_is_explicit_output": true,
+    "input_graph_not_mutated_in_place": true,
+    "evidence_lineage_and_confidence_preserved": true,
+    "graph_records_reversible": true,
+    "graph_writer_idempotent": true,
+    "butterfly_trail_remains_ephemeral_observer_state": true,
+    "next_stage": "answer_rebuild_from_persistent_cosmos_knowledge"
+  }
+}
