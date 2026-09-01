@@ -7563,3 +7563,232 @@ jobs:
             fi
           fi
 
+      - name: Write Knowledge Completion Evidence Execution integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-evidence-execution-integration-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/normalized.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$OUTPUT_DIR/normalized.json" \
+            --out "$OUTPUT_DIR/candidates.json" \
+            > "$OUTPUT_DIR/candidate-stdout.json"
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input "$OUTPUT_DIR/candidates.json" \
+            --out "$OUTPUT_DIR/candidate-validation.json"
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$OUTPUT_DIR/candidate-validation.json" \
+            --out "$OUTPUT_DIR/evidence-strategy.json"
+
+          node - "$OUTPUT_DIR/evidence-strategy.json" "$OUTPUT_DIR/evidence-adapter-results.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,outFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const tasks=strategy.evidence_tasks||[];
+          if(tasks.length!==6) throw new Error(`Expected 6 evidence tasks; got ${tasks.length}`);
+
+          const now="2026-09-01T12:00:00Z";
+          const results=[];
+          tasks.forEach((task,i)=>{
+            const label=String(task.candidate_label||"candidate");
+            const safe=label.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"");
+
+            results.push({
+              evidence_task_id:task.evidence_task_id,
+              source_url_or_identifier:`fixture://authority-a/${safe}`,
+              source_type:"manufacturer_or_oem_technical_document",
+              source_title:`Authoritative technical documentation for ${label}`,
+              source_publisher_or_owner:`Fixture Authority A ${i+1}`,
+              source_date_or_event_date:"2026-08-15",
+              retrieved_at:now,
+              extracted_fact:`The source explicitly identifies ${label} as equipment or a component used in HV substations.`,
+              supports_or_contradicts:"supports",
+              directness:"direct",
+              authority_score:100,
+              independence_group:`fixture-authority-a-${i+1}`,
+              geography_scope:"global",
+              temporal_scope:"current",
+              entity_ids:[],
+              relationship_ids:[],
+              query_used:(task.query_intents||[])[0]||`${label} HV Substations official`,
+              source_rank:1
+            });
+
+            results.push({
+              evidence_task_id:task.evidence_task_id,
+              source_url_or_identifier:`fixture://authority-b/${safe}`,
+              source_type:"utility_or_owner_engineering_standard",
+              source_title:`Independent engineering standard referencing ${label}`,
+              source_publisher_or_owner:`Fixture Authority B ${i+1}`,
+              source_date_or_event_date:"2026-08-20",
+              retrieved_at:now,
+              extracted_fact:`An independent engineering source also identifies ${label} within HV substation equipment.`,
+              supports_or_contradicts:"supports",
+              directness:"direct",
+              authority_score:96,
+              independence_group:`fixture-authority-b-${i+1}`,
+              geography_scope:"global",
+              temporal_scope:"current",
+              entity_ids:[],
+              relationship_ids:[],
+              query_used:(task.query_intents||[])[1]||(task.query_intents||[])[0]||`${label} HV Substations technical`,
+              source_rank:2
+            });
+          });
+
+          fs.writeFileSync(outFile,JSON.stringify({
+            schema_version:"0.1-fixture",
+            generated_at:now,
+            status:"adapter_results_ready",
+            adapter_name:"cosmos_knowledge_completion_evidence_fixture_adapter",
+            adapter_mode:"deterministic_fixture",
+            results
+          },null,2)+"\n");
+          NODE
+
+          node scripts/cosmos_evidence_executor.cjs \
+            --strategy "$OUTPUT_DIR/evidence-strategy.json" \
+            --adapter-results "$OUTPUT_DIR/evidence-adapter-results.json" \
+            --out "$OUTPUT_DIR/evidence-executor.json"
+
+
+          node - "$OUTPUT_DIR/evidence-strategy.json" \
+                 "$OUTPUT_DIR/evidence-executor.json" \
+                 "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [strategyFile,executorFile,testFile]=process.argv.slice(2);
+          const strategy=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const payload=JSON.parse(fs.readFileSync(executorFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          const tasks=strategy.evidence_tasks||[];
+          const records=payload.evidence_records||[];
+          const queue=payload.validation_queue||[];
+          const state=payload.execution_state||{};
+
+          if(payload.status!=="evidence_execution_normalized" ||
+             tasks.length!==6 ||
+             records.length!==12 ||
+             queue.length!==6 ||
+             Number(state.adapter_result_count)!==12 ||
+             Number(state.orphan_result_count)!==0){
+            fail("Knowledge Completion Evidence Execution controlled output invalid.");
+          }
+
+          for(const record of records){
+            if(record.epistemic_status!=="collected_evidence" ||
+               record.validation_status!=="not_evaluated" ||
+               record.knowledge_status!=="not_admitted"){
+              fail("Evidence record crossed epistemic boundary.");
+            }
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_evidence_execution_integration_test_passed",
+            question:"What are the HV substation equipment?",
+            subject:"HV Substations",
+            evidence_strategy:{
+              status:strategy.status,
+              evidence_task_count:tasks.length
+            },
+            evidence_execution:{
+              status:payload.status,
+              adapter_mode:payload.source_adapter?.adapter_mode,
+              evidence_task_count:state.evidence_task_count,
+              adapter_result_count:state.adapter_result_count,
+              normalized_evidence_record_count:state.normalized_evidence_record_count,
+              orphan_result_count:state.orphan_result_count,
+              validation_decision_count:state.validation_decision_count,
+              knowledge_admission_count:state.knowledge_admission_count,
+              validation_queue_count:queue.length
+            },
+            per_candidate:tasks.map(task=>({
+              candidate_label:task.candidate_label,
+              evidence_task_id:task.evidence_task_id,
+              evidence_record_count:records.filter(r=>r.evidence_task_id===task.evidence_task_id).length,
+              independent_source_groups:[...new Set(records.filter(r=>r.evidence_task_id===task.evidence_task_id).map(r=>r.independence_group))].length
+            })),
+            safeguards:payload.safeguards,
+            architecture:{
+              cosmos_first:true,
+              deterministic_fixture_only:true,
+              evidence_is_not_knowledge:true,
+              validation_required_before_admission:true,
+              next_stage:"evidence_validation"
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Evidence Execution integration controlled-output changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion evidence execution integration"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Evidence Execution integration output after 3 attempts."
+              exit 1
+            fi
+          fi
+
