@@ -5402,3 +5402,135 @@ jobs:
           console.log("No candidates validated or admitted yet.");
           NODE
 
+      - name: Test Knowledge Completion Evidence Strategy integration v0.1
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          cat > "$TMP_DIR/normalized.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "status":"knowledge_completion_external_acquisition_results_normalized",
+            "provider":{"provider_name":"fixture","provider_mode":"deterministic_fixture"},
+            "acquisition_observations":[
+              {
+                "acquisition_observation_id":"obs_fixture_1",
+                "provider_request_id":"req_fixture_1",
+                "acquisition_plan_id":"plan_fixture_1",
+                "discovery_target_id":"target_fixture_1",
+                "target_type":"identify_components",
+                "statement":"HV Substations",
+                "source_url_or_identifier":"https://fixture.invalid/hv-substation",
+                "source_type":"unclassified_external_web_result",
+                "source_title":"HV Substation Equipment",
+                "source_publisher_or_owner":"fixture.invalid",
+                "source_date_or_event_date":null,
+                "retrieved_at":"2026-09-01T00:00:00Z",
+                "extracted_fact":"HV substation equipment includes power transformers, circuit breakers, disconnect switches, instrument transformers, surge arresters, and busbars.",
+                "supports_or_contradicts":"context_only",
+                "directness":"unclassified",
+                "authority_score":0,
+                "independence_group":"fixture.invalid",
+                "query_used":"HV substation equipment",
+                "epistemic_status":"external_acquisition_observation",
+                "validation_status":"not_started",
+                "knowledge_status":"not_admitted",
+                "executable":false
+              }
+            ],
+            "rejected_results":[],
+            "next_stage":"acquisition_observation_candidate_adapter"
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_completion_acquisition_observation_candidate_adapter_v0.1.mjs \
+            --input "$TMP_DIR/normalized.json" \
+            --out "$TMP_DIR/candidates.json" \
+            > "$TMP_DIR/candidate-stdout.json"
+
+          node scripts/cosmos_candidate_validation.cjs \
+            --input "$TMP_DIR/candidates.json" \
+            --out "$TMP_DIR/candidate-validation.json"
+
+          node scripts/cosmos_evidence_strategy.cjs \
+            --input "$TMP_DIR/candidate-validation.json" \
+            --out "$TMP_DIR/evidence-strategy.json"
+
+          node - "$TMP_DIR/candidate-validation.json" "$TMP_DIR/evidence-strategy.json" <<'NODE'
+          const fs=require("fs");
+          const [validationFile,strategyFile]=process.argv.slice(2);
+          const validation=JSON.parse(fs.readFileSync(validationFile,"utf8"));
+          const payload=JSON.parse(fs.readFileSync(strategyFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+
+          const targets=validation.validation_targets||[];
+          const tasks=payload.evidence_tasks||[];
+          const queue=payload.future_executor_queue||[];
+          const state=payload.evidence_state||{};
+
+          if(payload.schema_version!=="0.1" ||
+             payload.status!=="evidence_strategy_resolved" ||
+             payload.source_candidate_validation?.schema_version!=="0.1"){
+            fail("Evidence Strategy did not consume Candidate Validation v0.1.");
+          }
+
+          if(targets.length!==6 || tasks.length!==6 || queue.length!==tasks.length){
+            fail(`Evidence Strategy count mismatch: targets=${targets.length}, tasks=${tasks.length}, queue=${queue.length}`);
+          }
+
+          if(Number(state.validation_target_count)!==6 ||
+             Number(state.evidence_task_count)!==6 ||
+             state.external_execution_connected!==false){
+            fail("Evidence Strategy state invalid.");
+          }
+
+          for(const task of tasks){
+            if(!task.evidence_task_id ||
+               !task.validation_target_id ||
+               !Array.isArray(task.evidence_questions) ||
+               task.evidence_questions.length<1 ||
+               !Array.isArray(task.query_intents) ||
+               task.query_intents.length<1 ||
+               !Array.isArray(task.source_strategy) ||
+               task.source_strategy.length<1 ||
+               Number(task.sufficiency_contract?.minimum_total_sources)!==2 ||
+               Number(task.sufficiency_contract?.minimum_independent_sources)!==2 ||
+               task.sufficiency_contract?.contradiction_search_required!==true ||
+               task.validation_boundary?.evidence_collected!==false ||
+               task.validation_boundary?.validation_decision_made!==false ||
+               task.validation_boundary?.candidate_promoted!==false ||
+               task.validation_boundary?.executable!==false ||
+               task.validation_boundary?.knowledge_admitted!==false ||
+               task.execution?.mode!=="planned_only" ||
+               task.execution?.external_search_performed!==false ||
+               task.execution?.executor_status!=="not_connected" ||
+               Number(task.execution?.result_count)!==0){
+              fail(`Evidence Strategy task invalid: ${task.evidence_task_id||"unknown"}`);
+            }
+          }
+
+          const safeguards=payload.safeguards||{};
+          if(safeguards.performs_external_search!==false ||
+             safeguards.calls_openai_or_external_api!==false ||
+             safeguards.collects_evidence!==false ||
+             safeguards.validates_candidates!==false ||
+             safeguards.invents_evidence!==false ||
+             safeguards.writes_to_knowledge_graph!==false ||
+             safeguards.promotes_candidates_to_facts!==false ||
+             safeguards.source_authority_ranked!==true ||
+             safeguards.contradiction_search_required!==true ||
+             safeguards.independent_corroboration_planned!==true ||
+             safeguards.validation_required_before_execution!==true ||
+             safeguards.source_lineage_preserved!==true){
+            fail("Evidence Strategy safeguards invalid.");
+          }
+
+          console.log("Knowledge Completion → Evidence Strategy integration PASS.");
+          console.log(`Validation targets: ${targets.length}`);
+          console.log(`Evidence tasks: ${tasks.length}`);
+          console.log(`Future executor queue: ${queue.length}`);
+          console.log("Each candidate requires independent corroboration + contradiction search.");
+          console.log("No evidence collected, no AI/API, no validation, no admission, no graph write.");
+          NODE
+
