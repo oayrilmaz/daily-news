@@ -8031,3 +8031,202 @@ jobs:
             fi
           fi
 
+      - name: Write Knowledge Completion Knowledge Admission integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          OUTPUT_DIR="knowledge/cosmos/knowledge-completion-knowledge-admission-integration-test-v0.1"
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+
+          cat > "$OUTPUT_DIR/evidence-validator.json" <<'JSON'
+          {
+            "schema_version":"0.1",
+            "generated_at":"2026-09-01T12:00:00Z",
+            "status":"evidence_validation_resolved",
+            "source_evidence_executor":{"schema_version":"0.1","generated_at":"2026-09-01T12:00:00Z","status":"evidence_execution_normalized"},
+            "validation_state":{
+              "validation_target_count":2,
+              "completed_validation_count":2,
+              "knowledge_admission_count":0,
+              "by_disposition":{"supported":2},
+              "conceptual_distance_limit":null,
+              "continuation_possible":true
+            },
+            "validations":[
+              {
+                "evidence_validation_id":"evidence_validation_power_transformer",
+                "evidence_task_id":"evidence_task_power_transformer",
+                "validation_target_id":"validation_power_transformer",
+                "evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],
+                "evidence_record_count":2,
+                "disposition":"supported",
+                "confidence_score":75,
+                "confidence_band":"high",
+                "rationale":"Two independent direct high-authority sources support the candidate relationship.",
+                "evidence_balance":{"weighted_support":196,"weighted_contradiction":0,"independent_source_groups":2,"direct_high_authority_records":2},
+                "sufficiency_observation":{"total_source_threshold_met":true,"independent_source_threshold_met":true,"direct_primary_preference_met":true,"contradiction_search_observed":false},
+                "record_assessments":[],
+                "validation_status":"completed",
+                "knowledge_admission_status":"not_started",
+                "executable_for_knowledge_admission":true,
+                "epistemic_rule":"Validation may classify evidence, but only Knowledge Admission may create or update persistent Cosmos knowledge."
+              },
+              {
+                "evidence_validation_id":"evidence_validation_circuit_breaker",
+                "evidence_task_id":"evidence_task_circuit_breaker",
+                "validation_target_id":"validation_circuit_breaker",
+                "evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],
+                "evidence_record_count":2,
+                "disposition":"supported",
+                "confidence_score":75,
+                "confidence_band":"high",
+                "rationale":"Two independent direct high-authority sources support the candidate relationship.",
+                "evidence_balance":{"weighted_support":196,"weighted_contradiction":0,"independent_source_groups":2,"direct_high_authority_records":2},
+                "sufficiency_observation":{"total_source_threshold_met":true,"independent_source_threshold_met":true,"direct_primary_preference_met":true,"contradiction_search_observed":false},
+                "record_assessments":[],
+                "validation_status":"completed",
+                "knowledge_admission_status":"not_started",
+                "executable_for_knowledge_admission":true,
+                "epistemic_rule":"Validation may classify evidence, but only Knowledge Admission may create or update persistent Cosmos knowledge."
+              }
+            ],
+            "knowledge_admission_queue":[
+              {
+                "admission_rank":1,
+                "evidence_validation_id":"evidence_validation_power_transformer",
+                "evidence_task_id":"evidence_task_power_transformer",
+                "validation_target_id":"validation_power_transformer",
+                "disposition":"supported",
+                "confidence_score":75,
+                "confidence_band":"high",
+                "evidence_record_ids":["evidence_pt_oem","evidence_pt_utility"],
+                "admission_status":"not_started"
+              },
+              {
+                "admission_rank":2,
+                "evidence_validation_id":"evidence_validation_circuit_breaker",
+                "evidence_task_id":"evidence_task_circuit_breaker",
+                "validation_target_id":"validation_circuit_breaker",
+                "disposition":"supported",
+                "confidence_score":75,
+                "confidence_band":"high",
+                "evidence_record_ids":["evidence_cb_oem","evidence_cb_utility"],
+                "admission_status":"not_started"
+              }
+            ]
+          }
+          JSON
+
+          node scripts/cosmos_knowledge_admission.cjs \
+            --input "$OUTPUT_DIR/evidence-validator.json" \
+            --out "$OUTPUT_DIR/knowledge-admission.json"
+
+          node - "$OUTPUT_DIR/knowledge-admission.json" "$OUTPUT_DIR/test-result.json" <<'NODE'
+          const fs=require("fs");
+          const [admissionFile,testFile]=process.argv.slice(2);
+          const payload=JSON.parse(fs.readFileSync(admissionFile,"utf8"));
+          const fail=m=>{console.error(m);process.exit(1)};
+          const state=payload.admission_state||{};
+          const admissions=payload.admissions||[];
+          const graphQueue=payload.graph_write_queue||[];
+
+          if(payload.status!=="knowledge_admission_resolved" ||
+             admissions.length!==2 ||
+             graphQueue.length!==2 ||
+             Number(state.graph_write_eligible_count)!==2 ||
+             Number(state.graph_write_count)!==0){
+            fail("Knowledge Completion Knowledge Admission controlled output invalid.");
+          }
+
+          for(const row of admissions){
+            if(row.validation_disposition!=="supported" ||
+               row.decision!=="admit" ||
+               row.persistence_level!=="persistent_knowledge" ||
+               row.graph_write_eligibility!==true ||
+               row.graph_write_status!=="not_started"){
+              fail("Supported validation did not become graph-write-eligible persistent knowledge.");
+            }
+          }
+
+          const result={
+            schema_version:"0.1",
+            status:"cosmos_knowledge_completion_knowledge_admission_integration_test_passed",
+            question:"What are the HV substation equipment?",
+            subject:"HV Substations",
+            knowledge_admission:{
+              status:payload.status,
+              validation_count:state.validation_count,
+              validator_queue_count:state.validator_queue_count,
+              reviewed_count:state.reviewed_count,
+              graph_write_eligible_count:state.graph_write_eligible_count,
+              graph_write_count:state.graph_write_count,
+              by_decision:state.by_decision,
+              graph_write_queue_count:graphQueue.length
+            },
+            admissions:admissions.map(row=>({
+              knowledge_admission_id:row.knowledge_admission_id,
+              validation_target_id:row.validation_target_id,
+              validation_disposition:row.validation_disposition,
+              decision:row.decision,
+              admitted_claim_class:row.admitted_claim_class,
+              confidence_score:row.confidence_score,
+              confidence_band:row.confidence_band,
+              persistence_level:row.persistence_level,
+              evidence_record_count:(row.evidence_record_ids||[]).length,
+              graph_write_eligibility:row.graph_write_eligibility,
+              graph_write_status:row.graph_write_status
+            })),
+            graph_write_queue:graphQueue.map(row=>({
+              graph_write_rank:row.graph_write_rank,
+              knowledge_admission_id:row.knowledge_admission_id,
+              validation_target_id:row.validation_target_id,
+              decision:row.decision,
+              persistence_level:row.persistence_level,
+              graph_write_status:row.graph_write_status
+            })),
+            safeguards:payload.safeguards,
+            architecture:{
+              cosmos_first:true,
+              admission_establishes_persistence_eligibility:true,
+              admission_does_not_mutate_graph:true,
+              source_lineage_and_confidence_preserved:true,
+              graph_writer_is_next_boundary:true,
+              butterfly_trail_remains_ephemeral_observer_state:true,
+              next_stage:"graph_writer"
+            }
+          };
+
+          fs.writeFileSync(testFile,JSON.stringify(result,null,2)+"\n");
+          console.log(JSON.stringify(result,null,2));
+          NODE
+
+          git add "$OUTPUT_DIR"
+
+          if git diff --cached --quiet; then
+            echo "No Knowledge Admission integration controlled-output changes."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos knowledge completion knowledge admission integration"
+
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin "${GITHUB_REF_NAME}"
+              if ! git rebase "origin/${GITHUB_REF_NAME}"; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                pushed=true
+                break
+              fi
+              sleep $((attempt * 2))
+            done
+
+            if [ "$pushed" != "true" ]; then
+              echo "ERROR: Could not push Knowledge Admission integration output after 3 attempts."
+              exit 1
+            fi
+          fi
+
