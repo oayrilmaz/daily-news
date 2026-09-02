@@ -1,4 +1,5 @@
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -829,7 +830,287 @@
     return [item?.development_id,item?.signal_id,...(Array.isArray(item?.entity_ids)?item.entity_ids:[])].filter(Boolean);
   }
 
+  function resolveInstruction(question){
+    const q=String(question||"").trim();
+    if(/\b(risk|risks|risk factors|threats|vulnerabilities)\b/i.test(q)) return {id:"risk_analysis",label:"Potential risks"};
+    if(/\b(opportunit|opportunities|upside|benefits?)\b/i.test(q)) return {id:"opportunity_analysis",label:"Potential opportunities"};
+    if(/\b(impact|impacts|effect|effects|consequence|consequences)\b/i.test(q)) return {id:"impact_analysis",label:"Potential impacts"};
+    if(/\b(why|cause|causes|driver|drivers)\b/i.test(q)) return {id:"cause_analysis",label:"Drivers"};
+    return null;
+  }
+
+  function observerSubjectContext(){
+    const observer=state?.observer;
+    if(!observer) return null;
+
+    if(observer.kind==="entity" && observer.id && state.entities.has(observer.id)){
+      const entity=state.entities.get(observer.id);
+      return {
+        id:String(observer.id),
+        label:String(entity?.name||entity?.label||observer.label||observer.id).trim(),
+        kind:"entity",
+        entity
+      };
+    }
+
+    // A response/question is not automatically the subject.
+    // Walk the current Butterfly route backward and find the latest real entity.
+    const currentJourney=journeyPathTo(state.journey.current_node_id);
+    for(let i=currentJourney.length-1;i>=0;i--){
+      const snap=currentJourney[i]?.observer;
+      if(snap?.kind==="entity" && snap.id && state.entities.has(snap.id)){
+        const entity=state.entities.get(snap.id);
+        return {
+          id:String(snap.id),
+          label:String(entity?.name||entity?.label||snap.label||snap.id).trim(),
+          kind:"entity",
+          entity
+        };
+      }
+    }
+
+    if(state.entryObserver?.kind==="entity" && state.entryObserver.id && state.entities.has(state.entryObserver.id)){
+      const entity=state.entities.get(state.entryObserver.id);
+      return {
+        id:String(state.entryObserver.id),
+        label:String(entity?.name||entity?.label||state.entryObserver.label||state.entryObserver.id).trim(),
+        kind:"entity",
+        entity
+      };
+    }
+
+    return null;
+  }
+
+  function explicitSubjectFromInstruction(question){
+    let q=String(question||"").trim();
+    q=q
+      .replace(/^\s*(please\s+)?(list|show|identify|provide|give|tell me|explain|analy[sz]e|assess)\s+/i,"")
+      .replace(/\b(potential|main|major|key|current|today'?s?)\b/ig," ")
+      .replace(/\b(risks?|risk factors?|opportunities|impacts?|effects?|consequences?|drivers?|causes?)\b/ig," ")
+      .replace(/\b(for|of|about|to)\b/ig," ")
+      .replace(/\s+/g," ")
+      .trim();
+    return q.length>=3 ? q : "";
+  }
+
+  function findEntityByLooseLabel(label){
+    const target=normalizeSubject(label);
+    if(!target) return null;
+
+    const entities=[...state.entities.values()];
+    let exact=entities.find(entity=>
+      normalizeSubject(entity?.name||entity?.label||entity?.entity_id||"")===target
+    );
+    if(exact) return exact;
+
+    const tokens=subjectTokens(label).filter(token=>token.length>2);
+    if(!tokens.length) return null;
+
+    let best=null;
+    let bestScore=0;
+    for(const entity of entities){
+      const hay=normalizeSubject(entity?.name||entity?.label||entity?.entity_id||"");
+      const score=tokens.reduce((sum,token)=>sum+(hay.includes(token)?1:0),0);
+      if(score>bestScore){
+        best=entity;
+        bestScore=score;
+      }
+    }
+    return bestScore>=Math.min(2,tokens.length) ? best : null;
+  }
+
+  function subjectForInstruction(question){
+    const explicit=explicitSubjectFromInstruction(question);
+    if(explicit){
+      const entity=findEntityByLooseLabel(explicit);
+      if(entity){
+        return {
+          id:String(entity.entity_id||""),
+          label:String(entity.name||entity.label||explicit),
+          kind:"entity",
+          entity,
+          source:"explicit"
+        };
+      }
+      return {id:"",label:explicit,kind:"text",entity:null,source:"explicit"};
+    }
+
+    const contextual=observerSubjectContext();
+    return contextual ? {...contextual,source:"context"} : null;
+  }
+
+  function relatedEvidenceForSubject(subject,limit=8){
+    if(!subject) return [];
+    const tokens=subjectTokens(subject.label).filter(token=>token.length>2);
+
+    return state.dailyBrief.map((item,index)=>{
+      const hay=normalizeSubject([
+        dailyItemTitle(item),
+        dailyItemSummary(item),
+        ...(Array.isArray(item?.tags)?item.tags:[]),
+        ...(Array.isArray(item?.topics)?item.topics:[]),
+        ...(Array.isArray(item?.countries)?item.countries:[])
+      ].join(" "));
+
+      let score=tokens.reduce((sum,token)=>sum+(hay.includes(token)?1:0),0);
+
+      const ids=[
+        item?.development_id,
+        item?.signal_id,
+        ...(Array.isArray(item?.entity_ids)?item.entity_ids:[])
+      ].filter(Boolean);
+
+      if(subject.id && ids.includes(subject.id)) score+=20;
+      return {item,index,score};
+    })
+    .filter(row=>row.score>0)
+    .sort((a,b)=>b.score-a.score||a.index-b.index)
+    .slice(0,limit);
+  }
+
+  function graphNeighborsForSubject(subject,limit=14){
+    if(!subject?.id) return [];
+
+    const out=[];
+    for(const rel of incident(subject.id)){
+      const otherId=rel.from_entity_id===subject.id ? rel.to_entity_id : rel.from_entity_id;
+      const entity=state.entities.get(otherId);
+      if(entity) out.push(entity);
+    }
+
+    const seen=new Set();
+    return out.filter(entity=>{
+      const id=String(entity?.entity_id||"");
+      if(!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).slice(0,limit);
+  }
+
+  function riskAnswerFromKnownEvidence(subject,rows,neighbors){
+    const riskWords=/\b(risk|delay|constraint|shortage|bottleneck|pressure|stress|volatil|uncertain|permit|supply|capacity|cost|lead time|reliability|workforce|tariff|fire|safety|insurance|interconnection)\b/i;
+    const candidates=[];
+
+    for(const row of rows||[]){
+      const item=row.item;
+      const title=cleanSentence(dailyItemTitle(item),150);
+      const summary=cleanSentence(dailyItemSummary(item),210);
+      if(riskWords.test(`${title} ${summary}`)){
+        const candidate=summary||title;
+        if(candidate && !candidates.some(existing=>normalizeSubject(existing)===normalizeSubject(candidate))){
+          candidates.push(candidate);
+        }
+      }
+      if(candidates.length>=4) break;
+    }
+
+    if(candidates.length){
+      return `For ${subject.label}, the current Cosmos evidence points to these potential risk areas: ${candidates.join(" ")} These are evidence-backed watch areas, not certainties.`;
+    }
+
+    const neighborLabels=(neighbors||[])
+      .map(entity=>String(entity?.name||entity?.label||entity?.entity_id||"").trim())
+      .filter(Boolean)
+      .slice(0,6);
+
+    if(neighborLabels.length){
+      return `Cosmos can connect ${subject.label} to ${neighborLabels.join(", ")}, but the current graph does not contain enough validated risk-specific evidence to rank these connections as dependable risks yet.`;
+    }
+
+    return `Cosmos recognizes ${subject.label}, but it does not yet contain enough validated risk-specific evidence to give a dependable risk list.`;
+  }
+
+  function buildInstructionResponse(question,instruction){
+    const subject=subjectForInstruction(question);
+
+    if(!subject){
+      return {
+        id:`response:clarify:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+        label:instruction.label,
+        response_type:"clarification",
+        question,
+        answer:`${instruction.label} for what subject?`,
+        bullets:[],
+        projection_seed_ids:[],
+        source_label:"Cosmos context",
+        clarification_required:true
+      };
+    }
+
+    const rows=relatedEvidenceForSubject(subject,8);
+    const neighbors=graphNeighborsForSubject(subject,14);
+
+    if(instruction.id==="risk_analysis"){
+      const answer=riskAnswerFromKnownEvidence(subject,rows,neighbors);
+      const riskWords=/\b(risk|delay|constraint|shortage|bottleneck|pressure|stress|volatil|uncertain|permit|supply|capacity|cost|lead time|reliability|workforce|tariff|fire|safety|insurance|interconnection)\b/i;
+      const strongEvidence=rows.some(row=>
+        riskWords.test(`${dailyItemTitle(row.item)} ${dailyItemSummary(row.item)}`)
+      );
+
+      return {
+        id:`response:risk:${normalizeSubject(subject.label).replace(/\s+/g,"-")}`,
+        label:`Potential risks · ${subject.label}`,
+        response_type:"risk_analysis",
+        question,
+        subject,
+        subject_match:subject.id ? {
+          id:subject.id,
+          label:subject.label,
+          entity:subject.entity
+        } : null,
+        answer,
+        bullets:rows.map((row,index)=>({
+          id:dailyItemId(row.item,index),
+          title:dailyItemTitle(row.item)||`Evidence ${index+1}`,
+          summary:dailyItemSummary(row.item),
+          date:row.item?.published_at||row.item?.created_at||row.item?.date_utc||row.item?.date||state.dailyBriefDate||"",
+          article_id:row.item?.article_id||row.item?.development_id||row.item?.signal_id||row.item?.id||"",
+          seed_ids:seedIdsFromDailyItem(row.item)
+        })),
+        projection_seed_ids:[
+          ...(subject.id?[subject.id]:[]),
+          ...rows.flatMap(row=>seedIdsFromDailyItem(row.item))
+        ],
+        source_label:"Cosmos graph + PTD Today intelligence",
+        knowledge_completion: strongEvidence ? null : {
+          completion_required:true,
+          knowledge_status:"partial",
+          completion_tasks:[
+            `Acquire current risk-specific evidence for ${subject.label}.`,
+            `Verify the strongest risks across multiple independent sources before admission.`
+          ]
+        }
+      };
+    }
+
+    return {
+      id:`response:instruction:${instruction.id}:${normalizeSubject(subject.label).replace(/\s+/g,"-")}`,
+      label:`${instruction.label} · ${subject.label}`,
+      response_type:instruction.id,
+      question,
+      subject,
+      subject_match:subject.id ? {
+        id:subject.id,
+        label:subject.label,
+        entity:subject.entity
+      } : null,
+      answer:`Cosmos understands the request as ${instruction.label.toLowerCase()} for ${subject.label}, but this analysis type is not yet implemented in the deterministic answer layer.`,
+      bullets:[],
+      projection_seed_ids:subject.id?[subject.id]:[],
+      source_label:"Cosmos graph",
+      knowledge_completion:{
+        completion_required:true,
+        knowledge_status:"partial",
+        completion_tasks:[`Build validated ${instruction.label.toLowerCase()} evidence for ${subject.label}.`]
+      }
+    };
+  }
+
   function buildQuestionResponse(question){
+    const instruction=resolveInstruction(question);
+    if(instruction) return buildInstructionResponse(question,instruction);
+
     const intent=resolveQuestionIntent(question);
 
     if(intent.id==="daily_intelligence"){
@@ -2004,7 +2285,12 @@
       Boolean(String(observer?.response?.answer||"").trim()) &&
       (
         observer?.response?.response_type==="daily_intelligence" ||
-        observer?.response?.response_type==="outlook"
+        observer?.response?.response_type==="outlook" ||
+        (
+          observer?.response?.response_type==="risk_analysis" &&
+          observer?.response?.knowledge_completion?.completion_required!==true
+        ) ||
+        observer?.response?.response_type==="clarification"
       );
 
     const unresolved=
