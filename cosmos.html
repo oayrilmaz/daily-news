@@ -94,11 +94,38 @@
     .empty{display:none;text-align:center;padding:50px 20px;color:var(--muted)}
     .error{color:var(--danger)}
     .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
-    
-    .station-share{position:fixed;right:18px;bottom:18px;z-index:24;padding:10px 14px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.94);color:var(--ink);font:inherit;font-size:12px;font-weight:800;box-shadow:0 12px 32px rgba(26,20,15,.10);cursor:pointer;backdrop-filter:blur(12px)}
-    .station-share:hover{transform:translateY(-1px)}
-    .station-share[hidden],.station-share-status[hidden]{display:none}
-    .station-share-status{position:fixed;right:18px;bottom:66px;z-index:25;max-width:min(360px,calc(100vw - 36px));padding:9px 12px;border-radius:12px;background:rgba(26,20,15,.92);color:#fff;font-size:11px;line-height:1.35}
+
+    .metroShare{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:24px;
+      height:24px;
+      margin-left:7px;
+      vertical-align:middle;
+      border:1px solid rgba(133,174,255,.34);
+      border-radius:999px;
+      color:#8eb2ff;
+      background:rgba(74,122,220,.08);
+      cursor:pointer;
+      transform:translateY(2px);
+    }
+    .metroShare:hover{background:rgba(74,122,220,.16);border-color:rgba(133,174,255,.58)}
+    .metroShare svg{width:13px;height:13px;display:block}
+    .station-share-status{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      z-index:25;
+      max-width:min(360px,calc(100vw - 36px));
+      padding:9px 12px;
+      border-radius:12px;
+      background:rgba(26,20,15,.92);
+      color:#fff;
+      font-size:11px;
+      line-height:1.35
+    }
+    .station-share-status[hidden]{display:none}
 
     @media (min-width:800px){
       .main{padding:22px 20px 44px}
@@ -529,7 +556,6 @@
   <footer class="footer">PTD Today · Cosmos</footer>
 </div>
 
-  <button id="shareStationBtn" class="station-share" type="button" hidden>Share station</button>
   <div id="shareStationStatus" class="station-share-status" hidden role="status" aria-live="polite"></div>
 
 <script>
@@ -568,7 +594,6 @@
   const expandBtn = document.getElementById("expandBtn");
   const resetBtn = document.getElementById("resetBtn");
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
-  const shareStationBtn=document.getElementById("shareStationBtn");
   const shareStationStatus=document.getElementById("shareStationStatus");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
@@ -2631,7 +2656,14 @@
           <span class="metroDot"></span>
           <span class="metroLabel">
             <strong>${esc(label)} ${branchBadge}</strong>
-            <span>${current?"you are here":(active?"your route":"saved branch")}</span>
+            <span>
+              ${current?"you are here":(active?"your route":"saved branch")}
+              ${current?`<span class="metroShare" data-share-current-station role="button" tabindex="0" aria-label="Share this station" title="Share station">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>`:""}
+            </span>
           </span>
         </button>
       `;
@@ -2645,6 +2677,20 @@
         const node=journeyNodeById(button.dataset.journeyNode);
         if(!node || node.node_id===state.journey.current_node_id) return;
         restoreObserverFromJourneyNode(node);
+      });
+    });
+
+    butterflyMetro.querySelectorAll("[data-share-current-station]").forEach(icon=>{
+      const triggerShare=(event)=>{
+        event.preventDefault();
+        event.stopPropagation();
+        shareCurrentStation();
+      };
+      icon.addEventListener("click",triggerShare);
+      icon.addEventListener("keydown",(event)=>{
+        if(event.key==="Enter" || event.key===" "){
+          triggerShare(event);
+        }
       });
     });
 
@@ -2700,7 +2746,6 @@
   }
 
   function render(){
-    updateStationShareVisibility();
     const observer=state.observer;
     observerLabel.textContent=observerDisplayLabel(observer);
     if(observer.article_id){
@@ -3347,11 +3392,6 @@
     }
     ensureJourneyCurrent(state.observer);saveTrail();render();return true;
   }
-  function updateStationShareVisibility(){
-    shareStationBtn.hidden=!state.observer||state.observer.kind==="landing";
-  }
-  shareStationBtn.addEventListener("click",shareCurrentStation);
-
   function startFreshCosmos(){
     // Clicking the Cosmos title is an intentional new beginning.
     // Remove only observer/journey session state; canonical Cosmos knowledge is untouched.
