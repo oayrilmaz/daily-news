@@ -2607,6 +2607,28 @@
     const mainX=Math.max(22,Math.round(width*0.16));
     const rows=journeyRowMap();
 
+    // Give long station titles the vertical room they actually need.
+    // This prevents a long question from colliding with the next station on mobile.
+    const maxRow=Math.max(...[...rows.values()],0);
+    const rowHeights=new Map();
+    for(let row=0;row<=maxRow;row++) rowHeights.set(row,rowGap);
+    for(const node of nodes){
+      const row=rows.get(node.node_id)||0;
+      const label=String(node.observer?.label || node.observer?.question || "Cosmos");
+      const usableLabelWidth=Math.max(145,Math.min(190,width-120));
+      const approxCharsPerLine=Math.max(16,Math.floor(usableLabelWidth/7.2));
+      const lines=Math.max(1,Math.ceil(label.length/approxCharsPerLine));
+      const needed=Math.max(rowGap,44+lines*17);
+      rowHeights.set(row,Math.max(rowHeights.get(row)||rowGap,needed));
+    }
+
+    const rowTops=new Map();
+    let runningY=topPad;
+    for(let row=0;row<=maxRow;row++){
+      rowTops.set(row,runningY);
+      runningY += rowHeights.get(row)||rowGap;
+    }
+
     const positions=new Map();
     for(const node of nodes){
       const lane=lanes.get(node.node_id)||0;
@@ -2619,12 +2641,11 @@
 
       positions.set(node.node_id,{
         x,
-        y:topPad+row*rowGap
+        y:rowTops.get(row)??topPad
       });
     }
 
-    const maxRow=Math.max(...[...rows.values()],0);
-    const height=topPad*2+(maxRow+1)*rowGap+70;
+    const height=runningY+70;
 
     let routeSvg=`<svg class="metroRoutes" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">`;
 
@@ -3472,7 +3493,7 @@
 
       if(navigator.share){
         await navigator.share({
-          title:"Cosmos · Shared station",
+          title:title,
           text:shareText,
           url:data.share_url
         });
