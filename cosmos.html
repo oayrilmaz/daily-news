@@ -262,16 +262,16 @@
       position:relative;
       min-height:120px;
       padding:6px 0 8px;
-      overflow-x:auto;
+      overflow-x:hidden;
       overflow-y:visible;
-      -webkit-overflow-scrolling:touch;
     }
 
     .metroCanvas{
       position:relative;
-      min-width:100%;
-      width:max-content;
+      width:100%;
+      min-width:0;
       padding:4px 8px 12px 8px;
+      overflow:visible;
     }
 
     .metroColumn{
@@ -312,7 +312,7 @@
       grid-template-columns:28px minmax(0,1fr);
       gap:10px;
       align-items:center;
-      width:220px;
+      width:min(220px,calc(100vw - 150px));
       min-height:52px;
       border:0;
       background:transparent;
@@ -392,11 +392,11 @@
 
     @media (max-width:640px){
       .metro{
-        margin-right:-16px;
-        padding-right:16px;
+        margin-right:0;
+        padding-right:0;
       }
-      .metroStop{width:205px}
-      .metroColumn{width:220px}
+      .metroStop{width:min(205px,calc(100vw - 155px))}
+      .metroColumn{width:210px}
     }
 
     .metroEmpty{
@@ -1878,18 +1878,10 @@
 
   function branchLaneMap(){
     const laneById=new Map();
-    let nextRight=1;
-    let nextLeft=-1;
 
     const roots=state.journey.nodes
       .filter(n=>!n.parent_node_id)
       .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
-
-    function newBranchLane(branchOrdinal){
-      // Alternate visibly to the right and left of the main route.
-      if(branchOrdinal % 2 === 1) return nextRight++;
-      return nextLeft--;
-    }
 
     function assign(node,lane){
       laneById.set(node.node_id,lane);
@@ -1897,15 +1889,18 @@
 
       children.forEach((child,index)=>{
         if(index===0){
+          // Continue the primary route straight down.
           assign(child,lane);
         }else{
-          assign(child,newBranchLane(index));
+          // Alternate compact side branches, but never drift far away.
+          const side = index % 2 === 1 ? 1 : -1;
+          assign(child,side);
         }
       });
     }
 
     roots.forEach((root,index)=>{
-      assign(root,index===0?0:newBranchLane(index));
+      assign(root,index===0 ? 0 : (index%2===1 ? 1 : -1));
     });
 
     return laneById;
@@ -1934,31 +1929,30 @@
     const lanes=branchLaneMap();
 
     const rowGap=82;
-    const laneGap=230;
-    const leftPad=26;
+    const branchShift=72;
     const topPad=22;
     const stopXOffset=9;
     const stopYOffset=9;
 
-    const laneValues=[...lanes.values()];
-    const minLane=Math.min(...laneValues,0);
-    const maxLane=Math.max(...laneValues,0);
-    const laneOffset=Math.abs(minLane);
+    const width=Math.max(300,butterflyMetro.clientWidth||320);
+    const mainX=Math.max(22,Math.round(width*0.16));
 
     const positions=new Map();
     for(const node of nodes){
-      const lane=(lanes.get(node.node_id)||0)+laneOffset;
+      const lane=lanes.get(node.node_id)||0;
       const depth=journeyDepth(node);
+
+      // Keep every route inside the visible phone width.
+      // Main route goes down; branches move only a little left/right.
+      const rawX=mainX + lane*branchShift;
+      const x=Math.max(18,Math.min(rawX,width-235));
+
       positions.set(node.node_id,{
-        x:leftPad+lane*laneGap,
+        x,
         y:topPad+depth*rowGap
       });
     }
 
-    const width=Math.max(
-      butterflyMetro.clientWidth||320,
-      leftPad*2+(maxLane-minLane+1)*laneGap+210
-    );
     const maxDepth=Math.max(...nodes.map(journeyDepth),0);
     const height=topPad*2+(maxDepth+1)*rowGap+55;
 
@@ -2017,15 +2011,11 @@
       });
     });
 
-    // Center current station horizontally if the map is wider than the phone.
+    // The map is deliberately kept inside the viewport, so no sideways auto-scroll.
     const currentButton=butterflyMetro.querySelector(".metroStop.current");
     if(currentButton){
       requestAnimationFrame(()=>{
-        const targetLeft=Math.max(
-          0,
-          currentButton.offsetLeft - (butterflyMetro.clientWidth-currentButton.offsetWidth)/2
-        );
-        butterflyMetro.scrollTo({left:targetLeft,behavior:"smooth"});
+        currentButton.scrollIntoView({behavior:"smooth",block:"nearest",inline:"nearest"});
       });
     }
   }
