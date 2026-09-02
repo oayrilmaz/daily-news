@@ -588,7 +588,9 @@
     from_id: params.get("from_id") || "",
     to_id: params.get("to_id") || "",
     question: params.get("question") || "",
-    view: params.get("view") || ""
+    view: params.get("view") || "",
+    context_id: params.get("context_id") || "",
+    context_label: params.get("context_label") || ""
   };
 
   const state = {
@@ -841,9 +843,8 @@
 
   function observerSubjectContext(){
     const observer=state?.observer;
-    if(!observer) return null;
 
-    if(observer.kind==="entity" && observer.id && state.entities.has(observer.id)){
+    if(observer?.kind==="entity" && observer.id && state.entities.has(observer.id)){
       const entity=state.entities.get(observer.id);
       return {
         id:String(observer.id),
@@ -853,11 +854,23 @@
       };
     }
 
-    // A response/question is not automatically the subject.
-    // Walk the current Butterfly route backward and find the latest real entity.
-    const currentJourney=journeyPathTo(state.journey.current_node_id);
-    for(let i=currentJourney.length-1;i>=0;i--){
-      const snap=currentJourney[i]?.observer;
+    const active=journeyPathTo(state.journey.current_node_id);
+    for(let i=active.length-1;i>=0;i--){
+      const snap=active[i]?.observer;
+      if(snap?.kind==="entity" && snap.id && state.entities.has(snap.id)){
+        const entity=state.entities.get(snap.id);
+        return {
+          id:String(snap.id),
+          label:String(entity?.name||entity?.label||snap.label||snap.id).trim(),
+          kind:"entity",
+          entity
+        };
+      }
+    }
+
+    const all=[...(state.journey?.nodes||[])].sort((x,y)=>(y.created_at||0)-(x.created_at||0));
+    for(const node of all){
+      const snap=node?.observer;
       if(snap?.kind==="entity" && snap.id && state.entities.has(snap.id)){
         const entity=state.entities.get(snap.id);
         return {
@@ -884,13 +897,19 @@
 
   function explicitSubjectFromInstruction(question){
     let q=String(question||"").trim();
+
     q=q
-      .replace(/^\s*(please\s+)?(list|show|identify|provide|give|tell me|explain|analy[sz]e|assess)\s+/i,"")
-      .replace(/\b(potential|main|major|key|current|today'?s?)\b/ig," ")
-      .replace(/\b(risks?|risk factors?|opportunities|impacts?|effects?|consequences?|drivers?|causes?)\b/ig," ")
+      .replace(/^\s*(please\s+)?/i,"")
+      .replace(/^\s*(also\s+)?/i,"")
+      .replace(/^\s*(list|show|identify|provide|give|tell me|explain|analy[sz]e|assess)\s+/i,"")
+      .replace(/^\s*(also\s+)?/i,"")
+      .replace(/\b(all|the|all the|potential|main|major|key|current|today'?s?)\b/ig," ")
+      .replace(/\b(risks?|risk factors?|opportunit(?:y|ies)|impacts?|effects?|consequences?|drivers?|causes?)\b/ig," ")
       .replace(/\b(for|of|about|to)\b/ig," ")
       .replace(/\s+/g," ")
       .trim();
+
+    if(!q || /^(please|also|all|the|please also|all the)$/i.test(q)) return "";
     return q.length>=3 ? q : "";
   }
 
@@ -934,6 +953,17 @@
         };
       }
       return {id:"",label:explicit,kind:"text",entity:null,source:"explicit"};
+    }
+
+    if(entry.context_id && state.entities.has(entry.context_id)){
+      const entity=state.entities.get(entry.context_id);
+      return {
+        id:String(entry.context_id),
+        label:String(entity?.name||entity?.label||entry.context_label||entry.context_id),
+        kind:"entity",
+        entity,
+        source:"context_param"
+      };
     }
 
     const contextual=observerSubjectContext();
@@ -1021,6 +1051,56 @@
     return `Cosmos recognizes ${subject.label}, but it does not yet contain enough validated risk-specific evidence to give a dependable risk list.`;
   }
 
+  function opportunityAnswerFromKnownEvidence(subject,rows,neighbors){
+    const opportunityWords=/\b(opportun|growth|expand|expansion|investment|demand|upgrade|moderniz|efficien|capacity|procurement|market|service|aftermarket|replacement|retrofit|digital|automation|resilien|storage|renewable|data center|manufactur)\b/i;
+    const candidates=[];
+
+    for(const row of rows||[]){
+      const item=row.item;
+      const title=cleanSentence(dailyItemTitle(item),150);
+      const summary=cleanSentence(dailyItemSummary(item),210);
+      if(opportunityWords.test(`${title} ${summary}`)){
+        const candidate=summary||title;
+        if(candidate && !candidates.some(existing=>normalizeSubject(existing)===normalizeSubject(candidate))){
+          candidates.push(candidate);
+        }
+      }
+      if(candidates.length>=4) break;
+    }
+
+    if(candidates.length){
+      return `For ${subject.label}, the current Cosmos evidence points to these potential opportunity areas: ${candidates.join(" ")} These are evidence-backed opportunity signals, not guarantees.`;
+    }
+
+    const neighborLabels=(neighbors||[])
+      .map(entity=>String(entity?.name||entity?.label||entity?.entity_id||"").trim())
+      .filter(Boolean)
+      .slice(0,6);
+
+    if(neighborLabels.length){
+      return `Cosmos can connect ${subject.label} to ${neighborLabels.join(", ")}, which may contain opportunity paths, but the current graph does not yet contain enough validated opportunity-specific evidence to rank them dependably.`;
+    }
+
+    return `Cosmos recognizes ${subject.label}, but it does not yet contain enough validated opportunity-specific evidence to give a dependable opportunity list.`;
+  }
+
+  function genericInstructionAnswer(subject,rows,instruction){
+    const candidates=[];
+    for(const row of rows||[]){
+      const candidate=cleanSentence(dailyItemSummary(row.item)||dailyItemTitle(row.item),210);
+      if(candidate && !candidates.some(existing=>normalizeSubject(existing)===normalizeSubject(candidate))){
+        candidates.push(candidate);
+      }
+      if(candidates.length>=4) break;
+    }
+
+    if(candidates.length){
+      return `For ${subject.label}, Cosmos sees these ${instruction.label.toLowerCase()} in the current evidence: ${candidates.join(" ")}`;
+    }
+
+    return `Cosmos understands the request as ${instruction.label.toLowerCase()} for ${subject.label}, but the current graph does not yet contain enough validated evidence to answer it dependably.`;
+  }
+
   function buildInstructionResponse(question,instruction){
     const subject=subjectForInstruction(question);
 
@@ -1038,54 +1118,27 @@
       };
     }
 
-    const rows=relatedEvidenceForSubject(subject,8);
-    const neighbors=graphNeighborsForSubject(subject,14);
+    const rows=relatedEvidenceForSubject(subject,10);
+    const neighbors=graphNeighborsForSubject(subject,16);
+
+    let answer="";
+    let strongEvidence=rows.length>0;
 
     if(instruction.id==="risk_analysis"){
-      const answer=riskAnswerFromKnownEvidence(subject,rows,neighbors);
+      answer=riskAnswerFromKnownEvidence(subject,rows,neighbors);
       const riskWords=/\b(risk|delay|constraint|shortage|bottleneck|pressure|stress|volatil|uncertain|permit|supply|capacity|cost|lead time|reliability|workforce|tariff|fire|safety|insurance|interconnection)\b/i;
-      const strongEvidence=rows.some(row=>
-        riskWords.test(`${dailyItemTitle(row.item)} ${dailyItemSummary(row.item)}`)
-      );
-
-      return {
-        id:`response:risk:${normalizeSubject(subject.label).replace(/\s+/g,"-")}`,
-        label:`Potential risks · ${subject.label}`,
-        response_type:"risk_analysis",
-        question,
-        subject,
-        subject_match:subject.id ? {
-          id:subject.id,
-          label:subject.label,
-          entity:subject.entity
-        } : null,
-        answer,
-        bullets:rows.map((row,index)=>({
-          id:dailyItemId(row.item,index),
-          title:dailyItemTitle(row.item)||`Evidence ${index+1}`,
-          summary:dailyItemSummary(row.item),
-          date:row.item?.published_at||row.item?.created_at||row.item?.date_utc||row.item?.date||state.dailyBriefDate||"",
-          article_id:row.item?.article_id||row.item?.development_id||row.item?.signal_id||row.item?.id||"",
-          seed_ids:seedIdsFromDailyItem(row.item)
-        })),
-        projection_seed_ids:[
-          ...(subject.id?[subject.id]:[]),
-          ...rows.flatMap(row=>seedIdsFromDailyItem(row.item))
-        ],
-        source_label:"Cosmos graph + PTD Today intelligence",
-        knowledge_completion: strongEvidence ? null : {
-          completion_required:true,
-          knowledge_status:"partial",
-          completion_tasks:[
-            `Acquire current risk-specific evidence for ${subject.label}.`,
-            `Verify the strongest risks across multiple independent sources before admission.`
-          ]
-        }
-      };
+      strongEvidence=rows.some(row=>riskWords.test(`${dailyItemTitle(row.item)} ${dailyItemSummary(row.item)}`));
+    }else if(instruction.id==="opportunity_analysis"){
+      answer=opportunityAnswerFromKnownEvidence(subject,rows,neighbors);
+      const opportunityWords=/\b(opportun|growth|expand|expansion|investment|demand|upgrade|moderniz|efficien|capacity|procurement|market|service|aftermarket|replacement|retrofit|digital|automation|resilien|storage|renewable|data center|manufactur)\b/i;
+      strongEvidence=rows.some(row=>opportunityWords.test(`${dailyItemTitle(row.item)} ${dailyItemSummary(row.item)}`));
+    }else{
+      answer=genericInstructionAnswer(subject,rows,instruction);
+      strongEvidence=rows.length>=2;
     }
 
     return {
-      id:`response:instruction:${instruction.id}:${normalizeSubject(subject.label).replace(/\s+/g,"-")}`,
+      id:`response:${instruction.id}:${normalizeSubject(subject.label).replace(/\s+/g,"-")}`,
       label:`${instruction.label} · ${subject.label}`,
       response_type:instruction.id,
       question,
@@ -1095,14 +1148,27 @@
         label:subject.label,
         entity:subject.entity
       } : null,
-      answer:`Cosmos understands the request as ${instruction.label.toLowerCase()} for ${subject.label}, but this analysis type is not yet implemented in the deterministic answer layer.`,
-      bullets:[],
-      projection_seed_ids:subject.id?[subject.id]:[],
-      source_label:"Cosmos graph",
-      knowledge_completion:{
+      answer,
+      bullets:rows.map((row,index)=>({
+        id:dailyItemId(row.item,index),
+        title:dailyItemTitle(row.item)||`Evidence ${index+1}`,
+        summary:dailyItemSummary(row.item),
+        date:row.item?.published_at||row.item?.created_at||row.item?.date_utc||row.item?.date||state.dailyBriefDate||"",
+        article_id:row.item?.article_id||row.item?.development_id||row.item?.signal_id||row.item?.id||"",
+        seed_ids:seedIdsFromDailyItem(row.item)
+      })),
+      projection_seed_ids:[
+        ...(subject.id?[subject.id]:[]),
+        ...rows.flatMap(row=>seedIdsFromDailyItem(row.item))
+      ],
+      source_label:"Cosmos graph + PTD Today intelligence",
+      knowledge_completion: strongEvidence ? null : {
         completion_required:true,
         knowledge_status:"partial",
-        completion_tasks:[`Build validated ${instruction.label.toLowerCase()} evidence for ${subject.label}.`]
+        completion_tasks:[
+          `Acquire current ${instruction.label.toLowerCase()} evidence for ${subject.label}.`,
+          `Verify the strongest findings across multiple independent sources before admission.`
+        ]
       }
     };
   }
@@ -2787,6 +2853,24 @@
     target.searchParams.set("focus","question");
     target.searchParams.set("question",question);
     target.searchParams.set("from","cosmos-projection");
+
+    const contextSubject=
+      state.observer?.kind==="entity"
+        ? {id:state.observer.id,label:observerDisplayLabel(state.observer)}
+        : (
+            state.observer?.response?.subject_match?.id
+              ? {
+                  id:state.observer.response.subject_match.id,
+                  label:state.observer.response.subject_match.label||""
+                }
+              : observerSubjectContext()
+          );
+
+    if(contextSubject?.id){
+      target.searchParams.set("context_id",contextSubject.id);
+      if(contextSubject.label) target.searchParams.set("context_label",contextSubject.label);
+    }
+
     location.assign(target.toString());
   });
 
