@@ -690,14 +690,29 @@
 
   function resolveQuestionIntent(question){
     const q=String(question||"").trim();
-    if(
-      /\b(today'?s?|daily|latest|new|current)\b.*\b(news|brief|briefing|intelligence|signals?|developments?)\b/i.test(q) ||
-      /\b(provide|show|give)\b.*\b(today'?s?|daily|latest)\b.*\b(news|brief|intelligence|signals?)\b/i.test(q) ||
-      /\bwhat changed\b/i.test(q) || /\bwhat happened today\b/i.test(q)
-    ) return {id:"daily_intelligence",label:"Today's Intelligence"};
+
+    const todayIntent =
+      /\b(today'?s?|today|daily|latest|new|current|right now|now)\b.*\b(news|brief|briefing|intelligence|signals?|developments?|happening|going on|changed?)\b/i.test(q) ||
+      /\bwhat (is|what's|has been) going on\b/i.test(q) ||
+      /\bwhat'?s happening\b/i.test(q) ||
+      /\bwhat changed\b/i.test(q) ||
+      /\bwhat happened today\b/i.test(q) ||
+      /\btell me .*today/i.test(q);
+
+    if(todayIntent) return {id:"daily_intelligence",label:"Today's Intelligence"};
+
+    const outlookMatch=q.match(/\b(\d{1,4})\s*(day|days|week|weeks|month|months|year|years)\b/i);
+    if(outlookMatch || /\b(outlook|forecast|next\s+(day|week|month|year)|what happens next|what could happen next)\b/i.test(q)){
+      return {
+        id:"outlook",
+        label:"Outlook",
+        horizon:outlookMatch ? `${outlookMatch[1]} ${outlookMatch[2]}` : ""
+      };
+    }
+
     if(/\b(video|videos|media|youtube|watch)\b/i.test(q)) return {id:"media",label:"Media"};
     if(/\b(map|country|countries|geograph\w*|region|united states|usa|u\.?s\.?)\b/i.test(q)) return {id:"geography",label:"Global Intelligence"};
-    if(/\b(market|markets|stock|stocks|outlook|price|prices|investment)\b/i.test(q)) return {id:"market",label:"Market Pulse & Outlook"};
+    if(/\b(market|markets|stock|stocks|price|prices|investment)\b/i.test(q)) return {id:"market",label:"Market Pulse & Outlook"};
     return {id:"topic",label:q||"Cosmos"};
   }
 
@@ -714,22 +729,154 @@
     }).filter(row=>row.score>0).sort((a,b)=>b.score-a.score||a.index-b.index);
   }
 
+  function meaningfulQuestionTokens(question){
+    const stop=new Set([
+      "what","whats","what's","is","are","was","were","the","a","an","of","to","for",
+      "in","on","at","and","or","about","tell","me","show","give","provide","today",
+      "todays","today's","latest","current","news","going","happening","happened",
+      "brief","briefing","intelligence","signals","signal","developments","development",
+      "please","could","would","can","now","right"
+    ]);
+    return subjectTokens(question).filter(token=>!stop.has(token) && token.length>2);
+  }
+
+  function rankedDailyForQuestion(question,limit=6){
+    const meaningful=meaningfulQuestionTokens(question);
+
+    if(!meaningful.length){
+      return state.dailyBrief.slice(0,limit).map((item,index)=>({item,index,score:0}));
+    }
+
+    const ranked=state.dailyBrief.map((item,index)=>{
+      const hay=normalizeSubject([
+        dailyItemTitle(item),
+        dailyItemSummary(item),
+        ...(Array.isArray(item?.tags)?item.tags:[]),
+        ...(Array.isArray(item?.topics)?item.topics:[]),
+        ...(Array.isArray(item?.countries)?item.countries:[])
+      ].join(" "));
+      const score=meaningful.reduce((sum,token)=>sum+(hay.includes(token)?1:0),0);
+      return {item,index,score};
+    }).filter(row=>row.score>0)
+      .sort((a,b)=>b.score-a.score||a.index-b.index);
+
+    return ranked.length ? ranked.slice(0,limit) :
+      state.dailyBrief.slice(0,limit).map((item,index)=>({item,index,score:0}));
+  }
+
+  function cleanSentence(value,max=230){
+    let s=String(value||"").replace(/\s+/g," ").trim();
+    if(!s) return "";
+    if(s.length>max){
+      const clipped=s.slice(0,max);
+      const cut=Math.max(clipped.lastIndexOf("."),clipped.lastIndexOf(";"),clipped.lastIndexOf(","));
+      s=(cut>max*.55?clipped.slice(0,cut):clipped).trim()+"…";
+    }
+    return s;
+  }
+
+  function distillDailyAnswer(question,rows){
+    const items=(rows||[]).map(row=>row.item).filter(Boolean);
+    if(!items.length) return "Cosmos does not yet have a current briefing to support this answer.";
+
+    const topical=meaningfulQuestionTokens(question);
+    const subject=topical.length ? topical.join(" ") : "";
+
+    const points=[];
+    for(const item of items){
+      const title=cleanSentence(dailyItemTitle(item),155);
+      const summary=cleanSentence(dailyItemSummary(item),220);
+      const candidate=summary || title;
+      if(candidate && !points.some(p=>normalizeSubject(p)===normalizeSubject(candidate))){
+        points.push(candidate);
+      }
+      if(points.length===3) break;
+    }
+
+    if(subject){
+      return points.length
+        ? `For ${subject}, Cosmos sees ${points.join(" ")}`
+        : `Cosmos found current records related to ${subject}, but they are not detailed enough to distill reliably yet.`;
+    }
+
+    return points.length
+      ? `Today, the strongest signals Cosmos sees are: ${points.join(" ")}`
+      : "Cosmos has a current briefing, but it cannot yet distill a dependable overview from it.";
+  }
+
+  function distillOutlookAnswer(question,rows,horizon){
+    const items=(rows||[]).map(row=>row.item).filter(Boolean);
+    if(!items.length){
+      return `Cosmos does not yet have enough current evidence to build a ${horizon||"forward"} outlook.`;
+    }
+
+    const points=[];
+    for(const item of items){
+      const title=cleanSentence(dailyItemTitle(item),145);
+      const summary=cleanSentence(dailyItemSummary(item),190);
+      const candidate=summary || title;
+      if(candidate && !points.some(p=>normalizeSubject(p)===normalizeSubject(candidate))){
+        points.push(candidate);
+      }
+      if(points.length===3) break;
+    }
+
+    const period=horizon || "near-term";
+    return `For the next ${period}, Cosmos cannot know the future, but current signals point to these watch areas: ${points.join(" ")} This is a scenario based on today's evidence, not a prediction.`;
+  }
+
   function seedIdsFromDailyItem(item){
     return [item?.development_id,item?.signal_id,...(Array.isArray(item?.entity_ids)?item.entity_ids:[])].filter(Boolean);
   }
 
   function buildQuestionResponse(question){
     const intent=resolveQuestionIntent(question);
+
     if(intent.id==="daily_intelligence"){
-      const selected=state.dailyBrief.slice(0,6);
+      const ranked=rankedDailyForQuestion(question,6);
+      const selected=ranked.map(row=>row.item);
       return {
         id:`response:daily:${normalizeSubject(question).replace(/\s+/g,"-")}`,
-        label:"Today's Intelligence",response_type:"daily_intelligence",question,
-        answer:selected.length?`Here are ${selected.length} current PTD Today intelligence items available from today's briefing.`:"Today's briefing is available, but no intelligence items were found in the current data.",
-        bullets:selected.map((item,index)=>({id:dailyItemId(item,index),title:dailyItemTitle(item)||`Intelligence item ${index+1}`,summary:dailyItemSummary(item),seed_ids:seedIdsFromDailyItem(item)})),
-        projection_seed_ids:selected.flatMap(seedIdsFromDailyItem),source_label:"PTD Today daily briefing"
+        label:"Today's Intelligence",
+        response_type:"daily_intelligence",
+        question,
+        answer:distillDailyAnswer(question,ranked),
+        bullets:selected.map((item,index)=>({
+          id:dailyItemId(item,index),
+          title:dailyItemTitle(item)||`Intelligence item ${index+1}`,
+          summary:dailyItemSummary(item),
+          date:item?.published_at || item?.created_at || item?.date_utc || item?.date || state.dailyBriefDate || "",
+          article_id:item?.article_id || item?.development_id || item?.signal_id || item?.id || "",
+          seed_ids:seedIdsFromDailyItem(item)
+        })),
+        projection_seed_ids:selected.flatMap(seedIdsFromDailyItem),
+        source_label:"PTD Today daily briefing"
       };
     }
+
+    if(intent.id==="outlook"){
+      const ranked=rankedDailyForQuestion(question,6);
+      const selected=ranked.map(row=>row.item);
+      return {
+        id:`response:outlook:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+        label:intent.horizon ? `${intent.horizon} outlook` : "Outlook",
+        response_type:"outlook",
+        question,
+        answer:distillOutlookAnswer(question,ranked,intent.horizon),
+        bullets:selected.map((item,index)=>({
+          id:dailyItemId(item,index),
+          title:dailyItemTitle(item)||`Signal ${index+1}`,
+          summary:dailyItemSummary(item),
+          date:item?.published_at || item?.created_at || item?.date_utc || item?.date || state.dailyBriefDate || "",
+          article_id:item?.article_id || item?.development_id || item?.signal_id || item?.id || "",
+          seed_ids:seedIdsFromDailyItem(item)
+        })),
+        projection_seed_ids:selected.flatMap(seedIdsFromDailyItem),
+        source_label:"Current Cosmos signals; scenario only",
+        epistemic_state:"scenario"
+      };
+    }
+
     if(intent.id==="topic"){
       const semantic=buildSemanticQuestionAnswer(question);
       const completion=semantic.knowledge_completion;
@@ -766,7 +913,21 @@
       };
     }
     const materialized={media:"Media",geography:"Global Intelligence",market:"Market Pulse & Outlook"}[intent.id] || intent.label;
-    return {id:`response:${intent.id}:${normalizeSubject(question).replace(/\s+/g,"-")}`,label:materialized,response_type:intent.id,question,answer:`${materialized} is available as an on-demand PTD Today view. This response is ready to materialize that experience inside Cosmos.`,bullets:[],projection_seed_ids:[],source_label:"PTD Today surface"};
+    return {
+      id:`response:${intent.id}:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+      label:materialized,
+      response_type:intent.id,
+      question,
+      answer:`Cosmos understands this as a ${materialized} request, but the current answer layer does not yet have enough structured evidence to answer it directly.`,
+      bullets:[],
+      projection_seed_ids:[],
+      source_label:"PTD Today surface",
+      knowledge_completion:{
+        completion_required:true,
+        knowledge_status:"missing",
+        completion_tasks:[`Build or retrieve validated ${materialized} evidence for this request.`]
+      }
+    };
   }
 
   function entitySeedsFromProjectionIds(ids){
@@ -1838,10 +1999,19 @@
     `).join("");
 
     const completion=observer?.response?.knowledge_completion;
+    const hasSupportedResponse=
+      observer?.kind==="response" &&
+      Boolean(String(observer?.response?.answer||"").trim()) &&
+      (
+        observer?.response?.response_type==="daily_intelligence" ||
+        observer?.response?.response_type==="outlook"
+      );
+
     const unresolved=
       completion?.completion_required===true ||
       (
         observer?.kind==="response" &&
+        !hasSupportedResponse &&
         projection.nodes.length<=1 &&
         !projectionEvidenceItems(observer).length
       );
@@ -1861,13 +2031,18 @@
         ? `Journey began with: “${entryQuestion}”`
         : "";
 
-    const evidenceText=evidence.length
-      ? `${evidence.length} source${evidence.length===1?"":"s"} behind this view`
-      : (
-          completion?.completion_required===true
-            ? "Verified evidence still incomplete"
-            : `${projection.nodes.length} connected objects`
-        );
+    const evidenceText=
+      observer?.response?.response_type==="outlook"
+        ? `${evidence.length || observer?.response?.bullets?.length || 0} current signals · scenario`
+        : (
+            evidence.length
+              ? `${evidence.length} source${evidence.length===1?"":"s"} behind this view`
+              : (
+                  completion?.completion_required===true
+                    ? "Verified evidence still incomplete"
+                    : `${projection.nodes.length} connected objects`
+                )
+          );
     projectionBasis.textContent=evidenceText;
 
     if(evidence.length){
