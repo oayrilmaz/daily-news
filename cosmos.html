@@ -151,6 +151,22 @@
       font-size:10.5px;
       line-height:1.45
     }
+
+    .projectionUnknown{
+      margin-top:11px;
+      border:1px solid rgba(255,209,138,.16);
+      border-radius:14px;
+      background:rgba(255,209,138,.035);
+      padding:11px 12px;
+      color:#b7c2d3;
+      font-size:12.5px;
+      line-height:1.55
+    }
+    .projectionUnknown strong{
+      color:#f0d6a7;
+      font-weight:700
+    }
+
     .projectionMeta{
       display:flex;
       gap:7px;
@@ -313,7 +329,7 @@
       gap:10px;
       align-items:center;
       width:min(220px,calc(100vw - 150px));
-      min-height:52px;
+      min-height:62px;
       border:0;
       background:transparent;
       color:inherit;
@@ -349,7 +365,9 @@
       display:block;
       color:#edf3ff;
       font-size:13px;
-      line-height:1.3
+      line-height:1.28;
+      overflow-wrap:anywhere;
+      word-break:normal
     }
     .metroLabel span{
       display:block;
@@ -451,6 +469,7 @@
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
         <div class="projectionContext" id="projectionContext"></div>
+        <div class="projectionUnknown" id="projectionUnknown" style="display:none"></div>
         <div class="projectionOrigin" id="projectionOrigin"></div>
 
         <div class="projectionMeta">
@@ -544,6 +563,7 @@
   const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
   const projectionContext = document.getElementById("projectionContext");
+  const projectionUnknown = document.getElementById("projectionUnknown");
   const projectionOrigin = document.getElementById("projectionOrigin");
   const projectionBasis = document.getElementById("projectionBasis");
   const projectionSources = document.getElementById("projectionSources");
@@ -1729,7 +1749,7 @@
         const subject=observer.response?.subject_match?.label ||
           observer.semantic_subject_label ||
           "this subject";
-        return `Cosmos understands ${subject}, but it does not yet have enough verified structured evidence to give a reliable direct answer.`;
+        return `Cosmos has identified ${subject}, but the answer is still outside its verified knowledge.`;
       }
       if(observer.response?.answer) return observer.response.answer;
     }
@@ -1817,12 +1837,30 @@
       </div>
     `).join("");
 
+    const completion=observer?.response?.knowledge_completion;
+    const unresolved=
+      completion?.completion_required===true ||
+      (
+        observer?.kind==="response" &&
+        projection.nodes.length<=1 &&
+        !projectionEvidenceItems(observer).length
+      );
+
+    if(unresolved){
+      projectionUnknown.style.display="block";
+      projectionUnknown.innerHTML=
+        `<strong>Cosmos does not know enough yet.</strong> ` +
+        `It has identified the subject, but it does not yet have enough verified knowledge to give a dependable answer.`;
+    }else{
+      projectionUnknown.style.display="none";
+      projectionUnknown.innerHTML="";
+    }
+
     projectionOrigin.textContent=
       observer?.kind==="entity" && entryQuestion && normalizeSubject(entryQuestion)!==normalizeSubject(currentLabel)
         ? `Journey began with: “${entryQuestion}”`
         : "";
 
-    const completion=observer?.response?.knowledge_completion;
     const evidenceText=evidence.length
       ? `${evidence.length} source${evidence.length===1?"":"s"} behind this view`
       : (
@@ -1874,6 +1912,39 @@
       depth++;
     }
     return depth;
+  }
+
+
+  function journeyRowMap(){
+    // Every station gets its own vertical row. This keeps long labels,
+    // branch badges and multiple saved routes from ever sitting on top
+    // of each other on mobile.
+    const rows=new Map();
+    let row=0;
+
+    const roots=state.journey.nodes
+      .filter(n=>!n.parent_node_id)
+      .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+
+    function walk(node){
+      if(rows.has(node.node_id)) return;
+      rows.set(node.node_id,row++);
+      const children=journeyChildren(node.node_id);
+
+      // Keep the primary/current continuation visually closest to the parent,
+      // then place saved alternatives beneath it as separate stations.
+      children.forEach(child=>walk(child));
+    }
+
+    roots.forEach(root=>walk(root));
+
+    // Safety for any orphaned historical node.
+    state.journey.nodes
+      .filter(n=>!rows.has(n.node_id))
+      .sort((a,b)=>(a.created_at||0)-(b.created_at||0))
+      .forEach(node=>rows.set(node.node_id,row++));
+
+    return rows;
   }
 
   function branchLaneMap(){
@@ -1928,33 +1999,34 @@
     const activeIds=new Set(activePath.map(n=>n.node_id));
     const lanes=branchLaneMap();
 
-    const rowGap=82;
-    const branchShift=72;
+    const rowGap=86;
+    const branchShift=68;
     const topPad=22;
     const stopXOffset=9;
     const stopYOffset=9;
 
     const width=Math.max(300,butterflyMetro.clientWidth||320);
     const mainX=Math.max(22,Math.round(width*0.16));
+    const rows=journeyRowMap();
 
     const positions=new Map();
     for(const node of nodes){
       const lane=lanes.get(node.node_id)||0;
-      const depth=journeyDepth(node);
+      const row=rows.get(node.node_id)||0;
 
       // Keep every route inside the visible phone width.
-      // Main route goes down; branches move only a little left/right.
+      // Main route goes down; branches only peel slightly left/right.
       const rawX=mainX + lane*branchShift;
       const x=Math.max(18,Math.min(rawX,width-235));
 
       positions.set(node.node_id,{
         x,
-        y:topPad+depth*rowGap
+        y:topPad+row*rowGap
       });
     }
 
-    const maxDepth=Math.max(...nodes.map(journeyDepth),0);
-    const height=topPad*2+(maxDepth+1)*rowGap+55;
+    const maxRow=Math.max(...[...rows.values()],0);
+    const height=topPad*2+(maxRow+1)*rowGap+70;
 
     let routeSvg=`<svg class="metroRoutes" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">`;
 
