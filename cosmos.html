@@ -129,6 +129,28 @@
       font-size:15px;
       line-height:1.62
     }
+    .projectionContext{
+      margin-top:11px;
+      padding-top:11px;
+      border-top:1px solid rgba(255,255,255,.07);
+      display:grid;
+      gap:8px
+    }
+    .projectionContextRow{
+      color:#9eacc0;
+      font-size:12.5px;
+      line-height:1.52
+    }
+    .projectionContextRow strong{
+      color:#d9e4f4;
+      font-weight:700
+    }
+    .projectionOrigin{
+      margin-top:10px;
+      color:#74839a;
+      font-size:10.5px;
+      line-height:1.45
+    }
     .projectionMeta{
       display:flex;
       gap:7px;
@@ -272,6 +294,26 @@
       cursor:pointer;
       width:100%
     }
+    .metroStop.branchDepth1{padding-left:28px}
+    .metroStop.branchDepth2{padding-left:56px}
+    .metroStop.branchDepth3{padding-left:84px}
+    .metroBranchTag{
+      display:inline-block;
+      margin-left:6px;
+      padding:2px 6px;
+      border:1px solid rgba(122,162,255,.18);
+      border-radius:999px;
+      color:#8197ba;
+      font-size:9px;
+      font-weight:600;
+      vertical-align:middle
+    }
+    .metroStop.offRoute{opacity:.72}
+    .metroStop.offRoute:hover{opacity:1}
+    .metroStop.current{opacity:1}
+    .metroStop.routeRoot .metroDot{
+      border-color:#8395b0;
+    }
     .metroStop:not(:last-child)::after{
       content:"";
       position:absolute;
@@ -367,6 +409,9 @@
         <h2 class="projectionTitle" id="projectionTitle">Cosmos</h2>
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
+        <div class="projectionContext" id="projectionContext"></div>
+        <div class="projectionOrigin" id="projectionOrigin"></div>
+
         <div class="projectionMeta">
           <span id="projectionBasis">Resolving evidence…</span>
           <button type="button" id="sourcesBtn">Sources</button>
@@ -453,6 +498,8 @@
 
   const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
+  const projectionContext = document.getElementById("projectionContext");
+  const projectionOrigin = document.getElementById("projectionOrigin");
   const projectionBasis = document.getElementById("projectionBasis");
   const projectionSources = document.getElementById("projectionSources");
   const sourcesBtn = document.getElementById("sourcesBtn");
@@ -489,7 +536,13 @@
     history: [],
     expanded: false,
     entryObserver: null,
-    trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1"
+    trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
+    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_2",
+    journey: {
+      nodes: [],
+      current_node_id: "",
+      next_id: 1
+    }
   };
 
   const esc = (value) => String(value ?? "")
@@ -921,6 +974,143 @@
         ? [subject?.id,...equipment.map(x=>x.id)].filter(Boolean)
         : [subject?.id].filter(Boolean)
     };
+  }
+
+
+  function journeyObserverKey(observer){
+    if(!observer) return "";
+    return [
+      observer.kind||"",
+      observer.id||"",
+      observer.label||"",
+      observer.question||""
+    ].join("|");
+  }
+
+  function journeyNodeById(id){
+    return state.journey.nodes.find(node=>node.node_id===id) || null;
+  }
+
+  function loadJourney(){
+    try{
+      const raw=sessionStorage.getItem(state.journeyStorageKey);
+      if(!raw) return;
+      const parsed=JSON.parse(raw);
+      if(!parsed || !Array.isArray(parsed.nodes)) return;
+      state.journey.nodes=parsed.nodes;
+      state.journey.current_node_id=parsed.current_node_id||"";
+      state.journey.next_id=Number(parsed.next_id)||(
+        parsed.nodes.reduce((m,n)=>Math.max(m,Number(String(n.node_id||"").replace(/\D/g,""))||0),0)+1
+      );
+    }catch{}
+  }
+
+  function saveJourney(){
+    try{
+      sessionStorage.setItem(state.journeyStorageKey,JSON.stringify(state.journey));
+    }catch{}
+  }
+
+  function addJourneyNode(observer,parentNodeId="",forceNew=false){
+    if(!observer) return null;
+    const key=journeyObserverKey(observer);
+
+    // If we are simply returning to a previously visited station, reuse it.
+    if(!forceNew){
+      const existing=state.journey.nodes.find(node=>node.observer_key===key);
+      if(existing){
+        state.journey.current_node_id=existing.node_id;
+        saveJourney();
+        return existing;
+      }
+    }
+
+    const parent=parentNodeId || state.journey.current_node_id || "";
+    const node={
+      node_id:`j${state.journey.next_id++}`,
+      parent_node_id:parent,
+      observer_key:key,
+      observer:observerSnapshot(observer),
+      created_at:Date.now()
+    };
+    state.journey.nodes.push(node);
+    state.journey.current_node_id=node.node_id;
+    saveJourney();
+    return node;
+  }
+
+  function ensureJourneyCurrent(observer){
+    if(!observer) return;
+    if(!state.journey.nodes.length){
+      addJourneyNode(observer,"",true);
+      return;
+    }
+
+    const current=journeyNodeById(state.journey.current_node_id);
+    if(current && current.observer_key===journeyObserverKey(observer)) return;
+
+    // Reuse a previously visited station if it exists; otherwise branch from
+    // the current station without deleting any forward history.
+    const existing=state.journey.nodes.find(node=>node.observer_key===journeyObserverKey(observer));
+    if(existing){
+      state.journey.current_node_id=existing.node_id;
+      saveJourney();
+    }else{
+      addJourneyNode(observer,state.journey.current_node_id,true);
+    }
+  }
+
+  function journeyPathTo(nodeId){
+    const path=[];
+    let node=journeyNodeById(nodeId);
+    const seen=new Set();
+    while(node && !seen.has(node.node_id)){
+      seen.add(node.node_id);
+      path.unshift(node);
+      node=node.parent_node_id ? journeyNodeById(node.parent_node_id) : null;
+    }
+    return path;
+  }
+
+  function journeyChildren(parentId){
+    return state.journey.nodes
+      .filter(node=>node.parent_node_id===parentId)
+      .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+  }
+
+  function restoreObserverFromJourneyNode(node){
+    if(!node?.observer) return;
+    const snap=node.observer;
+
+    if(snap.kind==="entity" && snap.id && state.entities.has(snap.id)){
+      const entity=state.entities.get(snap.id);
+      state.observer={
+        ...snap,
+        entity,
+        label:entity.name||entity.label||snap.label||snap.id
+      };
+    }else if(snap.kind==="response" && snap.question){
+      const response=buildQuestionResponse(snap.question);
+      state.observer={
+        ...snap,
+        kind:"response",
+        id:response.id,
+        label:snap.label||snap.question,
+        response,
+        question:snap.question,
+        semantic_subject_id:response?.subject_match?.id||"",
+        semantic_subject_label:response?.subject_match?.label||""
+      };
+      state.response=response;
+    }else{
+      state.observer={...snap};
+    }
+
+    state.journey.current_node_id=node.node_id;
+    state.expanded=false;
+    saveJourney();
+    saveTrail();
+    render();
   }
 
   function observerSnapshot(observer){
@@ -1478,6 +1668,12 @@
 
 
   function compactEssence(observer){
+    if(observer?.kind==="entity"){
+      const entity=state.entities.get(observer.id);
+      return entity?.summary || entity?.description || entity?.definition ||
+        `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
+    }
+
     const direct=buildDirectAnswerForObserver(observer);
     if(direct) return direct;
 
@@ -1492,13 +1688,37 @@
       if(observer.response?.answer) return observer.response.answer;
     }
 
-    if(observer?.kind==="entity"){
-      const entity=state.entities.get(observer.id);
-      return entity?.summary || entity?.description || entity?.definition ||
-        `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
-    }
-
     return `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
+  }
+
+  function compactCenterContext(observer){
+    if(observer?.kind!=="entity") return [];
+
+    const intel=buildCenterIntelligence(observer.id);
+    if(!intel) return [];
+
+    const rows=[];
+    if(intel.current_state?.length){
+      rows.push({
+        label:"What Cosmos sees now",
+        text:intel.current_state.slice(0,2).join(" ")
+      });
+    }
+    if(intel.why_it_matters){
+      rows.push({
+        label:"Why it matters",
+        text:intel.why_it_matters
+      });
+    }
+    if(intel.latest_movement?.length){
+      const first=intel.latest_movement[0];
+      const move=[first?.title,first?.summary].filter(Boolean).join(" — ");
+      if(move) rows.push({
+        label:"Latest movement",
+        text:move
+      });
+    }
+    return rows.slice(0,2);
   }
 
   function projectionEvidenceItems(observer){
@@ -1535,12 +1755,26 @@
   }
 
   function renderProjectionLayer(observer,projection){
-    const title=observer?.question || observerDisplayLabel(observer) || "Cosmos";
+    const currentLabel=observerDisplayLabel(observer) || "Cosmos";
+    const entryQuestion=observer?.question || entry.question || "";
+    const title=observer?.kind==="entity" ? currentLabel : (entryQuestion || currentLabel);
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
+    const contextRows=compactCenterContext(observer);
 
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
+
+    projectionContext.innerHTML=contextRows.map(row=>`
+      <div class="projectionContextRow">
+        <strong>${esc(row.label)}:</strong> ${esc(row.text)}
+      </div>
+    `).join("");
+
+    projectionOrigin.textContent=
+      observer?.kind==="entity" && entryQuestion && normalizeSubject(entryQuestion)!==normalizeSubject(currentLabel)
+        ? `Journey began with: “${entryQuestion}”`
+        : "";
 
     const completion=observer?.response?.knowledge_completion;
     const evidenceText=evidence.length
@@ -1562,61 +1796,71 @@
       `).join("");
     }else{
       projectionSources.innerHTML = completion?.completion_required===true
-        ? `<p>Cosmos has not yet admitted enough verified evidence to support a stronger answer. The internal completion diagnostics are intentionally hidden from the default view.</p>`
+        ? `<p>Cosmos has not yet admitted enough verified evidence to support a stronger answer. The internal completion diagnostics remain hidden from the default view.</p>`
         : `<p>No directly linked source is exposed for this projection yet.</p>`;
     }
   }
 
   function trailObservers(){
-    const rows=[...(state.history||[]),state.observer].filter(Boolean);
-    const unique=[];
-    for(const row of rows){
-      const label=observerDisplayLabel(row);
-      if(!label) continue;
-      const last=unique[unique.length-1];
-      if(last && last.id===row.id && last.label===label) continue;
-      unique.push({id:row.id||"",kind:row.kind||"",label});
-    }
-    return unique.slice(-12);
+    // Retained only for compatibility with any future code that expects a path.
+    return journeyPathTo(state.journey.current_node_id).map(node=>node.observer);
   }
 
   function renderButterflyJourney(){
-    const trail=trailObservers();
+    ensureJourneyCurrent(state.observer);
 
-    if(!trail.length){
+    const nodes=state.journey.nodes;
+    if(!nodes.length){
       butterflyMetro.innerHTML=`<div class="metroEmpty">Your path through Cosmos will appear here as you travel.</div>`;
       return;
     }
 
-    butterflyMetro.innerHTML=trail.map((row,index)=>{
-      const current=index===trail.length-1;
+    const currentId=state.journey.current_node_id;
+    const activePath=journeyPathTo(currentId);
+    const activeIds=new Set(activePath.map(node=>node.node_id));
+
+    // Render the whole journey tree. Nothing disappears when the viewer
+    // goes back. A new choice from an earlier station becomes a branch.
+    const roots=nodes.filter(node=>!node.parent_node_id);
+    const rows=[];
+
+    function walk(node,depth,branchIndex){
+      rows.push({node,depth,branchIndex});
+      const children=journeyChildren(node.node_id);
+      children.forEach((child,index)=>walk(
+        child,
+        Math.min(depth + (children.length>1 ? 1 : 0),3),
+        index
+      ));
+    }
+
+    roots.forEach((root,index)=>walk(root,0,index));
+
+    butterflyMetro.innerHTML=rows.map(({node,depth,branchIndex})=>{
+      const current=node.node_id===currentId;
+      const onRoute=activeIds.has(node.node_id);
+      const childCount=journeyChildren(node.node_id).length;
+      const label=node.observer?.label || node.observer?.question || "Cosmos";
+      const branchTag=childCount>1 ? `<span class="metroBranchTag">${childCount} routes</span>` : "";
       return `
-        <button type="button" class="metroStop ${current?"current":""}" data-metro-index="${index}">
+        <button type="button"
+          class="metroStop branchDepth${depth} ${current?"current":""} ${onRoute?"":"offRoute"} ${!node.parent_node_id?"routeRoot":""}"
+          data-journey-node="${esc(node.node_id)}">
           <span class="metroDot"></span>
           <span class="metroLabel">
-            <strong>${esc(row.label)}</strong>
-            <span>${current?"you are here":"previous stop"}</span>
+            <strong>${esc(label)} ${branchTag}</strong>
+            <span>${current ? "you are here" : (onRoute ? "your route" : "saved branch")}</span>
           </span>
           <span class="metroPresence" aria-hidden="true"></span>
         </button>
       `;
     }).join("");
 
-    butterflyMetro.querySelectorAll("[data-metro-index]").forEach(button=>{
+    butterflyMetro.querySelectorAll("[data-journey-node]").forEach(button=>{
       button.addEventListener("click",()=>{
-        const index=Number(button.dataset.metroIndex);
-        const target=trail[index];
-        if(!target || index===trail.length-1) return;
-
-        const full=[...(state.history||[]),state.observer].filter(Boolean);
-        const selected=full[Math.max(0,full.length-trail.length)+index];
-        if(!selected) return;
-
-        state.history=full.slice(0,Math.max(0,full.length-trail.length)+index);
-        state.observer=selected;
-        state.expanded=false;
-        saveTrail();
-        render();
+        const node=journeyNodeById(button.dataset.journeyNode);
+        if(!node || node.node_id===state.journey.current_node_id) return;
+        restoreObserverFromJourneyNode(node);
       });
     });
   }
@@ -1778,8 +2022,14 @@
   function recenterEntity(id){
     const entity=state.entities.get(id);
     if(!entity) return;
+
     const previous=state.observer;
+    const parentJourneyId=state.journey.current_node_id;
+
+    // Keep browser-style back history for the header button, but the permanent
+    // Butterfly Journey lives independently and is never pruned.
     state.history.push(previous);
+
     state.observer={
       kind:"entity",
       id,
@@ -1791,6 +2041,17 @@
       from_observer_label:previous?.label||""
     };
     state.expanded=false;
+
+    const existing=state.journey.nodes.find(
+      node=>node.observer_key===journeyObserverKey(state.observer)
+    );
+    if(existing){
+      state.journey.current_node_id=existing.node_id;
+    }else{
+      addJourneyNode(state.observer,parentJourneyId,true);
+    }
+    saveJourney();
+
     edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
     history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}${state.observer.question?`&question=${encodeURIComponent(state.observer.question)}`:""}`);
     saveTrail();
@@ -1848,20 +2109,28 @@
     state.history.push(state.observer);
     state.observer=state.entryObserver;
     state.expanded=false;
+    ensureJourneyCurrent(state.observer);
     saveTrail();
     history.pushState({cosmos:true},"",location.pathname+location.search);
     render();
   });
   backBtn.addEventListener("click",()=>{
     const previous=state.history.pop();
-    if(previous){state.observer=previous;state.expanded=false;saveTrail();render()}
-    else history.back();
+    if(previous){
+      state.observer=previous;
+      state.expanded=false;
+      ensureJourneyCurrent(state.observer);
+      saveTrail();
+      render();
+    }else history.back();
   });
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
   loadKnowledge().then(()=>{
+    loadJourney();
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
+    ensureJourneyCurrent(state.observer);
     saveTrail();
     render();
   }).catch(error=>{
