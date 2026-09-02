@@ -3369,23 +3369,14 @@
     hydrateUniversalAnswer(question);
   });
 
-  const SHARED_STATION_PARAM="station";
+  const SHARED_STATION_PARAM="shared";
+  const SHARED_GATEWAY_PARAM="gateway";
 
-  function encodeStation(value){
-    const bytes=new TextEncoder().encode(String(value||""));let binary="";
-    bytes.forEach(b=>binary+=String.fromCharCode(b));
-    return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-  }
-  function decodeStation(value){
-    let b=String(value||"").replace(/-/g,"+").replace(/_/g,"/");
-    while(b.length%4)b+="=";
-    const binary=atob(b);
-    return new TextDecoder().decode(Uint8Array.from(binary,c=>c.charCodeAt(0)));
-  }
-  function currentStationPayload(){
+  function currentStationPersistentPayload(){
     const o=state.observer;
-    if(!o||o.kind==="landing")return null;
+    if(!o||o.kind==="landing") return null;
     const r=o.response||null;
+
     const ids=Array.isArray(r?.dynamic_projection_ids)?r.dynamic_projection_ids:[];
     const entities=ids.map(id=>state.entities.get(id)).filter(Boolean).map(e=>({...e}));
     const idSet=new Set(ids);
@@ -3394,14 +3385,41 @@
       idSet.has(rel.from_entity_id||rel.from_id) &&
       idSet.has(rel.to_entity_id||rel.to_id)
     ).map(rel=>({...rel}));
+
+    const sources=Array.isArray(r?.bullets)
+      ? r.bullets.map(item=>({
+          title:String(item?.title||""),
+          url:String(item?.url||""),
+          note:String(item?.summary||"")
+        })).filter(item=>item.title||item.url)
+      : [];
+
     return {
-      v:2,shared_at:new Date().toISOString(),kind:o.kind||"",id:o.id||"",label:o.label||"",
-      question:o.question||"",semantic_subject_id:o.semantic_subject_id||r?.subject_match?.id||"",
-      semantic_subject_label:o.semantic_subject_label||r?.subject_match?.label||"",
+      question:o.question||r?.question||o.label||"",
+      label:o.label||r?.label||"",
+      subject:o.semantic_subject_label||r?.subject_match?.label||"",
+      intent:r?.intent||"",
+      short_answer:r?.short_answer||"",
+      answer:r?.answer||"",
+      sources,
+      observer:{
+        kind:o.kind||"",
+        id:o.id||"",
+        label:o.label||"",
+        question:o.question||"",
+        semantic_subject_id:o.semantic_subject_id||r?.subject_match?.id||"",
+        semantic_subject_label:o.semantic_subject_label||r?.subject_match?.label||""
+      },
       response:r?{
-        label:r.label||"",question:r.question||o.question||"",answer:r.answer||"",short_answer:r.short_answer||"",
-        intent:r.intent||"",epistemic_state:r.epistemic_state||"",confidence:r.confidence||"",
-        source_label:r.source_label||"",bullets:Array.isArray(r.bullets)?r.bullets.slice(0,10):[],
+        label:r.label||"",
+        question:r.question||o.question||"",
+        answer:r.answer||"",
+        short_answer:r.short_answer||"",
+        intent:r.intent||"",
+        epistemic_state:r.epistemic_state||"",
+        confidence:r.confidence||"",
+        source_label:r.source_label||"",
+        bullets:Array.isArray(r.bullets)?r.bullets.slice(0,10):[],
         projection_seed_ids:Array.isArray(r.projection_seed_ids)?r.projection_seed_ids:[],
         dynamic_projection_ids:ids,
         dynamic_projection_relationship_count:Number(r.dynamic_projection_relationship_count||relationships.length),
@@ -3409,79 +3427,166 @@
         knowledge_gaps:Array.isArray(r.knowledge_gaps)?r.knowledge_gaps.slice(0,8):[]
       }:null,
       projection:{entities,relationships},
-      journey:Array.isArray(state.journey?.nodes)?state.journey.nodes.slice(-20).map(n=>({...n})):[]
+      journey:Array.isArray(state.journey?.nodes)?state.journey.nodes.slice(-24).map(n=>({...n})):[]
     };
   }
-  function stationShareUrl(){
-    const payload=currentStationPayload();if(!payload)return "";
-    const u=new URL(window.location.href);u.pathname="/cosmos.html";u.search="";u.hash="";
-    u.searchParams.set(SHARED_STATION_PARAM,encodeStation(JSON.stringify(payload)));
-    return u.toString();
-  }
+
   function shareNotice(message){
-    shareStationStatus.textContent=message;shareStationStatus.hidden=false;
-    clearTimeout(shareNotice.timer);shareNotice.timer=setTimeout(()=>shareStationStatus.hidden=true,2600);
+    shareStationStatus.textContent=message;
+    shareStationStatus.hidden=false;
+    clearTimeout(shareNotice.timer);
+    shareNotice.timer=setTimeout(()=>shareStationStatus.hidden=true,3200);
   }
+
+  async function createPersistentStation(){
+    const payload=currentStationPersistentPayload();
+    if(!payload) throw new Error("No current station to share.");
+
+    const response=await fetch(`${COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"")}/api/cosmos/share`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok || !data?.share_url){
+      throw new Error(data?.error||"Could not create shared station.");
+    }
+    return data;
+  }
+
   async function shareCurrentStation(){
-    const url=stationShareUrl();if(!url)return;
-    const p=currentStationPayload(),title=p?.question||p?.label||"Cosmos station";
+    shareNotice("Preparing shared station…");
+
     try{
-      if(navigator.share){await navigator.share({title:"Cosmos · Shared station",text:`I found this station in Cosmos: ${title}`,url});return;}
-      await navigator.clipboard.writeText(url);shareNotice("Station link copied.");
+      const data=await createPersistentStation();
+
+      // Copy the generated post text first. LinkedIn's iOS share extension may
+      // accept the URL but ignore supplied text, so paste-ready copy is safest.
+      if(data.post_text && navigator.clipboard){
+        try{await navigator.clipboard.writeText(data.post_text);}catch{}
+      }
+
+      const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
+      const shareText=data.post_text||`Explore this station in Cosmos: ${title}`;
+
+      if(navigator.share){
+        await navigator.share({
+          title:"Cosmos · Shared station",
+          text:shareText,
+          url:data.share_url
+        });
+        shareNotice("Post text copied. Paste it in your social post if needed.");
+        return;
+      }
+
+      if(navigator.clipboard){
+        await navigator.clipboard.writeText(`${shareText}\n\n${data.share_url}`);
+        shareNotice("Post text and station link copied.");
+      }else{
+        window.open(data.share_url,"_blank","noopener");
+      }
     }catch(error){
-      if(error?.name==="AbortError")return;
-      try{await navigator.clipboard.writeText(url);shareNotice("Station link copied.");}
-      catch{shareNotice("Could not copy the station link.");}
+      if(error?.name==="AbortError") return;
+      console.warn("Station sharing failed",error);
+      shareNotice(error?.message||"Could not share this station.");
     }
   }
-  function sharedStationPayload(){
-    const encoded=new URLSearchParams(window.location.search).get(SHARED_STATION_PARAM);
-    if(!encoded)return null;
-    try{const p=JSON.parse(decodeStation(encoded));return p?.v===2?p:null;}catch{return null;}
+
+  async function restorePersistentSharedStation(){
+    const params=new URLSearchParams(window.location.search);
+    const stationId=params.get(SHARED_STATION_PARAM);
+    if(!stationId) return false;
+
+    const gateway=params.get(SHARED_GATEWAY_PARAM) ||
+      COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"");
+
+    try{
+      const response=await fetch(`${gateway}/api/cosmos/station/${encodeURIComponent(stationId)}`);
+      const p=await response.json();
+      if(!response.ok) throw new Error(p?.error||"Shared station unavailable.");
+
+      for(const e of (p.projection?.entities||[])){
+        if(e?.entity_id) state.entities.set(e.entity_id,e);
+      }
+
+      if(Array.isArray(p.projection?.relationships)&&p.projection.relationships.length){
+        const incoming=new Set(p.projection.relationships.map(r=>r.relationship_id).filter(Boolean));
+        state.relationships=[
+          ...state.relationships.filter(r=>!incoming.has(r.relationship_id)),
+          ...p.projection.relationships
+        ];
+      }
+
+      const sourceObserver=p.observer||{};
+      const rr=p.response||null;
+      const restoredResponse=rr?{
+        id:`response:shared:${stationId}`,
+        label:rr.label||p.label||p.question||"Shared station",
+        response_type:"shared-station",
+        question:rr.question||p.question||"",
+        answer:rr.answer||p.answer||"",
+        short_answer:rr.short_answer||p.short_answer||"",
+        intent:rr.intent||p.intent||"",
+        epistemic_state:rr.epistemic_state||"uncertain",
+        confidence:rr.confidence||"low",
+        subject_match:sourceObserver.semantic_subject_id?{
+          id:sourceObserver.semantic_subject_id,
+          label:sourceObserver.semantic_subject_label||sourceObserver.semantic_subject_id,
+          entity:state.entities.get(sourceObserver.semantic_subject_id)||null
+        }:null,
+        bullets:Array.isArray(rr.bullets)?rr.bullets:[],
+        projection_seed_ids:Array.isArray(rr.projection_seed_ids)?rr.projection_seed_ids:[],
+        dynamic_projection_ids:Array.isArray(rr.dynamic_projection_ids)?rr.dynamic_projection_ids:[],
+        dynamic_projection_relationship_count:Number(rr.dynamic_projection_relationship_count||0),
+        source_label:rr.source_label||"Shared Cosmos station",
+        knowledge_completion:null,
+        suggested_stations:Array.isArray(rr.suggested_stations)?rr.suggested_stations:[],
+        knowledge_gaps:Array.isArray(rr.knowledge_gaps)?rr.knowledge_gaps:[]
+      }:null;
+
+      state.observer=restoredResponse?{
+        kind:"response",
+        id:restoredResponse.id,
+        label:sourceObserver.label||p.label||p.question||restoredResponse.label,
+        response:restoredResponse,
+        question:sourceObserver.question||p.question||restoredResponse.question||"",
+        semantic_subject_id:sourceObserver.semantic_subject_id||"",
+        semantic_subject_label:sourceObserver.semantic_subject_label||"",
+        article_id:""
+      }:{
+        kind:sourceObserver.kind||"entity",
+        id:sourceObserver.id||sourceObserver.semantic_subject_id||"",
+        label:sourceObserver.label||p.label||p.question||"Shared station",
+        question:sourceObserver.question||p.question||"",
+        semantic_subject_id:sourceObserver.semantic_subject_id||"",
+        semantic_subject_label:sourceObserver.semantic_subject_label||""
+      };
+
+      state.entryObserver=state.observer;
+      state.history=[];
+      state.universalAnswerLoaded=true;
+      state.universalAnswerPending=false;
+
+      if(Array.isArray(p.journey)&&p.journey.length){
+        state.journey.nodes=p.journey;
+        state.journey.current_node_id=p.journey[p.journey.length-1]?.node_id ||
+          p.journey[p.journey.length-1]?.id || "";
+        state.journey.next_id=p.journey.length+1;
+      }
+
+      ensureJourneyCurrent(state.observer);
+      saveJourney();
+      saveTrail();
+      render();
+      return true;
+    }catch(error){
+      console.warn("Shared Cosmos station could not be restored.",error);
+      return false;
+    }
   }
-  function restoreSharedStation(p){
-    if(!p)return false;
-    for(const e of (p.projection?.entities||[])){
-      if(e?.entity_id)state.entities.set(e.entity_id,e);
-    }
-    if(Array.isArray(p.projection?.relationships)&&p.projection.relationships.length){
-      const incoming=new Set(p.projection.relationships.map(r=>r.relationship_id).filter(Boolean));
-      state.relationships=[
-        ...state.relationships.filter(r=>!incoming.has(r.relationship_id)),
-        ...p.projection.relationships
-      ];
-    }
-    const r=p.response?{
-      id:`response:shared:${normalizeSubject(p.question||p.label||"station").replace(/\s+/g,"-")}`,
-      label:p.response.label||p.label||p.question||"Shared station",response_type:"shared-station",
-      question:p.response.question||p.question||"",answer:p.response.answer||"",short_answer:p.response.short_answer||"",
-      intent:p.response.intent||"",epistemic_state:p.response.epistemic_state||"uncertain",confidence:p.response.confidence||"low",
-      subject_match:p.semantic_subject_id?{id:p.semantic_subject_id,label:p.semantic_subject_label||p.semantic_subject_id,entity:state.entities.get(p.semantic_subject_id)||null}:null,
-      bullets:Array.isArray(p.response.bullets)?p.response.bullets:[],
-      projection_seed_ids:Array.isArray(p.response.projection_seed_ids)?p.response.projection_seed_ids:[],
-      dynamic_projection_ids:Array.isArray(p.response.dynamic_projection_ids)?p.response.dynamic_projection_ids:[],
-      dynamic_projection_relationship_count:Number(p.response.dynamic_projection_relationship_count||0),
-      source_label:p.response.source_label||"Shared Cosmos station",knowledge_completion:null,
-      suggested_stations:Array.isArray(p.response.suggested_stations)?p.response.suggested_stations:[],
-      knowledge_gaps:Array.isArray(p.response.knowledge_gaps)?p.response.knowledge_gaps:[]
-    }:null;
-    state.observer=r?{
-      kind:"response",id:r.id,label:p.question||p.label||r.label,response:r,question:p.question||r.question||"",
-      semantic_subject_id:p.semantic_subject_id||"",semantic_subject_label:p.semantic_subject_label||"",article_id:""
-    }:{
-      kind:p.kind||"entity",id:p.id||p.semantic_subject_id||"",label:p.label||p.semantic_subject_label||"Shared station",
-      question:p.question||"",semantic_subject_id:p.semantic_subject_id||"",semantic_subject_label:p.semantic_subject_label||""
-    };
-    state.entryObserver=state.observer;
-    state.history=[];
-    state.universalAnswerLoaded=true;state.universalAnswerPending=false;
-    if(Array.isArray(p.journey)&&p.journey.length){
-      state.journey.nodes=p.journey;
-      state.journey.current_node_id=p.journey[p.journey.length-1]?.id||"";
-      state.journey.next_id=p.journey.length+1;
-    }
-    ensureJourneyCurrent(state.observer);saveTrail();render();return true;
-  }
+
+
   function startFreshCosmos(){
     // Clicking the Cosmos title is an intentional new beginning.
     // Remove only observer/journey session state; canonical Cosmos knowledge is untouched.
@@ -3530,11 +3635,10 @@
   });
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
-  loadKnowledge().then(()=>{
+  loadKnowledge().then(async ()=>{
     loadJourney();
 
-    const shared=sharedStationPayload();
-    if(shared && restoreSharedStation(shared)) return;
+    if(await restorePersistentSharedStation()) return;
 
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
