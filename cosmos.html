@@ -279,6 +279,33 @@
       width:235px;
     }
 
+    .metroRoutes{
+      position:absolute;
+      inset:0;
+      z-index:1;
+      overflow:visible;
+      pointer-events:none
+    }
+    .metroRoutePath{
+      fill:none;
+      stroke:#55729f;
+      stroke-width:2.2;
+      stroke-linecap:round;
+      stroke-linejoin:round;
+      opacity:.48
+    }
+    .metroRoutePath.active{
+      stroke:#86a8eb;
+      stroke-width:2.8;
+      opacity:.98
+    }
+    .metroRoutePath.saved{
+      stroke:#536885;
+      stroke-width:2;
+      opacity:.42
+    }
+
+
     .metroStop{
       position:absolute;
       display:grid;
@@ -342,20 +369,6 @@
       vertical-align:middle
     }
 
-    .metroLine{
-      position:absolute;
-      z-index:1;
-      height:2px;
-      background:linear-gradient(90deg,#536a8b,#6d8fc6);
-      transform-origin:0 50%;
-      opacity:.82;
-      pointer-events:none
-    }
-    .metroLine.saved{opacity:.42}
-    .metroLine.active{
-      background:linear-gradient(90deg,#6688c9,#88a9ef);
-      opacity:.96
-    }
 
     .metroLegend{
       display:flex;
@@ -443,7 +456,7 @@
         <div class="projectionMeta">
           <span id="projectionBasis">Resolving evidence…</span>
           <button type="button" id="sourcesBtn">Sources</button>
-          <button type="button" id="rippleBtn">Follow ripple</button>
+          <button type="button" id="rippleBtn">Butterfly map ↓</button>
         </div>
 
         <form class="projectionAsk" id="projectionAskForm" autocomplete="off">
@@ -1841,17 +1854,13 @@
 
 
   function butterflyShouldStayOpen(){
-    try{
-      return sessionStorage.getItem(state.journeyViewStorageKey)==="1";
-    }catch{
-      return false;
-    }
+    return true;
   }
 
-  function setButterflyOpen(open){
-    butterflyWrap.classList.toggle("active",Boolean(open));
+  function setButterflyOpen(open=true){
+    butterflyWrap.classList.add("active");
     try{
-      sessionStorage.setItem(state.journeyViewStorageKey,open?"1":"0");
+      sessionStorage.setItem(state.journeyViewStorageKey,"1");
     }catch{}
   }
 
@@ -1868,43 +1877,51 @@
   }
 
   function branchLaneMap(){
-    // Root/current main route stays in lane 0.
-    // Every additional child at a branch point receives its own lateral lane.
     const laneById=new Map();
-    let nextPositive=1;
-    let nextNegative=-1;
+    let nextRight=1;
+    let nextLeft=-1;
 
-    const roots=state.journey.nodes.filter(n=>!n.parent_node_id)
+    const roots=state.journey.nodes
+      .filter(n=>!n.parent_node_id)
       .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+
+    function newBranchLane(branchOrdinal){
+      // Alternate visibly to the right and left of the main route.
+      if(branchOrdinal % 2 === 1) return nextRight++;
+      return nextLeft--;
+    }
 
     function assign(node,lane){
       laneById.set(node.node_id,lane);
       const children=journeyChildren(node.node_id);
+
       children.forEach((child,index)=>{
         if(index===0){
           assign(child,lane);
         }else{
-          const newLane = (index % 2)
-            ? nextPositive++
-            : nextNegative--;
-          assign(child,newLane);
+          assign(child,newBranchLane(index));
         }
       });
     }
 
-    roots.forEach((root,index)=>assign(root,index===0?0:nextPositive++));
+    roots.forEach((root,index)=>{
+      assign(root,index===0?0:newBranchLane(index));
+    });
+
     return laneById;
   }
 
-  function lineBetween(x1,y1,x2,y2,klass){
-    const dx=x2-x1,dy=y2-y1;
-    const length=Math.hypot(dx,dy);
-    const angle=Math.atan2(dy,dx)*180/Math.PI;
-    return `<div class="metroLine ${klass||""}" style="left:${x1}px;top:${y1}px;width:${length}px;transform:rotate(${angle}deg)"></div>`;
+  function routePath(x1,y1,x2,y2,klass){
+    const midY=(y1+y2)/2;
+    const d = Math.abs(x2-x1) < 6
+      ? `M ${x1} ${y1} L ${x2} ${y2}`
+      : `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+    return `<path class="metroRoutePath ${klass||""}" d="${d}" />`;
   }
 
   function renderButterflyJourney(){
     ensureJourneyCurrent(state.observer);
+    setButterflyOpen(true);
 
     const nodes=state.journey.nodes;
     if(!nodes.length){
@@ -1916,13 +1933,16 @@
     const activeIds=new Set(activePath.map(n=>n.node_id));
     const lanes=branchLaneMap();
 
-    const rowGap=78;
-    const laneGap=245;
-    const leftPad=20;
-    const topPad=14;
+    const rowGap=82;
+    const laneGap=230;
+    const leftPad=26;
+    const topPad=22;
+    const stopXOffset=9;
+    const stopYOffset=9;
 
-    const minLane=Math.min(...[...lanes.values()],0);
-    const maxLane=Math.max(...[...lanes.values()],0);
+    const laneValues=[...lanes.values()];
+    const minLane=Math.min(...laneValues,0);
+    const maxLane=Math.max(...laneValues,0);
     const laneOffset=Math.abs(minLane);
 
     const positions=new Map();
@@ -1937,14 +1957,13 @@
 
     const width=Math.max(
       butterflyMetro.clientWidth||320,
-      leftPad*2+(maxLane-minLane+1)*laneGap
+      leftPad*2+(maxLane-minLane+1)*laneGap+210
     );
     const maxDepth=Math.max(...nodes.map(journeyDepth),0);
-    const height=topPad*2+(maxDepth+1)*rowGap+30;
+    const height=topPad*2+(maxDepth+1)*rowGap+55;
 
-    let html=`<div class="metroCanvas" style="width:${width}px;height:${height}px">`;
+    let routeSvg=`<svg class="metroRoutes" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" aria-hidden="true">`;
 
-    // Connections first, behind stops.
     for(const node of nodes){
       if(!node.parent_node_id) continue;
       const parent=journeyNodeById(node.parent_node_id);
@@ -1952,15 +1971,17 @@
       const b=positions.get(node.node_id);
       if(!a||!b) continue;
 
-      const active=activeIds.has(node.node_id) && activeIds.has(parent.node_id);
-      html += lineBetween(
-        a.x+9,a.y+9,
-        b.x+9,b.y+9,
-        active?"active":"saved"
+      const isActive=activeIds.has(node.node_id) && activeIds.has(parent.node_id);
+      routeSvg += routePath(
+        a.x+stopXOffset,a.y+stopYOffset,
+        b.x+stopXOffset,b.y+stopYOffset,
+        isActive?"active":"saved"
       );
     }
+    routeSvg += `</svg>`;
 
-    // Stops.
+    let html=`<div class="metroCanvas" style="width:${width}px;height:${height}px">${routeSvg}`;
+
     for(const node of nodes){
       const p=positions.get(node.node_id);
       const current=node.node_id===state.journey.current_node_id;
@@ -1996,11 +2017,15 @@
       });
     });
 
-    // Keep current station visible without hiding the map.
+    // Center current station horizontally if the map is wider than the phone.
     const currentButton=butterflyMetro.querySelector(".metroStop.current");
     if(currentButton){
       requestAnimationFrame(()=>{
-        currentButton.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+        const targetLeft=Math.max(
+          0,
+          currentButton.offsetLeft - (butterflyMetro.clientWidth-currentButton.offsetWidth)/2
+        );
+        butterflyMetro.scrollTo({left:targetLeft,behavior:"smooth"});
       });
     }
   }
@@ -2060,10 +2085,8 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
-    if(butterflyShouldStayOpen()){
-      setButterflyOpen(true);
-      renderButterflyJourney();
-    }
+    setButterflyOpen(true);
+    renderButterflyJourney();
     emptyEl.style.display=projection.nodes.length ? "none":"block";
     const completionBlocked =
       observer?.kind==="response" &&
@@ -2227,7 +2250,7 @@
   rippleBtn.addEventListener("click",()=>{
     setButterflyOpen(true);
     renderButterflyJourney();
-    butterflyWrap.scrollIntoView({behavior:"smooth",block:"nearest"});
+    butterflyWrap.scrollIntoView({behavior:"smooth",block:"start"});
   });
 
   projectionAskForm.addEventListener("submit",event=>{
