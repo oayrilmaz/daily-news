@@ -2302,6 +2302,9 @@
   function compactEssence(observer){
     if(observer?.kind==="entity"){
       const entity=state.entities.get(observer.id);
+      if(entity?.ephemeral_projection){
+        return `This is a temporary Cosmos projection discovered from the previous station. Cosmos will research it before presenting a supported description.`;
+      }
       return entity?.summary || entity?.description || entity?.definition ||
         `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
     }
@@ -2325,6 +2328,9 @@
 
   function compactCenterContext(observer){
     if(observer?.kind!=="entity") return [];
+
+    const entity=state.entities.get(observer.id);
+    if(entity?.ephemeral_projection) return [];
 
     const intel=buildCenterIntelligence(observer.id);
     if(!intel) return [];
@@ -2371,6 +2377,8 @@
     }
 
     if(observer?.kind==="entity"){
+      const entity=state.entities.get(observer.id);
+      if(entity?.ephemeral_projection) return out.slice(0,8);
       const intel=buildCenterIntelligence(observer.id);
       for(const item of (intel?.article_cards||[])){
         const key=item.article_id||item.title;
@@ -2864,15 +2872,97 @@
 
     const previous=state.observer;
     const parentJourneyId=state.journey.current_node_id;
+    const label=entity.name||entity.label||id;
 
-    // Keep browser-style back history for the header button, but the permanent
-    // Butterfly Journey lives independently and is never pruned.
+    // Temporary projection nodes came from a specific universal answer.
+    // They must never inherit unrelated local PTD summaries. Clicking one
+    // turns it into a new universal station and asks Cosmos to explain the
+    // node in the context from which the viewer reached it.
+    if(entity.ephemeral_projection){
+      state.history.push(previous);
+
+      const previousLabel=observerDisplayLabel(previous);
+      const previousQuestion=String(previous?.question||"").trim();
+      const contextText=previousQuestion || previousLabel || "";
+
+      const researchQuestion=contextText && normalizeSubject(contextText)!==normalizeSubject(label)
+        ? `Explain "${label}" in the context of "${contextText}". What is it, why is it connected here, and what matters about that connection?`
+        : `Explain "${label}". What is it and what matters about it?`;
+
+      const provisional={
+        id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
+        label,
+        response_type:"universal_loading",
+        question:researchQuestion,
+        answer:"Cosmos is checking its own knowledge and the web…",
+        short_answer:"",
+        intent:"projection_exploration",
+        epistemic_state:"uncertain",
+        confidence:"low",
+        subject_match:{
+          id,
+          label,
+          entity
+        },
+        bullets:[],
+        projection_seed_ids:[id],
+        dynamic_projection_ids:[id],
+        source_label:"Cosmos reasoning",
+        knowledge_completion:null,
+        suggested_stations:[],
+        knowledge_gaps:[]
+      };
+
+      state.observer={
+        kind:"response",
+        id:provisional.id,
+        label,
+        response:provisional,
+        question:researchQuestion,
+        semantic_subject_id:id,
+        semantic_subject_label:label,
+        article_id:previous?.article_id||entry.article_id,
+        from_observer_id:previous?.id||"",
+        from_observer_label:previousLabel||""
+      };
+      state.response=provisional;
+      state.expanded=false;
+      state.universalAnswerLoaded=false;
+      state.universalAnswerPending=false;
+
+      const existing=state.journey.nodes.find(
+        node=>node.observer_key===journeyObserverKey(state.observer)
+      );
+      if(existing){
+        state.journey.current_node_id=existing.node_id;
+      }else{
+        addJourneyNode(state.observer,parentJourneyId,true);
+      }
+
+      saveJourney();
+      saveTrail();
+      edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
+
+      const url=new URL(location.href);
+      url.search="";
+      url.hash="";
+      url.searchParams.set("focus","question");
+      url.searchParams.set("question",researchQuestion);
+      url.searchParams.set("from","cosmos-projection");
+      history.pushState({cosmos:true},"",url.pathname+url.search);
+
+      render();
+      hydrateUniversalAnswer(researchQuestion,label);
+      return;
+    }
+
+    // Canonical Cosmos entity: retain existing deterministic recentering.
     state.history.push(previous);
 
     state.observer={
       kind:"entity",
       id,
-      label:entity.name||entity.label||id,
+      label,
       entity,
       article_id:previous?.article_id||entry.article_id,
       question:previous?.question||entry.question||"",
@@ -3071,7 +3161,7 @@
     };
   }
 
-  function universalResponseToObserver(question,data){
+  function universalResponseToObserver(question,data,displayLabel=""){
     const responseToken=`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     const subjectLabel=String(data?.subject||"").trim();
     const subjectEntity=subjectLabel ? findEntityByLooseLabel(subjectLabel) : null;
@@ -3095,7 +3185,7 @@
 
     const response={
       id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}`,
-      label:subjectLabel || question,
+      label:displayLabel || subjectLabel || question,
       response_type:"universal",
       question,
       answer:cleanUniversalAnswerText(data?.answer||data?.short_answer||"") || "Cosmos could not produce a dependable answer.",
@@ -3128,7 +3218,7 @@
     return {
       kind:"response",
       id:response.id,
-      label:question,
+      label:displayLabel || question,
       response,
       question,
       semantic_subject_id:response?.subject_match?.id||"",
@@ -3137,7 +3227,7 @@
     };
   }
 
-  async function hydrateUniversalAnswer(question){
+  async function hydrateUniversalAnswer(question,displayLabel=""){
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
@@ -3186,7 +3276,7 @@
         throw new Error("Cosmos gateway returned no answer");
       }
 
-      state.observer=universalResponseToObserver(question,data);
+      state.observer=universalResponseToObserver(question,data,displayLabel);
       state.response=state.observer.response;
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
@@ -3204,7 +3294,7 @@
       state.observer={
         kind:"response",
         id:local.id,
-        label:question,
+        label:displayLabel || question,
         response:local,
         question,
         semantic_subject_id:local?.subject_match?.id||"",
