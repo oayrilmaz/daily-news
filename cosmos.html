@@ -594,6 +594,7 @@
   };
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ozgurayrilmaz.workers.dev/api/cosmos/ask";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.0";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
 
   const state = {
@@ -1558,11 +1559,26 @@
 
   function journeyObserverKey(observer){
     if(!observer) return "";
+
+    // A question/answer is one station even if the response is re-hydrated,
+    // retried, or upgraded from local fallback to universal reasoning.
+    if(observer.kind==="response" || observer.kind==="question"){
+      const q=normalizeSubject(observer.question||observer.label||observer.id||"");
+      return `question|${q}`;
+    }
+
+    if(observer.kind==="entity"){
+      return `entity|${observer.id||normalizeSubject(observer.label||"")}`;
+    }
+
+    if(observer.kind==="relationship"){
+      return `relationship|${observer.id||observer.relationship_id||""}`;
+    }
+
     return [
       observer.kind||"",
       observer.id||"",
-      observer.label||"",
-      observer.question||""
+      normalizeSubject(observer.label||"")
     ].join("|");
   }
 
@@ -2830,7 +2846,7 @@
       <p><strong>${esc(entityLabel(rel.from_entity_id))} ${esc(relationshipLabel(rel))} ${esc(entityLabel(rel.to_entity_id))}</strong></p>
       <div class="edgeFacts">
         <div class="fact"><b>Confidence</b><span>${confidence===null?"Not supplied":esc(confidence+"%")}</span></div>
-        <div class="fact"><b>Epistemic state</b><span>${esc(rel.epistemic_status || rel.evidence_mode || "unqualified")}</span></div>
+        <div class="fact"><b>Epistemic state</b><span>${esc(rel.epistemic_status || rel.evidence_mode || "unqualified")}${rel.ephemeral_projection?" · temporary projection":""}</span></div>
         <div class="fact"><b>Relationship ID</b><span>${esc(rel.relationship_id || "not exposed")}</span></div>
         <div class="fact"><b>Feedback</b><span>${feedback?"Yes — reverse edge also exists":"No reverse edge in current projection"}</span></div>
         <div class="fact"><b>Time</b><span>${esc(rel.temporal_state || rel.valid_from || "not specified")}</span></div>
@@ -2883,33 +2899,156 @@
     return entity?.entity_id || "";
   }
 
+  function cleanUniversalAnswerText(value){
+    return String(value||"")
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,"$1")
+      .replace(/\((https?:\/\/[^)]+)\)/g,"")
+      .replace(/https?:\/\/\S+/g,"")
+      .replace(/\*\*([^*]+)\*\*/g,"$1")
+      .replace(/__([^_]+)__/g,"$1")
+      .replace(/\s+([,.;:!?])/g,"$1")
+      .replace(/[ \t]{2,}/g," ")
+      .replace(/\s+\n/g,"\n")
+      .trim();
+  }
+
+  function projectionConfidenceValue(value){
+    const v=String(value||"").toLowerCase();
+    if(v==="high") return 0.9;
+    if(v==="medium") return 0.7;
+    if(v==="low") return 0.45;
+    const n=Number(value);
+    return Number.isFinite(n) ? (n>1?n/100:n) : 0.5;
+  }
+
+  function canonicalOrEphemeralEntityId(label,responseToken,nodeId){
+    const canonical=findEntityByLooseLabel(label);
+    if(canonical?.entity_id) return canonical.entity_id;
+    const safe=String(nodeId||label||"node")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g,"-")
+      .replace(/^-+|-+$/g,"")
+      .slice(0,56) || "node";
+    return `ephemeral:${responseToken}:${safe}`;
+  }
+
+  function materializeDynamicProjection(data,responseToken,sources){
+    const nodes=Array.isArray(data?.projection_nodes) ? data.projection_nodes.slice(0,14) : [];
+    const relationships=Array.isArray(data?.projection_relationships)
+      ? data.projection_relationships.slice(0,22)
+      : [];
+
+    const idMap=new Map();
+    const materializedIds=[];
+
+    for(const node of nodes){
+      const localId=String(node?.id||"").trim();
+      const label=String(node?.label||localId||"").trim();
+      if(!localId || !label) continue;
+
+      const entityId=canonicalOrEphemeralEntityId(label,responseToken,localId);
+      idMap.set(localId,entityId);
+      materializedIds.push(entityId);
+
+      if(!state.entities.has(entityId)){
+        state.entities.set(entityId,{
+          entity_id:entityId,
+          name:label,
+          label,
+          type:String(node?.type||node?.role||"Projected concept"),
+          role:String(node?.role||"context"),
+          epistemic_state:String(node?.epistemic_state||"uncertain"),
+          confidence:projectionConfidenceValue(node?.confidence),
+          ephemeral_projection:true,
+          admitted_to_cosmos:false,
+          source_indexes:Array.isArray(node?.source_indexes)?node.source_indexes:[],
+          projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION
+        });
+      }
+    }
+
+    const ephemeralRelationships=[];
+    relationships.forEach((rel,index)=>{
+      const from=idMap.get(String(rel?.from_id||""));
+      const to=idMap.get(String(rel?.to_id||""));
+      if(!from || !to || from===to) return;
+
+      const sourceIndexes=Array.isArray(rel?.source_indexes)?rel.source_indexes:[];
+      const evidenceUrls=sourceIndexes
+        .map(i=>sources?.[Number(i)-1]?.url||"")
+        .filter(Boolean);
+
+      ephemeralRelationships.push({
+        relationship_id:`ephemeral-rel:${responseToken}:${index+1}`,
+        from_entity_id:from,
+        to_entity_id:to,
+        relationship_type:String(rel?.label||"related to"),
+        label:String(rel?.label||"related to"),
+        confidence:projectionConfidenceValue(rel?.confidence),
+        epistemic_status:String(rel?.epistemic_state||"uncertain"),
+        evidence_mode:String(rel?.epistemic_state||"uncertain"),
+        source_ids:evidenceUrls,
+        ephemeral_projection:true,
+        admitted_to_cosmos:false,
+        projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION
+      });
+    });
+
+    if(ephemeralRelationships.length){
+      state.relationships=[
+        ...state.relationships.filter(rel=>!String(rel?.relationship_id||"").startsWith(`ephemeral-rel:${responseToken}:`)),
+        ...ephemeralRelationships
+      ];
+    }
+
+    const subjectNode=nodes.find(node=>String(node?.role||"").toLowerCase()==="subject") || nodes[0] || null;
+    const subjectProjectionId=subjectNode
+      ? idMap.get(String(subjectNode.id||""))
+      : "";
+
+    return {
+      ids:[...new Set(materializedIds)],
+      subject_id:subjectProjectionId||"",
+      relationship_count:ephemeralRelationships.length
+    };
+  }
+
   function universalResponseToObserver(question,data){
+    const responseToken=`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     const subjectLabel=String(data?.subject||"").trim();
     const subjectEntity=subjectLabel ? findEntityByLooseLabel(subjectLabel) : null;
-    const subjectId=subjectEntity?.entity_id || entry.context_id || "";
 
     const sources=Array.isArray(data?.sources) ? data.sources.slice(0,10) : [];
     const suggested=Array.isArray(data?.suggested_stations) ? data.suggested_stations.slice(0,8) : [];
+    const dynamicProjection=materializeDynamicProjection(data,responseToken,sources);
 
+    const canonicalSubjectId=subjectEntity?.entity_id || entry.context_id || "";
+    const subjectId=dynamicProjection.subject_id || canonicalSubjectId || "";
+
+    // A single subject seed is enough: the temporary relationships let Cosmos
+    // expand outward naturally. If there is no subject node, use the first few
+    // projected nodes, then fall back to canonical/suggested entities.
+    const fallbackSuggested=suggested.map(entityIdForSuggestedLabel).filter(Boolean);
     const projectionSeedIds=[
       subjectId,
-      ...suggested.map(entityIdForSuggestedLabel)
+      ...(subjectId ? [] : dynamicProjection.ids.slice(0,3)),
+      ...(dynamicProjection.ids.length ? [] : fallbackSuggested)
     ].filter(Boolean);
 
     const response={
-      id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}:${Date.now()}`,
+      id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}`,
       label:subjectLabel || question,
       response_type:"universal",
       question,
-      answer:String(data?.answer||data?.short_answer||"").trim() || "Cosmos could not produce a dependable answer.",
-      short_answer:String(data?.short_answer||"").trim(),
+      answer:cleanUniversalAnswerText(data?.answer||data?.short_answer||"") || "Cosmos could not produce a dependable answer.",
+      short_answer:cleanUniversalAnswerText(data?.short_answer||""),
       intent:String(data?.intent||"").trim(),
       epistemic_state:String(data?.epistemic_state||"uncertain"),
       confidence:String(data?.confidence||"low"),
       subject_match: subjectId ? {
         id:subjectId,
-        label:subjectEntity?.name||subjectEntity?.label||subjectLabel||entry.context_label||subjectId,
-        entity:subjectEntity||state.entities.get(subjectId)||null
+        label:state.entities.get(subjectId)?.name || subjectLabel || entry.context_label || subjectId,
+        entity:state.entities.get(subjectId)||subjectEntity||null
       } : null,
       bullets:sources.map((source,index)=>({
         id:`web-source-${index+1}`,
@@ -2919,7 +3058,9 @@
         article_id:"",
         seed_ids:[]
       })),
-      projection_seed_ids:projectionSeedIds,
+      projection_seed_ids:[...new Set(projectionSeedIds)],
+      dynamic_projection_ids:dynamicProjection.ids,
+      dynamic_projection_relationship_count:dynamicProjection.relationship_count,
       source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
       knowledge_completion:null,
       suggested_stations:suggested,
