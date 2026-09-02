@@ -593,6 +593,9 @@
     context_label: params.get("context_label") || ""
   };
 
+  const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ozgurayrilmaz.workers.dev/api/cosmos/ask";
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+
   const state = {
     entities: new Map(),
     relationships: [],
@@ -601,6 +604,8 @@
     dailyBriefDate: "",
     response: null,
     observer: null,
+    universalAnswerLoaded: false,
+    universalAnswerPending: false,
     history: [],
     expanded: false,
     entryObserver: null,
@@ -2307,7 +2312,8 @@
       out.push({
         title:item.title||"Evidence",
         summary:item.summary||"",
-        article_id:item.article_id||""
+        article_id:item.article_id||"",
+        url:item.url||""
       });
     }
 
@@ -2320,7 +2326,8 @@
         out.push({
           title:item.title||"Evidence",
           summary:item.summary||"",
-          article_id:item.article_id||""
+          article_id:item.article_id||"",
+          url:item.url||""
         });
       }
     }
@@ -2350,6 +2357,7 @@
       observer?.kind==="response" &&
       Boolean(String(observer?.response?.answer||"").trim()) &&
       (
+        observer?.response?.response_type==="universal" ||
         observer?.response?.response_type==="daily_intelligence" ||
         observer?.response?.response_type==="outlook" ||
         (
@@ -2402,7 +2410,9 @@
         <div class="sourceItem">
           <strong>${esc(item.title)}</strong>
           ${item.summary?`<p>${esc(item.summary)}</p>`:""}
-          ${item.article_id?`<a href="/articles/${encodeURIComponent(item.article_id)}.html">Open source →</a>`:""}
+          ${item.url
+            ? `<a href="${esc(item.url)}" target="_blank" rel="noopener noreferrer">Open source →</a>`
+            : (item.article_id?`<a href="/articles/${encodeURIComponent(item.article_id)}.html">Open source →</a>`:"")}
         </div>
       `).join("");
     }else{
@@ -2832,6 +2842,183 @@
   }
 
 
+
+  function currentContextSubject(){
+    if(entry.context_id && state.entities.has(entry.context_id)){
+      const entity=state.entities.get(entry.context_id);
+      return {
+        id:entry.context_id,
+        label:entity?.name||entity?.label||entry.context_label||entry.context_id
+      };
+    }
+
+    if(state.observer?.kind==="entity"){
+      return {
+        id:state.observer.id,
+        label:observerDisplayLabel(state.observer)
+      };
+    }
+
+    if(state.observer?.response?.subject_match?.id){
+      return {
+        id:state.observer.response.subject_match.id,
+        label:state.observer.response.subject_match.label||""
+      };
+    }
+
+    const context=observerSubjectContext();
+    return context?.id ? {id:context.id,label:context.label||""} : null;
+  }
+
+  function journeyContextForGateway(){
+    const path=journeyPathTo(state.journey.current_node_id);
+    return path.slice(-12).map(node=>({
+      label:node?.observer?.label || node?.observer?.question || "",
+      kind:node?.observer?.kind || ""
+    })).filter(item=>item.label);
+  }
+
+  function entityIdForSuggestedLabel(label){
+    const entity=findEntityByLooseLabel(label);
+    return entity?.entity_id || "";
+  }
+
+  function universalResponseToObserver(question,data){
+    const subjectLabel=String(data?.subject||"").trim();
+    const subjectEntity=subjectLabel ? findEntityByLooseLabel(subjectLabel) : null;
+    const subjectId=subjectEntity?.entity_id || entry.context_id || "";
+
+    const sources=Array.isArray(data?.sources) ? data.sources.slice(0,10) : [];
+    const suggested=Array.isArray(data?.suggested_stations) ? data.suggested_stations.slice(0,8) : [];
+
+    const projectionSeedIds=[
+      subjectId,
+      ...suggested.map(entityIdForSuggestedLabel)
+    ].filter(Boolean);
+
+    const response={
+      id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}:${Date.now()}`,
+      label:subjectLabel || question,
+      response_type:"universal",
+      question,
+      answer:String(data?.answer||data?.short_answer||"").trim() || "Cosmos could not produce a dependable answer.",
+      short_answer:String(data?.short_answer||"").trim(),
+      intent:String(data?.intent||"").trim(),
+      epistemic_state:String(data?.epistemic_state||"uncertain"),
+      confidence:String(data?.confidence||"low"),
+      subject_match: subjectId ? {
+        id:subjectId,
+        label:subjectEntity?.name||subjectEntity?.label||subjectLabel||entry.context_label||subjectId,
+        entity:subjectEntity||state.entities.get(subjectId)||null
+      } : null,
+      bullets:sources.map((source,index)=>({
+        id:`web-source-${index+1}`,
+        title:String(source?.title||source?.url||`Source ${index+1}`),
+        summary:String(source?.note||""),
+        url:String(source?.url||""),
+        article_id:"",
+        seed_ids:[]
+      })),
+      projection_seed_ids:projectionSeedIds,
+      source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
+      knowledge_completion:null,
+      suggested_stations:suggested,
+      knowledge_gaps:Array.isArray(data?.knowledge_gaps)?data.knowledge_gaps:[]
+    };
+
+    return {
+      kind:"response",
+      id:response.id,
+      label:question,
+      response,
+      question,
+      semantic_subject_id:response?.subject_match?.id||"",
+      semantic_subject_label:response?.subject_match?.label||"",
+      article_id:entry.article_id
+    };
+  }
+
+  async function hydrateUniversalAnswer(question){
+    if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
+
+    state.universalAnswerPending=true;
+
+    // Make the transition explicit instead of briefly presenting a deterministic
+    // fallback as though it were the final answer.
+    if(state.observer?.kind==="response"){
+      state.observer.response={
+        ...state.observer.response,
+        response_type:"universal_loading",
+        answer:"Cosmos is checking its own knowledge and the web…",
+        knowledge_completion:null
+      };
+      render();
+    }
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
+
+    try{
+      const context=currentContextSubject();
+      const payload={
+        question,
+        context_subject:context,
+        journey:journeyContextForGateway(),
+        page:{
+          url:location.href,
+          entry_question:entry.question||"",
+          article_id:entry.article_id||""
+        }
+      };
+
+      const response=await fetch(COSMOS_ASK_ENDPOINT,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload),
+        signal:controller.signal
+      });
+
+      if(!response.ok){
+        throw new Error(`Cosmos gateway returned ${response.status}`);
+      }
+
+      const data=await response.json();
+      if(!data || !String(data.answer||data.short_answer||"").trim()){
+        throw new Error("Cosmos gateway returned no answer");
+      }
+
+      state.observer=universalResponseToObserver(question,data);
+      state.response=state.observer.response;
+      state.universalAnswerLoaded=true;
+      state.universalAnswerPending=false;
+
+      ensureJourneyCurrent(state.observer);
+      saveTrail();
+      render();
+    }catch(error){
+      console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
+      state.universalAnswerPending=false;
+
+      // Restore deterministic/local response as graceful fallback.
+      const local=buildQuestionResponse(question);
+      state.response=local;
+      state.observer={
+        kind:"response",
+        id:local.id,
+        label:question,
+        response:local,
+        question,
+        semantic_subject_id:local?.subject_match?.id||"",
+        semantic_subject_label:local?.subject_match?.label||"",
+        article_id:entry.article_id
+      };
+      ensureJourneyCurrent(state.observer);
+      render();
+    }finally{
+      clearTimeout(timer);
+    }
+  }
+
   sourcesBtn.addEventListener("click",()=>{
     sourcesDrawer.classList.toggle("active");
   });
@@ -2849,29 +3036,48 @@
       projectionAskInput.focus();
       return;
     }
-    const target=new URL("/cosmos.html",location.origin);
-    target.searchParams.set("focus","question");
-    target.searchParams.set("question",question);
-    target.searchParams.set("from","cosmos-projection");
 
-    const contextSubject=
-      state.observer?.kind==="entity"
-        ? {id:state.observer.id,label:observerDisplayLabel(state.observer)}
-        : (
-            state.observer?.response?.subject_match?.id
-              ? {
-                  id:state.observer.response.subject_match.id,
-                  label:state.observer.response.subject_match.label||""
-                }
-              : observerSubjectContext()
-          );
+    // Keep the journey and the current subject in memory. The universal
+    // gateway handles the follow-up conversationally; no case-specific route.
+    state.history.push(state.observer);
 
-    if(contextSubject?.id){
-      target.searchParams.set("context_id",contextSubject.id);
-      if(contextSubject.label) target.searchParams.set("context_label",contextSubject.label);
+    const provisional=buildQuestionResponse(question);
+    state.observer={
+      kind:"response",
+      id:provisional.id,
+      label:question,
+      response:{
+        ...provisional,
+        response_type:"universal_loading",
+        answer:"Cosmos is checking its own knowledge and the web…",
+        knowledge_completion:null
+      },
+      question,
+      semantic_subject_id:provisional?.subject_match?.id||"",
+      semantic_subject_label:provisional?.subject_match?.label||"",
+      article_id:entry.article_id
+    };
+
+    state.universalAnswerLoaded=false;
+    state.universalAnswerPending=false;
+    projectionAskInput.value="";
+
+    const url=new URL(location.href);
+    url.searchParams.set("focus","question");
+    url.searchParams.set("question",question);
+    url.searchParams.set("from","cosmos-projection");
+
+    const context=currentContextSubject();
+    if(context?.id){
+      url.searchParams.set("context_id",context.id);
+      if(context.label) url.searchParams.set("context_label",context.label);
     }
 
-    location.assign(target.toString());
+    history.pushState({cosmos:true},"",url.pathname+url.search);
+    ensureJourneyCurrent(state.observer);
+    saveTrail();
+    render();
+    hydrateUniversalAnswer(question);
   });
 
   expandBtn.addEventListener("click",()=>{state.expanded=true;render()});
@@ -2904,6 +3110,10 @@
     ensureJourneyCurrent(state.observer);
     saveTrail();
     render();
+
+    if(entry.focus==="question" && entry.question){
+      hydrateUniversalAnswer(entry.question);
+    }
   }).catch(error=>{
     console.error(error);
     statusEl.textContent="knowledge unavailable";
