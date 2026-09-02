@@ -1,467 +1,532 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
+  <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-TVKD1RLFE5"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
-    gtag("js", new Date());
-    gtag("config", "G-TVKD1RLFE5");
+    gtag('js', new Date());
+    gtag('config', 'G-TVKD1RLFE5');
   </script>
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#020611" />
-
-  <title>Cosmos | PTD Today</title>
+  <title>Cosmos — PTD Today</title>
   <meta name="description" content="Everything is connected. Ask anything. Explore everything." />
+  <meta name="theme-color" content="#07111f" />
   <link rel="canonical" href="https://ptdtoday.com/" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="PTD Today" />
-  <meta property="og:title" content="Cosmos | PTD Today" />
+  <meta property="og:title" content="Cosmos — PTD Today" />
   <meta property="og:description" content="Everything is connected. Ask anything. Explore everything." />
   <meta property="og:url" content="https://ptdtoday.com/" />
   <meta property="og:image" content="https://ptdtoday.com/assets/og-default.png" />
 
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Cosmos | PTD Today" />
-  <meta name="twitter:description" content="Everything is connected. Ask anything. Explore everything." />
-  <meta name="twitter:image" content="https://ptdtoday.com/assets/og-default.png" />
-
   <style>
     :root{
-      --bg0:#01040b;
-      --bg1:#030816;
-      --bg2:#061326;
-      --text:#f5f9ff;
-      --muted:rgba(221,233,247,.63);
-      --faint:rgba(206,224,244,.32);
-      --line:rgba(187,218,255,.17);
-      --line2:rgba(192,225,255,.31);
-      --cyan:#9fe9ff;
-      --blue:#5598ff;
-      --violet:#9c78ff;
+      --bg:#07111f;
+      --panel:#0d1726;
+      --panel2:#111d2f;
+      --ink:#f5f7fb;
+      --muted:#9ca9bc;
+      --line:#26364d;
+      --accent:#7aa2ff;
+      --accent2:#9dd6ff;
+      --soft:#17243a;
     }
 
     *{box-sizing:border-box}
-    html,body{margin:0;width:100%;min-height:100%;background:var(--bg0)}
+
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:
+        radial-gradient(circle at 50% 35%,#10264a 0,#07111f 45%,#030812 100%);
+      color:var(--ink);
+      font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+    }
+
     body{
       min-height:100dvh;
       overflow:hidden;
-      color:var(--text);
-      font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-      -webkit-font-smoothing:antialiased;
-      text-rendering:optimizeLegibility;
     }
 
-    .cosmos{
-      position:relative;
-      width:100%;
+    button,input{font:inherit}
+
+    .entryShell{
       min-height:100dvh;
+      position:relative;
       display:grid;
       place-items:center;
-      overflow:hidden;
       isolation:isolate;
-      background:
-        radial-gradient(circle at 50% 42%,rgba(44,92,145,.12) 0,rgba(18,44,80,.055) 27%,transparent 56%),
-        radial-gradient(circle at 50% 100%,rgba(56,74,162,.05),transparent 45%),
-        linear-gradient(180deg,#01040b 0%,#030814 46%,#020611 100%);
+      overflow:hidden;
+      padding:
+        max(28px,env(safe-area-inset-top))
+        18px
+        max(28px,env(safe-area-inset-bottom));
     }
 
-    /* very quiet "infinite" field, not a decorative star wallpaper */
-    .space,
-    .space::before,
-    .space::after{
+    /* Keep the same Cosmos visual language as cosmos.html, but with a dormant universe. */
+    .entryShell::before{
+      content:"";
       position:absolute;
       inset:-10%;
+      z-index:-8;
+      background:
+        radial-gradient(circle at 50% 45%,rgba(72,130,226,.12),transparent 23%),
+        radial-gradient(circle at 50% 48%,rgba(82,122,208,.07),transparent 37%),
+        radial-gradient(circle at 50% 34%,rgba(157,214,255,.035),transparent 52%);
+      filter:blur(12px);
+      pointer-events:none;
+    }
+
+    .starField,
+    .starField::before,
+    .starField::after{
+      position:absolute;
+      inset:0;
       content:"";
       pointer-events:none;
-      z-index:-4;
     }
 
-    .space{
-      opacity:.58;
+    .starField{
+      z-index:-10;
+      opacity:.38;
       background-image:
-        radial-gradient(circle at 8% 21%,rgba(255,255,255,.55) 0 .7px,transparent .95px),
-        radial-gradient(circle at 17% 72%,rgba(178,218,255,.42) 0 .65px,transparent .95px),
-        radial-gradient(circle at 26% 35%,rgba(255,255,255,.34) 0 .55px,transparent .85px),
-        radial-gradient(circle at 39% 12%,rgba(202,229,255,.35) 0 .65px,transparent .9px),
-        radial-gradient(circle at 48% 78%,rgba(255,255,255,.30) 0 .55px,transparent .85px),
-        radial-gradient(circle at 61% 27%,rgba(177,219,255,.45) 0 .65px,transparent .95px),
-        radial-gradient(circle at 72% 69%,rgba(255,255,255,.34) 0 .58px,transparent .9px),
-        radial-gradient(circle at 83% 17%,rgba(191,220,255,.43) 0 .65px,transparent .95px),
-        radial-gradient(circle at 93% 57%,rgba(255,255,255,.31) 0 .6px,transparent .9px);
-      background-size:380px 370px,460px 440px,570px 540px,680px 650px,790px 750px,920px 870px,1040px 970px,1170px 1080px,1320px 1210px;
+        radial-gradient(circle at 8% 15%,rgba(245,250,255,.75) 0 .65px,transparent 1px),
+        radial-gradient(circle at 20% 68%,rgba(196,224,255,.58) 0 .65px,transparent 1px),
+        radial-gradient(circle at 32% 27%,rgba(245,250,255,.55) 0 .65px,transparent 1px),
+        radial-gradient(circle at 43% 82%,rgba(175,211,255,.48) 0 .65px,transparent 1px),
+        radial-gradient(circle at 61% 11%,rgba(245,250,255,.68) 0 .65px,transparent 1px),
+        radial-gradient(circle at 72% 74%,rgba(188,218,255,.54) 0 .65px,transparent 1px),
+        radial-gradient(circle at 86% 29%,rgba(245,250,255,.62) 0 .65px,transparent 1px),
+        radial-gradient(circle at 94% 65%,rgba(166,211,255,.46) 0 .65px,transparent 1px);
+      background-size:
+        397px 367px,
+        541px 509px,
+        677px 619px,
+        761px 711px,
+        887px 829px,
+        1001px 947px,
+        1163px 1087px,
+        1319px 1231px;
     }
 
-    .space::before{
-      opacity:.30;
+    .starField::before{
+      opacity:.34;
       background:
-        radial-gradient(ellipse at 50% 42%,rgba(91,154,225,.13) 0%,transparent 42%);
-      filter:blur(38px);
+        radial-gradient(ellipse at 50% 46%,rgba(130,187,255,.08),transparent 42%);
+      filter:blur(32px);
     }
 
-    .space::after{
-      opacity:.18;
+    .starField::after{
       background:
-        conic-gradient(from 220deg at 50% 46%,transparent,rgba(94,86,190,.16),transparent 24%,rgba(50,155,206,.13),transparent 58%);
-      filter:blur(75px);
-      animation:nebulaDrift 42s linear infinite;
+        radial-gradient(circle at 50% 46%,rgba(122,162,255,.035),transparent 27%);
+      animation:spacePulse 8s ease-in-out infinite;
     }
 
-    .center{
-      width:min(680px,calc(100vw - 40px));
+    .entry{
+      width:min(760px,100%);
       display:flex;
       flex-direction:column;
       align-items:center;
       text-align:center;
-      transform:translateY(-2.8vh);
+      transform:translateY(-2.5vh);
     }
 
-    /* The object itself: a living, almost-black Cosmos with luminous atmosphere. */
     .life{
       position:relative;
-      width:clamp(180px,25vw,250px);
+      width:clamp(188px,31vw,272px);
       aspect-ratio:1;
       margin:0 0 28px;
       display:grid;
       place-items:center;
-      filter:drop-shadow(0 0 22px rgba(77,157,255,.15));
-      animation:wholeBreath 6.4s cubic-bezier(.45,0,.25,1) infinite;
-      will-change:transform,filter;
     }
 
-    .halo{
+    /* BREATH — slow expansion/contraction of the whole living field */
+    .breathField{
       position:absolute;
-      inset:-27%;
+      inset:-28%;
       border-radius:50%;
       background:
-        radial-gradient(circle,rgba(111,203,255,.14) 0 22%,rgba(76,128,255,.075) 38%,rgba(122,91,255,.035) 52%,transparent 72%);
-      filter:blur(25px);
-      animation:haloBreath 6.4s cubic-bezier(.45,0,.25,1) infinite;
+        radial-gradient(circle,
+          rgba(157,214,255,.14) 0 15%,
+          rgba(122,162,255,.10) 24%,
+          rgba(67,112,200,.045) 42%,
+          transparent 69%);
+      filter:blur(18px);
+      animation:cosmosBreath 6.2s cubic-bezier(.42,0,.30,1) infinite;
+      will-change:transform,opacity;
     }
 
-    .pulse-wave{
+    .breathRing{
       position:absolute;
-      inset:3%;
+      inset:-4%;
       border-radius:50%;
-      border:1px solid rgba(150,219,255,.18);
-      opacity:0;
-      animation:pulseWave 3.2s ease-out infinite;
+      border:1px solid rgba(157,214,255,.12);
+      box-shadow:
+        0 0 45px rgba(122,162,255,.09),
+        inset 0 0 35px rgba(157,214,255,.025);
+      animation:ringBreath 6.2s cubic-bezier(.42,0,.30,1) infinite;
     }
 
-    .pulse-wave.two{
-      animation-delay:.22s;
-      border-color:rgba(160,128,255,.13);
+    .breathRing.r2{
+      inset:8%;
+      border-color:rgba(122,162,255,.16);
+      animation-delay:-3.1s;
+      opacity:.45;
     }
 
-    .sphere{
+    /* The sphere is intentionally abstract: not a planet, not a logo, not an AI face. */
+    .cosmosOrb{
       position:absolute;
-      inset:13%;
+      inset:18%;
       border-radius:50%;
       overflow:hidden;
       background:
-        radial-gradient(circle at 35% 30%,rgba(228,248,255,.90) 0 1.2%,rgba(158,223,255,.44) 6%,rgba(55,139,216,.20) 17%,transparent 31%),
-        radial-gradient(circle at 63% 67%,rgba(118,86,255,.20),transparent 31%),
-        radial-gradient(circle at 50% 48%,rgba(10,30,62,.98) 0 51%,rgba(2,8,20,1) 78%);
-      border:1px solid rgba(182,226,255,.24);
+        radial-gradient(circle at 38% 31%,
+          rgba(244,250,255,.95) 0 1.6%,
+          rgba(185,226,255,.72) 6%,
+          rgba(116,175,242,.42) 17%,
+          rgba(48,95,172,.30) 31%,
+          rgba(16,37,76,.78) 58%,
+          rgba(7,14,31,.98) 100%);
+      border:1px solid rgba(157,214,255,.27);
       box-shadow:
-        inset 0 0 25px rgba(102,188,255,.13),
-        inset -18px -20px 46px rgba(0,0,0,.72),
-        0 0 0 1px rgba(67,126,199,.07),
-        0 0 26px rgba(87,174,255,.18),
-        0 0 62px rgba(78,114,255,.10);
+        0 0 36px rgba(122,162,255,.20),
+        0 0 90px rgba(73,111,201,.13),
+        inset 10px 8px 34px rgba(197,229,255,.09),
+        inset -20px -24px 46px rgba(0,0,0,.62);
+      animation:orbBreath 6.2s cubic-bezier(.42,0,.30,1) infinite;
+      will-change:transform,filter;
     }
 
-    .sphere::before{
+    .cosmosOrb::before{
       content:"";
       position:absolute;
-      inset:-17%;
+      inset:-20%;
       border-radius:50%;
       background:
-        conic-gradient(from 36deg,
-          transparent 0 13%,
-          rgba(129,219,255,.23) 17%,
-          transparent 24% 42%,
-          rgba(139,102,255,.17) 47%,
-          transparent 54% 72%,
-          rgba(88,190,235,.18) 76%,
-          transparent 83%);
-      filter:blur(5px);
-      opacity:.58;
-      animation:surfaceTurn 19s linear infinite;
+        conic-gradient(
+          from 220deg,
+          transparent 0 8%,
+          rgba(146,189,255,.10) 14%,
+          transparent 21%,
+          rgba(120,105,255,.12) 31%,
+          transparent 43%,
+          rgba(112,212,255,.10) 55%,
+          transparent 67%,
+          rgba(133,169,255,.08) 79%,
+          transparent 92%);
+      filter:blur(7px);
+      mix-blend-mode:screen;
+      animation:slowTurn 24s linear infinite;
     }
 
-    .sphere::after{
+    .cosmosOrb::after{
       content:"";
       position:absolute;
-      inset:5%;
+      inset:0;
       border-radius:50%;
       background:
-        repeating-radial-gradient(ellipse at 42% 43%,rgba(197,236,255,.065) 0 1px,transparent 2px 8px);
-      opacity:.45;
-      transform:rotate(-22deg);
-      animation:surfaceFlow 13s ease-in-out infinite alternate;
+        radial-gradient(circle at 64% 69%,rgba(100,77,255,.18),transparent 22%),
+        radial-gradient(circle at 34% 57%,rgba(80,198,255,.10),transparent 24%),
+        radial-gradient(circle at 42% 34%,rgba(255,255,255,.12),transparent 13%);
+      animation:orbInside 7.8s ease-in-out infinite;
+      mix-blend-mode:screen;
     }
 
-    .rim{
+    /* PULSE — separate from breathing, like a quiet double heartbeat */
+    .pulseCore{
       position:absolute;
-      inset:13%;
-      border-radius:50%;
-      background:transparent;
-      box-shadow:
-        inset 6px 4px 11px rgba(188,235,255,.23),
-        inset -4px -4px 14px rgba(83,100,255,.10);
-      animation:rimPulse 3.2s ease-in-out infinite;
-    }
-
-    .heart{
-      position:absolute;
-      width:4.2%;
+      width:9%;
       aspect-ratio:1;
       border-radius:50%;
-      background:#f2fbff;
+      background:#edf8ff;
       box-shadow:
-        0 0 6px rgba(255,255,255,.98),
-        0 0 18px rgba(144,224,255,.95),
-        0 0 42px rgba(88,151,255,.70),
-        0 0 78px rgba(133,89,255,.31);
-      animation:heartBeat 3.2s cubic-bezier(.42,0,.2,1) infinite;
+        0 0 8px rgba(255,255,255,.96),
+        0 0 25px rgba(157,214,255,.92),
+        0 0 64px rgba(122,162,255,.58);
+      animation:cosmosPulse 3.35s ease-in-out infinite;
+      will-change:transform,opacity;
     }
 
-    .name{
+    .pulseWave{
+      position:absolute;
+      width:20%;
+      aspect-ratio:1;
+      border-radius:50%;
+      border:1px solid rgba(157,214,255,.48);
+      animation:pulseWave 3.35s ease-out infinite;
+      opacity:0;
+    }
+
+    .pulseWave.w2{animation-delay:.22s}
+
+    .entry.resolving .breathField,
+    .entry.resolving .breathRing,
+    .entry.resolving .cosmosOrb{
+      animation-duration:2.1s;
+    }
+
+    .entry.resolving .pulseCore,
+    .entry.resolving .pulseWave{
+      animation-duration:1.15s;
+    }
+
+    h1{
       margin:0;
-      font-size:clamp(42px,7vw,66px);
+      color:#fff;
+      font-size:clamp(42px,6.8vw,68px);
       line-height:1;
-      font-weight:360;
-      letter-spacing:.21em;
-      padding-left:.21em;
-      color:rgba(247,252,255,.97);
-      text-shadow:0 0 24px rgba(140,213,255,.12);
+      font-weight:800;
+      letter-spacing:-.045em;
+      text-shadow:
+        0 0 28px rgba(122,162,255,.10);
     }
 
     .tagline{
-      margin:15px 0 0;
-      color:rgba(216,232,246,.53);
-      font-size:clamp(13px,2vw,15px);
-      line-height:1.5;
-      letter-spacing:.025em;
+      margin:14px 0 0;
+      color:var(--muted);
+      font-size:clamp(14px,2.2vw,17px);
+      line-height:1.55;
+      font-weight:400;
     }
 
-    .ask{
+    .askForm{
       width:min(610px,100%);
-      margin-top:35px;
+      margin-top:32px;
     }
 
-    .askbar{
-      min-height:58px;
+    .askBox{
       display:grid;
       grid-template-columns:48px minmax(0,1fr) 48px;
       align-items:center;
-      padding:4px 5px;
-      border:1px solid rgba(187,218,255,.15);
+      min-height:60px;
+      padding:5px 6px;
+      border:1px solid rgba(255,255,255,.10);
       border-radius:999px;
-      background:rgba(7,16,29,.48);
+      background:rgba(13,23,38,.72);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.018),
-        0 13px 50px rgba(0,0,0,.25);
-      -webkit-backdrop-filter:blur(18px);
+        0 20px 70px rgba(0,0,0,.28),
+        inset 0 1px 0 rgba(255,255,255,.025);
       backdrop-filter:blur(18px);
-      transition:.25s ease;
+      -webkit-backdrop-filter:blur(18px);
+      transition:
+        border-color .22s ease,
+        box-shadow .22s ease,
+        transform .22s ease;
     }
 
-    .askbar:focus-within{
-      border-color:rgba(177,225,255,.30);
-      background:rgba(8,18,32,.60);
+    .askBox:focus-within{
+      border-color:rgba(122,162,255,.44);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,.025),
-        0 16px 56px rgba(0,0,0,.29),
-        0 0 34px rgba(89,168,255,.065);
+        0 22px 80px rgba(0,0,0,.31),
+        0 0 0 1px rgba(122,162,255,.07),
+        0 0 36px rgba(122,162,255,.08);
+      transform:translateY(-1px);
     }
 
-    .ask input{
+    .askInput{
+      min-width:0;
       width:100%;
       border:0;
       outline:0;
       background:transparent;
-      color:#f4faff;
-      padding:13px 2px;
+      color:var(--ink);
+      padding:14px 5px;
       font-size:16px;
-      caret-color:#9fe9ff;
+      line-height:1.2;
+      caret-color:var(--accent2);
     }
 
-    .ask input::placeholder{color:rgba(213,232,247,.34)}
+    .askInput::placeholder{
+      color:rgba(156,169,188,.72);
+    }
 
-    .round{
-      width:42px;height:42px;
-      border-radius:50%;
+    .circleButton{
+      appearance:none;
+      width:43px;
+      height:43px;
       display:grid;
       place-items:center;
       padding:0;
-      appearance:none;
       border:0;
+      border-radius:50%;
       background:transparent;
-      color:rgba(221,239,252,.52);
+      color:#9ca9bc;
       cursor:pointer;
-      transition:background .2s ease,color .2s ease,transform .15s ease;
+      transition:
+        color .18s ease,
+        background .18s ease,
+        transform .18s ease,
+        box-shadow .18s ease;
     }
 
-    .round:hover{background:rgba(255,255,255,.055);color:#fff}
-    .round:active{transform:scale(.93)}
-
-    .round.go{
-      color:rgba(239,249,255,.88);
-      background:rgba(133,207,255,.08);
-      border:1px solid rgba(173,222,255,.08);
+    .circleButton:hover{
+      color:#f5f7fb;
+      background:rgba(255,255,255,.045);
     }
 
-    .round.go:hover{background:rgba(133,207,255,.14)}
+    .circleButton:active{transform:scale(.94)}
 
-    .round svg{
-      width:18px;height:18px;
-      stroke:currentColor;fill:none;
-      stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;
+    .circleButton svg{
+      width:19px;
+      height:19px;
+      fill:none;
+      stroke:currentColor;
+      stroke-width:1.8;
+      stroke-linecap:round;
+      stroke-linejoin:round;
     }
 
-    .round.listening{
+    .goButton{
+      color:#eaf2ff;
+      border:1px solid rgba(122,162,255,.18);
+      background:rgba(122,162,255,.10);
+    }
+
+    .goButton:hover{
+      background:rgba(122,162,255,.18);
+    }
+
+    .voiceButton.listening{
       color:#fff;
-      background:rgba(113,203,255,.13);
-      animation:listening 1.2s ease-in-out infinite;
+      background:rgba(122,162,255,.13);
+      box-shadow:0 0 28px rgba(122,162,255,.18);
+      animation:listening 1.3s ease-in-out infinite;
     }
 
     .status{
       height:22px;
       margin-top:10px;
-      color:rgba(203,224,241,.36);
-      font-size:11.5px;
+      color:#8190a8;
+      font-size:12px;
       line-height:1.4;
     }
 
-    .bottom{
-      position:absolute;
-      left:0;right:0;
-      bottom:max(15px,env(safe-area-inset-bottom));
-      color:rgba(199,219,235,.24);
-      text-align:center;
-      font-size:10px;
-      letter-spacing:.11em;
-      text-transform:uppercase;
-      pointer-events:none;
+    @keyframes cosmosBreath{
+      0%,100%{transform:scale(.86);opacity:.30}
+      48%{transform:scale(1.13);opacity:.92}
+      58%{transform:scale(1.07);opacity:.73}
     }
 
-    /* ------------------------ LIFE ------------------------ */
-
-    /* Breath = the entire Cosmos inhales and exhales slowly. */
-    @keyframes wholeBreath{
-      0%,100%{transform:scale(.955);filter:drop-shadow(0 0 18px rgba(73,155,255,.11))}
-      46%{transform:scale(1.035);filter:drop-shadow(0 0 31px rgba(92,181,255,.21))}
-      58%{transform:scale(1.022);filter:drop-shadow(0 0 27px rgba(86,170,255,.17))}
+    @keyframes ringBreath{
+      0%,100%{transform:scale(.92);opacity:.26}
+      48%{transform:scale(1.075);opacity:.78}
+      58%{transform:scale(1.035);opacity:.58}
     }
 
-    @keyframes haloBreath{
-      0%,100%{transform:scale(.90);opacity:.43}
-      46%{transform:scale(1.12);opacity:.92}
-      58%{transform:scale(1.06);opacity:.72}
+    @keyframes orbBreath{
+      0%,100%{transform:scale(.955);filter:brightness(.86) saturate(.92)}
+      48%{transform:scale(1.045);filter:brightness(1.12) saturate(1.08)}
+      58%{transform:scale(1.022);filter:brightness(1.03) saturate(1.03)}
     }
 
-    /* Pulse = a separate heartbeat: lub-dub, then quiet. */
-    @keyframes heartBeat{
-      0%,10%,100%{transform:scale(.72);opacity:.56}
-      13%{transform:scale(1.38);opacity:1}
-      17%{transform:scale(.82);opacity:.68}
-      22%{transform:scale(1.18);opacity:.98}
-      29%{transform:scale(.76);opacity:.58}
-    }
-
-    @keyframes rimPulse{
-      0%,10%,100%{opacity:.38;filter:brightness(.8)}
-      13%{opacity:.95;filter:brightness(1.32)}
-      17%{opacity:.54;filter:brightness(.94)}
-      22%{opacity:.83;filter:brightness(1.18)}
-      29%{opacity:.42;filter:brightness(.86)}
+    @keyframes cosmosPulse{
+      0%,38%,100%{transform:scale(.72);opacity:.48}
+      43%{transform:scale(1.18);opacity:1}
+      48%{transform:scale(.78);opacity:.62}
+      53%{transform:scale(1.04);opacity:.94}
+      61%{transform:scale(.72);opacity:.50}
     }
 
     @keyframes pulseWave{
-      0%,11%{transform:scale(.80);opacity:0}
-      13%{opacity:.34}
-      36%{transform:scale(1.24);opacity:0}
-      100%{transform:scale(1.24);opacity:0}
+      0%,39%{transform:scale(.45);opacity:0}
+      43%{opacity:.60}
+      60%{transform:scale(3.8);opacity:0}
+      100%{opacity:0}
     }
 
-    @keyframes surfaceTurn{
-      from{transform:rotate(0deg) scale(1)}
-      to{transform:rotate(360deg) scale(1)}
+    @keyframes orbInside{
+      0%,100%{opacity:.48;transform:scale(.98)}
+      50%{opacity:.84;transform:scale(1.035)}
     }
 
-    @keyframes surfaceFlow{
-      from{transform:rotate(-22deg) scale(.97);opacity:.30}
-      to{transform:rotate(-10deg) scale(1.05);opacity:.53}
+    @keyframes slowTurn{
+      to{transform:rotate(360deg)}
     }
 
-    @keyframes nebulaDrift{
-      from{transform:rotate(0deg) scale(1)}
-      to{transform:rotate(360deg) scale(1.08)}
+    @keyframes spacePulse{
+      0%,100%{opacity:.35;transform:scale(.97)}
+      50%{opacity:.72;transform:scale(1.04)}
     }
 
     @keyframes listening{
-      0%,100%{box-shadow:0 0 0 0 rgba(133,214,255,0)}
-      50%{box-shadow:0 0 0 7px rgba(133,214,255,.07)}
+      0%,100%{box-shadow:0 0 0 0 rgba(122,162,255,.05)}
+      50%{box-shadow:0 0 0 8px rgba(122,162,255,.08)}
     }
 
-    /* Awake/resolving: Cosmos is no longer dormant. */
-    .center.awake .life{animation-duration:2.25s}
-    .center.awake .halo{animation-duration:2.25s}
-    .center.awake .heart,
-    .center.awake .rim,
-    .center.awake .pulse-wave{animation-duration:1.25s}
-
-    @media(max-width:640px){
-      .center{width:min(100% - 30px,680px);transform:translateY(-3vh)}
-      .life{width:clamp(168px,51vw,215px);margin-bottom:23px}
-      .name{font-size:44px}
-      .tagline{font-size:13px;max-width:340px}
-      .ask{margin-top:29px}
-      .askbar{min-height:56px;grid-template-columns:45px minmax(0,1fr) 45px}
+    @media (max-width:640px){
+      .entry{transform:translateY(-3.5vh)}
+      .life{
+        width:clamp(188px,58vw,236px);
+        margin-bottom:24px;
+      }
+      .askForm{margin-top:28px}
+      .askBox{
+        grid-template-columns:44px minmax(0,1fr) 44px;
+        min-height:58px;
+      }
     }
 
-    @media(max-height:660px){
-      .center{transform:none}
-      .life{width:min(31vh,185px);margin-bottom:16px}
-      .name{font-size:38px}
-      .tagline{margin-top:10px}
-      .ask{margin-top:20px}
-      .bottom{display:none}
+    @media (max-height:670px){
+      .entry{transform:none}
+      .life{
+        width:min(29vh,190px);
+        margin-bottom:15px;
+      }
+      h1{font-size:40px}
+      .tagline{margin-top:9px}
+      .askForm{margin-top:20px}
     }
 
-    @media(prefers-reduced-motion:reduce){
-      .life,.halo,.heart,.rim,.pulse-wave,.space::after,.sphere::before,.sphere::after{
-        animation:none !important;
+    @media (prefers-reduced-motion:reduce){
+      .breathField,
+      .breathRing,
+      .cosmosOrb,
+      .cosmosOrb::before,
+      .cosmosOrb::after,
+      .pulseCore,
+      .pulseWave,
+      .starField::after{
+        animation-duration:.001ms !important;
+        animation-iteration-count:1 !important;
       }
     }
   </style>
 </head>
 
 <body>
-  <main class="cosmos">
-    <div class="space" aria-hidden="true"></div>
+  <main class="entryShell">
+    <div class="starField" aria-hidden="true"></div>
 
-    <section class="center" id="center">
+    <section class="entry" id="entry">
       <div class="life" aria-hidden="true">
-        <div class="halo"></div>
-        <div class="pulse-wave"></div>
-        <div class="pulse-wave two"></div>
-        <div class="sphere"></div>
-        <div class="rim"></div>
-        <div class="heart"></div>
+        <div class="breathField"></div>
+        <div class="breathRing"></div>
+        <div class="breathRing r2"></div>
+        <div class="cosmosOrb"></div>
+        <div class="pulseWave"></div>
+        <div class="pulseWave w2"></div>
+        <div class="pulseCore"></div>
       </div>
 
-      <h1 class="name">COSMOS</h1>
+      <h1>Cosmos</h1>
       <p class="tagline">Everything is connected. Ask anything. Explore everything.</p>
 
-      <form class="ask" id="askForm" autocomplete="off">
-        <div class="askbar">
-          <button class="round" id="voiceBtn" type="button" aria-label="Ask by voice">
+      <form class="askForm" id="askForm" autocomplete="off">
+        <div class="askBox">
+          <button class="circleButton voiceButton" id="voiceButton" type="button" aria-label="Ask Cosmos by voice">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <rect x="9" y="3" width="6" height="11" rx="3"></rect>
               <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"></path>
@@ -471,15 +536,18 @@
           </button>
 
           <input
+            class="askInput"
             id="question"
             type="text"
-            placeholder="Ask Cosmos..."
-            aria-label="Ask Cosmos"
+            name="question"
             maxlength="600"
+            placeholder="Ask Cosmos…"
+            aria-label="Ask Cosmos"
             enterkeyhint="go"
+            inputmode="text"
           />
 
-          <button class="round go" type="submit" aria-label="Enter Cosmos">
+          <button class="circleButton goButton" type="submit" aria-label="Enter Cosmos">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 12h14"></path>
               <path d="m14 7 5 5-5 5"></path>
@@ -489,102 +557,104 @@
         <div class="status" id="status" aria-live="polite"></div>
       </form>
     </section>
-
-    <div class="bottom">PTD Today · Cosmos</div>
   </main>
 
   <script>
+  (function(){
+    "use strict";
+
     /*
-      Existing legacy homepage deep links remain valid.
-      Fresh / and /index.html are the Cosmos entry.
+      Preserve the old PTD Today homepage as /intelligence.html.
+      Existing country/category/outlook/map/hash deep links continue there.
     */
-    (function(){
-      const p=new URLSearchParams(location.search);
-      const legacy=["country","category","map","outlook","summary"];
-      const legacyQuery=legacy.some(k=>p.has(k));
-      const legacyHash=Boolean(location.hash)&&!p.has("question")&&!p.has("focus");
+    const incoming = new URLSearchParams(location.search);
+    const legacyKeys = ["country","category","map","outlook","summary"];
+    const hasLegacyQuery = legacyKeys.some(key => incoming.has(key));
+    const hasLegacyHash = Boolean(location.hash);
 
-      if(legacyQuery||legacyHash){
-        location.replace("/intelligence.html"+location.search+location.hash);
-      }
-    })();
+    if (hasLegacyQuery || hasLegacyHash) {
+      location.replace("/intelligence.html" + location.search + location.hash);
+      return;
+    }
 
-    const center=document.getElementById("center");
-    const form=document.getElementById("askForm");
-    const input=document.getElementById("question");
-    const status=document.getElementById("status");
-    const voiceBtn=document.getElementById("voiceBtn");
+    const form = document.getElementById("askForm");
+    const input = document.getElementById("question");
+    const entry = document.getElementById("entry");
+    const status = document.getElementById("status");
+    const voiceButton = document.getElementById("voiceButton");
 
-    function go(question){
-      question=String(question||"").trim();
+    function enterCosmos(value){
+      const question = String(value || "").trim();
 
       if(!question){
-        status.textContent="Ask a question to create the center.";
         input.focus();
+        status.textContent = "Ask anything.";
         return;
       }
 
-      center.classList.add("awake");
-      status.textContent="Creating your center...";
+      entry.classList.add("resolving");
+      status.textContent = "Creating your center…";
 
-      const url=new URL("/cosmos.html",location.origin);
-      url.searchParams.set("focus","question");
-      url.searchParams.set("question",question);
-      url.searchParams.set("from","cosmos-entry");
+      const target = new URL("/cosmos.html",location.origin);
+      target.searchParams.set("focus","question");
+      target.searchParams.set("question",question);
+      target.searchParams.set("from","cosmos-entry");
 
-      setTimeout(()=>location.assign(url.toString()),420);
+      setTimeout(() => location.assign(target.toString()), 430);
     }
 
-    form.addEventListener("submit",e=>{
-      e.preventDefault();
-      go(input.value);
+    form.addEventListener("submit",event=>{
+      event.preventDefault();
+      enterCosmos(input.value);
     });
 
     input.addEventListener("input",()=>{
-      if(status.textContent)status.textContent="";
+      if(status.textContent) status.textContent="";
     });
 
-    const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if(!Recognition){
-      voiceBtn.style.opacity=".28";
-      voiceBtn.title="Voice input is unavailable in this browser";
-      voiceBtn.setAttribute("aria-disabled","true");
+      voiceButton.style.opacity=".32";
+      voiceButton.setAttribute("aria-disabled","true");
+      voiceButton.title="Voice input is not available in this browser";
     }else{
-      const rec=new Recognition();
-      rec.lang="en-US";
-      rec.interimResults=true;
-      rec.continuous=false;
+      const recognition = new Recognition();
+      recognition.lang="en-US";
+      recognition.interimResults=true;
+      recognition.continuous=false;
 
-      rec.onstart=()=>{
-        voiceBtn.classList.add("listening");
-        status.textContent="Listening...";
+      recognition.onstart=()=>{
+        voiceButton.classList.add("listening");
+        status.textContent="Listening…";
       };
 
-      rec.onresult=e=>{
-        let text="";
-        for(let i=e.resultIndex;i<e.results.length;i++){
-          text+=e.results[i][0].transcript;
+      recognition.onresult=event=>{
+        let transcript="";
+        for(let i=event.resultIndex;i<event.results.length;i++){
+          transcript += event.results[i][0].transcript;
         }
-        if(text.trim())input.value=text.trim();
+        if(transcript.trim()) input.value=transcript.trim();
       };
 
-      rec.onerror=e=>{
-        voiceBtn.classList.remove("listening");
-        status.textContent=e.error==="not-allowed"
-          ?"Microphone permission was not granted."
-          :"Voice input could not start.";
+      recognition.onerror=event=>{
+        voiceButton.classList.remove("listening");
+        status.textContent =
+          event.error==="not-allowed"
+            ? "Microphone permission was not granted."
+            : "Voice input could not start.";
       };
 
-      rec.onend=()=>{
-        voiceBtn.classList.remove("listening");
-        status.textContent=input.value.trim()?"Press the arrow to enter Cosmos.":"";
+      recognition.onend=()=>{
+        voiceButton.classList.remove("listening");
+        status.textContent=input.value.trim() ? "Press the arrow to enter Cosmos." : "";
       };
 
-      voiceBtn.addEventListener("click",()=>{
-        try{rec.start()}catch(e){}
+      voiceButton.addEventListener("click",()=>{
+        try{ recognition.start(); }catch{}
       });
     }
+  })();
   </script>
 </body>
 </html>
