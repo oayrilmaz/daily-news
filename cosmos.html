@@ -558,6 +558,7 @@
   const edgeDetail = document.getElementById("edgeDetail");
   const expandBtn = document.getElementById("expandBtn");
   const resetBtn = document.getElementById("resetBtn");
+  const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
@@ -3219,6 +3220,31 @@
     saveTrail();
     render();
     hydrateUniversalAnswer(question);
+  });
+
+  function startFreshCosmos(){
+    // Clicking the Cosmos title is an intentional new beginning.
+    // Remove only observer/journey session state; canonical Cosmos knowledge is untouched.
+    try{
+      sessionStorage.removeItem(state.journeyStorageKey);
+      sessionStorage.removeItem(state.trailStorageKey);
+      sessionStorage.removeItem(state.journeyViewStorageKey);
+    }catch{}
+
+    state.journey={
+      nodes:[],
+      current_node_id:"",
+      next_id:1
+    };
+    state.history=[];
+    state.universalAnswerLoaded=false;
+    state.universalAnswerPending=false;
+  }
+
+  cosmosHomeLink.addEventListener("click",(event)=>{
+    event.preventDefault();
+    startFreshCosmos();
+    window.location.assign("/");
   });
 
   expandBtn.addEventListener("click",()=>{state.expanded=true;render()});
