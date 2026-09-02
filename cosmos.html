@@ -246,6 +246,8 @@
       text-decoration:none
     }
 
+
+    /* Butterfly Journey v0.3 — persistent, branching metro map */
     .butterflyWrap{
       margin-top:14px;
       border:1px solid rgba(255,255,255,.09);
@@ -255,77 +257,51 @@
       display:none
     }
     .butterflyWrap.active{display:block}
-    .butterflyHead{
-      display:flex;
-      align-items:flex-end;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:12px
-    }
-    .butterflyHead h2{
-      margin:0;
-      font-size:13px;
-      text-transform:uppercase;
-      letter-spacing:.13em;
-      color:#c4d0e3
-    }
-    .butterflyHead span{
-      color:#78879d;
-      font-size:10px
-    }
+
     .metro{
       position:relative;
-      display:grid;
-      gap:0;
-      padding:2px 0 2px 3px
+      min-height:120px;
+      padding:6px 0 8px;
+      overflow-x:auto;
+      overflow-y:visible;
+      -webkit-overflow-scrolling:touch;
     }
-    .metroStop{
+
+    .metroCanvas{
       position:relative;
+      min-width:100%;
+      width:max-content;
+      padding:4px 8px 12px 8px;
+    }
+
+    .metroColumn{
+      position:absolute;
+      width:235px;
+    }
+
+    .metroStop{
+      position:absolute;
       display:grid;
-      grid-template-columns:26px minmax(0,1fr) auto;
+      grid-template-columns:28px minmax(0,1fr);
       gap:10px;
       align-items:center;
-      min-height:54px;
+      width:220px;
+      min-height:52px;
       border:0;
       background:transparent;
       color:inherit;
       text-align:left;
       padding:0;
       cursor:pointer;
-      width:100%
+      opacity:.78;
     }
-    .metroStop.branchDepth1{padding-left:28px}
-    .metroStop.branchDepth2{padding-left:56px}
-    .metroStop.branchDepth3{padding-left:84px}
-    .metroBranchTag{
-      display:inline-block;
-      margin-left:6px;
-      padding:2px 6px;
-      border:1px solid rgba(122,162,255,.18);
-      border-radius:999px;
-      color:#8197ba;
-      font-size:9px;
-      font-weight:600;
-      vertical-align:middle
-    }
-    .metroStop.offRoute{opacity:.72}
-    .metroStop.offRoute:hover{opacity:1}
+    .metroStop:hover{opacity:1}
     .metroStop.current{opacity:1}
-    .metroStop.routeRoot .metroDot{
-      border-color:#8395b0;
-    }
-    .metroStop:not(:last-child)::after{
-      content:"";
-      position:absolute;
-      left:12px;
-      top:34px;
-      bottom:-20px;
-      width:1px;
-      background:linear-gradient(180deg,#6f93d7,#435873)
-    }
+    .metroStop.savedBranch{opacity:.66}
+
     .metroDot{
       position:relative;
-      z-index:2;
+      z-index:4;
       width:18px;height:18px;
       border-radius:50%;
       border:2px solid #637a9b;
@@ -337,10 +313,11 @@
       background:#244c97;
       box-shadow:0 0 0 6px rgba(122,162,255,.10),0 0 26px rgba(122,162,255,.20)
     }
-    .metroStop.future .metroDot{
-      border-style:dashed;
-      opacity:.72
+    .metroStop.branchPoint .metroDot{
+      border-color:#9cb9ef;
+      box-shadow:0 0 0 5px rgba(122,162,255,.07)
     }
+
     .metroLabel strong{
       display:block;
       color:#edf3ff;
@@ -353,11 +330,62 @@
       color:#7f8da3;
       font-size:10.5px
     }
-    .metroPresence{
-      color:#6f7e95;
-      font-size:10px;
-      white-space:nowrap
+    .metroRouteBadge{
+      display:inline-block;
+      margin-left:6px;
+      padding:2px 6px;
+      border:1px solid rgba(122,162,255,.20);
+      border-radius:999px;
+      color:#8298bb;
+      font-size:9px;
+      font-weight:600;
+      vertical-align:middle
     }
+
+    .metroLine{
+      position:absolute;
+      z-index:1;
+      height:2px;
+      background:linear-gradient(90deg,#536a8b,#6d8fc6);
+      transform-origin:0 50%;
+      opacity:.82;
+      pointer-events:none
+    }
+    .metroLine.saved{opacity:.42}
+    .metroLine.active{
+      background:linear-gradient(90deg,#6688c9,#88a9ef);
+      opacity:.96
+    }
+
+    .metroLegend{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin:0 0 10px;
+      color:#73829a;
+      font-size:10px
+    }
+    .metroLegend span{
+      display:inline-flex;
+      gap:5px;
+      align-items:center
+    }
+    .metroLegend i{
+      display:inline-block;
+      width:16px;height:2px;
+      background:#6688c9
+    }
+    .metroLegend .saved i{opacity:.42}
+
+    @media (max-width:640px){
+      .metro{
+        margin-right:-16px;
+        padding-right:16px;
+      }
+      .metroStop{width:205px}
+      .metroColumn{width:220px}
+    }
+
     .metroEmpty{
       color:#8d9bb0;
       font-size:12px;
@@ -436,6 +464,10 @@
       <div class="butterflyHead">
         <h2>Butterfly journey</h2>
         <span>travel backward · forward · sideways</span>
+      </div>
+      <div class="metroLegend">
+        <span><i></i> current route</span>
+        <span class="saved"><i></i> saved branch</span>
       </div>
       <div class="metro" id="butterflyMetro"></div>
     </section>
@@ -538,6 +570,7 @@
     entryObserver: null,
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
     journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_2",
+    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_3",
     journey: {
       nodes: [],
       current_node_id: "",
@@ -1806,6 +1839,70 @@
     return journeyPathTo(state.journey.current_node_id).map(node=>node.observer);
   }
 
+
+  function butterflyShouldStayOpen(){
+    try{
+      return sessionStorage.getItem(state.journeyViewStorageKey)==="1";
+    }catch{
+      return false;
+    }
+  }
+
+  function setButterflyOpen(open){
+    butterflyWrap.classList.toggle("active",Boolean(open));
+    try{
+      sessionStorage.setItem(state.journeyViewStorageKey,open?"1":"0");
+    }catch{}
+  }
+
+  function journeyDepth(node){
+    let depth=0;
+    let cursor=node;
+    const seen=new Set();
+    while(cursor?.parent_node_id && !seen.has(cursor.node_id)){
+      seen.add(cursor.node_id);
+      cursor=journeyNodeById(cursor.parent_node_id);
+      depth++;
+    }
+    return depth;
+  }
+
+  function branchLaneMap(){
+    // Root/current main route stays in lane 0.
+    // Every additional child at a branch point receives its own lateral lane.
+    const laneById=new Map();
+    let nextPositive=1;
+    let nextNegative=-1;
+
+    const roots=state.journey.nodes.filter(n=>!n.parent_node_id)
+      .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+
+    function assign(node,lane){
+      laneById.set(node.node_id,lane);
+      const children=journeyChildren(node.node_id);
+      children.forEach((child,index)=>{
+        if(index===0){
+          assign(child,lane);
+        }else{
+          const newLane = (index % 2)
+            ? nextPositive++
+            : nextNegative--;
+          assign(child,newLane);
+        }
+      });
+    }
+
+    roots.forEach((root,index)=>assign(root,index===0?0:nextPositive++));
+    return laneById;
+  }
+
+  function lineBetween(x1,y1,x2,y2,klass){
+    const dx=x2-x1,dy=y2-y1;
+    const length=Math.hypot(dx,dy);
+    const angle=Math.atan2(dy,dx)*180/Math.PI;
+    return `<div class="metroLine ${klass||""}" style="left:${x1}px;top:${y1}px;width:${length}px;transform:rotate(${angle}deg)"></div>`;
+  }
+
   function renderButterflyJourney(){
     ensureJourneyCurrent(state.observer);
 
@@ -1815,46 +1912,81 @@
       return;
     }
 
-    const currentId=state.journey.current_node_id;
-    const activePath=journeyPathTo(currentId);
-    const activeIds=new Set(activePath.map(node=>node.node_id));
+    const activePath=journeyPathTo(state.journey.current_node_id);
+    const activeIds=new Set(activePath.map(n=>n.node_id));
+    const lanes=branchLaneMap();
 
-    // Render the whole journey tree. Nothing disappears when the viewer
-    // goes back. A new choice from an earlier station becomes a branch.
-    const roots=nodes.filter(node=>!node.parent_node_id);
-    const rows=[];
+    const rowGap=78;
+    const laneGap=245;
+    const leftPad=20;
+    const topPad=14;
 
-    function walk(node,depth,branchIndex){
-      rows.push({node,depth,branchIndex});
-      const children=journeyChildren(node.node_id);
-      children.forEach((child,index)=>walk(
-        child,
-        Math.min(depth + (children.length>1 ? 1 : 0),3),
-        index
-      ));
+    const minLane=Math.min(...[...lanes.values()],0);
+    const maxLane=Math.max(...[...lanes.values()],0);
+    const laneOffset=Math.abs(minLane);
+
+    const positions=new Map();
+    for(const node of nodes){
+      const lane=(lanes.get(node.node_id)||0)+laneOffset;
+      const depth=journeyDepth(node);
+      positions.set(node.node_id,{
+        x:leftPad+lane*laneGap,
+        y:topPad+depth*rowGap
+      });
     }
 
-    roots.forEach((root,index)=>walk(root,0,index));
+    const width=Math.max(
+      butterflyMetro.clientWidth||320,
+      leftPad*2+(maxLane-minLane+1)*laneGap
+    );
+    const maxDepth=Math.max(...nodes.map(journeyDepth),0);
+    const height=topPad*2+(maxDepth+1)*rowGap+30;
 
-    butterflyMetro.innerHTML=rows.map(({node,depth,branchIndex})=>{
-      const current=node.node_id===currentId;
-      const onRoute=activeIds.has(node.node_id);
-      const childCount=journeyChildren(node.node_id).length;
+    let html=`<div class="metroCanvas" style="width:${width}px;height:${height}px">`;
+
+    // Connections first, behind stops.
+    for(const node of nodes){
+      if(!node.parent_node_id) continue;
+      const parent=journeyNodeById(node.parent_node_id);
+      const a=positions.get(parent?.node_id);
+      const b=positions.get(node.node_id);
+      if(!a||!b) continue;
+
+      const active=activeIds.has(node.node_id) && activeIds.has(parent.node_id);
+      html += lineBetween(
+        a.x+9,a.y+9,
+        b.x+9,b.y+9,
+        active?"active":"saved"
+      );
+    }
+
+    // Stops.
+    for(const node of nodes){
+      const p=positions.get(node.node_id);
+      const current=node.node_id===state.journey.current_node_id;
+      const active=activeIds.has(node.node_id);
+      const children=journeyChildren(node.node_id);
       const label=node.observer?.label || node.observer?.question || "Cosmos";
-      const branchTag=childCount>1 ? `<span class="metroBranchTag">${childCount} routes</span>` : "";
-      return `
+      const branchBadge=children.length>1
+        ? `<span class="metroRouteBadge">${children.length} routes</span>`
+        : "";
+
+      html += `
         <button type="button"
-          class="metroStop branchDepth${depth} ${current?"current":""} ${onRoute?"":"offRoute"} ${!node.parent_node_id?"routeRoot":""}"
+          class="metroStop ${current?"current":""} ${active?"":"savedBranch"} ${children.length>1?"branchPoint":""}"
+          style="left:${p.x}px;top:${p.y}px"
           data-journey-node="${esc(node.node_id)}">
           <span class="metroDot"></span>
           <span class="metroLabel">
-            <strong>${esc(label)} ${branchTag}</strong>
-            <span>${current ? "you are here" : (onRoute ? "your route" : "saved branch")}</span>
+            <strong>${esc(label)} ${branchBadge}</strong>
+            <span>${current?"you are here":(active?"your route":"saved branch")}</span>
           </span>
-          <span class="metroPresence" aria-hidden="true"></span>
         </button>
       `;
-    }).join("");
+    }
+
+    html += `</div>`;
+    butterflyMetro.innerHTML=html;
 
     butterflyMetro.querySelectorAll("[data-journey-node]").forEach(button=>{
       button.addEventListener("click",()=>{
@@ -1863,6 +1995,14 @@
         restoreObserverFromJourneyNode(node);
       });
     });
+
+    // Keep current station visible without hiding the map.
+    const currentButton=butterflyMetro.querySelector(".metroStop.current");
+    if(currentButton){
+      requestAnimationFrame(()=>{
+        currentButton.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"});
+      });
+    }
   }
 
   function renderObserverDetails(observer,projection){
@@ -1920,7 +2060,10 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
-    renderButterflyJourney();
+    if(butterflyShouldStayOpen()){
+      setButterflyOpen(true);
+      renderButterflyJourney();
+    }
     emptyEl.style.display=projection.nodes.length ? "none":"block";
     const completionBlocked =
       observer?.kind==="response" &&
@@ -2082,11 +2225,9 @@
   });
 
   rippleBtn.addEventListener("click",()=>{
-    butterflyWrap.classList.toggle("active");
-    if(butterflyWrap.classList.contains("active")){
-      renderButterflyJourney();
-      butterflyWrap.scrollIntoView({behavior:"smooth",block:"nearest"});
-    }
+    setButterflyOpen(true);
+    renderButterflyJourney();
+    butterflyWrap.scrollIntoView({behavior:"smooth",block:"nearest"});
   });
 
   projectionAskForm.addEventListener("submit",event=>{
