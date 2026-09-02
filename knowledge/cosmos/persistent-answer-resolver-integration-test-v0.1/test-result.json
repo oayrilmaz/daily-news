@@ -1,0 +1,139 @@
+{
+  "schema_version": "0.1",
+  "status": "cosmos_persistent_answer_resolver_integration_test_passed",
+  "known_question": {
+    "question": "What are the HV substation equipment?",
+    "subject": {
+      "id": "hv_substations",
+      "label": "HV Substations"
+    },
+    "route": "persistent_cosmos_answer",
+    "answer_status": "supported_from_persistent_cosmos_knowledge",
+    "answer": {
+      "answer_type": "structured_enumeration",
+      "direct_answer": "Cosmos currently has 2 admitted equipment relationships for HV Substations.",
+      "items": [
+        {
+          "id": "circuit_breaker",
+          "label": "Circuit Breaker",
+          "class": "component_or_equipment",
+          "answer_role": null,
+          "confidence_score": 75,
+          "confidence_band": "high",
+          "validation_disposition": "supported",
+          "evidence_record_ids": [
+            "evidence_cb_oem",
+            "evidence_cb_utility"
+          ],
+          "graph_record_id": "g_cb",
+          "knowledge_admission_id": "knowledge_admission_cb",
+          "reversible": true
+        },
+        {
+          "id": "power_transformer",
+          "label": "Power Transformer",
+          "class": "component_or_equipment",
+          "answer_role": null,
+          "confidence_score": 75,
+          "confidence_band": "high",
+          "validation_disposition": "supported",
+          "evidence_record_ids": [
+            "evidence_pt_oem",
+            "evidence_pt_utility"
+          ],
+          "graph_record_id": "g_pt",
+          "knowledge_admission_id": "knowledge_admission_pt",
+          "reversible": true
+        }
+      ],
+      "primary_items": [],
+      "secondary_items": [],
+      "more_items": [],
+      "unclassified_items": [
+        {
+          "id": "circuit_breaker",
+          "label": "Circuit Breaker",
+          "class": "component_or_equipment",
+          "answer_role": null,
+          "confidence_score": 75,
+          "confidence_band": "high",
+          "validation_disposition": "supported",
+          "evidence_record_ids": [
+            "evidence_cb_oem",
+            "evidence_cb_utility"
+          ],
+          "graph_record_id": "g_cb",
+          "knowledge_admission_id": "knowledge_admission_cb",
+          "reversible": true
+        },
+        {
+          "id": "power_transformer",
+          "label": "Power Transformer",
+          "class": "component_or_equipment",
+          "answer_role": null,
+          "confidence_score": 75,
+          "confidence_band": "high",
+          "validation_disposition": "supported",
+          "evidence_record_ids": [
+            "evidence_pt_oem",
+            "evidence_pt_utility"
+          ],
+          "graph_record_id": "g_pt",
+          "knowledge_admission_id": "knowledge_admission_pt",
+          "reversible": true
+        }
+      ]
+    },
+    "projection": {
+      "release_supported_answer_projection": true,
+      "hold_broad_projection": false,
+      "first_ring_source": "persistent_answer_items"
+    },
+    "execution": {
+      "persistent_graph_checked": true,
+      "acquisition_executed": false,
+      "external_search_executed": false,
+      "ai_executed": false,
+      "knowledge_completion_executed": false
+    }
+  },
+  "unknown_question": {
+    "route": "knowledge_completion",
+    "answer_status": "knowledge_completion_required",
+    "knowledge_completion_request": {
+      "question": "What equipment is in an unknown system?",
+      "subject": {
+        "id": "unknown_subject",
+        "label": "unknown_subject"
+      },
+      "reason": "persistent_cosmos_knowledge_insufficient",
+      "requested_stage": "knowledge_completion_orchestrator"
+    },
+    "projection": {
+      "release_supported_answer_projection": false,
+      "hold_broad_projection": true,
+      "first_ring_source": "resolved_subject_only"
+    }
+  },
+  "safeguards": {
+    "persistent_cosmos_checked_before_knowledge_completion": true,
+    "known_answer_does_not_trigger_knowledge_completion": true,
+    "unknown_answer_does_not_invent_answer": true,
+    "performs_external_search": false,
+    "calls_openai_or_external_api": false,
+    "performs_acquisition": false,
+    "mutates_graph": false,
+    "preserves_persistent_answer_confidence": true,
+    "preserves_persistent_answer_evidence_lineage": true,
+    "preserves_question_as_observer": true
+  },
+  "architecture": {
+    "persistent_graph_is_first_answer_source": true,
+    "known_questions_bypass_knowledge_completion": true,
+    "unknown_questions_route_to_existing_knowledge_completion": true,
+    "known_answer_items_become_first_projection_ring": true,
+    "broad_associations_do_not_replace_direct_answer": true,
+    "question_remains_observer": true,
+    "next_stage": "live_cosmos_persistent_answer_integration"
+  }
+}
