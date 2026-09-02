@@ -8407,3 +8407,30 @@ jobs:
             test "$pushed" = true
           fi
 
+
+      - name: Write Persistent Answer Resolver Integration v0.1 Controlled Output
+        if: ${{ inputs.write_cosmos_entry_experience_test }}
+        run: |
+          set -euo pipefail
+          D="knowledge/cosmos/persistent-answer-resolver-integration-test-v0.1"
+          rm -rf "$D"; mkdir -p "$D"
+          cp knowledge/cosmos/persistent-knowledge-answer-rebuild-test-v0.1/graph.json "$D/graph.json"
+          node scripts/cosmos_persistent_answer_resolver_integration_v0.1.mjs --graph "$D/graph.json" --question "What are the HV substation equipment?" --subject-id hv_substations --out "$D/known.json"
+          node scripts/cosmos_persistent_answer_resolver_integration_v0.1.mjs --graph "$D/graph.json" --question "What equipment is in an unknown system?" --subject-id unknown_subject --out "$D/unknown.json"
+          node - "$D/known.json" "$D/unknown.json" "$D/test-result.json" <<'NODE'
+          const fs=require("fs"); const [kf,uf,of]=process.argv.slice(2),k=JSON.parse(fs.readFileSync(kf)),u=JSON.parse(fs.readFileSync(uf));
+          if(k.route!=="persistent_cosmos_answer"||k.persistent_answer?.items?.length!==2||k.knowledge_completion_request!==null) throw Error("Known route invalid");
+          if(k.execution.acquisition_executed||k.execution.external_search_executed||k.execution.ai_executed||k.execution.knowledge_completion_executed) throw Error("Known fallback executed");
+          if(k.projection.first_ring_source!=="persistent_answer_items"||!k.projection.release_supported_answer_projection||k.projection.hold_broad_projection) throw Error("Known projection invalid");
+          if(u.route!=="knowledge_completion"||!u.knowledge_completion_request||u.persistent_answer!==null||!u.projection.hold_broad_projection) throw Error("Unknown route invalid");
+          const result={schema_version:"0.1",status:"cosmos_persistent_answer_resolver_integration_test_passed",known_question:{question:k.question,subject:k.subject,route:k.route,answer_status:k.answer_status,answer:k.persistent_answer,projection:k.projection,execution:k.execution},unknown_question:{route:u.route,answer_status:u.answer_status,knowledge_completion_request:u.knowledge_completion_request,projection:u.projection},safeguards:k.safeguards,architecture:{persistent_graph_is_first_answer_source:true,known_questions_bypass_knowledge_completion:true,unknown_questions_route_to_existing_knowledge_completion:true,known_answer_items_become_first_projection_ring:true,broad_associations_do_not_replace_direct_answer:true,question_remains_observer:true,next_stage:"live_cosmos_persistent_answer_integration"}};
+          fs.writeFileSync(of,JSON.stringify(result,null,2)+"\n"); console.log(JSON.stringify(result,null,2));
+          NODE
+          git add "$D"
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "test: write Cosmos persistent answer resolver integration"
+            pushed=false
+            for attempt in 1 2 3; do git fetch origin "${GITHUB_REF_NAME}"; if ! git rebase "origin/${GITHUB_REF_NAME}"; then git rebase --abort || true; exit 1; fi; if git push origin "HEAD:${GITHUB_REF_NAME}"; then pushed=true; break; fi; sleep $((attempt*2)); done
+            test "$pushed" = true
+          fi
