@@ -3482,14 +3482,10 @@
     try{
       const data=await createPersistentStation();
 
-      // Copy the generated post text first. LinkedIn's iOS share extension may
-      // accept the URL but ignore supplied text, so paste-ready copy is safest.
-      if(data.post_text && navigator.clipboard){
-        try{await navigator.clipboard.writeText(data.post_text);}catch{}
-      }
-
       const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
-      const shareText=data.post_text||`Explore this station in Cosmos: ${title}`;
+      // The Worker deliberately returns a compact cross-platform share text:
+      // essence + topic hashtags, capped to stay safe for short-form portals.
+      const shareText=data.share_text||data.post_text||`Explore this station in Cosmos. #PTDToday`;
 
       if(navigator.share){
         await navigator.share({
@@ -3497,16 +3493,17 @@
           text:shareText,
           url:data.share_url
         });
-        shareNotice("Post text copied. Paste it in your social post if needed.");
+        // No copy/paste step. Apps that accept Web Share text receive it
+        // automatically. LinkedIn may ignore that field on iOS, so the shared
+        // station itself carries the same essence + hashtags in Open Graph
+        // metadata and still produces a meaningful card with no manual paste.
+        shareNotice("Station shared.");
         return;
       }
 
-      if(navigator.clipboard){
-        await navigator.clipboard.writeText(`${shareText}\n\n${data.share_url}`);
-        shareNotice("Post text and station link copied.");
-      }else{
-        window.open(data.share_url,"_blank","noopener");
-      }
+      // Desktop/browser fallback: open the persistent station directly rather
+      // than asking the user to manually paste a prepared caption.
+      window.open(data.share_url,"_blank","noopener");
     }catch(error){
       if(error?.name==="AbortError") return;
       console.warn("Station sharing failed",error);
