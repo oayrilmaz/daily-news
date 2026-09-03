@@ -127,6 +127,24 @@
     }
     .station-share-status[hidden]{display:none}
 
+    .cosmos-share-menu{
+      position:fixed;inset:0;z-index:40;display:grid;place-items:end center;
+      padding:18px;background:rgba(2,8,18,.38);backdrop-filter:blur(7px)
+    }
+    .cosmos-share-menu[hidden]{display:none}
+    .cosmos-share-sheet{
+      width:min(420px,100%);border:1px solid rgba(142,178,255,.22);border-radius:18px;
+      background:rgba(8,18,32,.98);padding:12px;box-shadow:0 20px 70px rgba(0,0,0,.45)
+    }
+    .cosmos-share-essence{font-size:12px;line-height:1.45;color:#c9d5e7;padding:8px 6px 11px}
+    .cosmos-share-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .cosmos-share-action{
+      appearance:none;border:1px solid rgba(142,178,255,.22);border-radius:13px;background:rgba(255,255,255,.035);
+      color:#eef4ff;padding:11px 8px;font:inherit;font-size:12px;cursor:pointer
+    }
+    .cosmos-share-action:active{transform:scale(.98)}
+    .cosmos-share-close{margin-top:8px;width:100%;color:#9cacc4}
+
     @media (min-width:800px){
       .main{padding:22px 20px 44px}
       .detail{grid-template-columns:1.1fr .9fr}
@@ -558,6 +576,18 @@
 
   <div id="shareStationStatus" class="station-share-status" hidden role="status" aria-live="polite"></div>
 
+  <div id="cosmosShareMenu" class="cosmos-share-menu" hidden aria-hidden="true">
+    <div class="cosmos-share-sheet" role="dialog" aria-modal="true" aria-label="Share this Cosmos station">
+      <div id="cosmosShareEssence" class="cosmos-share-essence"></div>
+      <div class="cosmos-share-actions">
+        <button id="shareLinkedIn" class="cosmos-share-action" type="button">LinkedIn</button>
+        <button id="shareX" class="cosmos-share-action" type="button">X</button>
+        <button id="shareMore" class="cosmos-share-action" type="button">More</button>
+      </div>
+      <button id="shareClose" class="cosmos-share-action cosmos-share-close" type="button">Close</button>
+    </div>
+  </div>
+
 <script>
   // Cosmos Semantic Knowledge Completion live integration v0.1
 (function(){
@@ -595,6 +625,12 @@
   const resetBtn = document.getElementById("resetBtn");
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
+  const cosmosShareMenu=document.getElementById("cosmosShareMenu");
+  const cosmosShareEssence=document.getElementById("cosmosShareEssence");
+  const shareLinkedIn=document.getElementById("shareLinkedIn");
+  const shareX=document.getElementById("shareX");
+  const shareMore=document.getElementById("shareMore");
+  const shareClose=document.getElementById("shareClose");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
@@ -3476,36 +3512,68 @@
     return data;
   }
 
-  async function shareCurrentStation(){
-    shareNotice("Preparing shared station…");
+  let preparedShare=null;
 
+  function closeShareMenu(){
+    cosmosShareMenu.hidden=true;
+    cosmosShareMenu.setAttribute("aria-hidden","true");
+  }
+
+  function openShareMenu(data){
+    preparedShare=data;
+    cosmosShareEssence.textContent=data.share_text||data.post_text||"Explore this Cosmos station. #PTDToday";
+    cosmosShareMenu.hidden=false;
+    cosmosShareMenu.setAttribute("aria-hidden","false");
+  }
+
+  function openExternal(url){
+    const win=window.open(url,"_blank","noopener,noreferrer");
+    if(!win) location.href=url;
+  }
+
+  shareClose?.addEventListener("click",closeShareMenu);
+  cosmosShareMenu?.addEventListener("click",event=>{if(event.target===cosmosShareMenu) closeShareMenu();});
+
+  shareLinkedIn?.addEventListener("click",()=>{
+    if(!preparedShare?.share_url) return;
+    // LinkedIn does not allow arbitrary post-body prefill from a public share URL.
+    // The station URL therefore carries the short essence + hashtags in its
+    // server-rendered Open Graph object, requiring no manual copy/paste.
+    const u=`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(preparedShare.share_url)}`;
+    closeShareMenu();
+    openExternal(u);
+  });
+
+  shareX?.addEventListener("click",()=>{
+    if(!preparedShare?.share_url) return;
+    const text=preparedShare.x_text||preparedShare.share_text||preparedShare.post_text||"#PTDToday";
+    const u=`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(preparedShare.share_url)}`;
+    closeShareMenu();
+    openExternal(u);
+  });
+
+  shareMore?.addEventListener("click",async()=>{
+    if(!preparedShare?.share_url) return;
+    const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
+    const text=preparedShare.share_text||preparedShare.post_text||"Explore this station in Cosmos. #PTDToday";
+    try{
+      if(navigator.share){
+        await navigator.share({title,text,url:preparedShare.share_url});
+        closeShareMenu();
+      }else{
+        closeShareMenu();
+        openExternal(preparedShare.share_url);
+      }
+    }catch(error){if(error?.name!=="AbortError") shareNotice("Could not share this station.");}
+  });
+
+  async function shareCurrentStation(){
+    shareNotice("Preparing share…");
     try{
       const data=await createPersistentStation();
-
-      const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
-      // The Worker deliberately returns a compact cross-platform share text:
-      // essence + topic hashtags, capped to stay safe for short-form portals.
-      const shareText=data.share_text||data.post_text||`Explore this station in Cosmos. #PTDToday`;
-
-      if(navigator.share){
-        await navigator.share({
-          title:title,
-          text:shareText,
-          url:data.share_url
-        });
-        // No copy/paste step. Apps that accept Web Share text receive it
-        // automatically. LinkedIn may ignore that field on iOS, so the shared
-        // station itself carries the same essence + hashtags in Open Graph
-        // metadata and still produces a meaningful card with no manual paste.
-        shareNotice("Station shared.");
-        return;
-      }
-
-      // Desktop/browser fallback: open the persistent station directly rather
-      // than asking the user to manually paste a prepared caption.
-      window.open(data.share_url,"_blank","noopener");
+      openShareMenu(data);
+      shareNotice("Ready to share.");
     }catch(error){
-      if(error?.name==="AbortError") return;
       console.warn("Station sharing failed",error);
       shareNotice(error?.message||"Could not share this station.");
     }
@@ -3682,4 +3750,3 @@
 
 </body>
 </html>
-
