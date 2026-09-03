@@ -316,48 +316,26 @@
 
 
     /* Current-stop essence — simple native sharing */
-    .currentStopEssence{
-      margin-top:18px;
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:18px;
-      background:rgba(11,23,42,.72);
-      padding:16px;
-    }
-    .currentStopEssenceEyebrow{
-      color:#8ea1bf;
-      font-size:10px;
-      font-weight:800;
-      letter-spacing:.16em;
-      text-transform:uppercase;
-    }
-    .currentStopEssenceTitle{
-      margin-top:7px;
-      color:#f5f8ff;
-      font-size:15px;
-      font-weight:800;
-      line-height:1.35;
-    }
-    .currentStopEssenceText{
-      margin-top:9px;
-      color:#b6c2d5;
-      font-size:13px;
-      line-height:1.55;
+    .projectionShareRow{
+      display:flex;
+      justify-content:flex-start;
+      margin-top:12px;
     }
     .currentStopShare{
-      margin-top:13px;
       display:inline-flex;
       align-items:center;
       gap:7px;
       min-height:38px;
-      padding:0 13px;
-      border:1px solid rgba(128,166,235,.34);
+      padding:8px 13px;
+      border:1px solid rgba(130,164,222,.24);
       border-radius:999px;
-      background:rgba(70,111,190,.10);
-      color:#b9d0ff;
+      background:rgba(14,31,58,.42);
+      color:#aebfda;
       font:inherit;
-      font-size:12px;
-      font-weight:800;
+      font-size:11px;
+      font-weight:600;
       cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
     }
     .currentStopShare svg{width:14px;height:14px;display:block}
     .currentStopShare:active{transform:scale(.98)}
@@ -577,6 +555,13 @@
           <button type="button" id="rippleBtn">Butterfly map ↓</button>
         </div>
 
+        <div class="projectionShareRow">
+          <button class="currentStopShare" id="currentStopShare" type="button" aria-label="Share this current stop">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Share current stop
+          </button>
+        </div>
+
         <form class="projectionAsk" id="projectionAskForm" autocomplete="off">
           <input id="projectionAskInput" maxlength="600" placeholder="Ask anything about this…" aria-label="Ask Cosmos about this" />
           <button type="submit" aria-label="Ask">↑</button>
@@ -601,15 +586,6 @@
         <span class="saved"><i></i> saved branch</span>
       </div>
       <div class="metro" id="butterflyMetro"></div>
-      <div class="currentStopEssence" id="currentStopEssence">
-        <div class="currentStopEssenceEyebrow">Cosmos essence · current stop</div>
-        <div class="currentStopEssenceTitle" id="currentStopEssenceTitle">Current stop</div>
-        <div class="currentStopEssenceText" id="currentStopEssenceText">Cosmos is resolving the essence of this stop.</div>
-        <button class="currentStopShare" id="currentStopShare" type="button" aria-label="Share this current stop">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Share current stop
-        </button>
-      </div>
     </section>
 
     <section class="detail legacyDetail" aria-hidden="true">
@@ -670,8 +646,6 @@
   const resetBtn = document.getElementById("resetBtn");
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
-  const currentStopEssenceTitle=document.getElementById("currentStopEssenceTitle");
-  const currentStopEssenceText=document.getElementById("currentStopEssenceText");
   const currentStopShare=document.getElementById("currentStopShare");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
@@ -2783,15 +2757,6 @@
       });
     });
 
-
-
-    // Keep a simple, readable essence box for the current stop below the journey.
-    const currentObserver=state.observer||{};
-    const currentResponse=currentObserver.response||{};
-    const currentTitle=currentObserver.question||currentResponse.question||currentObserver.label||currentResponse.label||"Current stop";
-    const currentEssence=currentResponse.short_answer||currentResponse.answer||"Cosmos is resolving the essence of this stop.";
-    if(currentStopEssenceTitle) currentStopEssenceTitle.textContent=currentTitle;
-    if(currentStopEssenceText) currentStopEssenceText.textContent=currentEssence;
 
     // The map is deliberately kept inside the viewport, so no sideways auto-scroll.
     const currentButton=butterflyMetro.querySelector(".metroStop.current");
