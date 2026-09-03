@@ -3511,6 +3511,101 @@
     return data;
   }
 
+  function wrapCanvasText(ctx,text,maxWidth,maxLines=3){
+    const words=String(text||"").replace(/\s+/g," ").trim().split(" ").filter(Boolean);
+    const lines=[];
+    let line="";
+    for(const word of words){
+      const test=line?`${line} ${word}`:word;
+      if(ctx.measureText(test).width<=maxWidth || !line){
+        line=test;
+      }else{
+        lines.push(line);
+        line=word;
+        if(lines.length===maxLines-1) break;
+      }
+    }
+    if(line && lines.length<maxLines) lines.push(line);
+    const used=lines.join(" ").split(" ").length;
+    if(used<words.length && lines.length){
+      let last=lines[lines.length-1];
+      while(last.length>3 && ctx.measureText(`${last}…`).width>maxWidth) last=last.slice(0,-1);
+      lines[lines.length-1]=`${last.replace(/[.,;:!?\s]+$/,'')}…`;
+    }
+    return lines;
+  }
+
+  function drawRoundedRect(ctx,x,y,w,h,r){
+    const radius=Math.min(r,w/2,h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+radius,y);
+    ctx.arcTo(x+w,y,x+w,y+h,radius);
+    ctx.arcTo(x+w,y+h,x,y+h,radius);
+    ctx.arcTo(x,y+h,x,y,radius);
+    ctx.arcTo(x,y,x+w,y,radius);
+    ctx.closePath();
+  }
+
+  async function buildCosmosShareCard(payload,data){
+    const canvas=document.createElement("canvas");
+    canvas.width=1200;
+    canvas.height=627;
+    const ctx=canvas.getContext("2d");
+    if(!ctx) throw new Error("Could not create share card.");
+
+    const question=String(payload.question||payload.label||"Current Cosmos stop").trim();
+    const essence=String(payload.short_answer||payload.answer||data.share_text||"").replace(/\s+/g," ").trim();
+    const social=String(data.share_text||data.linkedin_text||data.post_text||"").trim();
+    const hashtags=(social.match(/#[A-Za-z0-9_]+/g)||[]).slice(0,3).join("  ");
+
+    const gradient=ctx.createLinearGradient(0,0,1200,627);
+    gradient.addColorStop(0,"#07111f");
+    gradient.addColorStop(1,"#0b1730");
+    ctx.fillStyle=gradient;
+    ctx.fillRect(0,0,1200,627);
+
+    ctx.strokeStyle="rgba(112,156,255,.28)";
+    ctx.lineWidth=2;
+    drawRoundedRect(ctx,42,38,1116,551,34);
+    ctx.stroke();
+
+    ctx.fillStyle="#8fa7c9";
+    ctx.font="600 24px -apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif";
+    ctx.fillText("PTD TODAY · COSMOS",76,86);
+
+    ctx.fillStyle="#ffffff";
+    ctx.font="700 48px -apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif";
+    const titleLines=wrapCanvasText(ctx,question,1030,3);
+    let ty=148;
+    for(const line of titleLines){ ctx.fillText(line,76,ty); ty+=58; }
+
+    const boxY=Math.max(332,ty+18);
+    const boxH=170;
+    ctx.fillStyle="rgba(10,24,47,.78)";
+    drawRoundedRect(ctx,76,boxY,1048,boxH,24);
+    ctx.fill();
+    ctx.strokeStyle="rgba(124,164,255,.34)";
+    ctx.stroke();
+
+    ctx.fillStyle="#8fa7c9";
+    ctx.font="600 20px -apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif";
+    ctx.fillText("COSMOS ESSENCE",106,boxY+38);
+
+    ctx.fillStyle="#dbe7f8";
+    ctx.font="400 27px -apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif";
+    const essenceLines=wrapCanvasText(ctx,essence,980,3);
+    let ey=boxY+80;
+    for(const line of essenceLines){ ctx.fillText(line,106,ey); ey+=38; }
+
+    ctx.fillStyle="#87a9ff";
+    ctx.font="600 22px -apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif";
+    ctx.fillText(hashtags||"#Cosmos",76,570);
+
+    return await new Promise((resolve,reject)=>{
+      canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("Could not create share card.")),"image/png",0.96);
+    });
+  }
+
   async function shareCurrentStation(){
     shareNotice("Preparing current stop…");
     try{
@@ -3518,14 +3613,24 @@
       const payload=currentStationPersistentPayload()||{};
       const title=payload.question||payload.label||"Cosmos · Current stop";
       const shareText=String(data.linkedin_text||data.share_text||data.post_text||"").trim();
-
-      // Send caption + permanent link as one text payload. On iPhone this
-      // keeps the short Cosmos text above the link and gives receiving apps
-      // one URL to detect and render as their normal boxed link preview.
       const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
 
       if(navigator.share){
-        await navigator.share({title,text:combined});
+        // LinkedIn's iPhone extension repeatedly ignored our URL preview metadata.
+        // Share a real Cosmos card as an image attachment instead, while keeping
+        // the short social text + permanent URL in the same native share action.
+        try{
+          const blob=await buildCosmosShareCard(payload,data);
+          const file=new File([blob],"cosmos-current-stop.png",{type:"image/png"});
+          if(!navigator.canShare || navigator.canShare({files:[file]})){
+            await navigator.share({title,text:combined,files:[file]});
+          }else{
+            await navigator.share({title,text:combined});
+          }
+        }catch(cardError){
+          console.warn("Cosmos card attachment unavailable; sharing text/link only.",cardError);
+          await navigator.share({title,text:combined});
+        }
       }else if(navigator.clipboard?.writeText){
         await navigator.clipboard.writeText(combined);
         shareNotice("Share text copied.");
