@@ -3616,21 +3616,14 @@
       const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
 
       if(navigator.share){
-        // LinkedIn's iPhone extension repeatedly ignored our URL preview metadata.
-        // Share a real Cosmos card as an image attachment instead, while keeping
-        // the short social text + permanent URL in the same native share action.
-        try{
-          const blob=await buildCosmosShareCard(payload,data);
-          const file=new File([blob],"cosmos-current-stop.png",{type:"image/png"});
-          if(!navigator.canShare || navigator.canShare({files:[file]})){
-            await navigator.share({title,text:combined,files:[file]});
-          }else{
-            await navigator.share({title,text:combined});
-          }
-        }catch(cardError){
-          console.warn("Cosmos card attachment unavailable; sharing text/link only.",cardError);
-          await navigator.share({title,text:combined});
-        }
+        // Share the station as a webpage URL, not as a PNG attachment.
+        // This lets iOS and destination apps treat /s/<id> as a link object
+        // and fetch the server-rendered Open Graph preview from the Worker.
+        await navigator.share({
+          title,
+          text: shareText,
+          url: data.share_url
+        });
       }else if(navigator.clipboard?.writeText){
         await navigator.clipboard.writeText(combined);
         shareNotice("Share text copied.");
