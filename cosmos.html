@@ -315,6 +315,53 @@
     }
 
 
+    /* Current-stop essence — simple native sharing */
+    .currentStopEssence{
+      margin-top:18px;
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      background:rgba(11,23,42,.72);
+      padding:16px;
+    }
+    .currentStopEssenceEyebrow{
+      color:#8ea1bf;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+    }
+    .currentStopEssenceTitle{
+      margin-top:7px;
+      color:#f5f8ff;
+      font-size:15px;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .currentStopEssenceText{
+      margin-top:9px;
+      color:#b6c2d5;
+      font-size:13px;
+      line-height:1.55;
+    }
+    .currentStopShare{
+      margin-top:13px;
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      min-height:38px;
+      padding:0 13px;
+      border:1px solid rgba(128,166,235,.34);
+      border-radius:999px;
+      background:rgba(70,111,190,.10);
+      color:#b9d0ff;
+      font:inherit;
+      font-size:12px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .currentStopShare svg{width:14px;height:14px;display:block}
+    .currentStopShare:active{transform:scale(.98)}
+
     /* Butterfly Journey v0.3 — persistent, branching metro map */
     .butterflyWrap{
       margin-top:14px;
@@ -554,6 +601,15 @@
         <span class="saved"><i></i> saved branch</span>
       </div>
       <div class="metro" id="butterflyMetro"></div>
+      <div class="currentStopEssence" id="currentStopEssence">
+        <div class="currentStopEssenceEyebrow">Cosmos essence · current stop</div>
+        <div class="currentStopEssenceTitle" id="currentStopEssenceTitle">Current stop</div>
+        <div class="currentStopEssenceText" id="currentStopEssenceText">Cosmos is resolving the essence of this stop.</div>
+        <button class="currentStopShare" id="currentStopShare" type="button" aria-label="Share this current stop">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Share current stop
+        </button>
+      </div>
     </section>
 
     <section class="detail legacyDetail" aria-hidden="true">
@@ -576,17 +632,6 @@
 
   <div id="shareStationStatus" class="station-share-status" hidden role="status" aria-live="polite"></div>
 
-  <div id="cosmosShareMenu" class="cosmos-share-menu" hidden aria-hidden="true">
-    <div class="cosmos-share-sheet" role="dialog" aria-modal="true" aria-label="Share this Cosmos station">
-      <div id="cosmosShareEssence" class="cosmos-share-essence"></div>
-      <div class="cosmos-share-actions">
-        <button id="shareLinkedIn" class="cosmos-share-action" type="button">LinkedIn</button>
-        <button id="shareX" class="cosmos-share-action" type="button">X</button>
-        <button id="shareMore" class="cosmos-share-action" type="button">More</button>
-      </div>
-      <button id="shareClose" class="cosmos-share-action cosmos-share-close" type="button">Close</button>
-    </div>
-  </div>
 
 <script>
   // Cosmos Semantic Knowledge Completion live integration v0.1
@@ -625,12 +670,9 @@
   const resetBtn = document.getElementById("resetBtn");
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
-  const cosmosShareMenu=document.getElementById("cosmosShareMenu");
-  const cosmosShareEssence=document.getElementById("cosmosShareEssence");
-  const shareLinkedIn=document.getElementById("shareLinkedIn");
-  const shareX=document.getElementById("shareX");
-  const shareMore=document.getElementById("shareMore");
-  const shareClose=document.getElementById("shareClose");
+  const currentStopEssenceTitle=document.getElementById("currentStopEssenceTitle");
+  const currentStopEssenceText=document.getElementById("currentStopEssenceText");
+  const currentStopShare=document.getElementById("currentStopShare");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
@@ -2723,11 +2765,7 @@
             <strong>${esc(label)} ${branchBadge}</strong>
             <span>
               ${current?"you are here":(active?"your route":"saved branch")}
-              ${current?`<span class="metroShare" data-share-current-station role="button" tabindex="0" aria-label="Share this station" title="Share station">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </span>`:""}
+
             </span>
           </span>
         </button>
@@ -2745,19 +2783,15 @@
       });
     });
 
-    butterflyMetro.querySelectorAll("[data-share-current-station]").forEach(icon=>{
-      const triggerShare=(event)=>{
-        event.preventDefault();
-        event.stopPropagation();
-        shareCurrentStation();
-      };
-      icon.addEventListener("click",triggerShare);
-      icon.addEventListener("keydown",(event)=>{
-        if(event.key==="Enter" || event.key===" "){
-          triggerShare(event);
-        }
-      });
-    });
+
+
+    // Keep a simple, readable essence box for the current stop below the journey.
+    const currentObserver=state.observer||{};
+    const currentResponse=currentObserver.response||{};
+    const currentTitle=currentObserver.question||currentResponse.question||currentObserver.label||currentResponse.label||"Current stop";
+    const currentEssence=currentResponse.short_answer||currentResponse.answer||"Cosmos is resolving the essence of this stop.";
+    if(currentStopEssenceTitle) currentStopEssenceTitle.textContent=currentTitle;
+    if(currentStopEssenceText) currentStopEssenceText.textContent=currentEssence;
 
     // The map is deliberately kept inside the viewport, so no sideways auto-scroll.
     const currentButton=butterflyMetro.querySelector(".metroStop.current");
@@ -3512,72 +3546,29 @@
     return data;
   }
 
-  let preparedShare=null;
-
-  function closeShareMenu(){
-    cosmosShareMenu.hidden=true;
-    cosmosShareMenu.setAttribute("aria-hidden","true");
-  }
-
-  function openShareMenu(data){
-    preparedShare=data;
-    cosmosShareEssence.textContent=data.share_text||data.post_text||"Explore this Cosmos station. #PTDToday";
-    cosmosShareMenu.hidden=false;
-    cosmosShareMenu.setAttribute("aria-hidden","false");
-  }
-
-  function openExternal(url){
-    const win=window.open(url,"_blank","noopener,noreferrer");
-    if(!win) location.href=url;
-  }
-
-  shareClose?.addEventListener("click",closeShareMenu);
-  cosmosShareMenu?.addEventListener("click",event=>{if(event.target===cosmosShareMenu) closeShareMenu();});
-
-  shareLinkedIn?.addEventListener("click",()=>{
-    if(!preparedShare?.share_url) return;
-    // LinkedIn does not allow arbitrary post-body prefill from a public share URL.
-    // The station URL therefore carries the short essence + hashtags in its
-    // server-rendered Open Graph object, requiring no manual copy/paste.
-    const u=`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(preparedShare.share_url)}`;
-    closeShareMenu();
-    openExternal(u);
-  });
-
-  shareX?.addEventListener("click",()=>{
-    if(!preparedShare?.share_url) return;
-    const text=preparedShare.x_text||preparedShare.share_text||preparedShare.post_text||"#PTDToday";
-    const u=`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(preparedShare.share_url)}`;
-    closeShareMenu();
-    openExternal(u);
-  });
-
-  shareMore?.addEventListener("click",async()=>{
-    if(!preparedShare?.share_url) return;
-    const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
-    const text=preparedShare.share_text||preparedShare.post_text||"Explore this station in Cosmos. #PTDToday";
-    try{
-      if(navigator.share){
-        await navigator.share({title,text,url:preparedShare.share_url});
-        closeShareMenu();
-      }else{
-        closeShareMenu();
-        openExternal(preparedShare.share_url);
-      }
-    }catch(error){if(error?.name!=="AbortError") shareNotice("Could not share this station.");}
-  });
-
   async function shareCurrentStation(){
-    shareNotice("Preparing share…");
+    shareNotice("Preparing current stop…");
     try{
       const data=await createPersistentStation();
-      openShareMenu(data);
-      shareNotice("Ready to share.");
+      const payload=currentStationPersistentPayload()||{};
+      const title=payload.question||payload.label||"Cosmos · Current stop";
+      const text=data.share_text||data.x_text||data.post_text||"Explore this stop in Cosmos. #PTDToday";
+
+      if(navigator.share){
+        await navigator.share({title,text,url:data.share_url});
+      }else{
+        // Desktop fallback: open the permanent current-stop page directly.
+        window.open(data.share_url,"_blank","noopener,noreferrer");
+      }
+      shareNotice("Current stop shared.");
     }catch(error){
+      if(error?.name==="AbortError") return;
       console.warn("Station sharing failed",error);
-      shareNotice(error?.message||"Could not share this station.");
+      shareNotice(error?.message||"Could not share this stop.");
     }
   }
+
+  currentStopShare?.addEventListener("click",shareCurrentStation);
 
   async function restorePersistentSharedStation(){
     const params=new URLSearchParams(window.location.search);
