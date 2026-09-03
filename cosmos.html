@@ -608,19 +608,6 @@
 
   <div id="shareStationStatus" class="station-share-status" hidden role="status" aria-live="polite"></div>
 
-  <div id="cosmosShareMenu" class="cosmos-share-menu" hidden aria-hidden="true">
-    <div class="cosmos-share-sheet" role="dialog" aria-modal="true" aria-label="Share this Cosmos station">
-      <div id="cosmosShareEssence" class="cosmos-share-essence"></div>
-      <div class="cosmos-share-actions">
-        <button id="shareLinkedIn" class="cosmos-share-action" type="button">LinkedIn</button>
-        <button id="shareX" class="cosmos-share-action" type="button">X</button>
-        <button id="shareMore" class="cosmos-share-action" type="button">iPhone Share</button>
-      </div>
-      <button id="shareClose" class="cosmos-share-action cosmos-share-close" type="button">Close</button>
-    </div>
-  </div>
-
-
 
 <script>
   // Cosmos Semantic Knowledge Completion live integration v0.1
@@ -660,12 +647,6 @@
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
   const currentStopShare=document.getElementById("currentStopShare");
-  const cosmosShareMenu=document.getElementById("cosmosShareMenu");
-  const cosmosShareEssence=document.getElementById("cosmosShareEssence");
-  const shareLinkedIn=document.getElementById("shareLinkedIn");
-  const shareX=document.getElementById("shareX");
-  const shareMore=document.getElementById("shareMore");
-  const shareClose=document.getElementById("shareClose");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
@@ -3530,67 +3511,24 @@
     return data;
   }
 
-  let preparedShare=null;
-
-  function closeShareMenu(){
-    cosmosShareMenu.hidden=true;
-    cosmosShareMenu.setAttribute("aria-hidden","true");
-  }
-
-  function openShareMenu(data){
-    preparedShare=data;
-    cosmosShareEssence.textContent=data.share_text||data.post_text||"Explore this Cosmos station. #PTDToday";
-    cosmosShareMenu.hidden=false;
-    cosmosShareMenu.setAttribute("aria-hidden","false");
-  }
-
-  function openExternal(url){
-    const win=window.open(url,"_blank","noopener,noreferrer");
-    if(!win) location.href=url;
-  }
-
-  shareClose?.addEventListener("click",closeShareMenu);
-  cosmosShareMenu?.addEventListener("click",event=>{if(event.target===cosmosShareMenu) closeShareMenu();});
-
-  shareLinkedIn?.addEventListener("click",()=>{
-    if(!preparedShare?.share_url) return;
-    // Bypass LinkedIn's iOS share extension. Open LinkedIn's own URL-share
-    // composer so LinkedIn fetches the station's Open Graph object itself.
-    const u=`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(preparedShare.share_url)}`;
-    closeShareMenu();
-    openExternal(u);
-  });
-
-  shareX?.addEventListener("click",()=>{
-    if(!preparedShare?.share_url) return;
-    const text=preparedShare.x_text||preparedShare.share_text||preparedShare.post_text||"#PTDToday";
-    const u=`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(preparedShare.share_url)}`;
-    closeShareMenu();
-    openExternal(u);
-  });
-
-  shareMore?.addEventListener("click",async()=>{
-    if(!preparedShare?.share_url) return;
-    const title=currentStationPersistentPayload()?.question||"Cosmos shared station";
-    const text=preparedShare.share_text||preparedShare.post_text||"Explore this station in Cosmos. #PTDToday";
-    try{
-      if(navigator.share){
-        await navigator.share({title,text,url:preparedShare.share_url});
-        closeShareMenu();
-      }else{
-        closeShareMenu();
-        openExternal(preparedShare.share_url);
-      }
-    }catch(error){if(error?.name!=="AbortError") shareNotice("Could not share this station.");}
-  });
-
   async function shareCurrentStation(){
     shareNotice("Preparing current stop…");
     try{
       const data=await createPersistentStation();
-      openShareMenu(data);
-      shareNotice("Choose where to share.");
+      // Native iPhone share only. Share the permanent station URL as the
+      // canonical object and let the destination app read its Open Graph
+      // title, Cosmos essence, hashtags and preview image from the Worker.
+      // LinkedIn's iOS extension has repeatedly stripped Web Share text, so
+      // deliberately do not send a competing title/text payload here.
+      if(navigator.share){
+        await navigator.share({url:data.share_url});
+      }else{
+        // Desktop fallback: open the permanent current-stop page directly.
+        window.open(data.share_url,"_blank","noopener,noreferrer");
+      }
+      shareNotice("Share sheet opened.");
     }catch(error){
+      if(error?.name==="AbortError") return;
       console.warn("Station sharing failed",error);
       shareNotice(error?.message||"Could not share this stop.");
     }
