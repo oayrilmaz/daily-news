@@ -3515,15 +3515,22 @@
     shareNotice("Preparing current stop…");
     try{
       const data=await createPersistentStation();
-      // Native iPhone share only. Share the permanent station URL as the
-      // canonical object and let the destination app read its Open Graph
-      // title, Cosmos essence, hashtags and preview image from the Worker.
-      // LinkedIn's iOS extension has repeatedly stripped Web Share text, so
-      // deliberately do not send a competing title/text payload here.
+      const payload=currentStationPersistentPayload()||{};
+      const title=payload.question||payload.label||"Cosmos · Current stop";
+      const shareText=String(data.linkedin_text||data.share_text||data.post_text||"").trim();
+
+      // Send caption + permanent link as one text payload. On iPhone this
+      // keeps the short Cosmos text above the link and gives receiving apps
+      // one URL to detect and render as their normal boxed link preview.
+      const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
+
       if(navigator.share){
-        await navigator.share({url:data.share_url});
+        await navigator.share({title,text:combined});
+      }else if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(combined);
+        shareNotice("Share text copied.");
+        return;
       }else{
-        // Desktop fallback: open the permanent current-stop page directly.
         window.open(data.share_url,"_blank","noopener,noreferrer");
       }
       shareNotice("Share sheet opened.");
