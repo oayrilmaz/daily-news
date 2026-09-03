@@ -3515,12 +3515,12 @@
     shareNotice("Preparing current stop…");
     try{
       const data=await createPersistentStation();
-      const payload=currentStationPersistentPayload()||{};
-      const title=payload.question||payload.label||"Cosmos · Current stop";
-      const text=data.share_text||data.x_text||data.post_text||"Explore this stop in Cosmos. #PTDToday";
-
+      // Share the persistent social object as URL-only. LinkedIn's iOS share
+      // extension frequently discards Web Share text; passing only the URL gives
+      // it the cleanest chance to scrape the station's Open Graph title, essence,
+      // hashtags and preview image from /s/<id>.
       if(navigator.share){
-        await navigator.share({title,text,url:data.share_url});
+        await navigator.share({url:data.share_url});
       }else{
         // Desktop fallback: open the permanent current-stop page directly.
         window.open(data.share_url,"_blank","noopener,noreferrer");
