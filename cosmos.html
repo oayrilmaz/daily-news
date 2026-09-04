@@ -1,6 +1,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -3640,6 +3641,18 @@
       if(navigator.share){
         // Share as a real webpage URL object. This is the most reliable path for
         // LinkedIn/iOS to invoke its composer and fetch the Open Graph preview.
+        // Keep the current working native share flow, but also place the
+        // generated exact-station commentary + hashtags on the clipboard.
+        // LinkedIn's iOS share extension may ignore Web Share `text`, so the
+        // clipboard preserves the ready-to-use post without changing the card URL.
+        if(shareText && navigator.clipboard?.writeText){
+          try{
+            await navigator.clipboard.writeText(shareText);
+          }catch(copyError){
+            console.warn("Could not copy Cosmos post text to clipboard.",copyError);
+          }
+        }
+
         await navigator.share({
           title,
           text: shareText,
