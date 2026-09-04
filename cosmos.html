@@ -3638,13 +3638,12 @@
       const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
 
       if(navigator.share){
-        // Controlled LinkedIn/iOS test: send one combined text payload containing
-        // the generated current-station post, hashtags and the share URL.
-        // Some destination apps preserve one text payload more reliably than
-        // separate Web Share text + url fields.
+        // Share as a real webpage URL object. This is the most reliable path for
+        // LinkedIn/iOS to invoke its composer and fetch the Open Graph preview.
         await navigator.share({
           title,
-          text: combined
+          text: shareText,
+          url: data.share_url
         });
       }else if(navigator.clipboard?.writeText){
         await navigator.clipboard.writeText(combined);
