@@ -27,6 +27,26 @@
     .observer{min-width:0;text-align:center;flex:1}
     .observer .kicker{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
     .observer .label{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .observer .presence{
+      margin-top:3px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      color:#8fa5c4;
+      font-size:10px;
+      font-weight:600;
+      line-height:1.15;
+      white-space:nowrap
+    }
+    .observer .presence[hidden]{display:none}
+    .observer .presenceDot{
+      width:6px;
+      height:6px;
+      border-radius:50%;
+      background:#8cd7b5;
+      box-shadow:0 0 0 3px rgba(140,215,181,.08),0 0 10px rgba(140,215,181,.28)
+    }
     .iconBtn{border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--ink);border-radius:999px;min-width:42px;height:42px;padding:0 13px;cursor:pointer}
     .main{width:min(1180px,100%);margin:0 auto;padding:18px 12px 36px;flex:1}
     .intro{text-align:center;max-width:720px;margin:2px auto 14px}
@@ -514,6 +534,10 @@
     <div class="observer">
       <div class="kicker">Current observer</div>
       <div class="label" id="observerLabel">Cosmos</div>
+      <div class="presence" id="presenceIndicator" hidden aria-live="polite">
+        <span class="presenceDot" aria-hidden="true"></span>
+        <span id="presenceText"></span>
+      </div>
     </div>
     <a class="iconBtn" href="/" aria-label="PTD Today home" style="display:grid;place-items:center;text-decoration:none">⌂</a>
   </header>
@@ -643,6 +667,8 @@
   const statusEl = document.getElementById("status");
   const emptyEl = document.getElementById("emptyState");
   const observerLabel = document.getElementById("observerLabel");
+  const presenceIndicator = document.getElementById("presenceIndicator");
+  const presenceText = document.getElementById("presenceText");
   const observerDetail = document.getElementById("observerDetail");
   const edgeDetail = document.getElementById("edgeDetail");
   const expandBtn = document.getElementById("expandBtn");
@@ -686,8 +712,11 @@
   };
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
+  const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
   const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.0";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+  const PRESENCE_HEARTBEAT_MS = 25000;
+  const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
   const state = {
     entities: new Map(),
@@ -2810,9 +2839,124 @@
     });
   }
 
+  // Live Presence v0.1 — anonymous, station-scoped, temporary.
+  // No account, name, IP address, or profile is exposed to other observers.
+  const presenceState={
+    station_key:"",
+    timer:null,
+    request_serial:0
+  };
+
+  function presenceSessionId(){
+    try{
+      let id=localStorage.getItem(PRESENCE_SESSION_KEY);
+      if(!id){
+        id=(crypto?.randomUUID?.() || `p-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        localStorage.setItem(PRESENCE_SESSION_KEY,id);
+      }
+      return id;
+    }catch{
+      return `p-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }
+
+  const PRESENCE_SESSION_ID=presenceSessionId();
+
+  function presenceStationKey(observer){
+    if(!observer) return "";
+    if(observer.kind==="response" || observer.kind==="question"){
+      const q=normalizeSubject(observer.question||observer.response?.question||observer.label||observer.id||"");
+      return q ? `question|${q}` : "";
+    }
+    if(observer.kind==="entity"){
+      const id=String(observer.id||"").trim();
+      return id ? `entity|${id}` : `entity-label|${normalizeSubject(observer.label||"")}`;
+    }
+    if(observer.kind==="relationship"){
+      const id=String(observer.relationship_id||observer.id||"").trim();
+      return id ? `relationship|${id}` : `relationship-label|${normalizeSubject(observer.label||"")}`;
+    }
+    if(observer.kind==="development"){
+      const id=String(observer.id||observer.article_id||"").trim();
+      return id ? `development|${id}` : `development-label|${normalizeSubject(observer.label||"")}`;
+    }
+    const label=normalizeSubject(observer.label||observer.id||"");
+    return label ? `${observer.kind||"observer"}|${label}` : "";
+  }
+
+  function renderPresenceCount(count){
+    const n=Number(count);
+    if(!presenceIndicator || !presenceText || !Number.isFinite(n) || n<1){
+      if(presenceIndicator) presenceIndicator.hidden=true;
+      return;
+    }
+    presenceText.textContent=`${Math.round(n)} here now`;
+    presenceIndicator.hidden=false;
+  }
+
+  async function heartbeatPresence(expectedStationKey){
+    const stationKey=String(expectedStationKey||presenceState.station_key||"").trim();
+    if(!stationKey || document.visibilityState==="hidden") return;
+
+    const serial=++presenceState.request_serial;
+    try{
+      const response=await fetch(COSMOS_PRESENCE_ENDPOINT,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          station_key:stationKey,
+          session_id:PRESENCE_SESSION_ID
+        }),
+        cache:"no-store"
+      });
+      if(!response.ok) throw new Error(`Presence returned ${response.status}`);
+      const data=await response.json();
+
+      // Ignore a late response if the observer already moved elsewhere.
+      if(serial!==presenceState.request_serial || stationKey!==presenceState.station_key) return;
+      renderPresenceCount(data?.count);
+    }catch(error){
+      if(stationKey===presenceState.station_key && presenceIndicator){
+        presenceIndicator.hidden=true;
+      }
+      console.warn("Cosmos live presence unavailable.",error);
+    }
+  }
+
+  function syncLivePresence(observer){
+    const nextKey=presenceStationKey(observer);
+    if(!nextKey){
+      presenceState.station_key="";
+      clearInterval(presenceState.timer);
+      presenceState.timer=null;
+      if(presenceIndicator) presenceIndicator.hidden=true;
+      return;
+    }
+
+    if(nextKey===presenceState.station_key && presenceState.timer) return;
+
+    presenceState.station_key=nextKey;
+    presenceState.request_serial++;
+    clearInterval(presenceState.timer);
+    presenceState.timer=null;
+    if(presenceIndicator) presenceIndicator.hidden=true;
+
+    heartbeatPresence(nextKey);
+    presenceState.timer=setInterval(()=>{
+      heartbeatPresence(presenceState.station_key);
+    },PRESENCE_HEARTBEAT_MS);
+  }
+
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="visible" && presenceState.station_key){
+      heartbeatPresence(presenceState.station_key);
+    }
+  });
+
   function render(){
     const observer=state.observer;
     observerLabel.textContent=observerDisplayLabel(observer);
+    syncLivePresence(observer);
     if(observer.article_id){
       articleBtn.href=`/articles/${encodeURIComponent(observer.article_id)}.html`;
       articleBtn.textContent="Back to article";
