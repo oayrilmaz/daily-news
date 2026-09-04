@@ -623,7 +623,8 @@
     entryParams.has("observer") ||
     entryParams.has("article_id") ||
     entryParams.has("from_id") ||
-    entryParams.has("to_id");
+    entryParams.has("to_id") ||
+    entryParams.has("shared");
 
   // Fresh Cosmos visits always begin at the single living Cosmos entrance at /.
   // Only explicit observer/deep-link requests stay in the Cosmos explorer.
@@ -2758,13 +2759,11 @@
     });
 
 
-    // The map is deliberately kept inside the viewport, so no sideways auto-scroll.
-    const currentButton=butterflyMetro.querySelector(".metroStop.current");
-    if(currentButton){
-      requestAnimationFrame(()=>{
-        currentButton.scrollIntoView({behavior:"smooth",block:"nearest",inline:"nearest"});
-      });
-    }
+    // Do not move the user's viewport during render.
+    // On phones, render() can run again when an async Cosmos answer arrives;
+    // auto-scrolling the current Butterfly station here made the page jump away
+    // from whatever section the user was reading. The viewport now moves only
+    // after an explicit user action (for example tapping "Butterfly map").
   }
 
   function renderObserverDetails(observer,projection){
@@ -3432,6 +3431,25 @@
     const o=state.observer;
     if(!o||o.kind==="landing") return null;
     const r=o.response||null;
+    const currentJourneyNode=journeyNodeById(state.journey?.current_node_id);
+
+    // Sharing is station-centric, not journey-entry-centric.
+    // The visible/current station label is the public title; the underlying
+    // research question is retained separately so Cosmos can reconstruct the
+    // station exactly when somebody opens the shared link.
+    const shareTitle=String(
+      currentJourneyNode?.observer?.label ||
+      o.label ||
+      o.semantic_subject_label ||
+      r?.subject_match?.label ||
+      r?.label ||
+      o.question ||
+      "Current Cosmos stop"
+    ).replace(/\s+/g," ").trim();
+
+    const researchQuestion=String(
+      o.question || r?.question || currentJourneyNode?.observer?.question || shareTitle
+    ).replace(/\s+/g," ").trim();
 
     const ids=Array.isArray(r?.dynamic_projection_ids)?r.dynamic_projection_ids:[];
     const entities=ids.map(id=>state.entities.get(id)).filter(Boolean).map(e=>({...e}));
@@ -3451,9 +3469,11 @@
       : [];
 
     return {
-      question:o.question||r?.question||o.label||"",
-      label:o.label||r?.label||"",
-      subject:o.semantic_subject_label||r?.subject_match?.label||"",
+      share_title:shareTitle,
+      current_station_label:shareTitle,
+      question:researchQuestion,
+      label:shareTitle,
+      subject:o.semantic_subject_label||r?.subject_match?.label||shareTitle,
       intent:r?.intent||"",
       short_answer:r?.short_answer||"",
       answer:r?.answer||"",
@@ -3461,14 +3481,14 @@
       observer:{
         kind:o.kind||"",
         id:o.id||"",
-        label:o.label||"",
-        question:o.question||"",
+        label:shareTitle,
+        question:researchQuestion,
         semantic_subject_id:o.semantic_subject_id||r?.subject_match?.id||"",
-        semantic_subject_label:o.semantic_subject_label||r?.subject_match?.label||""
+        semantic_subject_label:o.semantic_subject_label||r?.subject_match?.label||shareTitle
       },
       response:r?{
-        label:r.label||"",
-        question:r.question||o.question||"",
+        label:shareTitle,
+        question:r.question||researchQuestion,
         answer:r.answer||"",
         short_answer:r.short_answer||"",
         intent:r.intent||"",
@@ -3483,7 +3503,8 @@
         knowledge_gaps:Array.isArray(r.knowledge_gaps)?r.knowledge_gaps.slice(0,8):[]
       }:null,
       projection:{entities,relationships},
-      journey:Array.isArray(state.journey?.nodes)?state.journey.nodes.slice(-24).map(n=>({...n})):[]
+      journey:Array.isArray(state.journey?.nodes)?state.journey.nodes.slice(-24).map(n=>({...n})):[],
+      journey_current_node_id:state.journey?.current_node_id||""
     };
   }
 
@@ -3611,7 +3632,7 @@
     try{
       const data=await createPersistentStation();
       const payload=currentStationPersistentPayload()||{};
-      const title=payload.question||payload.label||"Cosmos · Current stop";
+      const title=payload.share_title||payload.current_station_label||payload.label||payload.question||"Cosmos · Current stop";
       const shareText=String(data.linkedin_text||data.share_text||data.post_text||"").trim();
       const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
 
@@ -3718,9 +3739,12 @@
 
       if(Array.isArray(p.journey)&&p.journey.length){
         state.journey.nodes=p.journey;
-        state.journey.current_node_id=p.journey[p.journey.length-1]?.node_id ||
-          p.journey[p.journey.length-1]?.id || "";
-        state.journey.next_id=p.journey.length+1;
+        const requestedCurrent=String(p.journey_current_node_id||"");
+        const requestedExists=p.journey.some(node=>node?.node_id===requestedCurrent);
+        state.journey.current_node_id=requestedExists
+          ? requestedCurrent
+          : (p.journey[p.journey.length-1]?.node_id || p.journey[p.journey.length-1]?.id || "");
+        state.journey.next_id=p.journey.reduce((m,n)=>Math.max(m,Number(String(n?.node_id||"").replace(/\D/g,""))||0),0)+1;
       }
 
       ensureJourneyCurrent(state.observer);
