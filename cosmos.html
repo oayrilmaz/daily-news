@@ -1,5 +1,6 @@
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -3637,13 +3638,13 @@
       const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
 
       if(navigator.share){
-        // Share the station as a webpage URL, not as a PNG attachment.
-        // This lets iOS and destination apps treat /s/<id> as a link object
-        // and fetch the server-rendered Open Graph preview from the Worker.
+        // Controlled LinkedIn/iOS test: send one combined text payload containing
+        // the generated current-station post, hashtags and the share URL.
+        // Some destination apps preserve one text payload more reliably than
+        // separate Web Share text + url fields.
         await navigator.share({
           title,
-          text: shareText,
-          url: data.share_url
+          text: combined
         });
       }else if(navigator.clipboard?.writeText){
         await navigator.clipboard.writeText(combined);
