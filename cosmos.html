@@ -1,8 +1,3 @@
-
-
-
-
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -751,6 +746,8 @@
     entities: new Map(),
     relationships: [],
     developments: new Map(),
+    changes: new Map(),
+    causalEdges: [],
     dailyBrief: [],
     dailyBriefDate: "",
     response: null,
@@ -761,7 +758,7 @@
     expanded: false,
     entryObserver: null,
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
-    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_2",
+    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_3",
     journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_3",
     journey: {
       nodes: [],
@@ -801,13 +798,24 @@
     return response.json();
   }
 
+  async function fetchJsonOptional(path){
+    try{
+      return await fetchJson(path);
+    }catch(error){
+      console.info(`Optional Cosmos layer unavailable: ${path}`,error);
+      return null;
+    }
+  }
+
   async function loadKnowledge(){
     statusEl.textContent = "loading knowledge";
-    const [entitiesPayload, relationshipsPayload, developmentsPayload, dailyBriefPayload] = await Promise.all([
+    const [entitiesPayload, relationshipsPayload, developmentsPayload, dailyBriefPayload, changesPayload, causalEdgesPayload] = await Promise.all([
       fetchJson("/knowledge/entities.json"),
       fetchJson("/knowledge/relationships.json"),
       fetchJson("/knowledge/developments.json"),
-      fetchJson("/briefs/daily-ai.json")
+      fetchJson("/briefs/daily-ai.json"),
+      fetchJsonOptional("/knowledge/change-ledger.json"),
+      fetchJsonOptional("/knowledge/causal-edges.json")
     ]);
 
     for(const entity of normalizePayload(entitiesPayload,"entities")){
@@ -820,6 +828,14 @@
       if(development?.development_id) state.developments.set(development.development_id,development);
     }
 
+    for(const change of normalizePayload(changesPayload,"changes")){
+      const id=change?.change_id || change?.transition_id;
+      if(id) state.changes.set(id,{...change,change_id:id});
+    }
+
+    state.causalEdges = normalizePayload(causalEdgesPayload,"causal_edges")
+      .filter(edge=>edge?.from_change_id && edge?.to_change_id && edge?.mechanism);
+
     state.dailyBrief = Array.isArray(dailyBriefPayload)
       ? dailyBriefPayload
       : (dailyBriefPayload?.items || dailyBriefPayload?.daily_items || dailyBriefPayload?.briefing || dailyBriefPayload?.developments || dailyBriefPayload?.signals || []);
@@ -828,7 +844,7 @@
       (dailyBriefPayload?.date_utc || dailyBriefPayload?.generated_at ||
        dailyBriefPayload?.briefing_date || dailyBriefPayload?.date || "");
 
-    statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships`;
+    statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships · ${state.changes.size} changes`;
   }
 
   function syntheticRelationshipObserver(){
@@ -1707,29 +1723,106 @@
   }
 
 
-  function journeyObserverKey(observer){
-    if(!observer) return "";
-
-    // A question/answer is one station even if the response is re-hydrated,
-    // retried, or upgraded from local fallback to universal reasoning.
-    if(observer.kind==="response" || observer.kind==="question"){
-      const q=normalizeSubject(observer.question||observer.label||observer.id||"");
-      return `question|${q}`;
+  // COSMOS CONTRACT v1 — Coordinate → Station → Change → Butterfly.
+  // The query is an entrance. The resolved focus is the station center.
+  function coordinateForObserver(observer){
+    if(!observer){
+      return {focus_type:"cosmos",focus_id:"cosmos",time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
     }
 
-    if(observer.kind==="entity"){
-      return `entity|${observer.id||normalizeSubject(observer.label||"")}`;
+    const semanticId = observer.semantic_subject_id || observer.response?.subject_match?.id || "";
+    const entityId = observer.kind==="entity" ? observer.id : semanticId;
+
+    if(entityId){
+      return {
+        focus_type:"entity",
+        focus_id:String(entityId),
+        time_mode:"live",
+        geography:null,
+        lens:"now",
+        epistemic_mode:observer?.response?.epistemic_state==="scenario"?"imagine":"know"
+      };
     }
 
     if(observer.kind==="relationship"){
-      return `relationship|${observer.id||observer.relationship_id||""}`;
+      return {focus_type:"relationship",focus_id:String(observer.relationship_id||observer.id||""),time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
     }
 
-    return [
-      observer.kind||"",
-      observer.id||"",
-      normalizeSubject(observer.label||"")
-    ].join("|");
+    if(observer.kind==="development"){
+      return {focus_type:"development",focus_id:String(observer.id||""),time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
+    }
+
+    const q=normalizeSubject(observer.question||observer.label||observer.id||"");
+    return {focus_type:"investigation",focus_id:q?`question:${q}`:"cosmos",time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
+  }
+
+  function coordinateKey(coordinate){
+    const c=coordinate||{};
+    return [c.focus_type||"",c.focus_id||"",c.time_mode||"live",c.geography||"",c.lens||"now",c.epistemic_mode||"know"].join("|");
+  }
+
+  function focusEntityId(observer){
+    const c=coordinateForObserver(observer);
+    return c.focus_type==="entity" && state.entities.has(c.focus_id) ? c.focus_id : "";
+  }
+
+  function changesForFocus(observer){
+    const focusId=focusEntityId(observer);
+    if(!focusId) return [];
+    const rows=[];
+    for(const change of state.changes.values()){
+      const subject=String(change.subject_id||change.entity_id||change.subject_ref||"");
+      if(subject!==focusId) continue;
+      rows.push(change);
+    }
+    return rows.sort((a,b)=>{
+      const ta=Date.parse(a.current_state_time||a.effective_at||a.observed_at||a.created_at||"")||0;
+      const tb=Date.parse(b.current_state_time||b.effective_at||b.observed_at||b.created_at||"")||0;
+      return tb-ta || String(a.change_id).localeCompare(String(b.change_id));
+    });
+  }
+
+  function primaryChangeForFocus(observer){
+    return changesForFocus(observer)[0] || null;
+  }
+
+  function changeDisplay(change){
+    if(!change) return "";
+    const dim=String(change.state_dimension_id||change.dimension||change.label||"State").replace(/[_-]+/g," ");
+    const direction=String(change.direction||change.transition_type||"").replace(/_/g," ");
+    const prev=change.previous_state;
+    const curr=change.current_state;
+    if(prev!==undefined && curr!==undefined && String(prev)!=="" && String(curr)!=="") return `${dim}: ${prev} → ${curr}`;
+    return [dim,direction].filter(Boolean).join(" · ");
+  }
+
+  function acceptedCausalEdgesFrom(change){
+    if(!change?.change_id) return [];
+    return state.causalEdges.filter(edge=>{
+      if(edge.from_change_id!==change.change_id) return false;
+      const status=String(edge.validation_status||edge.status||edge.epistemic_state||"accepted").toLowerCase();
+      return !["rejected","invalid","unsupported"].includes(status);
+    });
+  }
+
+  function stationProjection(observer){
+    const coordinate=coordinateForObserver(observer);
+    const focusId=focusEntityId(observer);
+    const focus=focusId ? state.entities.get(focusId) : null;
+    const primaryChange=primaryChangeForFocus(observer);
+    return {
+      station_projection_id:`station:${coordinateKey(coordinate)}`,
+      coordinate,
+      focus_id:focusId,
+      focus_label:focus?.name||focus?.label||observerDisplayLabel(observer),
+      primary_change:primaryChange,
+      butterfly_available:Boolean(primaryChange && acceptedCausalEdgesFrom(primaryChange).length)
+    };
+  }
+
+  function journeyObserverKey(observer){
+    if(!observer) return "";
+    return coordinateKey(coordinateForObserver(observer));
   }
 
   function journeyNodeById(id){
@@ -1775,6 +1868,8 @@
       node_id:`j${state.journey.next_id++}`,
       parent_node_id:parent,
       observer_key:key,
+      coordinate:coordinateForObserver(observer),
+      via_operation:observer?.via_operation||"ENTER",
       observer:observerSnapshot(observer),
       created_at:Date.now()
     };
@@ -1823,6 +1918,34 @@
       .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
   }
 
+  function reconcileJourneyWithResolvedObserver(observer){
+    const current=journeyNodeById(state.journey.current_node_id);
+    const resolvedCoordinate=coordinateForObserver(observer);
+    if(!current){
+      ensureJourneyCurrent(observer);
+      return;
+    }
+
+    const currentCoordinate=current.coordinate || current.observer?.coordinate || coordinateForObserver(current.observer);
+    const wasInvestigation=currentCoordinate?.focus_type==="investigation";
+    const nowResolved=resolvedCoordinate?.focus_type!=="investigation";
+
+    // A query is an entrance, not a permanent station. If the same ASK resolves
+    // after asynchronous knowledge completion, upgrade the current Journey node
+    // in place instead of adding a fake question station before the real focus.
+    if(wasInvestigation && nowResolved){
+      current.coordinate=resolvedCoordinate;
+      current.observer_key=coordinateKey(resolvedCoordinate);
+      current.observer=observerSnapshot(observer);
+      current.via_operation="ASK";
+      state.journey.current_node_id=current.node_id;
+      saveJourney();
+      return;
+    }
+
+    ensureJourneyCurrent(observer);
+  }
+
   function restoreObserverFromJourneyNode(node){
     if(!node?.observer) return;
     const snap=node.observer;
@@ -1869,7 +1992,9 @@
       semantic_subject_id: observer.semantic_subject_id || observer.response?.subject_match?.id || "",
       semantic_subject_label: observer.semantic_subject_label || observer.response?.subject_match?.label || "",
       from_observer_id: observer.from_observer_id || "",
-      from_observer_label: observer.from_observer_label || ""
+      from_observer_label: observer.from_observer_label || "",
+      coordinate: coordinateForObserver(observer),
+      via_operation: observer.via_operation || ""
     };
   }
 
@@ -1999,32 +2124,61 @@
   }
 
   function project(observer){
-    const seeds = seedEntityIds(observer);
-    const dist = neighbors(seeds,MAX_DISTANCE);
-    const limit = state.expanded ? MAX_EXPANDED_NODES : MAX_INITIAL_NODES;
+    const station=stationProjection(observer);
+    const focusId=station.focus_id;
+    const limit=state.expanded ? 12 : 7;
 
-    let candidateIds = [...dist.keys()].sort((a,b)=>{
+    // Contract-compliant Station: the resolved focus is the center. Nearby is
+    // a finite set of defensible typed direct relationships, not a duplicate
+    // seed node plus arbitrary graph-distance rings.
+    if(focusId){
+      const incidentEdges=incident(focusId)
+        .filter(rel=>rel?.from_entity_id && rel?.to_entity_id)
+        .sort((a,b)=>{
+          const ca=confidencePercent(a.confidence)||0;
+          const cb=confidencePercent(b.confidence)||0;
+          if(cb!==ca) return cb-ca;
+          return String(a.relationship_id||"").localeCompare(String(b.relationship_id||""));
+        });
+
+      const nearby=[];
+      const seen=new Set();
+      for(const rel of incidentEdges){
+        const otherId=rel.from_entity_id===focusId ? rel.to_entity_id : rel.from_entity_id;
+        if(!otherId || otherId===focusId || seen.has(otherId) || !state.entities.has(otherId)) continue;
+        seen.add(otherId);
+        nearby.push({
+          id:otherId,
+          label:entityLabel(otherId),
+          distance:1,
+          type:state.entities.get(otherId)?.type||"Object",
+          isSeed:false,
+          why_shown:relationshipLabel(rel),
+          relationship:rel
+        });
+        if(nearby.length>=limit) break;
+      }
+
+      const selected=new Set(nearby.map(n=>n.id));
+      const edges=state.relationships.filter(r=>selected.has(r.from_entity_id) && selected.has(r.to_entity_id));
+      const centerEdges=nearby.map(n=>n.relationship).filter(Boolean);
+      return {nodes:nearby,edges,centerEdges,seeds:[],station};
+    }
+
+    // Graceful unresolved/investigation fallback: preserve the existing graph
+    // projection without pretending the query itself is a resolved Thing.
+    const seeds=seedEntityIds(observer);
+    const dist=neighbors(seeds,MAX_DISTANCE);
+    const fallbackLimit=state.expanded ? MAX_EXPANDED_NODES : MAX_INITIAL_NODES;
+    let candidateIds=[...dist.keys()].sort((a,b)=>{
       const da=dist.get(a),db=dist.get(b);
       return da-db || scoreEntity(b,db)-scoreEntity(a,da) || entityLabel(a).localeCompare(entityLabel(b));
-    }).slice(0,limit);
-
-    for(const seed of seeds){
-      if(seed && !candidateIds.includes(seed)) candidateIds.unshift(seed);
-    }
-    candidateIds = [...new Set(candidateIds)].slice(0,limit);
-
-    const selected = new Set(candidateIds);
-    const edges = state.relationships
-      .filter(r => selected.has(r.from_entity_id) && selected.has(r.to_entity_id))
-      .sort((a,b)=>(confidencePercent(b.confidence)||0)-(confidencePercent(a.confidence)||0));
-
-    const nodes = candidateIds.map(id=>({
-      id,label:entityLabel(id),distance:dist.get(id) ?? 0,
-      type:state.entities.get(id)?.type || "Object",
-      isSeed:seeds.includes(id)
-    }));
-
-    return {nodes,edges,seeds};
+    }).slice(0,fallbackLimit);
+    candidateIds=[...new Set(candidateIds)];
+    const selected=new Set(candidateIds);
+    const edges=state.relationships.filter(r=>selected.has(r.from_entity_id) && selected.has(r.to_entity_id));
+    const nodes=candidateIds.map(id=>({id,label:entityLabel(id),distance:dist.get(id)??0,type:state.entities.get(id)?.type||"Object",isSeed:false}));
+    return {nodes,edges,centerEdges:[],seeds,station};
   }
 
   function svgEl(name,attrs={}){
@@ -2514,10 +2668,14 @@
   function renderProjectionLayer(observer,projection){
     const currentLabel=observerDisplayLabel(observer) || "Cosmos";
     const entryQuestion=observer?.question || entry.question || "";
-    const title=observer?.kind==="entity" ? currentLabel : (entryQuestion || currentLabel);
+    const station=projection.station || stationProjection(observer);
+    const title=station.focus_id ? station.focus_label : (entryQuestion || currentLabel);
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
     const contextRows=compactCenterContext(observer);
+    if(station.primary_change){
+      contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
+    }
 
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
@@ -2624,49 +2782,38 @@
   }
 
   function renderButterflyEffect(){
-    if(!effectStep) return;
-    const path=journeyPathTo(state.journey.current_node_id);
-    if(path.length<2){
-      effectStep.innerHTML=`<div class="effectVerdict">This is the first station. A butterfly effect needs a change that can propagate from one station to another.</div>`;
+    if(!effectStep || !effectWrap) return;
+    const station=stationProjection(state.observer);
+    const change=station.primary_change;
+    const edges=acceptedCausalEdgesFrom(change);
+
+    // No initiating Change or accepted causal continuation = no Butterfly CTA.
+    // Ordinary users should never see unresolved causal diagnostics by default.
+    if(!change || !edges.length){
+      effectWrap.style.display="none";
+      effectStep.innerHTML="";
       return;
     }
 
-    const previous=path[path.length-2]?.observer||null;
-    const current=path[path.length-1]?.observer||null;
-    const previousLabel=previous?.label||previous?.question||"Previous station";
-    const currentLabel=current?.label||current?.question||"Current station";
-    const fromId=observerEntityIdFromSnapshot(previous);
-    const toId=observerEntityIdFromSnapshot(current);
+    effectWrap.style.display="block";
+    const edge=edges[0];
+    const downstream=state.changes.get(edge.to_change_id);
+    const mechanism=String(edge.mechanism||"").trim();
+    const carrier=String(edge.carrier||"").trim();
+    const conditions=Array.isArray(edge.conditions)?edge.conditions.filter(Boolean):[];
 
-    const route=`<div class="effectRoute"><strong>${esc(previousLabel)}</strong><span class="effectArrow">→</span><strong>${esc(currentLabel)}</strong></div>`;
-
-    if(!fromId || !toId){
-      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">This is a valid journey step, but Cosmos cannot yet resolve both stations to supported objects. It will not call this a butterfly effect.</div><div class="effectMeta"><span>navigation ≠ causation</span><span>causal status: unresolved</span></div>`;
-      return;
-    }
-
-    const forward=bestRelationship(fromId,toId);
-    const reverse=bestRelationship(toId,fromId);
-
-    if(forward && causalRelationshipKind(forward)==="causal"){
-      const confidence=confidencePercent(forward.confidence);
-      effectStep.innerHTML=route+`<div class="effectVerdict"><strong>Supported causal step:</strong> ${esc(entityLabel(fromId))} ${esc(relationshipLabel(forward))} ${esc(entityLabel(toId))}. This is the incremental effect Cosmos can currently defend from the previous station to this one.</div><div class="effectMeta"><span>direction: previous → current</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span><span>${esc(forward.epistemic_status||forward.evidence_mode||"stored relationship")}</span></div>`;
-      return;
-    }
-
-    if(reverse && causalRelationshipKind(reverse)==="causal"){
-      const confidence=confidencePercent(reverse.confidence);
-      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning"><strong>The journey direction is not the supported causal direction.</strong> Cosmos currently supports the reverse: ${esc(entityLabel(toId))} ${esc(relationshipLabel(reverse))} ${esc(entityLabel(fromId))}. So traveling from ${esc(previousLabel)} to ${esc(currentLabel)} should not be presented as a butterfly-effect step.</div><div class="effectMeta"><span>supported direction: current → previous</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span><span>journey preserved</span></div>`;
-      return;
-    }
-
-    if(forward){
-      const confidence=confidencePercent(forward.confidence);
-      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">Cosmos knows these stations are connected (${esc(relationshipLabel(forward))}), but the stored relationship is not explicitly causal. The connection stays in Cosmos; it is not promoted to a butterfly effect.</div><div class="effectMeta"><span>relationship: association</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span></div>`;
-      return;
-    }
-
-    effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">Your journey moved between these stations, but Cosmos has no supported direct causal relationship from the previous station to the current one. It will not invent one.</div><div class="effectMeta"><span>navigation ≠ causation</span><span>causal status: unsupported</span></div>`;
+    effectStep.innerHTML=`
+      <div class="effectRoute">
+        <strong>${esc(changeDisplay(change))}</strong>
+        <span class="effectArrow">→</span>
+        <strong>${esc(downstream?changeDisplay(downstream):edge.to_change_id)}</strong>
+      </div>
+      <div class="effectVerdict"><strong>Follow the Butterfly:</strong> ${esc(mechanism)}${carrier?` through ${esc(carrier)}`:""}.</div>
+      <div class="effectMeta">
+        <span>initiating Δ: ${esc(change.change_id)}</span>
+        <span>causal direction preserved</span>
+        ${conditions.length?`<span>condition: ${esc(conditions[0])}</span>`:""}
+      </div>`;
   }
 
   function trailObservers(){
@@ -2858,7 +3005,10 @@
       const current=node.node_id===state.journey.current_node_id;
       const active=activeIds.has(node.node_id);
       const children=journeyChildren(node.node_id);
-      const label=node.observer?.label || node.observer?.question || "Cosmos";
+      const c=node.coordinate || node.observer?.coordinate || null;
+      const label=(c?.focus_type==="entity" && state.entities.has(c.focus_id))
+        ? entityLabel(c.focus_id)
+        : (node.observer?.label || node.observer?.question || "Cosmos");
       const branchBadge=children.length>1
         ? `<span class="metroRouteBadge">${children.length} routes</span>`
         : "";
@@ -2966,24 +3116,9 @@
 
   function presenceStationKey(observer){
     if(!observer) return "";
-    if(observer.kind==="response" || observer.kind==="question"){
-      const q=normalizeSubject(observer.question||observer.response?.question||observer.label||observer.id||"");
-      return q ? `question|${q}` : "";
-    }
-    if(observer.kind==="entity"){
-      const id=String(observer.id||"").trim();
-      return id ? `entity|${id}` : `entity-label|${normalizeSubject(observer.label||"")}`;
-    }
-    if(observer.kind==="relationship"){
-      const id=String(observer.relationship_id||observer.id||"").trim();
-      return id ? `relationship|${id}` : `relationship-label|${normalizeSubject(observer.label||"")}`;
-    }
-    if(observer.kind==="development"){
-      const id=String(observer.id||observer.article_id||"").trim();
-      return id ? `development|${id}` : `development-label|${normalizeSubject(observer.label||"")}`;
-    }
-    const label=normalizeSubject(observer.label||observer.id||"");
-    return label ? `${observer.kind||"observer"}|${label}` : "";
+    const coordinate=coordinateForObserver(observer);
+    const key=coordinateKey(coordinate);
+    return key ? `coordinate|${key}` : "";
   }
 
   function renderPresenceCount(count){
@@ -3057,7 +3192,8 @@
 
   function render(){
     const observer=state.observer;
-    observerLabel.textContent=observerDisplayLabel(observer);
+    const currentStation=stationProjection(observer);
+    observerLabel.textContent=currentStation.focus_id ? currentStation.focus_label : observerDisplayLabel(observer);
     syncLivePresence(observer);
     if(observer.article_id){
       articleBtn.href=`/articles/${encodeURIComponent(observer.article_id)}.html`;
@@ -3104,6 +3240,21 @@
 
     const reverseKeys=new Set(projection.edges.map(r=>`${r.from_entity_id}|${r.to_entity_id}`));
 
+    // Typed relationships from the Station focus to each nearby stop.
+    for(const rel of (projection.centerEdges||[])){
+      const focusId=projection.station?.focus_id;
+      const otherId=rel.from_entity_id===focusId ? rel.to_entity_id : rel.from_entity_id;
+      const p=positions.get(otherId);
+      if(!p) continue;
+      const line=svgEl("line",{
+        x1:center.x,y1:center.y,x2:p.x,y2:p.y,
+        stroke:"#617896","stroke-width":1.5,opacity:.78
+      });
+      line.style.cursor="pointer";
+      line.addEventListener("click",()=>showEdge(rel,false));
+      svg.appendChild(line);
+    }
+
     for(const rel of projection.edges){
       const a=positions.get(rel.from_entity_id),b=positions.get(rel.to_entity_id);
       if(!a||!b) continue;
@@ -3123,14 +3274,7 @@
       svg.appendChild(line);
     }
 
-    // Semantic spokes connect observer to initial seeds. They are navigation affordances, not graph facts.
-    for(const seed of projection.seeds){
-      const p=positions.get(seed); if(!p) continue;
-      svg.appendChild(svgEl("line",{
-        x1:center.x,y1:center.y,x2:p.x,y2:p.y,
-        stroke:"#36578c","stroke-width":1,"stroke-dasharray":"2 7",opacity:.6
-      }));
-    }
+
 
     for(const node of projection.nodes){
       const p=positions.get(node.id); if(!p) continue;
@@ -3161,7 +3305,7 @@
     const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3});
     og.appendChild(ring);og.appendChild(inner);
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
-    const label=observerDisplayLabel(observer);
+    const label=projection.station?.focus_label || observerDisplayLabel(observer);
     const chunks=label.match(/.{1,18}(?:\s|$)/g) || [label];
     chunks.slice(0,4).forEach((line,i)=>{
       const t=svgEl("tspan",{x:0,dy:i===0?`${-(Math.min(chunks.length,4)-1)*7}px`:"14px"});
@@ -3227,7 +3371,8 @@
         semantic_subject_label:label,
         article_id:previous?.article_id||entry.article_id,
         from_observer_id:previous?.id||"",
-        from_observer_label:previousLabel||""
+        from_observer_label:previousLabel||"",
+        via_operation:"ENTER"
       };
       state.response=provisional;
       state.expanded=false;
@@ -3271,7 +3416,8 @@
       article_id:previous?.article_id||entry.article_id,
       question:previous?.question||entry.question||"",
       from_observer_id:previous?.id||"",
-      from_observer_label:previous?.label||""
+      from_observer_label:previous?.label||"",
+      via_operation:"ENTER"
     };
     state.expanded=false;
 
@@ -3585,7 +3731,7 @@
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
 
-      ensureJourneyCurrent(state.observer);
+      reconcileJourneyWithResolvedObserver(state.observer);
       saveTrail();
       render();
     }catch(error){
@@ -3605,7 +3751,7 @@
         semantic_subject_label:local?.subject_match?.label||"",
         article_id:entry.article_id
       };
-      ensureJourneyCurrent(state.observer);
+      reconcileJourneyWithResolvedObserver(state.observer);
       render();
     }finally{
       clearTimeout(timer);
@@ -3648,7 +3794,8 @@
       question,
       semantic_subject_id:provisional?.subject_match?.id||"",
       semantic_subject_label:provisional?.subject_match?.label||"",
-      article_id:entry.article_id
+      article_id:entry.article_id,
+      via_operation:"ASK"
     };
 
     state.universalAnswerLoaded=false;
@@ -3686,14 +3833,17 @@
     // The visible/current station label is the public title; the underlying
     // research question is retained separately so Cosmos can reconstruct the
     // station exactly when somebody opens the shared link.
+    const station=stationProjection(o);
     const shareTitle=String(
-      currentJourneyNode?.observer?.label ||
-      o.label ||
-      o.semantic_subject_label ||
-      r?.subject_match?.label ||
-      r?.label ||
-      o.question ||
-      "Current Cosmos stop"
+      station.focus_id ? station.focus_label : (
+        currentJourneyNode?.observer?.label ||
+        o.label ||
+        o.semantic_subject_label ||
+        r?.subject_match?.label ||
+        r?.label ||
+        o.question ||
+        "Current Cosmos stop"
+      )
     ).replace(/\s+/g," ").trim();
 
     const researchQuestion=String(
@@ -3723,6 +3873,7 @@
       question:researchQuestion,
       label:shareTitle,
       subject:o.semantic_subject_label||r?.subject_match?.label||shareTitle,
+      coordinate:station.coordinate,
       intent:r?.intent||"",
       short_answer:r?.short_answer||"",
       answer:r?.answer||"",
