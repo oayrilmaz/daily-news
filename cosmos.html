@@ -2,6 +2,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -362,7 +363,23 @@
     .currentStopShare svg{width:14px;height:14px;display:block}
     .currentStopShare:active{transform:scale(.98)}
 
-    /* Butterfly Journey v0.3 — persistent, branching metro map */
+    /* Butterfly Effect v0.1 — causality is separate from navigation history. */
+    .effectWrap{
+      margin-top:14px;border:1px solid rgba(255,255,255,.09);border-radius:22px;
+      background:rgba(8,18,33,.62);padding:16px
+    }
+    .effectHead h2{margin:0;font-size:18px;color:#f4f7fb}
+    .effectHead span{display:block;margin-top:4px;color:#8494ab;font-size:11px}
+    .effectStep{margin-top:12px;border:1px solid rgba(122,162,255,.18);border-radius:16px;background:rgba(255,255,255,.025);padding:13px}
+    .effectRoute{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#dce6f6}
+    .effectRoute strong{color:#fff}
+    .effectArrow{color:#7aa2ff;font-weight:800}
+    .effectVerdict{margin-top:9px;color:#c3cfe0;font-size:12.5px;line-height:1.55}
+    .effectMeta{margin-top:9px;display:flex;gap:7px;flex-wrap:wrap}
+    .effectMeta span{padding:5px 8px;border:1px solid var(--line);border-radius:999px;color:#8fa2bf;font-size:10px}
+    .effectWarning{color:#f0d6a7}
+
+    /* Journey Map v0.4 — persistent, branching travel history */
     .butterflyWrap{
       margin-top:14px;
       border:1px solid rgba(255,255,255,.09);
@@ -578,7 +595,7 @@
         <div class="projectionMeta">
           <span id="projectionBasis">Resolving evidence…</span>
           <button type="button" id="sourcesBtn">Sources</button>
-          <button type="button" id="rippleBtn">Butterfly map ↓</button>
+          <button type="button" id="rippleBtn">Your journey ↓</button>
         </div>
 
         <div class="projectionShareRow">
@@ -602,10 +619,20 @@
       </div>
     </section>
 
-    <section class="butterflyWrap" id="butterflyWrap" aria-label="Butterfly journey">
+    <section class="effectWrap" id="effectWrap" aria-label="Butterfly effect">
+      <div class="effectHead">
+        <h2>Butterfly effect</h2>
+        <span>cause → change → consequence · only when Cosmos can support the causal direction</span>
+      </div>
+      <div class="effectStep" id="effectStep">
+        <div class="effectVerdict">Travel to another station and Cosmos will test whether the previous station actually affects the current one.</div>
+      </div>
+    </section>
+
+    <section class="butterflyWrap" id="butterflyWrap" aria-label="Your journey">
       <div class="butterflyHead">
-        <h2>Butterfly journey</h2>
-        <span>travel backward · forward · sideways</span>
+        <h2>Your journey</h2>
+        <span>where you traveled · branches you saved</span>
       </div>
       <div class="metroLegend">
         <span><i></i> current route</span>
@@ -691,6 +718,8 @@
   const rippleBtn = document.getElementById("rippleBtn");
   const butterflyWrap = document.getElementById("butterflyWrap");
   const butterflyMetro = document.getElementById("butterflyMetro");
+  const effectWrap = document.getElementById("effectWrap");
+  const effectStep = document.getElementById("effectStep");
   const projectionAskForm = document.getElementById("projectionAskForm");
   const projectionAskInput = document.getElementById("projectionAskInput");
 
@@ -1837,6 +1866,8 @@
       label: observer.label,
       article_id: observer.article_id || "",
       question: observer.question || "",
+      semantic_subject_id: observer.semantic_subject_id || observer.response?.subject_match?.id || "",
+      semantic_subject_label: observer.semantic_subject_label || observer.response?.subject_match?.label || "",
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || ""
     };
@@ -2567,6 +2598,77 @@
     }
   }
 
+  function observerEntityIdFromSnapshot(snapshot){
+    if(!snapshot) return "";
+    if(snapshot.kind==="entity" && snapshot.id && state.entities.has(snapshot.id)) return snapshot.id;
+    const semantic=String(snapshot.semantic_subject_id||"").trim();
+    if(semantic && state.entities.has(semantic)) return semantic;
+    return "";
+  }
+
+  function causalRelationshipKind(rel){
+    const label=normalizeSubject(relationshipLabel(rel));
+    const causalTerms=[
+      "cause","causes","caused","drive","drives","driven","affect","affects","affected",
+      "impact","impacts","influence","influences","contribute","contributes","constrain","constrains",
+      "increase","increases","decrease","decreases","delay","delays","enable","enables","lead to","leads to",
+      "result in","results in","create","creates","trigger","triggers","pressure","raises","reduces"
+    ];
+    return causalTerms.some(term=>label.includes(term)) ? "causal" : "association";
+  }
+
+  function bestRelationship(fromId,toId){
+    return state.relationships
+      .filter(rel=>rel.from_entity_id===fromId && rel.to_entity_id===toId)
+      .sort((a,b)=>(confidencePercent(b.confidence)||0)-(confidencePercent(a.confidence)||0))[0] || null;
+  }
+
+  function renderButterflyEffect(){
+    if(!effectStep) return;
+    const path=journeyPathTo(state.journey.current_node_id);
+    if(path.length<2){
+      effectStep.innerHTML=`<div class="effectVerdict">This is the first station. A butterfly effect needs a change that can propagate from one station to another.</div>`;
+      return;
+    }
+
+    const previous=path[path.length-2]?.observer||null;
+    const current=path[path.length-1]?.observer||null;
+    const previousLabel=previous?.label||previous?.question||"Previous station";
+    const currentLabel=current?.label||current?.question||"Current station";
+    const fromId=observerEntityIdFromSnapshot(previous);
+    const toId=observerEntityIdFromSnapshot(current);
+
+    const route=`<div class="effectRoute"><strong>${esc(previousLabel)}</strong><span class="effectArrow">→</span><strong>${esc(currentLabel)}</strong></div>`;
+
+    if(!fromId || !toId){
+      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">This is a valid journey step, but Cosmos cannot yet resolve both stations to supported objects. It will not call this a butterfly effect.</div><div class="effectMeta"><span>navigation ≠ causation</span><span>causal status: unresolved</span></div>`;
+      return;
+    }
+
+    const forward=bestRelationship(fromId,toId);
+    const reverse=bestRelationship(toId,fromId);
+
+    if(forward && causalRelationshipKind(forward)==="causal"){
+      const confidence=confidencePercent(forward.confidence);
+      effectStep.innerHTML=route+`<div class="effectVerdict"><strong>Supported causal step:</strong> ${esc(entityLabel(fromId))} ${esc(relationshipLabel(forward))} ${esc(entityLabel(toId))}. This is the incremental effect Cosmos can currently defend from the previous station to this one.</div><div class="effectMeta"><span>direction: previous → current</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span><span>${esc(forward.epistemic_status||forward.evidence_mode||"stored relationship")}</span></div>`;
+      return;
+    }
+
+    if(reverse && causalRelationshipKind(reverse)==="causal"){
+      const confidence=confidencePercent(reverse.confidence);
+      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning"><strong>The journey direction is not the supported causal direction.</strong> Cosmos currently supports the reverse: ${esc(entityLabel(toId))} ${esc(relationshipLabel(reverse))} ${esc(entityLabel(fromId))}. So traveling from ${esc(previousLabel)} to ${esc(currentLabel)} should not be presented as a butterfly-effect step.</div><div class="effectMeta"><span>supported direction: current → previous</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span><span>journey preserved</span></div>`;
+      return;
+    }
+
+    if(forward){
+      const confidence=confidencePercent(forward.confidence);
+      effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">Cosmos knows these stations are connected (${esc(relationshipLabel(forward))}), but the stored relationship is not explicitly causal. The connection stays in Cosmos; it is not promoted to a butterfly effect.</div><div class="effectMeta"><span>relationship: association</span><span>confidence: ${confidence===null?"not supplied":esc(confidence+"%")}</span></div>`;
+      return;
+    }
+
+    effectStep.innerHTML=route+`<div class="effectVerdict effectWarning">Your journey moved between these stations, but Cosmos has no supported direct causal relationship from the previous station to the current one. It will not invent one.</div><div class="effectMeta"><span>navigation ≠ causation</span><span>causal status: unsupported</span></div>`;
+  }
+
   function trailObservers(){
     // Retained only for compatibility with any future code that expects a path.
     return journeyPathTo(state.journey.current_node_id).map(node=>node.observer);
@@ -2967,6 +3069,7 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
+    renderButterflyEffect();
     setButterflyOpen(true);
     renderButterflyJourney();
     emptyEl.style.display=projection.nodes.length ? "none":"block";
