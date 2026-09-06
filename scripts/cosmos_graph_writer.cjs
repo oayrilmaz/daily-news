@@ -100,6 +100,8 @@ function buildKnowledgeRecord(admission){
     evidence_validation_id:admission.evidence_validation_id,
     evidence_task_id:admission.evidence_task_id,
     validation_target_id:admission.validation_target_id,
+    validation_target_type:admission.validation_target_type||"relationship_claim",
+    claim:admission.claim||null,
 
     claim_class:admission.admitted_claim_class,
     validation_disposition:admission.validation_disposition,
