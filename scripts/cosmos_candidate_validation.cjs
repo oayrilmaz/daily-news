@@ -53,8 +53,46 @@ function writeJson(file,payload){
   fs.writeFileSync(file,JSON.stringify(payload,null,2),"utf8");
 }
 
-function normalizeKey(subject,label,cls){
+function normalizeClaim(candidate){
+  const raw=candidate && typeof candidate.claim==="object" ? candidate.claim : null;
+  if(raw && clean(raw.claim_type)==="state_claim"){
+    return {
+      claim_type:"state_claim",
+      subject_id:clean(raw.subject_id)||null,
+      state_dimension:clean(raw.state_dimension)||null,
+      value:raw.value ?? null,
+      unit:clean(raw.unit)||null,
+      effective_at:clean(raw.effective_at)||null,
+      geography:clean(raw.geography)||null,
+      scope:clean(raw.scope)||null,
+      value_type:clean(raw.value_type)||"reported"
+    };
+  }
+  return {
+    claim_type:"relationship_claim",
+    abstract_subject:clean(candidate?.abstract_subject)||null,
+    candidate_label:clean(candidate?.candidate_label)||null,
+    candidate_class:clean(candidate?.candidate_class)||null
+  };
+}
+
+function normalizeKey(subject,label,cls,claim){
+  const normalizedClaim=claim && typeof claim==="object" ? claim : null;
+  if(normalizedClaim?.claim_type==="state_claim"){
+    return [
+      "state_claim",
+      clean(normalizedClaim.subject_id).toLowerCase(),
+      clean(normalizedClaim.state_dimension).toLowerCase(),
+      JSON.stringify(normalizedClaim.value),
+      clean(normalizedClaim.unit).toLowerCase(),
+      clean(normalizedClaim.effective_at).toLowerCase(),
+      clean(normalizedClaim.geography).toLowerCase(),
+      clean(normalizedClaim.scope).toLowerCase(),
+      clean(normalizedClaim.value_type).toLowerCase()
+    ].join("|");
+  }
   return [
+    "relationship_claim",
     clean(subject).toLowerCase(),
     clean(label).toLowerCase(),
     clean(cls).toLowerCase()
@@ -76,10 +114,12 @@ function consolidate(raw){
   const groups=new Map();
 
   for(const c of candidates){
+    const claim=normalizeClaim(c);
     const key=normalizeKey(
       c.abstract_subject,
       c.candidate_label,
-      c.candidate_class
+      c.candidate_class,
+      claim
     );
 
     if(!groups.has(key)){
@@ -87,6 +127,8 @@ function consolidate(raw){
         abstract_subject:c.abstract_subject,
         candidate_label:c.candidate_label,
         candidate_class:c.candidate_class,
+        validation_target_type:claim.claim_type,
+        claim,
         source_candidate_ids:[],
         parent_acquisition_plan_ids:[],
         parent_discovery_target_ids:[],
@@ -124,6 +166,8 @@ function consolidate(raw){
       abstract_subject:g.abstract_subject,
       candidate_label:g.candidate_label,
       candidate_class:g.candidate_class,
+      validation_target_type:g.validation_target_type,
+      claim:g.claim,
 
       epistemic_status:"provisional_candidate",
       validation_status:"not_started",
@@ -148,8 +192,9 @@ function consolidate(raw){
       proposed_investigation_types:
         uniq(g.proposed_investigation_types),
 
-      validation_objective:
-        `Determine whether "${g.candidate_label}" materially instantiates or enables "${g.abstract_subject}" in the relevant consequence path.`,
+      validation_objective:g.validation_target_type==="state_claim"
+        ? `Determine whether the proposed ${g.claim.state_dimension} state for ${g.claim.subject_id} is supported for the stated time, geography and scope.`
+        : `Determine whether "${g.candidate_label}" materially instantiates or enables "${g.abstract_subject}" in the relevant consequence path.`,
 
       validation_requirements:
         uniq(g.validation_requirements),
@@ -224,6 +269,8 @@ function consolidate(raw){
       abstract_subject:t.abstract_subject,
       candidate_label:t.candidate_label,
       candidate_class:t.candidate_class,
+      validation_target_type:t.validation_target_type,
+      claim:t.claim,
       validation_objective:t.validation_objective,
       validation_requirements:t.validation_requirements,
       evidence_contract:t.evidence_contract,
@@ -283,5 +330,6 @@ if(require.main===module) main();
 
 module.exports={
   consolidate,
-  normalizeKey
+  normalizeKey,
+  normalizeClaim
 };
