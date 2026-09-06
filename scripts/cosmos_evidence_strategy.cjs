@@ -104,6 +104,20 @@ function sourceProfile(candidateClass){
 }
 
 function evidenceQuestions(target){
+  if(target.validation_target_type==="state_claim"){
+    const claim=target.claim||{};
+    const subject=clean(claim.subject_id)||"the subject";
+    const dimension=clean(claim.state_dimension)||"state";
+    const value=`${claim.value ?? "unknown"}${clean(claim.unit)?` ${clean(claim.unit)}`:""}`;
+    return [
+      `What authoritative evidence directly supports ${dimension} = ${value} for ${subject}?`,
+      `What effective date or period does this ${dimension} value apply to?`,
+      `What geography, asset, product, population, or other scope does this state apply to?`,
+      `Is the value observed, reported, estimated, forecast, target, or scenario?`,
+      `What independent evidence corroborates or contradicts this state claim?`
+    ];
+  }
+
   const subject=clean(target.abstract_subject);
   const label=clean(target.candidate_label);
 
@@ -117,6 +131,20 @@ function evidenceQuestions(target){
 }
 
 function queryIntents(target){
+  if(target.validation_target_type==="state_claim"){
+    const claim=target.claim||{};
+    const subject=clean(claim.subject_id);
+    const dimension=clean(claim.state_dimension);
+    const value=`${claim.value ?? ""} ${clean(claim.unit)}`.trim();
+    return uniq([
+      `"${subject}" "${dimension}" "${value}"`,
+      `"${subject}" "${dimension}" current`,
+      `"${subject}" "${dimension}" official`,
+      `"${subject}" "${dimension}" report`,
+      `"${subject}" "${dimension}" data`
+    ]);
+  }
+
   const subject=clean(target.abstract_subject);
   const label=clean(target.candidate_label);
 
@@ -156,6 +184,8 @@ function buildEvidenceTask(target,index){
     ]),
     evidence_rank:index+1,
     validation_target_id:target.validation_target_id,
+    validation_target_type:target.validation_target_type||"relationship_claim",
+    claim:target.claim||null,
 
     abstract_subject:target.abstract_subject,
     candidate_label:target.candidate_label,
@@ -173,7 +203,10 @@ function buildEvidenceTask(target,index){
       source_date_required:true,
       source_identity_required:true,
       extracted_fact_required:true,
-      relationship_direction_required_where_applicable:true,
+      relationship_direction_required_where_applicable:
+        target.validation_target_type!=="state_claim",
+      state_value_semantics_required:
+        target.validation_target_type==="state_claim",
       geography_scope_required_where_applicable:true,
       temporal_scope_required_where_applicable:true
     },
@@ -291,6 +324,8 @@ function runEvidenceStrategy(raw){
       execution_rank:index+1,
       evidence_task_id:task.evidence_task_id,
       validation_target_id:task.validation_target_id,
+      validation_target_type:task.validation_target_type,
+      claim:task.claim,
       abstract_subject:task.abstract_subject,
       candidate_label:task.candidate_label,
       candidate_class:task.candidate_class,
