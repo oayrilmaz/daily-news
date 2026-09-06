@@ -290,6 +290,8 @@ function validateTask(taskRow, records){
     ]),
     evidence_task_id:taskRow.evidence_task_id,
     validation_target_id:taskRow.validation_target_id,
+    validation_target_type:taskRow.validation_target_type||"relationship_claim",
+    claim:taskRow.claim||null,
 
     evidence_record_ids:records.map(r=>r.evidence_record_id),
     evidence_record_count:records.length,
@@ -387,6 +389,8 @@ function runEvidenceValidator(raw){
         evidence_validation_id:v.evidence_validation_id,
         evidence_task_id:v.evidence_task_id,
         validation_target_id:v.validation_target_id,
+        validation_target_type:v.validation_target_type,
+        claim:v.claim,
         disposition:v.disposition,
         confidence_score:v.confidence_score,
         confidence_band:v.confidence_band,
