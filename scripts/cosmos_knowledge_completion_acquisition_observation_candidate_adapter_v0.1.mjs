@@ -88,6 +88,32 @@ function extractExplicitLabels(observation){
   return uniq(parts).slice(0,24);
 }
 
+function normalizeStructuredStateObservation(raw,observation){
+  if(!raw || typeof raw!=="object") return null;
+  const subject_id=normalizeSpace(raw.subject_id);
+  const state_dimension=normalizeSpace(raw.state_dimension);
+  const unit=normalizeSpace(raw.unit);
+  const effective_at=normalizeSpace(raw.effective_at);
+  const geography=normalizeSpace(raw.geography);
+  const scope=normalizeSpace(raw.scope);
+  const value_type=normalizeSpace(raw.value_type)||"reported";
+  const value=Number(raw.value);
+  const allowedValueTypes=new Set(["observed","reported","measured","actual","estimated","forecast","target","scenario"]);
+  if(!subject_id || !state_dimension || !Number.isFinite(value) || !unit || !effective_at) return null;
+  if(!allowedValueTypes.has(value_type) || !Number.isFinite(Date.parse(effective_at))) return null;
+
+  // A structured provider payload remains an observation. It may only become
+  // a provisional state claim if its numeric value and unit are explicitly
+  // grounded in the extracted source fact.
+  const fact=normalizeSpace(observation?.extracted_fact);
+  if(!fact) return null;
+  const escapeRegExp=x=>String(x).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+  const grounded=new RegExp(`\\b${escapeRegExp(raw.value)}\\s*${escapeRegExp(unit)}\\b`,"i").test(fact);
+  if(!grounded) return null;
+
+  return {claim_type:"state_claim",subject_id,state_dimension,value,unit,effective_at,geography:geography||null,scope:scope||null,value_type};
+}
+
 export function adaptAcquisitionObservations(input){
   if(input?.schema_version!=="0.1" ||
      input?.status!=="knowledge_completion_external_acquisition_results_normalized" ||
@@ -105,6 +131,25 @@ export function adaptAcquisitionObservations(input){
        obs.knowledge_status!=="not_admitted" ||
        obs.executable!==false){
       throw new Error(`Observation ${obs.acquisition_observation_id||"(unknown)"} crossed the protected acquisition boundary.`);
+    }
+
+    const stateClaim=normalizeStructuredStateObservation(obs.state_observation,obs);
+    if(stateClaim){
+      const subject=normalizeSpace(obs.statement)||stateClaim.subject_id;
+      const cls="state_observation";
+      const label=`${stateClaim.subject_id} ${stateClaim.state_dimension} = ${stateClaim.value} ${stateClaim.unit}`;
+      const key=["state_claim",stateClaim.subject_id,stateClaim.state_dimension,String(stateClaim.value),stateClaim.unit,stateClaim.effective_at,stateClaim.geography||"",stateClaim.scope||"",stateClaim.value_type].map(x=>String(x).toLowerCase()).join("|");
+      if(!groups.has(key)){
+        groups.set(key,{abstract_subject:subject,candidate_label:label,candidate_class:cls,relationship_semantic:null,claim:stateClaim,original_target_types:[],source_observation_ids:[],provider_request_ids:[],acquisition_plan_ids:[],discovery_target_ids:[],source_evidence:[]});
+      }
+      const g=groups.get(key);
+      g.original_target_types.push(obs.target_type||"state_observation");
+      g.source_observation_ids.push(obs.acquisition_observation_id);
+      g.provider_request_ids.push(obs.provider_request_id);
+      g.acquisition_plan_ids.push(obs.acquisition_plan_id);
+      g.discovery_target_ids.push(obs.discovery_target_id);
+      g.source_evidence.push({acquisition_observation_id:obs.acquisition_observation_id,source_url_or_identifier:obs.source_url_or_identifier,source_title:obs.source_title,source_type:obs.source_type,source_publisher_or_owner:obs.source_publisher_or_owner??null,source_date_or_event_date:obs.source_date_or_event_date??null,retrieved_at:obs.retrieved_at??null,extracted_fact:obs.extracted_fact,supports_or_contradicts:obs.supports_or_contradicts,directness:obs.directness??null,authority_score:Number.isFinite(Number(obs.authority_score))?Number(obs.authority_score):0,independence_group:obs.independence_group??null,geography_scope:obs.geography_scope??null,temporal_scope:obs.temporal_scope??null,entity_ids:arr(obs.entity_ids),relationship_ids:arr(obs.relationship_ids),query_used:obs.query_used??null});
+      continue;
     }
 
     const labels=extractExplicitLabels(obs);
@@ -170,17 +215,26 @@ export function adaptAcquisitionObservations(input){
     candidate_label:g.candidate_label,
     candidate_class:g.candidate_class,
     relationship_semantic:g.relationship_semantic,
+    claim:g.claim??null,
     epistemic_status:"provisional_candidate",
     validated:false,
     executable:false,
     knowledge_status:"not_admitted",
     proposed_investigation_types:uniq(g.original_target_types),
-    validation_requirements:[
-      "confirm candidate identity and requested relationship",
-      "confirm with independent evidence where required",
-      "capture contradictory evidence",
-      "preserve source provenance and temporal scope"
-    ],
+    validation_requirements:g.claim?.claim_type==="state_claim"
+      ?[
+        "confirm subject identity and state dimension",
+        "confirm value, unit, effective time, geography and scope",
+        "confirm with independent evidence where required",
+        "capture contradictory evidence",
+        "preserve source provenance and temporal scope"
+      ]
+      :[
+        "confirm candidate identity and requested relationship",
+        "confirm with independent evidence where required",
+        "capture contradictory evidence",
+        "preserve source provenance and temporal scope"
+      ],
     source_observation_count:uniq(g.source_observation_ids).length,
     source_evidence:g.source_evidence,
     lineage:{
@@ -227,6 +281,8 @@ export function adaptAcquisitionObservations(input){
       candidates_remain_provisional:true,
       candidate_source_lineage_preserved:true,
       requested_relationship_semantic_preserved:true,
+      explicit_state_observations_can_become_provisional_state_claims:true,
+      state_claim_values_must_be_grounded_in_source_fact:true,
       candidate_validation_required:true,
       admitted_cosmos_knowledge_reused_before_reacquisition:true
     },
