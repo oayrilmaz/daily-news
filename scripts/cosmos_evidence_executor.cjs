@@ -146,6 +146,8 @@ function normalizeEvidenceRecord(result,task,index){
     evidence_record_id:recordId,
     evidence_task_id:task.evidence_task_id,
     validation_target_id:task.validation_target_id,
+    validation_target_type:task.validation_target_type||"relationship_claim",
+    claim:task.claim||null,
 
     source_url_or_identifier:sourceId || null,
     source_type:clean(result.source_type) || "unclassified",
@@ -230,6 +232,8 @@ function evaluateTaskExecution(task,records){
   return {
     evidence_task_id:task.evidence_task_id,
     validation_target_id:task.validation_target_id,
+    validation_target_type:task.validation_target_type||"relationship_claim",
+    claim:task.claim||null,
 
     collected_record_count:records.length,
     supporting_record_count:supporting.length,
@@ -344,6 +348,8 @@ function runEvidenceExecutor(strategyRaw,adapterRaw){
       validation_rank:index+1,
       evidence_task_id:row.evidence_task_id,
       validation_target_id:row.validation_target_id,
+      validation_target_type:row.validation_target_type,
+      claim:row.claim,
       evidence_record_ids:evidence_records
         .filter(r=>r.evidence_task_id===row.evidence_task_id)
         .map(r=>r.evidence_record_id),
