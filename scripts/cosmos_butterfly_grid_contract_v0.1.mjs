@@ -25,6 +25,80 @@ function confidenceExplanation(edge){
   };
 }
 
+
+function changeLabel(change){
+  const dim=txt(change?.state_dimension_id||change?.dimension||change?.subject_id,"Change").replace(/[_-]+/g," ");
+  const prev=change?.previous_state?.value ?? change?.previous_state;
+  const curr=change?.current_state?.value ?? change?.current_state;
+  const unit=txt(change?.unit||change?.current_state?.unit||change?.previous_state?.unit);
+  if(prev!==undefined && curr!==undefined && `${prev}`!=="" && `${curr}`!=="") return `${dim}: ${prev}${unit?` ${unit}`:""} → ${curr}${unit?` ${unit}`:""}`;
+  return `${dim}${change?.direction?` · ${change.direction}`:""}`;
+}
+
+export function buildButterflyChangeGridContract({changes,causalEdges,originChangeId,currentChangeId,maxInitialNodes=8,maxInitialEdges=14,maxDepth=3}){
+  const changeList=Array.isArray(changes)?changes:[];
+  const edgeList=Array.isArray(causalEdges)?causalEdges:[];
+  const byId=new Map(changeList.filter(c=>c?.transition_id||c?.change_id).map(c=>[c.transition_id||c.change_id,c]));
+  const originId=txt(originChangeId);
+  const centerId=txt(currentChangeId||originId);
+  if(!originId || !byId.has(originId)) throw new Error("Butterfly change projection requires a valid origin Change");
+  if(!centerId || !byId.has(centerId)) throw new Error("Butterfly change projection center Change is missing");
+
+  const accepted=edgeList.filter(e=>{
+    const status=txt(e?.validation_status||e?.status||e?.epistemic_state,"supported").toLowerCase();
+    return e?.from_change_id && e?.to_change_id && txt(e?.mechanism) && !["rejected","invalid","unsupported"].includes(status) && byId.has(e.from_change_id) && byId.has(e.to_change_id);
+  });
+
+  const depth=new Map([[centerId,0]]);
+  const queue=[centerId];
+  while(queue.length){
+    const id=queue.shift();
+    const d=depth.get(id);
+    if(d>=maxDepth) continue;
+    for(const e of accepted){
+      let other=null;
+      if(e.from_change_id===id) other=e.to_change_id;
+      else if(e.to_change_id===id) other=e.from_change_id;
+      if(other && !depth.has(other)){ depth.set(other,d+1); queue.push(other); }
+    }
+  }
+
+  const ranked=[...depth.entries()].sort((a,b)=>a[1]-b[1]||changeLabel(byId.get(a[0])).localeCompare(changeLabel(byId.get(b[0]))));
+  const selectedIds=new Set(ranked.slice(0,maxInitialNodes).map(([id])=>id));
+  selectedIds.add(centerId);
+  const visibleEdges=accepted.filter(e=>selectedIds.has(e.from_change_id)&&selectedIds.has(e.to_change_id)).slice(0,maxInitialEdges);
+  const visibleNodes=[...selectedIds].map(id=>{
+    const c=byId.get(id);
+    const d=depth.get(id)??0;
+    return {
+      id,label:changeLabel(c),type:"world_change",is_center:id===centerId,is_origin:id===originId,
+      projection_distance:d,distance_band:id===centerId?"center":`distance_${d}`,
+      temporal_state:c?.current_state_time||null,geography_scope:c?.geography||null,
+      epistemic_status:c?.epistemic_state||null,
+      interaction:{can_follow_cause:visibleEdges.some(e=>e.to_change_id===id),can_follow_effect:visibleEdges.some(e=>e.from_change_id===id),can_recenter:true}
+    };
+  });
+  const gridEdges=visibleEdges.map(e=>({
+    id:e.causal_edge_id||e.id,from:e.from_change_id,to:e.to_change_id,relationship:"causal_change",direction:"directed",
+    relation_class:e.from_change_id===centerId?"effect":e.to_change_id===centerId?"cause":"causal_path",
+    mechanism:e.mechanism,carrier:e.carrier||null,conditions:uniq(e.conditions),counterforces:uniq(e.counterforces),
+    epistemic_status:e.epistemic_state||null,evidence_ids:uniq(e.evidence_refs),structural_support_refs:uniq(e.structural_support_refs),
+    interaction:{can_follow_ripple:true,follow_effect_focus:{type:"change",id:e.to_change_id},follow_cause_focus:{type:"change",id:e.from_change_id}}
+  }));
+  const hiddenNodeIds=changeList.map(c=>c.transition_id||c.change_id).filter(id=>id&&!selectedIds.has(id));
+  const visibleEdgeIds=new Set(gridEdges.map(e=>e.id));
+  const hiddenEdgeIds=accepted.map(e=>e.causal_edge_id||e.id).filter(id=>id&&!visibleEdgeIds.has(id));
+  return {
+    schema_version:"0.2",status:"butterfly_grid_contract_resolved",mode:"change_causal",
+    center:{id:centerId,label:changeLabel(byId.get(centerId)),type:"world_change"},
+    butterfly:{origin_change_id:originId,current_change_id:centerId,accepted_edge_count:accepted.length},
+    initial_view:{max_initial_nodes:maxInitialNodes,max_initial_edges:maxInitialEdges,visible_node_count:visibleNodes.length,visible_edge_count:gridEdges.length,nodes:visibleNodes,edges:gridEdges},
+    expansion_frontier:{hidden_node_ids:hiddenNodeIds,hidden_edge_ids:hiddenEdgeIds,hidden_node_count:hiddenNodeIds.length,hidden_edge_count:hiddenEdgeIds.length,can_expand:hiddenNodeIds.length>0||hiddenEdgeIds.length>0},
+    navigation_contract:{node_click_action:"recenter_change_projection",edge_follow_action:"follow_causal_change",why_action:"follow_cause",next_action:"follow_effect",around_action:"return_to_object_projection",history_should_be_reversible:true},
+    safeguards:{performs_external_search:false,calls_openai_or_external_api:false,mutates_graph:false,creates_new_facts:false,requires_first_class_changes:true,requires_accepted_causal_edges:true,object_relationships_are_not_causal_edges:true}
+  };
+}
+
 export function buildButterflyGridContract({projection,maxInitialNodes=8,maxInitialEdges=14}){
   if(projection?.status!=="dimensionless_projection_resolved") throw new Error("Expected dimensionless_projection_resolved input");
 
