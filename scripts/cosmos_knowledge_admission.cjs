@@ -68,6 +68,16 @@ function normalizeInput(raw){
 
 function admissionDecision(validation){
   const disposition=clean(validation.disposition);
+  const targetType=clean(validation.validation_target_type)||"relationship_claim";
+  const supportedClass=targetType==="state_claim"
+    ? "validated_supported_state"
+    : "validated_supported_relationship";
+  const qualifiedClass=targetType==="state_claim"
+    ? "validated_qualified_state"
+    : "validated_qualified_relationship";
+  const contradictedClass=targetType==="state_claim"
+    ? "validated_contradicted_state_claim"
+    : "validated_negative_relationship";
   const confidence=Number(validation.confidence_score || 0);
   const evidenceCount=Number(validation.evidence_record_count || 0);
   const independent=Number(
@@ -78,7 +88,7 @@ function admissionDecision(validation){
     if(confidence>=70 && evidenceCount>=2 && independent>=2){
       return {
         decision:"admit",
-        admitted_claim_class:"validated_supported_relationship",
+        admitted_claim_class:supportedClass,
         persistence_level:"persistent_knowledge",
         reason:
           "Supported by sufficient independent evidence with high enough confidence for persistent admission."
@@ -98,7 +108,7 @@ function admissionDecision(validation){
     if(confidence>=65 && evidenceCount>=2 && independent>=2){
       return {
         decision:"admit_with_qualification",
-        admitted_claim_class:"validated_qualified_relationship",
+        admitted_claim_class:qualifiedClass,
         persistence_level:"persistent_qualified_knowledge",
         reason:
           "Evidence supports the relationship, but material contradiction requires qualified admission."
@@ -118,7 +128,7 @@ function admissionDecision(validation){
     if(confidence>=65 && evidenceCount>=2 && independent>=2){
       return {
         decision:"admit_contradiction",
-        admitted_claim_class:"validated_negative_relationship",
+        admitted_claim_class:contradictedClass,
         persistence_level:"persistent_qualified_knowledge",
         reason:
           "Contradictory evidence is sufficiently strong and independent to admit a negative/limiting relationship."
@@ -160,6 +170,8 @@ function buildAdmissionRecord(validation,index){
     evidence_validation_id:validation.evidence_validation_id,
     evidence_task_id:validation.evidence_task_id,
     validation_target_id:validation.validation_target_id,
+    validation_target_type:validation.validation_target_type||"relationship_claim",
+    claim:validation.claim||null,
 
     validation_disposition:validation.disposition,
     confidence_score:validation.confidence_score,
@@ -219,6 +231,8 @@ function runKnowledgeAdmission(raw){
       knowledge_admission_id:row.knowledge_admission_id,
       evidence_validation_id:row.evidence_validation_id,
       validation_target_id:row.validation_target_id,
+      validation_target_type:row.validation_target_type,
+      claim:row.claim,
       admitted_claim_class:row.admitted_claim_class,
       validation_disposition:row.validation_disposition,
       confidence_score:row.confidence_score,
