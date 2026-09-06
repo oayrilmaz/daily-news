@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.1-test",
+  "status": "fixture_only",
+  "causal_edges": [
+    {
+      "causal_edge_id": "cedge_fixture_1",
+      "edge_type": "change_to_change",
+      "from_change_id": "chg_fixture_transformer_lead_time",
+      "to_change_id": "chg_fixture_project_schedule",
+      "mechanism": "Longer transformer lead time consumes procurement schedule margin and increases project schedule exposure.",
+      "carrier": "procurement_delivery_schedule",
+      "conditions": ["affected transformer class is required", "available schedule float is insufficient"],
+      "evidence_refs": ["fixture_ev_1"],
+      "structural_support_refs": ["fixture_rel_1"],
+      "epistemic_state": "supported",
+      "butterfly_eligible": true
+    },
+    {
+      "causal_edge_id": "cedge_fixture_2",
+      "edge_type": "change_to_change",
+      "from_change_id": "chg_fixture_project_schedule",
+      "to_change_id": "chg_fixture_substation_exposure",
+      "mechanism": "Increased project schedule exposure propagates to the substation execution window when the affected equipment lies on the controlling path.",
+      "carrier": "project_schedule_dependency",
+      "conditions": ["equipment lies on the controlling execution path", "no recovery action restores the consumed float"],
+      "evidence_refs": ["fixture_ev_2"],
+      "structural_support_refs": ["fixture_rel_2"],
+      "epistemic_state": "supported",
+      "butterfly_eligible": true
+    }
+  ]
+}
