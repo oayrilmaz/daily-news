@@ -132,6 +132,23 @@ export function buildProviderRequests(input){
   };
 }
 
+function normalizeStructuredStateObservation(raw){
+  if(!raw || typeof raw!=="object") return null;
+  const subject_id=txt(raw.subject_id);
+  const state_dimension=txt(raw.state_dimension);
+  const unit=txt(raw.unit);
+  const effective_at=txt(raw.effective_at);
+  const geography=txt(raw.geography);
+  const scope=txt(raw.scope);
+  const value_type=txt(raw.value_type)||"reported";
+  const value=Number(raw.value);
+  const allowedValueTypes=new Set(["observed","reported","measured","actual","estimated","forecast","target","scenario"]);
+  if(!subject_id || !state_dimension || !Number.isFinite(value) || !unit || !effective_at) return null;
+  if(!allowedValueTypes.has(value_type)) return null;
+  if(!Number.isFinite(Date.parse(effective_at))) return null;
+  return {subject_id,state_dimension,value,unit,effective_at,geography:geography||null,scope:scope||null,value_type};
+}
+
 export function normalizeProviderResults({adapterPlan,providerResults}){
   if(adapterPlan?.status!=="knowledge_completion_external_acquisition_requests_ready"){
     throw new Error("Adapter plan not ready.");
@@ -203,6 +220,7 @@ export function normalizeProviderResults({adapterPlan,providerResults}){
       source_rank:Number.isFinite(Number(result.source_rank))
         ?Number(result.source_rank)
         :Number(req.source_constraint.source_rank),
+      state_observation:normalizeStructuredStateObservation(result.state_observation),
       epistemic_status:"external_acquisition_observation",
       validation_status:"not_started",
       knowledge_status:"not_admitted",
@@ -239,6 +257,7 @@ export function normalizeProviderResults({adapterPlan,providerResults}){
       source_provenance_preserved:true,
       contradiction_disposition_preserved:true,
       source_strategy_lineage_preserved:true,
+      structured_state_observation_preserved_without_validation:true,
       validation_required_before_admission:true
     },
     safeguards:{
