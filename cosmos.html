@@ -373,6 +373,9 @@
     .effectMeta{margin-top:9px;display:flex;gap:7px;flex-wrap:wrap}
     .effectMeta span{padding:5px 8px;border:1px solid var(--line);border-radius:999px;color:#8fa2bf;font-size:10px}
     .effectWarning{color:#f0d6a7}
+    .effectActions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
+    .effectAction{min-height:34px;padding:7px 11px;border:1px solid rgba(122,162,255,.26);border-radius:999px;background:rgba(27,48,83,.58);color:#dce7f8;font:inherit;font-size:11px;font-weight:700;cursor:pointer}
+    .effectAction:disabled{opacity:.38;cursor:default}
 
     /* Journey Map v0.4 — persistent, branching travel history */
     .butterflyWrap{
@@ -764,6 +767,11 @@
       nodes: [],
       current_node_id: "",
       next_id: 1
+    },
+    butterfly: {
+      origin_change_id: "",
+      current_change_id: "",
+      status: "idle"
     }
   };
 
@@ -807,6 +815,14 @@
     }
   }
 
+  async function fetchFirstOptional(paths){
+    for(const path of paths){
+      const payload=await fetchJsonOptional(path);
+      if(payload) return payload;
+    }
+    return null;
+  }
+
   async function loadKnowledge(){
     statusEl.textContent = "loading knowledge";
     const [entitiesPayload, relationshipsPayload, developmentsPayload, dailyBriefPayload, changesPayload, causalEdgesPayload] = await Promise.all([
@@ -814,8 +830,14 @@
       fetchJson("/knowledge/relationships.json"),
       fetchJson("/knowledge/developments.json"),
       fetchJson("/briefs/daily-ai.json"),
-      fetchJsonOptional("/knowledge/change-ledger.json"),
-      fetchJsonOptional("/knowledge/causal-edges.json")
+      fetchFirstOptional([
+        "/knowledge/cosmos/world-changes-current.json",
+        "/knowledge/change-ledger.json"
+      ]),
+      fetchFirstOptional([
+        "/knowledge/cosmos/causal-change-edges-current.json",
+        "/knowledge/causal-edges.json"
+      ])
     ]);
 
     for(const entity of normalizePayload(entitiesPayload,"entities")){
@@ -828,7 +850,10 @@
       if(development?.development_id) state.developments.set(development.development_id,development);
     }
 
-    for(const change of normalizePayload(changesPayload,"changes")){
+    const changeRows = normalizePayload(changesPayload,"world_changes").length
+      ? normalizePayload(changesPayload,"world_changes")
+      : normalizePayload(changesPayload,"changes");
+    for(const change of changeRows){
       const id=change?.change_id || change?.transition_id;
       if(id) state.changes.set(id,{...change,change_id:id});
     }
@@ -1730,6 +1755,17 @@
       return {focus_type:"cosmos",focus_id:"cosmos",time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
     }
 
+    if(observer.kind==="change" && (observer.change_id||observer.id)){
+      return {
+        focus_type:"change",
+        focus_id:String(observer.change_id||observer.id),
+        time_mode:"live",
+        geography:observer.geography||null,
+        lens:"butterfly",
+        epistemic_mode:"know"
+      };
+    }
+
     const semanticId = observer.semantic_subject_id || observer.response?.subject_match?.id || "";
     const entityId = observer.kind==="entity" ? observer.id : semanticId;
 
@@ -1763,7 +1799,13 @@
 
   function focusEntityId(observer){
     const c=coordinateForObserver(observer);
-    return c.focus_type==="entity" && state.entities.has(c.focus_id) ? c.focus_id : "";
+    if(c.focus_type==="entity" && state.entities.has(c.focus_id)) return c.focus_id;
+    if(c.focus_type==="change"){
+      const change=state.changes.get(c.focus_id);
+      const subjectId=String(change?.subject_id||change?.entity_id||change?.subject_ref||"");
+      return subjectId && state.entities.has(subjectId) ? subjectId : "";
+    }
+    return "";
   }
 
   function changesForFocus(observer){
@@ -1783,16 +1825,29 @@
   }
 
   function primaryChangeForFocus(observer){
+    const c=coordinateForObserver(observer);
+    if(c.focus_type==="change") return state.changes.get(c.focus_id)||null;
     return changesForFocus(observer)[0] || null;
+  }
+
+  function stateValueDisplay(value,fallbackUnit=""){
+    if(value===undefined || value===null) return "";
+    if(typeof value==="object"){
+      const raw=value.value ?? value.label ?? value.state ?? "";
+      const unit=String(value.unit||fallbackUnit||"").trim();
+      return `${raw}${unit?` ${unit}`:""}`.trim();
+    }
+    return `${value}${fallbackUnit?` ${fallbackUnit}`:""}`.trim();
   }
 
   function changeDisplay(change){
     if(!change) return "";
-    const dim=String(change.state_dimension_id||change.dimension||change.label||"State").replace(/[_-]+/g," ");
+    const dim=String(change.state_dimension_id||change.dimension||change.label||change.subject_id||"State").replace(/[_-]+/g," ");
     const direction=String(change.direction||change.transition_type||"").replace(/_/g," ");
-    const prev=change.previous_state;
-    const curr=change.current_state;
-    if(prev!==undefined && curr!==undefined && String(prev)!=="" && String(curr)!=="") return `${dim}: ${prev} → ${curr}`;
+    const unit=String(change.unit||change.current_state?.unit||change.previous_state?.unit||"").trim();
+    const prev=stateValueDisplay(change.previous_state,unit);
+    const curr=stateValueDisplay(change.current_state,unit);
+    if(prev && curr) return `${dim}: ${prev} → ${curr}`;
     return [dim,direction].filter(Boolean).join(" · ");
   }
 
@@ -1805,18 +1860,28 @@
     });
   }
 
+  function acceptedCausalEdgesTo(change){
+    if(!change?.change_id) return [];
+    return state.causalEdges.filter(edge=>{
+      if(edge.to_change_id!==change.change_id) return false;
+      const status=String(edge.validation_status||edge.status||edge.epistemic_state||"accepted").toLowerCase();
+      return !["rejected","invalid","unsupported"].includes(status);
+    });
+  }
+
   function stationProjection(observer){
     const coordinate=coordinateForObserver(observer);
     const focusId=focusEntityId(observer);
     const focus=focusId ? state.entities.get(focusId) : null;
     const primaryChange=primaryChangeForFocus(observer);
+    const changeFocused=coordinate.focus_type==="change" ? state.changes.get(coordinate.focus_id) : null;
     return {
       station_projection_id:`station:${coordinateKey(coordinate)}`,
       coordinate,
       focus_id:focusId,
-      focus_label:focus?.name||focus?.label||observerDisplayLabel(observer),
+      focus_label:changeFocused ? changeDisplay(changeFocused) : (focus?.name||focus?.label||observerDisplayLabel(observer)),
       primary_change:primaryChange,
-      butterfly_available:Boolean(primaryChange && acceptedCausalEdgesFrom(primaryChange).length)
+      butterfly_available:Boolean(primaryChange && (acceptedCausalEdgesFrom(primaryChange).length || acceptedCausalEdgesTo(primaryChange).length))
     };
   }
 
@@ -1957,6 +2022,13 @@
         entity,
         label:entity.name||entity.label||snap.label||snap.id
       };
+    }else if(snap.kind==="change" && (snap.change_id||snap.id) && state.changes.has(snap.change_id||snap.id)){
+      const changeId=snap.change_id||snap.id;
+      const change=state.changes.get(changeId);
+      state.observer={...snap,kind:"change",id:changeId,change_id:changeId,label:changeDisplay(change),semantic_subject_id:String(change.subject_id||"")};
+      state.butterfly.current_change_id=changeId;
+      state.butterfly.origin_change_id=state.butterfly.origin_change_id||changeId;
+      state.butterfly.status="active";
     }else if(snap.kind==="response" && snap.question){
       const response=buildQuestionResponse(snap.question);
       state.observer={
@@ -2090,6 +2162,11 @@
 
   function seedEntityIds(observer){
     if(observer.kind === "entity") return [observer.id];
+    if(observer.kind === "change"){
+      const change=state.changes.get(observer.change_id||observer.id);
+      const subjectId=String(change?.subject_id||"");
+      return subjectId && state.entities.has(subjectId) ? [subjectId] : [];
+    }
     if(observer.kind === "relationship"){
       const rel = observer.rel;
       return [
@@ -2781,39 +2858,92 @@
       .sort((a,b)=>(confidencePercent(b.confidence)||0)-(confidencePercent(a.confidence)||0))[0] || null;
   }
 
+  function recenterChange(changeId,operation="FOLLOW_EFFECT"){
+    const change=state.changes.get(changeId);
+    if(!change) return;
+    const previous=state.observer;
+    const parentJourneyId=state.journey.current_node_id;
+    state.history.push(previous);
+    state.butterfly.origin_change_id=state.butterfly.origin_change_id || changeId;
+    state.butterfly.current_change_id=changeId;
+    state.butterfly.status="active";
+    state.observer={
+      kind:"change",
+      id:changeId,
+      change_id:changeId,
+      label:changeDisplay(change),
+      semantic_subject_id:String(change.subject_id||""),
+      geography:change.geography||null,
+      via_operation:operation
+    };
+    state.expanded=false;
+    addJourneyNode(state.observer,parentJourneyId,true);
+    saveJourney();
+    saveTrail();
+    render();
+  }
+
+  function returnAroundFromChange(){
+    const c=coordinateForObserver(state.observer);
+    if(c.focus_type!=="change") return;
+    const change=state.changes.get(c.focus_id);
+    const subjectId=String(change?.subject_id||"");
+    if(!subjectId || !state.entities.has(subjectId)) return;
+    state.butterfly.status="paused";
+    recenterEntity(subjectId,"AROUND");
+  }
+
   function renderButterflyEffect(){
     if(!effectStep || !effectWrap) return;
     const station=stationProjection(state.observer);
     const change=station.primary_change;
-    const edges=acceptedCausalEdgesFrom(change);
+    const outgoing=acceptedCausalEdgesFrom(change);
+    const incoming=acceptedCausalEdgesTo(change);
 
-    // No initiating Change or accepted causal continuation = no Butterfly CTA.
-    // Ordinary users should never see unresolved causal diagnostics by default.
-    if(!change || !edges.length){
+    if(!change || (!outgoing.length && !incoming.length)){
       effectWrap.style.display="none";
       effectStep.innerHTML="";
       return;
     }
 
     effectWrap.style.display="block";
-    const edge=edges[0];
-    const downstream=state.changes.get(edge.to_change_id);
-    const mechanism=String(edge.mechanism||"").trim();
-    const carrier=String(edge.carrier||"").trim();
-    const conditions=Array.isArray(edge.conditions)?edge.conditions.filter(Boolean):[];
+    const edge=outgoing[0] || incoming[0];
+    const nextChange=outgoing[0] ? state.changes.get(outgoing[0].to_change_id) : null;
+    const prevChange=incoming[0] ? state.changes.get(incoming[0].from_change_id) : null;
+    const mechanism=String(edge?.mechanism||"").trim();
+    const carrier=String(edge?.carrier||"").trim();
+    const conditions=Array.isArray(edge?.conditions)?edge.conditions.filter(Boolean):[];
+
+    if(!state.butterfly.origin_change_id){
+      state.butterfly.origin_change_id=change.change_id;
+      state.butterfly.current_change_id=change.change_id;
+    }
 
     effectStep.innerHTML=`
       <div class="effectRoute">
+        ${prevChange?`<strong>${esc(changeDisplay(prevChange))}</strong><span class="effectArrow">→</span>`:""}
         <strong>${esc(changeDisplay(change))}</strong>
-        <span class="effectArrow">→</span>
-        <strong>${esc(downstream?changeDisplay(downstream):edge.to_change_id)}</strong>
+        ${nextChange?`<span class="effectArrow">→</span><strong>${esc(changeDisplay(nextChange))}</strong>`:""}
       </div>
       <div class="effectVerdict"><strong>Follow the Butterfly:</strong> ${esc(mechanism)}${carrier?` through ${esc(carrier)}`:""}.</div>
       <div class="effectMeta">
-        <span>initiating Δ: ${esc(change.change_id)}</span>
+        <span>Δ ${esc(change.change_id)}</span>
         <span>causal direction preserved</span>
         ${conditions.length?`<span>condition: ${esc(conditions[0])}</span>`:""}
+      </div>
+      <div class="effectActions">
+        <button class="effectAction" type="button" data-butterfly-why ${prevChange?"":"disabled"}>← Why</button>
+        <button class="effectAction" type="button" data-butterfly-around ${focusEntityId(state.observer)?"":"disabled"}>Around</button>
+        <button class="effectAction" type="button" data-butterfly-next ${nextChange?"":"disabled"}>Next →</button>
       </div>`;
+
+    effectStep.querySelector("[data-butterfly-why]")?.addEventListener("click",()=>{
+      if(prevChange) recenterChange(prevChange.change_id,"FOLLOW_CAUSE");
+    });
+    effectStep.querySelector("[data-butterfly-next]")?.addEventListener("click",()=>{
+      if(nextChange) recenterChange(nextChange.change_id,"FOLLOW_EFFECT");
+    });
+    effectStep.querySelector("[data-butterfly-around]")?.addEventListener("click",returnAroundFromChange);
   }
 
   function trailObservers(){
@@ -3314,7 +3444,7 @@
     og.appendChild(ot);svg.appendChild(og);
   }
 
-  function recenterEntity(id){
+  function recenterEntity(id,operation="ENTER"){
     const entity=state.entities.get(id);
     if(!entity) return;
 
@@ -3417,7 +3547,7 @@
       question:previous?.question||entry.question||"",
       from_observer_id:previous?.id||"",
       from_observer_label:previous?.label||"",
-      via_operation:"ENTER"
+      via_operation:operation
     };
     state.expanded=false;
 
