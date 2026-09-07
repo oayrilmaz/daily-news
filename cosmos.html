@@ -285,6 +285,51 @@
       font-size:15px;
       line-height:1.62
     }
+    .projectionPulse{
+      display:none;
+      margin-top:15px;
+      padding-top:13px;
+      border-top:1px solid rgba(255,255,255,.07)
+    }
+    .projectionPulseHead{
+      display:flex;
+      align-items:center;
+      gap:7px;
+      margin-bottom:8px;
+      color:#8ea4c7;
+      font-size:10px;
+      letter-spacing:.14em;
+      text-transform:uppercase
+    }
+    .projectionPulseHead .miniCosmos{
+      width:9px;
+      height:9px;
+      flex-basis:9px
+    }
+    .projectionPulseHead .miniCosmos::before{width:4px;height:4px}
+    .projectionPulseHead .miniCosmos::after{width:14px;height:14px}
+    .projectionPulseItems{
+      display:grid;
+      gap:7px
+    }
+    .projectionPulseItem{
+      position:relative;
+      padding-left:14px;
+      color:#aebbd0;
+      font-size:12.5px;
+      line-height:1.5
+    }
+    .projectionPulseItem::before{
+      content:"";
+      position:absolute;
+      left:1px;
+      top:.62em;
+      width:5px;
+      height:5px;
+      border-radius:50%;
+      background:#789fee;
+      box-shadow:0 0 8px rgba(120,159,238,.35)
+    }
     .projectionContext{
       margin-top:11px;
       padding-top:11px;
@@ -675,6 +720,11 @@
         <h2 class="projectionTitle" id="projectionTitle">Cosmos</h2>
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
+        <div class="projectionPulse" id="projectionPulse">
+          <div class="projectionPulseHead"><span class="miniCosmos" aria-hidden="true"></span><span>Current pulse</span></div>
+          <div class="projectionPulseItems" id="projectionPulseItems"></div>
+        </div>
+
         <div class="projectionContext" id="projectionContext"></div>
         <div class="projectionUnknown" id="projectionUnknown" style="display:none"></div>
         <div class="projectionOrigin" id="projectionOrigin"></div>
@@ -795,6 +845,8 @@
 
   const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
+  const projectionPulse = document.getElementById("projectionPulse");
+  const projectionPulseItems = document.getElementById("projectionPulseItems");
   const projectionContext = document.getElementById("projectionContext");
   const projectionUnknown = document.getElementById("projectionUnknown");
   const projectionOrigin = document.getElementById("projectionOrigin");
@@ -2796,6 +2848,9 @@
     if(direct) return direct;
 
     if(observer?.kind==="response"){
+      const explicitEssence=String(observer.response?.essence||"").trim();
+      if(explicitEssence) return explicitEssence;
+
       const completion=observer.response?.knowledge_completion;
       if(completion?.completion_required===true){
         const subject=observer.response?.subject_match?.label ||
@@ -2886,13 +2941,33 @@
     const title=station.focus_id ? station.focus_label : (entryQuestion || currentLabel);
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
-    const contextRows=compactCenterContext(observer);
+    const contextRows=
+      observer?.kind==="response" && Array.isArray(observer.response?.current_pulse)
+        ? []
+        : compactCenterContext(observer);
     if(station.primary_change){
       contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
     }
 
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
+
+    const pulseItems =
+      observer?.kind==="response" && Array.isArray(observer.response?.current_pulse)
+        ? observer.response.current_pulse.filter(Boolean).slice(0,5)
+        : [];
+
+    if(projectionPulse && projectionPulseItems){
+      if(pulseItems.length){
+        projectionPulse.style.display="block";
+        projectionPulseItems.innerHTML=pulseItems
+          .map(item=>`<div class="projectionPulseItem">${esc(item)}</div>`)
+          .join("");
+      }else{
+        projectionPulse.style.display="none";
+        projectionPulseItems.innerHTML="";
+      }
+    }
 
     projectionContext.innerHTML=contextRows.map(row=>`
       <div class="projectionContextRow">
@@ -4101,6 +4176,10 @@
       question,
       answer:cleanUniversalAnswerText(data?.answer||data?.short_answer||"") || "Cosmos could not produce a dependable answer.",
       short_answer:cleanUniversalAnswerText(data?.short_answer||""),
+      essence:cleanUniversalAnswerText(data?.essence||""),
+      current_pulse:Array.isArray(data?.current_pulse)
+        ? data.current_pulse.map(item=>cleanUniversalAnswerText(item)).filter(Boolean).slice(0,5)
+        : [],
       intent:String(data?.intent||"").trim(),
       epistemic_state:String(data?.epistemic_state||"uncertain"),
       confidence:String(data?.confidence||"low"),
@@ -4337,6 +4416,8 @@
       coordinate:station.coordinate,
       intent:r?.intent||"",
       short_answer:r?.short_answer||"",
+      essence:r?.essence||"",
+      current_pulse:Array.isArray(r?.current_pulse)?r.current_pulse:[],
       answer:r?.answer||"",
       sources,
       observer:{
