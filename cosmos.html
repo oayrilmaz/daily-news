@@ -111,6 +111,91 @@
     .fact b{display:block;font-size:11px;color:#cbd7e8;margin-bottom:3px}
     .fact span{font-size:12px;color:var(--muted);word-break:break-word}
     .empty{display:none;text-align:center;padding:50px 20px;color:var(--muted)}
+    .cosmosWorking{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      max-width:min(620px,92%);
+      color:#aebbd0;
+      font-size:13px;
+      line-height:1.55;
+      text-align:left
+    }
+    .miniCosmos{
+      position:relative;
+      display:inline-block;
+      width:16px;
+      height:16px;
+      flex:0 0 16px;
+      border-radius:50%;
+      border:1px solid rgba(139,177,255,.72);
+      box-shadow:0 0 0 3px rgba(93,137,227,.08),0 0 14px rgba(93,137,227,.22);
+      animation:cosmosBeat 1.8s ease-in-out infinite;
+    }
+    .miniCosmos::before,
+    .miniCosmos::after{
+      content:"";
+      position:absolute;
+      inset:50% auto auto 50%;
+      border-radius:50%;
+      transform:translate(-50%,-50%);
+      pointer-events:none
+    }
+    .miniCosmos::before{
+      width:7px;
+      height:7px;
+      background:rgba(139,177,255,.52);
+      box-shadow:0 0 8px rgba(139,177,255,.32)
+    }
+    .miniCosmos::after{
+      width:22px;
+      height:22px;
+      border:1px solid rgba(139,177,255,.18);
+      animation:cosmosBreathe 3.6s ease-in-out infinite
+    }
+    @keyframes cosmosBeat{
+      0%,100%{transform:scale(.94);opacity:.76}
+      45%{transform:scale(1.08);opacity:1}
+      58%{transform:scale(1.01);opacity:.92}
+      70%{transform:scale(1.07);opacity:1}
+    }
+    @keyframes cosmosBreathe{
+      0%,100%{transform:translate(-50%,-50%) scale(.88);opacity:.25}
+      50%{transform:translate(-50%,-50%) scale(1.18);opacity:.78}
+    }
+    .projectionEyebrow{
+      display:flex;
+      align-items:center;
+      gap:8px
+    }
+    .projectionEyebrow .miniCosmos{
+      width:11px;
+      height:11px;
+      flex-basis:11px
+    }
+    .projectionEyebrow .miniCosmos::before{width:5px;height:5px}
+    .projectionEyebrow .miniCosmos::after{width:16px;height:16px}
+    .cosmosObserverRing{
+      transform-box:fill-box;
+      transform-origin:center;
+      animation:observerBreathe 4.8s ease-in-out infinite
+    }
+    .cosmosObserverCore{
+      transform-box:fill-box;
+      transform-origin:center;
+      animation:observerBeat 2.2s ease-in-out infinite
+    }
+    @keyframes observerBreathe{
+      0%,100%{transform:scale(.985);opacity:.86}
+      50%{transform:scale(1.045);opacity:1}
+    }
+    @keyframes observerBeat{
+      0%,100%{transform:scale(1)}
+      46%{transform:scale(1.018)}
+      56%{transform:scale(1)}
+      66%{transform:scale(1.014)}
+    }
     .error{color:var(--danger)}
     .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
 
@@ -573,7 +658,9 @@
         <span>inner → primary · outer → secondary</span>
       </div>
       <div class="status" id="status">loading</div>
-      <div class="empty" id="emptyState">No connected Cosmos objects were found for this observer.</div>
+      <div class="empty" id="emptyState">
+        <span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is working diligently behind the scenes, brewing the essence of your request.</span></span>
+      </div>
     </section>
 
     <div class="toolbar">
@@ -584,7 +671,7 @@
 
     <section class="projectionPanel" aria-label="Cosmos essence">
       <div class="projectionInner">
-        <div class="projectionEyebrow">Cosmos essence</div>
+        <div class="projectionEyebrow"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos essence</span></div>
         <h2 class="projectionTitle" id="projectionTitle">Cosmos</h2>
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
@@ -3393,7 +3480,23 @@
     renderButterflyEffect();
     setButterflyOpen(true);
     renderButterflyJourney();
-    emptyEl.style.display=projection.nodes.length ? "none":"block";
+    const semanticWorking =
+      Boolean(semanticFocusId) &&
+      !state.semanticProjectionCache.has(semanticFocusId) &&
+      (
+        Boolean(state.semanticProjectionPending.get(semanticFocusId)) ||
+        Boolean(state.universalAnswerPending)
+      );
+
+    if(projection.nodes.length){
+      emptyEl.style.display="none";
+    }else if(semanticWorking){
+      emptyEl.style.display="block";
+      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is working diligently behind the scenes, brewing the essence of your request.</span></span>`;
+    }else{
+      emptyEl.style.display="block";
+      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos has finished this pass. No additional defensible nearby stations are ready to surface yet.</span></span>`;
+    }
     const completionBlocked =
       observer?.kind==="response" &&
       observer?.response?.knowledge_completion?.completion_required===true;
@@ -3493,8 +3596,8 @@
     }
 
     const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`});
-    const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5});
-    const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3});
+    const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5,class:"cosmosObserverRing"});
+    const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3,class:"cosmosObserverCore"});
     og.appendChild(ring);og.appendChild(inner);
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=projection.station?.focus_label || observerDisplayLabel(observer);
@@ -4594,7 +4697,7 @@
     console.error(error);
     statusEl.textContent="knowledge unavailable";
     emptyEl.style.display="block";
-    emptyEl.innerHTML=`<span class="error">Cosmos knowledge could not be loaded.</span><br>${esc(error.message)}`;
+    emptyEl.innerHTML=`<span class="error">Cosmos could not complete this pass.</span><br>${esc(error.message)}`;
     state.observer=syntheticRelationshipObserver();
     state.entryObserver=state.observer;
     observerLabel.textContent=observerDisplayLabel(state.observer);
