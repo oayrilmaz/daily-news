@@ -570,6 +570,7 @@
         <span>solid → supported/current</span>
         <span>dashed → scenario/qualified</span>
         <span>↔ feedback</span>
+        <span>inner → primary · outer → secondary</span>
       </div>
       <div class="status" id="status">loading</div>
       <div class="empty" id="emptyState">No connected Cosmos objects were found for this observer.</div>
@@ -773,7 +774,12 @@
       origin_change_id: "",
       current_change_id: "",
       status: "idle"
-    }
+    },
+    // Semantic projection is observer-relative. It does not mutate canonical Cosmos knowledge.
+    // Each focus can have a high-level PRIMARY ring and a SECONDARY ring beneath it.
+    semanticProjectionCache: new Map(),
+    semanticProjectionPending: new Map(),
+    semanticProjectionSerial: 0
   };
 
   const esc = (value) => String(value ?? "")
@@ -2210,6 +2216,51 @@
     // a finite set of defensible typed direct relationships, not a duplicate
     // seed node plus arbitrary graph-distance rings.
     if(focusId){
+      // Prefer the governed observer-relative semantic projection when available.
+      // PRIMARY = same-altitude dimensions around the current focus.
+      // SECONDARY = one meaningful level beneath a primary dimension.
+      // Source/article phrasing never earns first-ring placement merely because it is directly connected.
+      const semantic=state.semanticProjectionCache.get(focusId);
+      if(semantic?.primary?.length){
+        const primaryLimit=state.expanded ? 9 : 7;
+        const secondaryLimit=state.expanded ? 12 : 7;
+        const primary=semantic.primary.slice(0,primaryLimit);
+        const primaryIds=new Set(primary.map(row=>row.id));
+        const secondary=(semantic.secondary||[])
+          .filter(row=>row.parent_id && primaryIds.has(row.parent_id))
+          .slice(0,secondaryLimit);
+
+        const nodes=[
+          ...primary.map(row=>({
+            id:row.id,label:row.label,distance:0,type:row.type||"Dimension",isSeed:false,
+            projection_depth:1,projection_role:"primary",why_shown:row.why_shown||"primary semantic dimension",
+            relationship:row.relationship||null
+          })),
+          ...secondary.map(row=>({
+            id:row.id,label:row.label,distance:1,type:row.type||"Dimension",isSeed:false,
+            projection_depth:2,projection_role:"secondary",parent_id:row.parent_id,
+            why_shown:row.why_shown||"secondary semantic dimension",relationship:row.relationship||null
+          }))
+        ];
+
+        const visibleIds=new Set(nodes.map(node=>node.id));
+        const semanticRelIds=new Set(semantic.relationship_ids||[]);
+        const edges=state.relationships.filter(rel=>
+          semanticRelIds.has(rel.relationship_id) &&
+          visibleIds.has(rel.from_entity_id) && visibleIds.has(rel.to_entity_id)
+        );
+        const centerEdges=primary.map(row=>row.relationship).filter(Boolean);
+        return {nodes,edges,centerEdges,seeds:[],station,semantic_projection:true};
+      }
+
+      // While a semantic projection is being resolved, do NOT fall back to a noisy
+      // direct-neighbor star for broad canonical subjects. Sparse is better than wrong altitude.
+      if(state.semanticProjectionPending.get(focusId)){
+        return {nodes:[],edges:[],centerEdges:[],seeds:[],station,semantic_projection_pending:true};
+      }
+
+      // Last-resort local fallback for offline/unavailable gateway conditions. This is
+      // intentionally sparse and excludes obvious detail-heavy phrases from a first ring.
       const incidentEdges=incident(focusId)
         .filter(rel=>rel?.from_entity_id && rel?.to_entity_id)
         .sort((a,b)=>{
@@ -2221,26 +2272,24 @@
 
       const nearby=[];
       const seen=new Set();
+      const detailPattern=/\b(transformer|interconnection|capacity market|critical mineral|data center|renewable integration|manufacturing|lead time|permitting|working time|statutory|benefit|queue|substation|switchgear|cable|component)\b/i;
       for(const rel of incidentEdges){
         const otherId=rel.from_entity_id===focusId ? rel.to_entity_id : rel.from_entity_id;
         if(!otherId || otherId===focusId || seen.has(otherId) || !state.entities.has(otherId)) continue;
+        const label=entityLabel(otherId);
+        if(detailPattern.test(label)) continue;
         seen.add(otherId);
         nearby.push({
-          id:otherId,
-          label:entityLabel(otherId),
-          distance:1,
-          type:state.entities.get(otherId)?.type||"Object",
-          isSeed:false,
-          why_shown:relationshipLabel(rel),
-          relationship:rel
+          id:otherId,label,distance:0,type:state.entities.get(otherId)?.type||"Object",isSeed:false,
+          projection_depth:1,projection_role:"fallback-primary",why_shown:relationshipLabel(rel),relationship:rel
         });
-        if(nearby.length>=limit) break;
+        if(nearby.length>=Math.min(limit,5)) break;
       }
 
       const selected=new Set(nearby.map(n=>n.id));
       const edges=state.relationships.filter(r=>selected.has(r.from_entity_id) && selected.has(r.to_entity_id));
       const centerEdges=nearby.map(n=>n.relationship).filter(Boolean);
-      return {nodes:nearby,edges,centerEdges,seeds:[],station};
+      return {nodes:nearby,edges,centerEdges,seeds:[],station,semantic_projection:false};
     }
 
     // Graceful unresolved/investigation fallback: preserve the existing graph
@@ -3333,6 +3382,11 @@
       articleBtn.href="/"; articleBtn.textContent="Back to PTD Today";
     }
 
+    const semanticFocusId=focusEntityId(observer);
+    if(semanticFocusId && !state.semanticProjectionCache.has(semanticFocusId) && !state.semanticProjectionPending.get(semanticFocusId)){
+      hydrateSemanticStationProjection(semanticFocusId,entityLabel(semanticFocusId));
+    }
+
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
@@ -3411,10 +3465,17 @@
       const p=positions.get(node.id); if(!p) continue;
       const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`});
       g.style.cursor="pointer";
-      const radius=node.isSeed?34:27;
-      const circle=svgEl("circle",{r:radius,fill:node.isSeed?"#173c7a":"#142338",stroke:node.isSeed?"#7aa2ff":"#36506f","stroke-width":node.isSeed?2.5:1.4});
+      const secondary=node.projection_depth===2 || node.projection_role==="secondary";
+      const radius=node.isSeed?34:(secondary?22:29);
+      const circle=svgEl("circle",{
+        r:radius,
+        fill:node.isSeed?"#173c7a":(secondary?"#0f1d2f":"#142b47"),
+        stroke:node.isSeed?"#7aa2ff":(secondary?"#2b405d":"#5579a8"),
+        "stroke-width":node.isSeed?2.5:(secondary?1.1:1.8),
+        opacity:secondary?0.82:1
+      });
       g.appendChild(circle);
-      const label=svgEl("text",{"text-anchor":"middle",fill:"#f5f7fb","font-size":node.isSeed?11:10,"font-weight":700});
+      const label=svgEl("text",{"text-anchor":"middle",fill:secondary?"#c2cede":"#f5f7fb","font-size":node.isSeed?11:(secondary?9:10),"font-weight":secondary?600:700});
       const words=node.label.split(/\s+/);
       const lines=[];
       let current="";
@@ -3659,6 +3720,101 @@
       .replace(/^-+|-+$/g,"")
       .slice(0,56) || "node";
     return `ephemeral:${responseToken}:${safe}`;
+  }
+
+  function semanticProjectionQuestion(label){
+    const subject=String(label||"").replace(/\s+/g," ").trim();
+    return `Build the structural Cosmos map around "${subject}". ` +
+      `This request is about semantic navigation, not a news summary. ` +
+      `Return the subject plus 5-7 PRIMARY dimensions that are natural peers at the subject's current abstraction level. ` +
+      `Then return useful SECONDARY concepts one level beneath those primary dimensions. ` +
+      `Do not flatten narrow details onto a broad subject. For a country or continent, primary dimensions should be broad systems such as geography, society, economy, governance/policy, infrastructure, energy, technology, environment, or similarly fundamental peers when appropriate; grid, transformers, data centers, capacity markets, permitting rules, benefits, and other narrow details belong deeper. ` +
+      `For any other kind of subject, infer equivalent high-level peer dimensions appropriate to that subject rather than using a fixed taxonomy. ` +
+      `Connect subject → primary → secondary explicitly in projection_relationships. ` +
+      `Do not invent a connection merely to fill the map; fewer nodes are acceptable. ` +
+      `The source provides knowledge; the projection decides the map.`;
+  }
+
+  async function hydrateSemanticStationProjection(entityId,label){
+    const focusId=String(entityId||"").trim();
+    if(!focusId || !state.entities.has(focusId)) return;
+    if(state.semanticProjectionCache.has(focusId) || state.semanticProjectionPending.get(focusId)) return;
+
+    const serial=++state.semanticProjectionSerial;
+    state.semanticProjectionPending.set(focusId,true);
+    if(focusEntityId(state.observer)===focusId) render();
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
+    try{
+      const question=semanticProjectionQuestion(label||entityLabel(focusId));
+      const payload={
+        question,
+        context_subject:{id:focusId,label:label||entityLabel(focusId)},
+        journey:journeyContextForGateway(),
+        page:{url:location.href,entry_question:entry.question||"",article_id:entry.article_id||"",projection_mode:"semantic_altitude"}
+      };
+      const response=await fetch(COSMOS_ASK_ENDPOINT,{
+        method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),signal:controller.signal
+      });
+      if(!response.ok) throw new Error(`Semantic projection gateway returned ${response.status}`);
+      const data=await response.json();
+      const responseToken=`semantic-${focusId.replace(/[^a-zA-Z0-9_-]/g,"-")}-${Date.now()}-${serial}`;
+      const sources=Array.isArray(data?.sources)?data.sources.slice(0,10):[];
+      const dynamic=materializeDynamicProjection(data,responseToken,sources);
+      const relPrefix=`ephemeral-rel:${responseToken}:`;
+      const rels=state.relationships.filter(rel=>String(rel?.relationship_id||"").startsWith(relPrefix));
+      const root=(dynamic.subject_id && state.entities.has(dynamic.subject_id)) ? dynamic.subject_id : focusId;
+
+      // If the model returned an ephemeral duplicate of a canonical focus, merge its
+      // outgoing hierarchy onto the canonical focus for projection purposes only.
+      const rootIds=new Set([focusId,root]);
+      const first=[];
+      const firstSeen=new Set();
+      for(const rel of rels){
+        let other="";
+        if(rootIds.has(rel.from_entity_id)) other=rel.to_entity_id;
+        else if(rootIds.has(rel.to_entity_id)) other=rel.from_entity_id;
+        if(!other || rootIds.has(other) || firstSeen.has(other) || !state.entities.has(other)) continue;
+        firstSeen.add(other);
+        first.push({
+          id:other,label:entityLabel(other),type:state.entities.get(other)?.type||"Dimension",
+          why_shown:relationshipLabel(rel),relationship:rel
+        });
+      }
+
+      // Primary nodes are direct semantic children of the subject in this dedicated
+      // hierarchy response. Secondary nodes must pass through a selected primary.
+      const second=[];
+      const secondSeen=new Set();
+      const primaryIds=new Set(first.map(row=>row.id));
+      for(const parent of first){
+        for(const rel of rels){
+          let child="";
+          if(rel.from_entity_id===parent.id) child=rel.to_entity_id;
+          else if(rel.to_entity_id===parent.id) child=rel.from_entity_id;
+          if(!child || rootIds.has(child) || primaryIds.has(child) || secondSeen.has(child) || !state.entities.has(child)) continue;
+          secondSeen.add(child);
+          second.push({
+            id:child,label:entityLabel(child),type:state.entities.get(child)?.type||"Dimension",
+            parent_id:parent.id,why_shown:relationshipLabel(rel),relationship:rel
+          });
+        }
+      }
+
+      if(first.length){
+        state.semanticProjectionCache.set(focusId,{
+          focus_id:focusId,primary:first.slice(0,7),secondary:second.slice(0,12),
+          relationship_ids:rels.map(rel=>rel.relationship_id),resolved_at:Date.now()
+        });
+      }
+    }catch(error){
+      console.warn("Cosmos semantic-altitude projection unavailable; using sparse local fallback.",error);
+    }finally{
+      clearTimeout(timer);
+      state.semanticProjectionPending.delete(focusId);
+      if(focusEntityId(state.observer)===focusId) render();
+    }
   }
 
   function materializeDynamicProjection(data,responseToken,sources){
