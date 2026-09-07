@@ -330,6 +330,12 @@
       background:#789fee;
       box-shadow:0 0 8px rgba(120,159,238,.35)
     }
+    .projectionPulseQuiet{
+      color:#8898b1;
+      font-size:12.5px;
+      line-height:1.55;
+      font-style:italic
+    }
     .projectionContext{
       margin-top:11px;
       padding-top:11px;
@@ -1997,6 +2003,151 @@
     return [dim,direction].filter(Boolean).join(" · ");
   }
 
+  function normalizedGeoTokens(value){
+    const out=[];
+    const visit=(v)=>{
+      if(v===undefined || v===null) return;
+      if(Array.isArray(v)){ v.forEach(visit); return; }
+      if(typeof v==="object"){
+        [
+          v.country,v.country_name,v.name,v.label,v.region,v.state,v.city,
+          v.geography,v.geographic_scope,v.jurisdiction
+        ].forEach(visit);
+        return;
+      }
+      const s=normalizeSubject(String(v));
+      if(s) out.push(s);
+    };
+    visit(value);
+    return [...new Set(out)];
+  }
+
+  function worldChangeTime(change){
+    return Date.parse(
+      change?.current_state_time ||
+      change?.effective_at ||
+      change?.observed_at ||
+      change?.admitted_at ||
+      change?.created_at ||
+      ""
+    ) || 0;
+  }
+
+  function worldChangeConfidence(change){
+    const raw=
+      change?.confidence ??
+      change?.confidence_score ??
+      change?.belief_confidence ??
+      change?.current_state?.confidence ??
+      null;
+    const n=confidencePercent(raw);
+    return n===null ? null : n;
+  }
+
+  function worldChangePulseEligible(change){
+    if(!change || !change.change_id) return false;
+
+    // Pulse is not created by the renderer. A governed upstream layer must explicitly
+    // establish material/significant eligibility. Until that exists, silence is valid.
+    const explicit =
+      change.pulse_eligible === true ||
+      change.significance?.pulse_eligible === true ||
+      change.attention?.pulse_eligible === true ||
+      String(change.attention_state||"").toUpperCase()==="WATCH" ||
+      String(change.attention_state||"").toUpperCase()==="PREPARE" ||
+      String(change.attention_state||"").toUpperCase()==="ACTION_WINDOW";
+
+    if(!explicit) return false;
+
+    const epistemic=String(
+      change.epistemic_state ||
+      change.validation_status ||
+      change.status ||
+      ""
+    ).toLowerCase();
+
+    if(["rejected","invalid","unsupported","scenario","hypothetical","candidate"].includes(epistemic)){
+      return false;
+    }
+
+    const confidence=worldChangeConfidence(change);
+    if(confidence!==null && confidence<60) return false;
+
+    return true;
+  }
+
+  function changeMatchesObserver(change,observer){
+    const focusId=focusEntityId(observer);
+    if(!focusId) return false;
+
+    const subjectId=String(change?.subject_id||change?.entity_id||change?.subject_ref||"");
+    if(subjectId && subjectId===focusId) return true;
+
+    const focus=state.entities.get(focusId);
+    if(!focus) return false;
+
+    // Geography propagation is allowed only when the governed Change itself carries
+    // explicit geographic scope. We do not infer location merely from topical relevance.
+    const focusType=normalizeSubject(focus.type||focus.entity_type||"");
+    const geographicFocus=
+      focusType.includes("country") ||
+      focusType.includes("geograph") ||
+      focusType.includes("jurisdiction") ||
+      focusType.includes("region");
+
+    if(!geographicFocus) return false;
+
+    const focusTokens=new Set([
+      normalizeSubject(focus.name||focus.label||""),
+      normalizeSubject(focus.canonical_name||""),
+      ...(Array.isArray(focus.aliases)?focus.aliases.map(normalizeSubject):[])
+    ].filter(Boolean));
+
+    const changeGeoTokens=normalizedGeoTokens(
+      change.geography ??
+      change.geographic_scope ??
+      change.scope?.geography ??
+      change.scope?.country ??
+      change.country ??
+      change.countries
+    );
+
+    return changeGeoTokens.some(token=>focusTokens.has(token));
+  }
+
+  function governedPulseForObserver(observer){
+    const rows=[...state.changes.values()]
+      .filter(worldChangePulseEligible)
+      .filter(change=>changeMatchesObserver(change,observer))
+      .sort((a,b)=>{
+        // Deterministic lexicographic priority, not a universal significance score:
+        // explicit higher attention/significance class first, then recency, then confidence.
+        const rank=(change)=>{
+          const stateName=String(change.attention_state||change.significance?.attention_state||"").toUpperCase();
+          if(stateName==="ACTION_WINDOW") return 3;
+          if(stateName==="PREPARE") return 2;
+          if(stateName==="WATCH") return 1;
+          return 0;
+        };
+        return rank(b)-rank(a) ||
+          worldChangeTime(b)-worldChangeTime(a) ||
+          (worldChangeConfidence(b)??-1)-(worldChangeConfidence(a)??-1) ||
+          String(a.change_id).localeCompare(String(b.change_id));
+      });
+
+    return rows.slice(0,5);
+  }
+
+  function governedPulseDisplay(change){
+    const subjectId=String(change?.subject_id||change?.entity_id||change?.subject_ref||"");
+    const subjectLabel=subjectId && state.entities.has(subjectId) ? entityLabel(subjectId) : "";
+    const transition=changeDisplay(change);
+    if(subjectLabel && transition && !normalizeSubject(transition).startsWith(normalizeSubject(subjectLabel))){
+      return `${subjectLabel} — ${transition}`;
+    }
+    return transition || subjectLabel || "A governed material change is active.";
+  }
+
   function acceptedCausalEdgesFrom(change){
     if(!change?.change_id) return [];
     return state.causalEdges.filter(edge=>{
@@ -2941,10 +3092,7 @@
     const title=station.focus_id ? station.focus_label : (entryQuestion || currentLabel);
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
-    const contextRows=
-      observer?.kind==="response" && Array.isArray(observer.response?.current_pulse)
-        ? []
-        : compactCenterContext(observer);
+    const contextRows=compactCenterContext(observer);
     if(station.primary_change){
       contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
     }
@@ -2952,20 +3100,20 @@
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
 
-    const pulseItems =
-      observer?.kind==="response" && Array.isArray(observer.response?.current_pulse)
-        ? observer.response.current_pulse.filter(Boolean).slice(0,5)
-        : [];
+    // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
+    // World Changes. Model/web current_pulse text is discovery-only and is never rendered.
+    const governedPulse=governedPulseForObserver(observer);
+    const pulseItems=governedPulse.map(governedPulseDisplay).filter(Boolean);
 
     if(projectionPulse && projectionPulseItems){
+      projectionPulse.style.display="block";
       if(pulseItems.length){
-        projectionPulse.style.display="block";
         projectionPulseItems.innerHTML=pulseItems
           .map(item=>`<div class="projectionPulseItem">${esc(item)}</div>`)
           .join("");
       }else{
-        projectionPulse.style.display="none";
-        projectionPulseItems.innerHTML="";
+        projectionPulseItems.innerHTML=
+          `<div class="projectionPulseQuiet">No major validated movement is surfacing at this level right now.</div>`;
       }
     }
 
@@ -4177,9 +4325,8 @@
       answer:cleanUniversalAnswerText(data?.answer||data?.short_answer||"") || "Cosmos could not produce a dependable answer.",
       short_answer:cleanUniversalAnswerText(data?.short_answer||""),
       essence:cleanUniversalAnswerText(data?.essence||""),
-      current_pulse:Array.isArray(data?.current_pulse)
-        ? data.current_pulse.map(item=>cleanUniversalAnswerText(item)).filter(Boolean).slice(0,5)
-        : [],
+      current_pulse:[], // governed Pulse is derived from world-changes-current.json only
+      pulse_candidate_count:Number(data?.meta?.discovered_pulse_candidate_count||0),
       intent:String(data?.intent||"").trim(),
       epistemic_state:String(data?.epistemic_state||"uncertain"),
       confidence:String(data?.confidence||"low"),
@@ -4417,7 +4564,7 @@
       intent:r?.intent||"",
       short_answer:r?.short_answer||"",
       essence:r?.essence||"",
-      current_pulse:Array.isArray(r?.current_pulse)?r.current_pulse:[],
+      current_pulse:governedPulseForObserver(o).map(governedPulseDisplay).filter(Boolean).slice(0,5),
       answer:r?.answer||"",
       sources,
       observer:{
