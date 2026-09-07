@@ -3730,7 +3730,11 @@
       `Then return useful SECONDARY concepts one level beneath those primary dimensions. ` +
       `Do not flatten narrow details onto a broad subject. For a country or continent, primary dimensions should be broad systems such as geography, society, economy, governance/policy, infrastructure, energy, technology, environment, or similarly fundamental peers when appropriate; grid, transformers, data centers, capacity markets, permitting rules, benefits, and other narrow details belong deeper. ` +
       `For any other kind of subject, infer equivalent high-level peer dimensions appropriate to that subject rather than using a fixed taxonomy. ` +
+      `Set projection_mode="structural" on every projection node. The subject MUST use projection_depth=0, parent_id="", projection_role="subject". ` +
+      `Each PRIMARY node MUST use projection_depth=1, parent_id equal to the subject node id, and projection_role="primary_dimension". ` +
+      `Each SECONDARY node MUST use projection_depth=2, parent_id equal to one returned primary node id, and projection_role="secondary_dimension". ` +
       `Connect subject → primary → secondary explicitly in projection_relationships. ` +
+      `Relationship relevance or strength MUST NOT be used as a substitute for semantic depth. ` +
       `Do not invent a connection merely to fill the map; fewer nodes are acceptable. ` +
       `The source provides knowledge; the projection decides the map.`;
   }
@@ -3766,46 +3770,92 @@
       const rels=state.relationships.filter(rel=>String(rel?.relationship_id||"").startsWith(relPrefix));
       const root=(dynamic.subject_id && state.entities.has(dynamic.subject_id)) ? dynamic.subject_id : focusId;
 
-      // If the model returned an ephemeral duplicate of a canonical focus, merge its
-      // outgoing hierarchy onto the canonical focus for projection purposes only.
+      // The Worker now returns explicit semantic altitude. Prefer that governed
+      // hierarchy over inferred graph adjacency. Relationship relevance/strength
+      // does NOT determine semantic depth.
       const rootIds=new Set([focusId,root]);
-      const first=[];
-      const firstSeen=new Set();
-      for(const rel of rels){
-        let other="";
-        if(rootIds.has(rel.from_entity_id)) other=rel.to_entity_id;
-        else if(rootIds.has(rel.to_entity_id)) other=rel.from_entity_id;
-        if(!other || rootIds.has(other) || firstSeen.has(other) || !state.entities.has(other)) continue;
-        firstSeen.add(other);
-        first.push({
-          id:other,label:entityLabel(other),type:state.entities.get(other)?.type||"Dimension",
-          why_shown:relationshipLabel(rel),relationship:rel
-        });
+      const projectedIds=new Set(dynamic.ids||[]);
+      const explicitPrimary=[];
+      const explicitSecondary=[];
+      const explicitPrimarySeen=new Set();
+      const explicitSecondarySeen=new Set();
+
+      for(const id of projectedIds){
+        if(!id || rootIds.has(id) || !state.entities.has(id)) continue;
+        const entity=state.entities.get(id);
+        const depth=Number(entity?.projection_depth);
+        const role=String(entity?.projection_role||"").toLowerCase();
+        if(depth===1 || role==="primary_dimension"){
+          if(explicitPrimarySeen.has(id)) continue;
+          explicitPrimarySeen.add(id);
+          explicitPrimary.push({
+            id,label:entityLabel(id),type:entity?.type||"Dimension",
+            why_shown:"primary semantic dimension",relationship:null
+          });
+        }
       }
 
-      // Primary nodes are direct semantic children of the subject in this dedicated
-      // hierarchy response. Secondary nodes must pass through a selected primary.
-      const second=[];
-      const secondSeen=new Set();
-      const primaryIds=new Set(first.map(row=>row.id));
-      for(const parent of first){
-        for(const rel of rels){
-          let child="";
-          if(rel.from_entity_id===parent.id) child=rel.to_entity_id;
-          else if(rel.to_entity_id===parent.id) child=rel.from_entity_id;
-          if(!child || rootIds.has(child) || primaryIds.has(child) || secondSeen.has(child) || !state.entities.has(child)) continue;
-          secondSeen.add(child);
-          second.push({
-            id:child,label:entityLabel(child),type:state.entities.get(child)?.type||"Dimension",
-            parent_id:parent.id,why_shown:relationshipLabel(rel),relationship:rel
+      const explicitPrimaryIds=new Set(explicitPrimary.map(row=>row.id));
+      for(const id of projectedIds){
+        if(!id || rootIds.has(id) || explicitPrimaryIds.has(id) || !state.entities.has(id)) continue;
+        const entity=state.entities.get(id);
+        const depth=Number(entity?.projection_depth);
+        const role=String(entity?.projection_role||"").toLowerCase();
+        const parentId=String(entity?.projection_parent_id||"");
+        if((depth===2 || role==="secondary_dimension") && parentId && explicitPrimaryIds.has(parentId)){
+          if(explicitSecondarySeen.has(id)) continue;
+          explicitSecondarySeen.add(id);
+          explicitSecondary.push({
+            id,label:entityLabel(id),type:entity?.type||"Dimension",
+            parent_id:parentId,why_shown:"secondary semantic dimension",relationship:null
           });
+        }
+      }
+
+      let first=explicitPrimary;
+      let second=explicitSecondary;
+
+      // Backward-compatible conservative fallback for an older Worker response:
+      // only infer subject→primary→secondary from this dedicated semantic request.
+      // Once explicit hierarchy is present, this branch is not used.
+      if(!first.length){
+        const firstSeen=new Set();
+        first=[];
+        for(const rel of rels){
+          let other="";
+          if(rootIds.has(rel.from_entity_id)) other=rel.to_entity_id;
+          else if(rootIds.has(rel.to_entity_id)) other=rel.from_entity_id;
+          if(!other || rootIds.has(other) || firstSeen.has(other) || !state.entities.has(other)) continue;
+          firstSeen.add(other);
+          first.push({
+            id:other,label:entityLabel(other),type:state.entities.get(other)?.type||"Dimension",
+            why_shown:relationshipLabel(rel),relationship:rel
+          });
+        }
+
+        second=[];
+        const secondSeen=new Set();
+        const primaryIds=new Set(first.map(row=>row.id));
+        for(const parent of first){
+          for(const rel of rels){
+            let child="";
+            if(rel.from_entity_id===parent.id) child=rel.to_entity_id;
+            else if(rel.to_entity_id===parent.id) child=rel.from_entity_id;
+            if(!child || rootIds.has(child) || primaryIds.has(child) || secondSeen.has(child) || !state.entities.has(child)) continue;
+            secondSeen.add(child);
+            second.push({
+              id:child,label:entityLabel(child),type:state.entities.get(child)?.type||"Dimension",
+              parent_id:parent.id,why_shown:relationshipLabel(rel),relationship:rel
+            });
+          }
         }
       }
 
       if(first.length){
         state.semanticProjectionCache.set(focusId,{
           focus_id:focusId,primary:first.slice(0,7),secondary:second.slice(0,12),
-          relationship_ids:rels.map(rel=>rel.relationship_id),resolved_at:Date.now()
+          relationship_ids:rels.map(rel=>rel.relationship_id),resolved_at:Date.now(),
+          hierarchy_source:explicitPrimary.length ? "worker_explicit_semantic_altitude" : "legacy_relationship_fallback"
         });
       }
     }catch(error){
@@ -3847,9 +3897,30 @@
           ephemeral_projection:true,
           admitted_to_cosmos:false,
           source_indexes:Array.isArray(node?.source_indexes)?node.source_indexes:[],
+          projection_mode:String(node?.projection_mode||""),
+          projection_depth:Number.isFinite(Number(node?.projection_depth)) ? Number(node.projection_depth) : null,
+          projection_parent_local_id:String(node?.parent_id||""),
+          projection_parent_id:"",
+          projection_role:String(node?.projection_role||""),
           projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION
         });
       }
+    }
+
+    // Resolve explicit semantic parent IDs after every local projection node has
+    // been materialized. The Worker owns hierarchy; the renderer does not infer it
+    // from relationship strength or arbitrary graph proximity.
+    for(const node of nodes){
+      const localId=String(node?.id||"").trim();
+      const entityId=idMap.get(localId);
+      if(!entityId || !state.entities.has(entityId)) continue;
+      const entity=state.entities.get(entityId);
+      const parentLocal=String(node?.parent_id||"").trim();
+      entity.projection_mode=String(node?.projection_mode||entity.projection_mode||"");
+      entity.projection_depth=Number.isFinite(Number(node?.projection_depth)) ? Number(node.projection_depth) : entity.projection_depth;
+      entity.projection_role=String(node?.projection_role||entity.projection_role||"");
+      entity.projection_parent_local_id=parentLocal;
+      entity.projection_parent_id=parentLocal ? (idMap.get(parentLocal)||"") : "";
     }
 
     const ephemeralRelationships=[];
