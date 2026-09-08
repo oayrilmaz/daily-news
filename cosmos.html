@@ -343,6 +343,18 @@
       font-size:15px;
       line-height:1.62
     }
+    .projectionArrival{
+      display:none;
+      margin-top:16px;
+      padding:14px 15px;
+      border:1px solid rgba(119,159,230,.24);
+      border-radius:16px;
+      background:linear-gradient(180deg,rgba(49,80,136,.12),rgba(11,24,45,.12));
+    }
+    .projectionArrivalHead{display:flex;align-items:center;gap:8px;color:#90a9d1;font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;margin-bottom:8px}
+    .projectionArrivalRoute{color:#dce8fb;font-size:13px;font-weight:800;line-height:1.35;margin-bottom:7px}
+    .projectionArrivalReason{color:#c3cee0;font-size:14px;line-height:1.55;margin:0}
+    .projectionArrivalMeta{margin-top:8px;color:#778ba9;font-size:10px;line-height:1.35}
     .projectionPulse{
       display:none;
       margin-top:15px;
@@ -784,6 +796,8 @@
         <h2 class="projectionTitle" id="projectionTitle">Cosmos</h2>
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
+        <div class="projectionArrival" id="projectionArrival"></div>
+
         <div class="projectionPulse" id="projectionPulse">
           <div class="projectionPulseHead"><span class="miniCosmos" aria-hidden="true"></span><span>Current pulse</span></div>
           <div class="projectionPulseItems" id="projectionPulseItems"></div>
@@ -909,6 +923,7 @@
 
   const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
+  const projectionArrival = document.getElementById("projectionArrival");
   const projectionPulse = document.getElementById("projectionPulse");
   const projectionPulseItems = document.getElementById("projectionPulseItems");
   const projectionContext = document.getElementById("projectionContext");
@@ -2324,6 +2339,9 @@
       observer_key:key,
       coordinate:coordinateForObserver(observer),
       via_operation:observer?.via_operation||"ENTER",
+      transition:observer?.arrival_transition ? {...observer.arrival_transition} : null,
+      pending_resolution:Boolean(observer?.resolution_pending),
+      pending_question:String(observer?.question||""),
       observer:observerSnapshot(observer),
       created_at:Date.now()
     };
@@ -2372,6 +2390,64 @@
       .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
   }
 
+  function normalizedJourneyLabel(value){
+    return normalizeSubject(String(value||"")).replace(/[^a-z0-9]+/g," ").trim();
+  }
+
+  function journeyNodeDisplayLabel(node){
+    const c=node?.coordinate || node?.observer?.coordinate || null;
+    if(c?.focus_type==="entity" && state.entities.has(c.focus_id)) return entityLabel(c.focus_id);
+    return String(node?.observer?.label || node?.observer?.question || c?.focus_label || "Cosmos").trim();
+  }
+
+  function dedupeAdjacentJourneyStops(){
+    let changed=true;
+    while(changed){
+      changed=false;
+      const ordered=[...state.journey.nodes].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+      for(const node of ordered){
+        if(!node?.parent_node_id) continue;
+        const parent=journeyNodeById(node.parent_node_id);
+        if(!parent) continue;
+        const a=normalizedJourneyLabel(journeyNodeDisplayLabel(parent));
+        const b=normalizedJourneyLabel(journeyNodeDisplayLabel(node));
+        if(!a || a!==b) continue;
+        parent.coordinate=node.coordinate || parent.coordinate;
+        parent.observer_key=node.observer_key || parent.observer_key;
+        parent.observer=node.observer || parent.observer;
+        parent.via_operation=node.via_operation || parent.via_operation;
+        parent.pending_resolution=false;
+        parent.pending_question="";
+        parent.transition=parent.transition || node.transition || null;
+        for(const child of state.journey.nodes){ if(child.parent_node_id===node.node_id) child.parent_node_id=parent.node_id; }
+        if(state.journey.current_node_id===node.node_id) state.journey.current_node_id=parent.node_id;
+        state.journey.nodes=state.journey.nodes.filter(row=>row.node_id!==node.node_id);
+        changed=true; break;
+      }
+    }
+    saveJourney();
+  }
+
+  function currentArrivalTransition(){
+    const current=journeyNodeById(state.journey.current_node_id);
+    return current?.transition || current?.observer?.arrival_transition || state.observer?.arrival_transition || null;
+  }
+
+  function projectionRelationshipForArrival(previous,targetId){
+    const fromId=focusEntityId(previous);
+    if(!fromId || !targetId) return null;
+    return state.relationships.find(rel=>rel?.ephemeral_projection && (((rel.from_entity_id===fromId)&&(rel.to_entity_id===targetId)) || ((rel.to_entity_id===fromId)&&(rel.from_entity_id===targetId)))) || null;
+  }
+
+  function buildArrivalTransition(previous,targetId,targetLabel,operation="ENTER"){
+    const fromLabel=observerDisplayLabel(previous);
+    if(!previous || !fromLabel || !targetLabel || normalizedJourneyLabel(fromLabel)===normalizedJourneyLabel(targetLabel)) return null;
+    const rel=projectionRelationshipForArrival(previous,targetId);
+    const relLabel=rel ? relationshipLabel(rel) : "exploratory connection";
+    const reason=String(rel?.reason || rel?.transition_reason || rel?.explanation || "").trim() || (rel ? `${targetLabel} was a meaningful next Station from ${fromLabel} because the previous projection connected them through ${relLabel}.` : `You selected ${targetLabel} while exploring ${fromLabel}. Cosmos preserves that route as Journey context without treating it as a causal claim.`);
+    return {from_label:fromLabel,to_label:targetLabel,operation,relationship_id:String(rel?.relationship_id||""),relationship_label:String(relLabel||"exploratory connection"),reason,epistemic_state:String(rel?.epistemic_status||rel?.evidence_mode||"inference"),confidence:confidencePercent(rel?.confidence),evidence_refs:Array.isArray(rel?.source_ids)?rel.source_ids.filter(Boolean):[],causal:false};
+  }
+
   function reconcileJourneyWithResolvedObserver(observer){
     const current=journeyNodeById(state.journey.current_node_id);
     const resolvedCoordinate=coordinateForObserver(observer);
@@ -2383,21 +2459,21 @@
     const currentCoordinate=current.coordinate || current.observer?.coordinate || coordinateForObserver(current.observer);
     const wasInvestigation=currentCoordinate?.focus_type==="investigation";
     const nowResolved=resolvedCoordinate?.focus_type!=="investigation";
+    const samePendingQuestion=current.pending_resolution && normalizedJourneyLabel(current.pending_question)===normalizedJourneyLabel(observer?.question);
 
-    // A query is an entrance, not a permanent station. If the same ASK resolves
-    // after asynchronous knowledge completion, upgrade the current Journey node
-    // in place instead of adding a fake question station before the real focus.
-    if(wasInvestigation && nowResolved){
+    if(samePendingQuestion || (wasInvestigation && nowResolved)){
       current.coordinate=resolvedCoordinate;
       current.observer_key=coordinateKey(resolvedCoordinate);
       current.observer=observerSnapshot(observer);
-      current.via_operation="ASK";
+      current.via_operation=current.via_operation || observer?.via_operation || "ENTER";
+      current.pending_resolution=false; current.pending_question="";
+      current.transition=current.transition || observer?.arrival_transition || null;
       state.journey.current_node_id=current.node_id;
-      saveJourney();
-      return;
+      dedupeAdjacentJourneyStops(); saveJourney(); return;
     }
 
     ensureJourneyCurrent(observer);
+    dedupeAdjacentJourneyStops();
   }
 
   function restoreObserverFromJourneyNode(node){
@@ -2465,6 +2541,7 @@
       response_coordinate: observer.response?.coordinate ? {...observer.response.coordinate} : null,
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || "",
+      arrival_transition: observer.arrival_transition ? {...observer.arrival_transition} : null,
       coordinate: coordinateForObserver(observer),
       via_operation: observer.via_operation || ""
     };
@@ -3366,6 +3443,17 @@
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
 
+    const arrival=currentArrivalTransition();
+    if(projectionArrival){
+      const validArrival=arrival && arrival.from_label && arrival.to_label && normalizedJourneyLabel(arrival.from_label)!==normalizedJourneyLabel(arrival.to_label);
+      if(validArrival){
+        const confidence=Number.isFinite(Number(arrival.confidence)) ? ` · ${Math.round(Number(arrival.confidence))}% confidence` : "";
+        const relation=String(arrival.relationship_label||"journey connection");
+        projectionArrival.style.display="block";
+        projectionArrival.innerHTML=`<div class="projectionArrivalHead"><span class="miniCosmos" aria-hidden="true"></span><span>Why you arrived here</span></div><div class="projectionArrivalRoute">${esc(arrival.from_label)} → ${esc(arrival.to_label)}</div><p class="projectionArrivalReason">${esc(arrival.reason||"")}</p><div class="projectionArrivalMeta">Journey connection · ${esc(relation)}${esc(confidence)} · this explains the route, not Butterfly causality.</div>`;
+      }else{ projectionArrival.style.display="none"; projectionArrival.innerHTML=""; }
+    }
+
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
     // World Changes. Model/web current_pulse text is discovery-only and is never rendered.
     const governedPulse=governedPulseForObserver(observer);
@@ -3673,6 +3761,7 @@
 
   function renderButterflyJourney(){
     ensureJourneyCurrent(state.observer);
+    dedupeAdjacentJourneyStops();
     setButterflyOpen(true);
 
     const nodes=state.journey.nodes;
@@ -3778,7 +3867,7 @@
             <strong>${esc(label)} ${branchBadge}</strong>
             <span>
               ${current?"you are here":(active?"your route":"saved branch")}
-
+              ${node.transition?.relationship_label ? ` · via ${esc(node.transition.relationship_label)}` : ""}
             </span>
           </span>
         </button>
@@ -4182,6 +4271,7 @@
       state.history.push(previous);
 
       const previousLabel=observerDisplayLabel(previous);
+      const arrivalTransition=buildArrivalTransition(previous,id,label,operation);
 
       // M3.2C — Coordinate isolation. Arrival history belongs to Journey only.
       // A newly selected Station is researched as itself; the previous Station
@@ -4223,7 +4313,9 @@
         article_id:"",
         from_observer_id:previous?.id||"",
         from_observer_label:previousLabel||"",
-        via_operation:"ENTER"
+        arrival_transition:arrivalTransition,
+        resolution_pending:true,
+        via_operation:operation||"ENTER"
       };
       state.response=provisional;
       state.expanded=false;
@@ -4235,8 +4327,11 @@
       );
       if(existing){
         state.journey.current_node_id=existing.node_id;
+        existing.transition=existing.transition || arrivalTransition || null;
+        existing.pending_resolution=true; existing.pending_question=researchQuestion;
       }else{
-        addJourneyNode(state.observer,parentJourneyId,true);
+        const created=addJourneyNode(state.observer,parentJourneyId,true);
+        if(created){ created.transition=arrivalTransition || null; created.pending_resolution=true; created.pending_question=researchQuestion; }
       }
 
       saveJourney();
@@ -4661,6 +4756,7 @@
         to_entity_id:to,
         relationship_type:String(rel?.label||"related to"),
         label:String(rel?.label||"related to"),
+        reason:String(rel?.reason||rel?.why||rel?.explanation||""),
         confidence:projectionConfidenceValue(rel?.confidence),
         epistemic_status:String(rel?.epistemic_state||"uncertain"),
         evidence_mode:String(rel?.epistemic_state||"uncertain"),
@@ -4958,7 +5054,9 @@
         throw new Error("Cosmos gateway returned no answer");
       }
 
+      const loadingObserver=state.observer;
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
+      if(loadingObserver?.arrival_transition){ resolvedObserver.arrival_transition={...loadingObserver.arrival_transition}; resolvedObserver.from_observer_id=loadingObserver.from_observer_id||""; resolvedObserver.from_observer_label=loadingObserver.from_observer_label||""; resolvedObserver.via_operation=loadingObserver.via_operation||"ENTER"; }
       setLoadingProgress(94,98);
       await new Promise(resolve=>setTimeout(resolve,180));
       setLoadingProgress(100,100);
