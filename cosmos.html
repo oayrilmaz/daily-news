@@ -4322,16 +4322,17 @@
 
     if(projection.nodes.length){
       emptyEl.style.display="none";
+    }else if(state.universalAnswerPending || observer?.response?.response_type==="universal_loading"){
+      // Loading belongs to the QUESTION/Coordinate, not only to semantic entity hydration.
+      // This restores the visible brewing experience for fresh universal questions.
+      emptyEl.style.display="block";
+      paintLoadingNarrative();
     }else if(semanticWorking){
       emptyEl.style.display="block";
-      if(state.universalAnswerPending){
-        paintLoadingNarrative();
-      }else{
-        emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is preparing this Station.</span></span>`;
-      }
+      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is preparing this Station.</span></span>`;
     }else{
       emptyEl.style.display="block";
-      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos has finished this pass. No additional defensible nearby stations are ready to surface yet.</span></span>`;
+      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>This Coordinate is intentionally sparse. Use the Cosmos Compass or ask another question to open a new direction.</span></span>`;
     }
     const completionBlocked =
       observer?.kind==="response" &&
@@ -4691,10 +4692,11 @@
     const broadDiscovery=/\b(good news|positive developments?|encouraging developments?|important developments?|major developments?|top developments?|world update|global update|what(?:'s| is) happening|what changed|latest developments?|latest news|news around the world)\b/i.test(raw);
     const explicitSubject=Boolean(explicitNarrowSubjectPhraseClient(raw));
     const namedSubjectForm=/^\s*(?:please\s+)?(?:tell me about|explain|describe|explore|show me|what is|who is|new developments in|latest developments in|latest news in|what is happening in|what changed in)\s+.{2,160}$/i.test(raw);
+    const connectionPath=/\b(how (?:could|can|does|would)|how is .* connected|connect .* to|connection between|path from|lead(?:s|ing)? to|affect(?:s|ed|ing)?|influence(?:s|d|ing)?|eventually (?:reach|affect|change)|take me from|follow .* to)\b/i.test(raw);
 
-    // Explicit scope/subject starts a new projection boundary. Journey remains
+    // Explicit scope/subject/path starts a new projection boundary. Journey remains
     // navigation provenance only; it is not evidence or hidden topical context.
-    return explicitGlobal || broadDiscovery || explicitSubject || namedSubjectForm;
+    return explicitGlobal || broadDiscovery || explicitSubject || namedSubjectForm || connectionPath;
   }
 
   function currentContextSubject(){
@@ -5039,6 +5041,21 @@
     };
   }
 
+  function materializeSuggestedProjectionFallback(subjectId,suggested,responseToken){
+    if(!subjectId || !state.entities.has(subjectId) || !Array.isArray(suggested) || !suggested.length) return {ids:[],relationship_count:0};
+    const ids=[]; const rels=[];
+    suggested.slice(0,6).forEach((raw,index)=>{
+      const label=String(raw||"").replace(/\s+/g," ").trim();
+      if(!label) return;
+      const id=`ephemeral:${responseToken}:door-${index+1}-${normalizeSubject(label).replace(/[^a-z0-9]+/g,"-").slice(0,42)}`;
+      if(!state.entities.has(id)){ state.entities.set(id,{ entity_id:id,name:label,label,type:"Exploration door",role:"context",epistemic_state:"uncertain",confidence:.45,ephemeral_projection:true,admitted_to_cosmos:false,source_indexes:[],projection_mode:"structural",projection_depth:1,projection_parent_id:subjectId,projection_role:"primary_dimension",projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION }); }
+      ids.push(id);
+      rels.push({ relationship_id:`ephemeral-rel:${responseToken}:fallback-${index+1}`,from_entity_id:subjectId,to_entity_id:id,relationship_type:"opens exploration toward",label:"opens exploration toward",reason:"Cosmos surfaced this as a possible next Station when the detailed topology could not be completed in the same pass.",confidence:.4,epistemic_status:"uncertain",evidence_mode:"uncertain",source_ids:[],ephemeral_projection:true,admitted_to_cosmos:false,projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION });
+    });
+    if(rels.length) state.relationships=[...state.relationships,...rels];
+    return {ids,relationship_count:rels.length};
+  }
+
   function ensureUniversalSubjectEntity(question,data,displayLabel,responseToken,dynamicProjection){
     if(dynamicProjection?.subject_id && state.entities.has(dynamicProjection.subject_id)){
       return dynamicProjection.subject_id;
@@ -5088,6 +5105,9 @@
       question,data,displayLabel,responseToken,dynamicProjection
     );
     const projectionSeedIds=[subjectId].filter(Boolean);
+    const usableDynamicIds=(dynamicProjection.ids||[]).filter(id=>id && id!==subjectId);
+    const suggestedFallback=usableDynamicIds.length ? {ids:[],relationship_count:0} : materializeSuggestedProjectionFallback(subjectId,suggested,responseToken);
+    const resolvedDynamicIds=[...new Set([subjectId,...(dynamicProjection.ids||[]),...(suggestedFallback.ids||[])].filter(Boolean))];
 
     const response={
       id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}`,
@@ -5117,8 +5137,8 @@
         seed_ids:[]
       })),
       projection_seed_ids:[...new Set(projectionSeedIds)],
-      dynamic_projection_ids:[...new Set([subjectId,...dynamicProjection.ids].filter(Boolean))],
-      dynamic_projection_relationship_count:dynamicProjection.relationship_count,
+      dynamic_projection_ids:resolvedDynamicIds,
+      dynamic_projection_relationship_count:Number(dynamicProjection.relationship_count||0)+Number(suggestedFallback.relationship_count||0),
       source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
       knowledge_completion:null,
       suggested_stations:suggested,
@@ -5273,6 +5293,8 @@
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
+    const brewStartedAt=Date.now();
+    const minimumVisibleBrewMs=1800;
     startLoadingProgress();
 
     // Make the transition explicit instead of briefly presenting a deterministic
@@ -5332,6 +5354,8 @@
 
       const loadingObserver=state.observer;
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
+      const remainingBrew=Math.max(0,minimumVisibleBrewMs-(Date.now()-brewStartedAt));
+      if(remainingBrew>0) await new Promise(resolve=>setTimeout(resolve,remainingBrew));
       if(loadingObserver?.arrival_transition){ resolvedObserver.arrival_transition={...loadingObserver.arrival_transition}; resolvedObserver.from_observer_id=loadingObserver.from_observer_id||""; resolvedObserver.from_observer_label=loadingObserver.from_observer_label||""; resolvedObserver.via_operation=loadingObserver.via_operation||"ENTER"; }
       setLoadingProgress(94,98);
       await new Promise(resolve=>setTimeout(resolve,180));
@@ -5356,7 +5380,11 @@
       render();
       restoreKnowledgeStatus();
     }catch(error){
-      console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
+      console.warn("Universal Cosmos gateway unavailable; preserving the Coordinate without topical substitution.",error);
+      const remainingBrew=Math.max(0,minimumVisibleBrewMs-(Date.now()-brewStartedAt));
+      if(remainingBrew>0) await new Promise(resolve=>setTimeout(resolve,remainingBrew));
+      setLoadingProgress(Math.max(state.loadingProgressValue,96),100);
+      await new Promise(resolve=>setTimeout(resolve,240));
       state.universalAnswerPending=false;
       stopLoadingProgress(true);
 
