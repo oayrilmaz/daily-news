@@ -211,6 +211,23 @@
     @keyframes observerLoadingSweep{
       to{transform:rotate(360deg)}
     }
+    .cosmosObserverProgressTrack{
+      fill:none;
+      stroke:rgba(119,159,232,.16);
+      stroke-width:3.2;
+      pointer-events:none
+    }
+    .cosmosObserverProgress{
+      fill:none;
+      stroke:#79a7ff;
+      stroke-width:3.4;
+      stroke-linecap:round;
+      pointer-events:none;
+      transform:rotate(-90deg);
+      transform-origin:center;
+      filter:drop-shadow(0 0 4px rgba(105,157,255,.62));
+      transition:stroke-dashoffset .42s cubic-bezier(.2,.7,.2,1),opacity .25s ease
+    }
     .error{color:var(--danger)}
     .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
 
@@ -919,6 +936,9 @@
     observer: null,
     universalAnswerLoaded: false,
     universalAnswerPending: false,
+    loadingProgressValue: 0,
+    loadingProgressCeiling: 0,
+    loadingProgressTimer: null,
     history: [],
     expanded: false,
     entryObserver: null,
@@ -2576,10 +2596,103 @@
     return 1000 - distance*170 + maxConfidence + Math.min(rels.length,20)*2;
   }
 
+  function projectionFromResolvedUniversalResponse(observer,station){
+    const response=observer?.response;
+    if(observer?.kind!=="response" || response?.response_type!=="universal") return null;
+
+    const ids=Array.isArray(response.dynamic_projection_ids)
+      ? response.dynamic_projection_ids.filter(id=>id && state.entities.has(id))
+      : [];
+    if(!ids.length) return null;
+
+    const idSet=new Set(ids);
+    const subjectId=String(response?.subject_match?.id||station?.focus_id||"");
+    const primary=[];
+    const secondary=[];
+
+    for(const id of ids){
+      if(id===subjectId) continue;
+      const entity=state.entities.get(id);
+      const depth=Number(entity?.projection_depth);
+      const role=String(entity?.projection_role||entity?.role||"").toLowerCase();
+      const row={
+        id,
+        label:entityLabel(id),
+        type:entity?.type||"Dimension",
+        isSeed:false,
+        why_shown:"resolved for this Coordinate"
+      };
+      if(depth===1 || role==="primary" || role==="primary_dimension"){
+        primary.push({...row,distance:0,projection_depth:1,projection_role:"primary"});
+      }else if(depth===2 || role==="secondary" || role==="secondary_dimension"){
+        secondary.push({
+          ...row,
+          distance:1,
+          projection_depth:2,
+          projection_role:"secondary",
+          parent_id:String(entity?.projection_parent_id||"")
+        });
+      }
+    }
+
+    // If the Worker supplied a projection without explicit depths, keep it
+    // response-local and conservative rather than falling back into the canonical PTD graph.
+    if(!primary.length){
+      for(const id of ids){
+        if(id===subjectId) continue;
+        const entity=state.entities.get(id);
+        if(String(entity?.role||"").toLowerCase()==="subject") continue;
+        primary.push({
+          id,label:entityLabel(id),type:entity?.type||"Projected concept",
+          isSeed:false,distance:0,projection_depth:1,projection_role:"primary",
+          why_shown:"resolved for this Coordinate"
+        });
+        if(primary.length>=7) break;
+      }
+    }
+
+    const primaryIds=new Set(primary.map(row=>row.id));
+    const visible=[
+      ...primary.slice(0,state.expanded?9:7),
+      ...secondary.filter(row=>!row.parent_id || primaryIds.has(row.parent_id)).slice(0,state.expanded?12:7)
+    ];
+    const visibleIds=new Set(visible.map(row=>row.id));
+
+    const rels=state.relationships.filter(rel=>
+      rel?.ephemeral_projection &&
+      idSet.has(rel.from_entity_id) &&
+      idSet.has(rel.to_entity_id)
+    );
+    const centerEdges=rels.filter(rel=>
+      subjectId && (
+        (rel.from_entity_id===subjectId && visibleIds.has(rel.to_entity_id)) ||
+        (rel.to_entity_id===subjectId && visibleIds.has(rel.from_entity_id))
+      )
+    );
+    const edges=rels.filter(rel=>
+      visibleIds.has(rel.from_entity_id) && visibleIds.has(rel.to_entity_id)
+    );
+
+    return {
+      nodes:visible,
+      edges,
+      centerEdges,
+      seeds:[],
+      station,
+      response_local_projection:true
+    };
+  }
+
   function project(observer){
     const station=stationProjection(observer);
     const focusId=station.focus_id;
     const limit=state.expanded ? 12 : 7;
+
+    // A universal answer already carries a Coordinate-specific temporary topology.
+    // Render that topology directly. Do not immediately re-query or blend it with
+    // the canonical PTD graph just because a projected label resembles a known entity.
+    const responseLocal=projectionFromResolvedUniversalResponse(observer,station);
+    if(responseLocal) return responseLocal;
 
     // Contract-compliant Station: the resolved focus is the center. Nearby is
     // a finite set of defensible typed direct relationships, not a duplicate
@@ -3795,7 +3908,18 @@
     }
 
     const semanticFocusId=focusEntityId(observer);
-    if(semanticFocusId && !state.semanticProjectionCache.has(semanticFocusId) && !state.semanticProjectionPending.get(semanticFocusId)){
+    const hasResolvedResponseProjection=
+      observer?.kind==="response" &&
+      observer?.response?.response_type==="universal" &&
+      Array.isArray(observer?.response?.dynamic_projection_ids) &&
+      observer.response.dynamic_projection_ids.length>0;
+
+    if(
+      semanticFocusId &&
+      !hasResolvedResponseProjection &&
+      !state.semanticProjectionCache.has(semanticFocusId) &&
+      !state.semanticProjectionPending.get(semanticFocusId)
+    ){
       hydrateSemanticStationProjection(semanticFocusId,entityLabel(semanticFocusId));
     }
 
@@ -3807,6 +3931,7 @@
     renderButterflyJourney();
     const semanticWorking =
       Boolean(semanticFocusId) &&
+      !hasResolvedResponseProjection &&
       !state.semanticProjectionCache.has(semanticFocusId) &&
       (
         Boolean(state.semanticProjectionPending.get(semanticFocusId)) ||
@@ -3930,8 +4055,7 @@
       observer?.response?.response_type==="universal_loading"
     );
     if(observerLoading){
-      // Clockwise activity sweep: intentionally indeterminate. It communicates
-      // active work without inventing a percentage-complete value we do not know.
+      // OUTER: continuous clockwise motion = Cosmos is actively working.
       const loadingArc=svgEl("circle",{
         r:69,
         cx:0,
@@ -3940,6 +4064,26 @@
         "aria-hidden":"true"
       });
       og.appendChild(loadingArc);
+
+      // INNER: brewing/progress ring. It is born empty and fills clockwise as
+      // the real client-side work advances through request, response, parsing,
+      // projection materialization and final reveal.
+      const progressRadius=56;
+      const progressCircumference=2*Math.PI*progressRadius;
+      const progressValue=clampLoadingProgress(state.loadingProgressValue);
+      const progressTrack=svgEl("circle",{
+        r:progressRadius,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
+      });
+      const progressRing=svgEl("circle",{
+        id:"cosmosObserverProgress",
+        r:progressRadius,cx:0,cy:0,
+        class:"cosmosObserverProgress",
+        "stroke-dasharray":progressCircumference,
+        "stroke-dashoffset":progressCircumference*(1-progressValue/100),
+        "aria-hidden":"true"
+      });
+      og.appendChild(progressTrack);
+      og.appendChild(progressRing);
     }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=projection.station?.focus_label || observerDisplayLabel(observer);
@@ -4207,6 +4351,7 @@
         journey:journeyContextForGateway(),
         page:{url:location.href,entry_question:entry.question||"",article_id:entry.article_id||"",projection_mode:"semantic_altitude"}
       };
+      setLoadingProgress(Math.max(state.loadingProgressValue,12),66);
       const response=await fetch(COSMOS_ASK_ENDPOINT,{
         method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),signal:controller.signal
       });
@@ -4491,10 +4636,59 @@
     };
   }
 
+  function clampLoadingProgress(value){
+    return Math.max(0,Math.min(100,Number(value)||0));
+  }
+
+  function paintLoadingProgress(){
+    const ring=document.getElementById("cosmosObserverProgress");
+    if(!ring) return;
+    const radius=Number(ring.getAttribute("r")||56);
+    const circumference=2*Math.PI*radius;
+    const progress=clampLoadingProgress(state.loadingProgressValue);
+    ring.setAttribute("stroke-dasharray",String(circumference));
+    ring.setAttribute("stroke-dashoffset",String(circumference*(1-progress/100)));
+    ring.style.opacity=progress>0 ? "1" : "0";
+  }
+
+  function setLoadingProgress(value,ceiling=null){
+    state.loadingProgressValue=clampLoadingProgress(value);
+    if(ceiling!==null) state.loadingProgressCeiling=clampLoadingProgress(ceiling);
+    requestAnimationFrame(paintLoadingProgress);
+  }
+
+  function startLoadingProgress(){
+    clearInterval(state.loadingProgressTimer);
+    state.loadingProgressValue=0;
+    state.loadingProgressCeiling=64;
+    state.loadingProgressTimer=setInterval(()=>{
+      if(!state.universalAnswerPending){
+        clearInterval(state.loadingProgressTimer);
+        state.loadingProgressTimer=null;
+        return;
+      }
+      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||64);
+      if(state.loadingProgressValue>=ceiling-.25) return;
+      const remaining=ceiling-state.loadingProgressValue;
+      state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.55,remaining*.055));
+      paintLoadingProgress();
+    },260);
+  }
+
+  function stopLoadingProgress(reset=true){
+    clearInterval(state.loadingProgressTimer);
+    state.loadingProgressTimer=null;
+    if(reset){
+      state.loadingProgressValue=0;
+      state.loadingProgressCeiling=0;
+    }
+  }
+
   async function hydrateUniversalAnswer(question,displayLabel=""){
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
+    startLoadingProgress();
 
     // Make the transition explicit instead of briefly presenting a deterministic
     // fallback as though it were the final answer.
@@ -4511,6 +4705,7 @@
       };
       state.response=loading;
       render();
+      setLoadingProgress(4,64);
     }
 
     const controller=new AbortController();
@@ -4541,15 +4736,24 @@
         throw new Error(`Cosmos gateway returned ${response.status}`);
       }
 
+      setLoadingProgress(Math.max(state.loadingProgressValue,72),82);
       const data=await response.json();
+      setLoadingProgress(Math.max(state.loadingProgressValue,84),90);
       if(!data || !String(data.answer||data.short_answer||"").trim()){
         throw new Error("Cosmos gateway returned no answer");
       }
 
-      state.observer=universalResponseToObserver(question,data,displayLabel);
+      const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
+      setLoadingProgress(94,94);
+      await new Promise(resolve=>setTimeout(resolve,120));
+      setLoadingProgress(100,100);
+      await new Promise(resolve=>setTimeout(resolve,260));
+
+      state.observer=resolvedObserver;
       state.response=state.observer.response;
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
+      stopLoadingProgress(true);
 
       reconcileJourneyWithResolvedObserver(state.observer);
       saveTrail();
@@ -4557,6 +4761,7 @@
     }catch(error){
       console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
       state.universalAnswerPending=false;
+      stopLoadingProgress(true);
 
       // Restore deterministic/local response as graceful fallback.
       const local=buildQuestionResponse(question);
