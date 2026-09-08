@@ -223,8 +223,7 @@
       stroke-width:5.2;
       stroke-linecap:round;
       pointer-events:none;
-      stroke-dasharray:100 100;
-      stroke-dashoffset:100;
+      opacity:0;
       filter:drop-shadow(0 0 7px rgba(105,157,255,.92));
       transition:stroke-dashoffset .34s cubic-bezier(.2,.72,.2,1),opacity .18s ease
     }
@@ -946,7 +945,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.4-m3.2h";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.5-m3.2i";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -1338,7 +1337,10 @@
     const target=normalizeSubject(label);
     if(!target) return null;
 
-    const entities=[...state.entities.values()];
+    // Identity resolution is allowed to use canonical/admitted Cosmos objects only.
+    // Temporary response-space projection nodes must never become canonical merely
+    // because a later phrase happens to share their label.
+    const entities=[...state.entities.values()].filter(entity=>!entity?.ephemeral_projection);
     let exact=entities.find(entity=>
       normalizeSubject(entity?.name||entity?.label||entity?.entity_id||"")===target
     );
@@ -1788,6 +1790,7 @@
 
   function resolveQuestionSubject(question){
     const ranked=[...state.entities.values()]
+      .filter(entity=>!entity?.ephemeral_projection)
       .map(entity=>({
         entity,
         label:entity.name || entity.label || entity.entity_id || "",
@@ -2416,18 +2419,24 @@
       state.butterfly.origin_change_id=state.butterfly.origin_change_id||changeId;
       state.butterfly.status="active";
     }else if(snap.kind==="response" && snap.question){
-      const response=buildQuestionResponse(snap.question);
+      // Returning through Journey must never reconstruct a universal Station from
+      // the legacy PTD/local answer builder. Re-open the saved Coordinate as a
+      // neutral loading Station and let the universal gateway rebuild it.
+      const response=buildUniversalLoadingResponse(snap.question,snap.label||snap.question);
+      if(snap.response_coordinate) response.coordinate={...snap.response_coordinate};
       state.observer={
         ...snap,
         kind:"response",
         id:response.id,
         label:snap.label||snap.question,
-        response:{...response,coordinate:snap.response_coordinate||response.coordinate||null},
+        response,
         question:snap.question,
-        semantic_subject_id:response?.subject_match?.id||"",
-        semantic_subject_label:response?.subject_match?.label||""
+        semantic_subject_id:"",
+        semantic_subject_label:""
       };
       state.response=response;
+      state.universalAnswerLoaded=false;
+      state.universalAnswerPending=false;
     }else{
       state.observer={...snap};
     }
@@ -2437,6 +2446,10 @@
     saveJourney();
     saveTrail();
     render();
+
+    if(snap.kind==="response" && snap.question){
+      queueMicrotask(()=>hydrateUniversalAnswer(snap.question,snap.label||snap.question));
+    }
   }
 
   function observerSnapshot(observer){
@@ -4114,27 +4127,31 @@
       // INNER: use the exact same 49px circle as the normal inner border.
       // pathLength=100 makes progress deterministic and visually starts from zero.
       const progressValue=clampLoadingProgress(state.loadingProgressValue);
+      const progressRadius=49;
+      const progressCircumference=2*Math.PI*progressRadius;
       const progressTrack=svgEl("circle",{
-        r:49,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
+        r:progressRadius,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
       });
       const progressRing=svgEl("circle",{
         id:"cosmosObserverProgress",
-        r:49,cx:0,cy:0,
-        pathLength:100,
+        r:progressRadius,cx:0,cy:0,
         class:"cosmosObserverProgress",
-        "stroke-dasharray":"100 100",
-        "stroke-dashoffset":String(100-progressValue),
-        transform:"rotate(-90)",
+        "data-circumference":String(progressCircumference),
+        "stroke-dasharray":`${progressCircumference} ${progressCircumference}`,
+        "stroke-dashoffset":String(progressCircumference*(1-progressValue/100)),
+        transform:"rotate(-90 0 0)",
         "aria-hidden":"true"
       });
+      progressRing.style.opacity=progressValue>0?"1":"0";
       og.appendChild(progressTrack);
       og.appendChild(progressRing);
 
-      // Keep progress detail visually tied to the brewing circle itself.
+      // Keep progress detail visually tied to the brewing circle itself and give
+      // it stable IDs so the progress timer updates the words without redrawing SVG.
       const stage=loadingStageFromProgress(progressValue);
-      const stageTitle=svgEl("text",{x:0,y:91,"text-anchor":"middle",fill:"#dce8ff","font-size":10,"font-weight":800,"letter-spacing":"1.1"});
+      const stageTitle=svgEl("text",{id:"cosmosObserverStageTitle",x:0,y:91,"text-anchor":"middle",fill:"#dce8ff","font-size":10,"font-weight":800,"letter-spacing":"1.1"});
       stageTitle.textContent=stage.title.toUpperCase();
-      const stagePct=svgEl("text",{x:0,y:108,"text-anchor":"middle",fill:"#7896c7","font-size":9,"font-weight":650});
+      const stagePct=svgEl("text",{id:"cosmosObserverStagePct",x:0,y:108,"text-anchor":"middle",fill:"#7896c7","font-size":9,"font-weight":650});
       stagePct.textContent=`${Math.round(progressValue)}% · BREWING THE ESSENCE`;
       og.appendChild(stageTitle);
       og.appendChild(stagePct);
@@ -4293,7 +4310,7 @@
 
   function explicitNarrowSubjectPhraseClient(question){
     const raw=String(question||"").trim();
-    const matches=[...raw.matchAll(/\b(?:about|regarding|around|within|in|for|on)\s+([^,;?.]{2,120})/ig)];
+    const matches=[...raw.matchAll(/\b(?:about|regarding|around|within|in|for|on|of)\s+([^,;?.]{2,120})/ig)];
     const generic=new Set([
       "world","the world","global","globally","worldwide","today","now","right now",
       "this week","last week","past week","this month","last month","recently","the future",
@@ -4310,15 +4327,36 @@
     return "";
   }
 
+  function questionDependsOnCurrentCoordinate(question){
+    const raw=String(question||"").trim();
+    if(!raw) return false;
+
+    const deictic=/\b(this|that|it|these|those|here|this topic|this subject|this station|current station|previous station|above)\b/i.test(raw);
+    const relational=/\b(compare|versus|vs\.?|relative to|connect|connection|related|relationship|affect|impact|cause|caused by|lead to|because of|from here|what about|and what about)\b/i.test(raw);
+
+    // A follow-up such as "what are the risks?" contains no new named subject
+    // and should remain inside the current Station. Explicitly named subjects do not.
+    const explicit=explicitNarrowSubjectPhraseClient(raw);
+    if(deictic) return true;
+    if(relational && !explicit) return true;
+
+    const shortFollowUp=/^\s*(why|how|risks?|opportunities?|impacts?|effects?|causes?|drivers?|what next|next|more|continue|go deeper|tell me more)\s*[?.!]*\s*$/i.test(raw);
+    return shortFollowUp;
+  }
+
   function shouldStartFreshCoordinate(question){
     const raw=String(question||"").trim();
     if(!raw) return false;
+    if(questionDependsOnCurrentCoordinate(raw)) return false;
+
     const explicitGlobal=/\b(global|globally|world|worldwide|across the world)\b/i.test(raw);
     const broadDiscovery=/\b(good news|positive developments?|encouraging developments?|important developments?|major developments?|top developments?|world update|global update|what(?:'s| is) happening|what changed|latest developments?|latest news|news around the world)\b/i.test(raw);
-    const deictic=/\b(this|that|it|here|there|this topic|this subject|this station|these|those)\b/i.test(raw);
-    if(explicitNarrowSubjectPhraseClient(raw)) return false;
-    if(deictic&&!explicitGlobal) return false;
-    return explicitGlobal||broadDiscovery;
+    const explicitSubject=Boolean(explicitNarrowSubjectPhraseClient(raw));
+    const namedSubjectForm=/^\s*(?:please\s+)?(?:tell me about|explain|describe|explore|show me|what is|who is|new developments in|latest developments in|latest news in|what is happening in|what changed in)\s+.{2,160}$/i.test(raw);
+
+    // Explicit scope/subject starts a new projection boundary. Journey remains
+    // navigation provenance only; it is not evidence or hidden topical context.
+    return explicitGlobal || broadDiscovery || explicitSubject || namedSubjectForm;
   }
 
   function currentContextSubject(){
@@ -4332,8 +4370,10 @@
     }
 
     if(state.observer?.response?.subject_match?.id){
+      const subjectId=String(state.observer.response.subject_match.id||"");
+      const subjectEntity=state.entities.get(subjectId);
       return {
-        id:state.observer.response.subject_match.id,
+        id:subjectEntity?.ephemeral_projection ? "" : subjectId,
         label:state.observer.response.subject_match.label||observerDisplayLabel(state.observer)||""
       };
     }
@@ -4434,7 +4474,8 @@
       const payload={
         question,
         context_subject:{id:focusId,label:label||entityLabel(focusId)},
-        journey:journeyContextForGateway(),
+        journey:[],
+        context_policy:"explicit_station_coordinate",
         page:{url:location.href,entry_question:entry.question||"",article_id:entry.article_id||"",projection_mode:"semantic_altitude"}
       };
       setLoadingProgress(Math.max(state.loadingProgressValue,12),66);
@@ -4649,27 +4690,55 @@
     };
   }
 
+  function ensureUniversalSubjectEntity(question,data,displayLabel,responseToken,dynamicProjection){
+    if(dynamicProjection?.subject_id && state.entities.has(dynamicProjection.subject_id)){
+      return dynamicProjection.subject_id;
+    }
+
+    const coordinate=(data?.coordinate && typeof data.coordinate==="object") ? data.coordinate : {};
+    const label=String(
+      coordinate.focus_label || data?.subject || displayLabel || question || "Cosmos"
+    ).replace(/\s+/g," ").trim() || "Cosmos";
+    const localId=String(coordinate.focus_id||data?.subject||label||"subject");
+    const entityId=canonicalOrEphemeralEntityId(label,responseToken,`subject-${localId}`);
+
+    if(!state.entities.has(entityId)){
+      state.entities.set(entityId,{
+        entity_id:entityId,
+        name:label,
+        label,
+        type:String(coordinate.focus_type||"Projected subject"),
+        role:"subject",
+        epistemic_state:String(data?.epistemic_state||"uncertain"),
+        confidence:projectionConfidenceValue(data?.confidence),
+        ephemeral_projection:true,
+        admitted_to_cosmos:false,
+        source_indexes:[],
+        projection_mode:String(data?.projection_mode||""),
+        projection_depth:0,
+        projection_parent_local_id:"",
+        projection_parent_id:"",
+        projection_role:"subject",
+        projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION
+      });
+    }
+    return entityId;
+  }
+
   function universalResponseToObserver(question,data,displayLabel=""){
     const responseToken=`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     const subjectLabel=String(data?.subject||"").trim();
-    const subjectEntity=subjectLabel ? findEntityByLooseLabel(subjectLabel) : null;
 
     const sources=Array.isArray(data?.sources) ? data.sources.slice(0,10) : [];
     const suggested=Array.isArray(data?.suggested_stations) ? data.suggested_stations.slice(0,8) : [];
     const dynamicProjection=materializeDynamicProjection(data,responseToken,sources);
 
-    const canonicalSubjectId=subjectEntity?.entity_id || state.observer?.semantic_subject_id || state.observer?.response?.subject_match?.id || "";
-    const subjectId=dynamicProjection.subject_id || canonicalSubjectId || "";
-
-    // A single subject seed is enough: the temporary relationships let Cosmos
-    // expand outward naturally. If there is no subject node, use the first few
-    // projected nodes, then fall back to canonical/suggested entities.
-    const fallbackSuggested=suggested.map(entityIdForSuggestedLabel).filter(Boolean);
-    const projectionSeedIds=[
-      subjectId,
-      ...(subjectId ? [] : dynamicProjection.ids.slice(0,3)),
-      ...(dynamicProjection.ids.length ? [] : fallbackSuggested)
-    ].filter(Boolean);
+    // Universal answer-space identity is isolated from the canonical PTD graph.
+    // Even an exact label match does not grant identity equivalence.
+    const subjectId=ensureUniversalSubjectEntity(
+      question,data,displayLabel,responseToken,dynamicProjection
+    );
+    const projectionSeedIds=[subjectId].filter(Boolean);
 
     const response={
       id:`response:universal:${normalizeSubject(question).replace(/\s+/g,"-")}`,
@@ -4688,7 +4757,7 @@
       subject_match: subjectId ? {
         id:subjectId,
         label:state.entities.get(subjectId)?.name || subjectLabel || observerDisplayLabel(state.observer) || subjectId,
-        entity:state.entities.get(subjectId)||subjectEntity||null
+        entity:state.entities.get(subjectId)||null
       } : null,
       bullets:sources.map((source,index)=>({
         id:`web-source-${index+1}`,
@@ -4699,7 +4768,7 @@
         seed_ids:[]
       })),
       projection_seed_ids:[...new Set(projectionSeedIds)],
-      dynamic_projection_ids:dynamicProjection.ids,
+      dynamic_projection_ids:[...new Set([subjectId,...dynamicProjection.ids].filter(Boolean))],
       dynamic_projection_relationship_count:dynamicProjection.relationship_count,
       source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
       knowledge_completion:null,
@@ -4749,14 +4818,22 @@
   }
 
   function paintLoadingProgress(){
-    const ring=document.getElementById("cosmosObserverProgress");
     const progress=clampLoadingProgress(state.loadingProgressValue);
+    const ring=document.getElementById("cosmosObserverProgress");
     if(ring){
-      ring.setAttribute("pathLength","100");
-      ring.setAttribute("stroke-dasharray","100 100");
-      ring.setAttribute("stroke-dashoffset",String(100-progress));
+      const fallbackCircumference=2*Math.PI*49;
+      const circumference=Number(ring.getAttribute("data-circumference"))||fallbackCircumference;
+      ring.setAttribute("stroke-dasharray",`${circumference} ${circumference}`);
+      ring.setAttribute("stroke-dashoffset",String(circumference*(1-progress/100)));
       ring.style.opacity=progress>0 ? "1" : "0";
     }
+
+    const stage=loadingStageFromProgress(progress);
+    const stageTitle=document.getElementById("cosmosObserverStageTitle");
+    const stagePct=document.getElementById("cosmosObserverStagePct");
+    if(stageTitle) stageTitle.textContent=stage.title.toUpperCase();
+    if(stagePct) stagePct.textContent=`${Math.round(progress)}% · BREWING THE ESSENCE`;
+
     paintLoadingNarrative();
   }
 
@@ -4769,7 +4846,7 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=58;
+    state.loadingProgressCeiling=72;
     state.loadingStage="connecting";
     state.loadingStageDetail="Reaching the universe and understanding your request…";
     requestAnimationFrame(paintLoadingProgress);
@@ -4779,7 +4856,7 @@
         state.loadingProgressTimer=null;
         return;
       }
-      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||58);
+      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||72);
       if(state.loadingProgressValue>=ceiling-.2) return;
       const remaining=ceiling-state.loadingProgressValue;
       state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.42,remaining*.045));
@@ -4796,6 +4873,29 @@
       state.loadingStage="connecting";
       state.loadingStageDetail="Connecting to Cosmos…";
     }
+  }
+
+  function buildUniversalFailureResponse(question,displayLabel="",message=""){
+    const loading=buildUniversalLoadingResponse(question,displayLabel||question);
+    return {
+      ...loading,
+      id:`response:universal-unavailable:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+      label:displayLabel||question||"Cosmos",
+      response_type:"universal_unavailable",
+      answer:"Cosmos could not complete this pass without risking an unrelated answer.",
+      short_answer:"",
+      essence:"The requested Coordinate is preserved, but Cosmos has not completed a dependable projection for it yet.",
+      epistemic_state:"uncertain",
+      confidence:"low",
+      bullets:[],
+      projection_seed_ids:[],
+      dynamic_projection_ids:[],
+      dynamic_projection_relationship_count:0,
+      source_label:"",
+      suggested_stations:[],
+      knowledge_gaps:[message ? `Gateway unavailable: ${String(message).slice(0,180)}` : "Universal answer unavailable."],
+      knowledge_completion:null
+    };
   }
 
   async function hydrateUniversalAnswer(question,displayLabel=""){
@@ -4819,14 +4919,14 @@
       };
       state.response=loading;
       render();
-      setLoadingProgress(6,58);
+      setLoadingProgress(6,72);
     }
 
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
+    const freshCoordinate=shouldStartFreshCoordinate(question);
 
     try{
-      const freshCoordinate=shouldStartFreshCoordinate(question);
       const context=freshCoordinate ? null : currentContextSubject();
       const payload={
         question,
@@ -4851,21 +4951,28 @@
         throw new Error(`Cosmos gateway returned ${response.status}`);
       }
 
-      setLoadingProgress(Math.max(state.loadingProgressValue,64),76);
+      setLoadingProgress(Math.max(state.loadingProgressValue,74),82);
       const data=await response.json();
-      setLoadingProgress(Math.max(state.loadingProgressValue,78),88);
+      setLoadingProgress(Math.max(state.loadingProgressValue,84),92);
       if(!data || !String(data.answer||data.short_answer||"").trim()){
         throw new Error("Cosmos gateway returned no answer");
       }
 
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
-      setLoadingProgress(92,97);
+      setLoadingProgress(94,98);
       await new Promise(resolve=>setTimeout(resolve,180));
       setLoadingProgress(100,100);
       await new Promise(resolve=>setTimeout(resolve,420));
 
       state.observer=resolvedObserver;
       state.response=state.observer.response;
+      if(
+        state.entryObserver?.kind==="response" &&
+        state.entryObserver?.question===question &&
+        state.entryObserver?.response?.response_type==="universal_loading"
+      ){
+        state.entryObserver=resolvedObserver;
+      }
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
       stopLoadingProgress(true);
@@ -4879,8 +4986,11 @@
       state.universalAnswerPending=false;
       stopLoadingProgress(true);
 
-      // Restore deterministic/local response as graceful fallback.
-      const local=buildQuestionResponse(question);
+      // Never answer a fresh/open-world Coordinate with the legacy PTD-local
+      // fallback. Sparse uncertainty is preferable to topical contamination.
+      const local=freshCoordinate
+        ? buildUniversalFailureResponse(question,displayLabel||question,error?.message||error)
+        : buildQuestionResponse(question);
       state.response=local;
       state.observer={
         kind:"response",
@@ -4952,7 +5062,8 @@
       if(context.label) url.searchParams.set("context_label",context.label);
     }else{
       url.searchParams.delete("context_id");
-      url.searchParams.delete("context_label");
+      if(context?.label) url.searchParams.set("context_label",context.label);
+      else url.searchParams.delete("context_label");
     }
 
     history.pushState({cosmos:true},"",url.pathname+url.search);
