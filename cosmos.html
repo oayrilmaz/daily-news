@@ -219,14 +219,14 @@
     }
     .cosmosObserverProgress{
       fill:none;
-      stroke:#89b5ff;
-      stroke-width:4.2;
+      stroke:#9bc1ff;
+      stroke-width:5.2;
       stroke-linecap:round;
       pointer-events:none;
-      transform:rotate(-90deg);
-      transform-origin:center;
-      filter:drop-shadow(0 0 6px rgba(105,157,255,.82));
-      transition:stroke-dasharray .36s cubic-bezier(.2,.7,.2,1),opacity .2s ease
+      stroke-dasharray:100 100;
+      stroke-dashoffset:100;
+      filter:drop-shadow(0 0 7px rgba(105,157,255,.92));
+      transition:stroke-dashoffset .34s cubic-bezier(.2,.72,.2,1),opacity .18s ease
     }
     .cosmosBrewStatus{
       display:flex;
@@ -946,7 +946,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.3-m3.2g";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.4-m3.2h";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -1039,6 +1039,14 @@
     return null;
   }
 
+  function knowledgeStatusText(){
+    return `${state.entities.size} objects · ${state.relationships.length} relationships · ${state.changes.size} changes`;
+  }
+
+  function restoreKnowledgeStatus(){
+    statusEl.textContent=knowledgeStatusText();
+  }
+
   async function loadKnowledge(){
     statusEl.textContent = "loading knowledge";
     const [entitiesPayload, relationshipsPayload, developmentsPayload, dailyBriefPayload, changesPayload, causalEdgesPayload] = await Promise.all([
@@ -1085,7 +1093,7 @@
       (dailyBriefPayload?.date_utc || dailyBriefPayload?.generated_at ||
        dailyBriefPayload?.briefing_date || dailyBriefPayload?.date || "");
 
-    statusEl.textContent = `${state.entities.size} objects · ${state.relationships.length} relationships · ${state.changes.size} changes`;
+    restoreKnowledgeStatus();
   }
 
   function syntheticRelationshipObserver(){
@@ -4114,11 +4122,22 @@
         r:49,cx:0,cy:0,
         pathLength:100,
         class:"cosmosObserverProgress",
-        "stroke-dasharray":`${progressValue} ${Math.max(0,100-progressValue)}`,
+        "stroke-dasharray":"100 100",
+        "stroke-dashoffset":String(100-progressValue),
+        transform:"rotate(-90)",
         "aria-hidden":"true"
       });
       og.appendChild(progressTrack);
       og.appendChild(progressRing);
+
+      // Keep progress detail visually tied to the brewing circle itself.
+      const stage=loadingStageFromProgress(progressValue);
+      const stageTitle=svgEl("text",{x:0,y:91,"text-anchor":"middle",fill:"#dce8ff","font-size":10,"font-weight":800,"letter-spacing":"1.1"});
+      stageTitle.textContent=stage.title.toUpperCase();
+      const stagePct=svgEl("text",{x:0,y:108,"text-anchor":"middle",fill:"#7896c7","font-size":9,"font-weight":650});
+      stagePct.textContent=`${Math.round(progressValue)}% · BREWING THE ESSENCE`;
+      og.appendChild(stageTitle);
+      og.appendChild(stagePct);
     }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=projection.station?.focus_label || observerDisplayLabel(observer);
@@ -4272,6 +4291,36 @@
 
 
 
+  function explicitNarrowSubjectPhraseClient(question){
+    const raw=String(question||"").trim();
+    const matches=[...raw.matchAll(/\b(?:about|regarding|around|within|in|for|on)\s+([^,;?.]{2,120})/ig)];
+    const generic=new Set([
+      "world","the world","global","globally","worldwide","today","now","right now",
+      "this week","last week","past week","this month","last month","recently","the future",
+      "short term","mid term","short to mid term","long term","humanity","everyone","people"
+    ]);
+    for(const match of matches){
+      let candidate=String(match?.[1]||"")
+        .replace(/\b(today|right now|now|this week|last week|past week|this month|last month|recently|latest|short(?:-| )term|mid(?:-| )term|long(?:-| )term)\b/ig," ")
+        .replace(/\s+/g," ").trim().toLowerCase();
+      if(!candidate||generic.has(candidate)) continue;
+      if(/^(the )?(world|globe|global developments?|positive developments?|good news|news|developments?)$/i.test(candidate)) continue;
+      return candidate;
+    }
+    return "";
+  }
+
+  function shouldStartFreshCoordinate(question){
+    const raw=String(question||"").trim();
+    if(!raw) return false;
+    const explicitGlobal=/\b(global|globally|world|worldwide|across the world)\b/i.test(raw);
+    const broadDiscovery=/\b(good news|positive developments?|encouraging developments?|important developments?|major developments?|top developments?|world update|global update|what(?:'s| is) happening|what changed|latest developments?|latest news|news around the world)\b/i.test(raw);
+    const deictic=/\b(this|that|it|here|there|this topic|this subject|this station|these|those)\b/i.test(raw);
+    if(explicitNarrowSubjectPhraseClient(raw)) return false;
+    if(deictic&&!explicitGlobal) return false;
+    return explicitGlobal||broadDiscovery;
+  }
+
   function currentContextSubject(){
     // M3.2C — the CURRENT Station owns the context boundary. Entry context is
     // only an initialization fallback and must never override a later Station.
@@ -4340,8 +4389,10 @@
   }
 
   function canonicalOrEphemeralEntityId(label,responseToken,nodeId){
-    const canonical=findEntityByLooseLabel(label);
-    if(canonical?.entity_id) return canonical.entity_id;
+    // M3.2H — response-space projection nodes are ALWAYS temporary. A label
+    // match such as Copper, Storage, Medicine, or Trust must not silently merge
+    // the new Coordinate into the canonical PTD graph. Canonical identity can be
+    // resolved later through governed admission; navigation should stay isolated.
     const safe=String(nodeId||label||"node")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g,"-")
@@ -4702,7 +4753,8 @@
     const progress=clampLoadingProgress(state.loadingProgressValue);
     if(ring){
       ring.setAttribute("pathLength","100");
-      ring.setAttribute("stroke-dasharray",`${progress} ${Math.max(0,100-progress)}`);
+      ring.setAttribute("stroke-dasharray","100 100");
+      ring.setAttribute("stroke-dashoffset",String(100-progress));
       ring.style.opacity=progress>0 ? "1" : "0";
     }
     paintLoadingNarrative();
@@ -4717,7 +4769,7 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=76;
+    state.loadingProgressCeiling=58;
     state.loadingStage="connecting";
     state.loadingStageDetail="Reaching the universe and understanding your request…";
     requestAnimationFrame(paintLoadingProgress);
@@ -4727,7 +4779,7 @@
         state.loadingProgressTimer=null;
         return;
       }
-      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||76);
+      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||58);
       if(state.loadingProgressValue>=ceiling-.2) return;
       const remaining=ceiling-state.loadingProgressValue;
       state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.42,remaining*.045));
@@ -4767,19 +4819,20 @@
       };
       state.response=loading;
       render();
-      setLoadingProgress(6,76);
+      setLoadingProgress(6,58);
     }
 
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
-      const context=currentContextSubject();
+      const freshCoordinate=shouldStartFreshCoordinate(question);
+      const context=freshCoordinate ? null : currentContextSubject();
       const payload={
         question,
         context_subject:context,
-        journey:journeyContextForGateway(),
-        context_policy:"current_coordinate_only",
+        journey:freshCoordinate ? [] : journeyContextForGateway(),
+        context_policy:freshCoordinate ? "fresh_open_world_coordinate" : "current_coordinate_only",
         page:{
           url:location.href,
           entry_question:entry.question||"",
@@ -4798,15 +4851,15 @@
         throw new Error(`Cosmos gateway returned ${response.status}`);
       }
 
-      setLoadingProgress(Math.max(state.loadingProgressValue,58),82);
+      setLoadingProgress(Math.max(state.loadingProgressValue,64),76);
       const data=await response.json();
-      setLoadingProgress(Math.max(state.loadingProgressValue,78),90);
+      setLoadingProgress(Math.max(state.loadingProgressValue,78),88);
       if(!data || !String(data.answer||data.short_answer||"").trim()){
         throw new Error("Cosmos gateway returned no answer");
       }
 
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
-      setLoadingProgress(91,96);
+      setLoadingProgress(92,97);
       await new Promise(resolve=>setTimeout(resolve,180));
       setLoadingProgress(100,100);
       await new Promise(resolve=>setTimeout(resolve,420));
@@ -4820,6 +4873,7 @@
       reconcileJourneyWithResolvedObserver(state.observer);
       saveTrail();
       render();
+      restoreKnowledgeStatus();
     }catch(error){
       console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
       state.universalAnswerPending=false;
@@ -4840,6 +4894,7 @@
       };
       reconcileJourneyWithResolvedObserver(state.observer);
       render();
+      restoreKnowledgeStatus();
     }finally{
       clearTimeout(timer);
     }
@@ -4890,10 +4945,14 @@
     url.searchParams.set("question",question);
     url.searchParams.set("from","cosmos-projection");
 
-    const context=currentContextSubject();
+    const freshCoordinate=shouldStartFreshCoordinate(question);
+    const context=freshCoordinate ? null : currentContextSubject();
     if(context?.id){
       url.searchParams.set("context_id",context.id);
       if(context.label) url.searchParams.set("context_label",context.label);
+    }else{
+      url.searchParams.delete("context_id");
+      url.searchParams.delete("context_label");
     }
 
     history.pushState({cosmos:true},"",url.pathname+url.search);
