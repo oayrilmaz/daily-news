@@ -1022,8 +1022,8 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.7-m3.7-defensible-bridge";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 90000;
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.8-m3.8-connection-path-reliability";
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 120000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
@@ -5029,7 +5029,7 @@
       ];
     }
 
-    const subjectNode=nodes.find(node=>String(node?.role||"").toLowerCase()==="subject") || nodes[0] || null;
+    const subjectNode=nodes.find(node=>String(node?.projection_role||node?.role||"").toLowerCase()==="subject") || nodes[0] || null;
     const subjectProjectionId=subjectNode
       ? idMap.get(String(subjectNode.id||""))
       : "";
@@ -5273,9 +5273,9 @@
       id:`response:universal-unavailable:${normalizeSubject(question).replace(/\s+/g,"-")}`,
       label:displayLabel||question||"Cosmos",
       response_type:"universal_unavailable",
-      answer:"Cosmos preserved this Coordinate, but the bridge could not be completed in the available pass.",
+      answer:"Cosmos kept this Coordinate open, but the reasoning pass did not return a usable path. Please retry this same question; Cosmos will preserve the destination rather than substitute another topic.",
       short_answer:"",
-      essence:"The question remains the Journey entrance. Cosmos has not yet earned enough support to draw the bridge without inventing a step.",
+      essence:"The question remains the Journey entrance. A connection path should appear here as qualified reasoning when it can be explained, even when some steps are inference rather than established causality.",
       epistemic_state:"uncertain",
       confidence:"low",
       bullets:[],
