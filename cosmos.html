@@ -213,20 +213,47 @@
     }
     .cosmosObserverProgressTrack{
       fill:none;
-      stroke:rgba(119,159,232,.16);
-      stroke-width:3.2;
+      stroke:rgba(119,159,232,.12);
+      stroke-width:3.5;
       pointer-events:none
     }
     .cosmosObserverProgress{
       fill:none;
-      stroke:#79a7ff;
-      stroke-width:3.4;
+      stroke:#89b5ff;
+      stroke-width:4.2;
       stroke-linecap:round;
       pointer-events:none;
       transform:rotate(-90deg);
       transform-origin:center;
-      filter:drop-shadow(0 0 4px rgba(105,157,255,.62));
-      transition:stroke-dashoffset .42s cubic-bezier(.2,.7,.2,1),opacity .25s ease
+      filter:drop-shadow(0 0 6px rgba(105,157,255,.82));
+      transition:stroke-dasharray .36s cubic-bezier(.2,.7,.2,1),opacity .2s ease
+    }
+    .cosmosBrewStatus{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      text-align:center;
+      color:#9fb0c9;
+      line-height:1.35
+    }
+    .cosmosBrewStatus strong{
+      color:#dce8ff;
+      font-size:12px;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      font-weight:750
+    }
+    .cosmosBrewStatus span{
+      color:#8394ae;
+      font-size:11px
+    }
+    .cosmosBrewStatus em{
+      color:#6f8fc7;
+      font-size:10px;
+      font-style:normal;
+      letter-spacing:.04em
     }
     .error{color:var(--danger)}
     .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
@@ -919,7 +946,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.1-m3.2c";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.3-m3.2g";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -939,6 +966,8 @@
     loadingProgressValue: 0,
     loadingProgressCeiling: 0,
     loadingProgressTimer: null,
+    loadingStage: "connecting",
+    loadingStageDetail: "Connecting to Cosmos…",
     history: [],
     expanded: false,
     entryObserver: null,
@@ -3942,7 +3971,11 @@
       emptyEl.style.display="none";
     }else if(semanticWorking){
       emptyEl.style.display="block";
-      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is working diligently behind the scenes, brewing the essence of your request.</span></span>`;
+      if(state.universalAnswerPending){
+        paintLoadingNarrative();
+      }else{
+        emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is preparing this Station.</span></span>`;
+      }
     }else{
       emptyEl.style.display="block";
       emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos has finished this pass. No additional defensible nearby stations are ready to surface yet.</span></span>`;
@@ -4046,40 +4079,42 @@
     }
 
     const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`});
-    const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5,class:"cosmosObserverRing"});
-    const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3,class:"cosmosObserverCore"});
-    og.appendChild(ring);og.appendChild(inner);
-
     const observerLoading=Boolean(
       state.universalAnswerPending ||
       observer?.response?.response_type==="universal_loading"
     );
+
+    // Keep the normal Cosmos geometry. During brewing the inner border becomes
+    // a faint track so the bright progress line can be generated from zero.
+    const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5,class:"cosmosObserverRing"});
+    const inner=svgEl("circle",{
+      r:49,
+      fill:"#0d1b31",
+      stroke:observerLoading?"rgba(78,119,199,.16)":"#4e77c7",
+      "stroke-width":observerLoading?3.5:1.3,
+      class:"cosmosObserverCore"
+    });
+    og.appendChild(ring);og.appendChild(inner);
+
     if(observerLoading){
-      // OUTER: continuous clockwise motion = Cosmos is actively working.
+      // OUTER: continuous clockwise movement means Cosmos is actively working.
       const loadingArc=svgEl("circle",{
-        r:69,
-        cx:0,
-        cy:0,
-        class:"cosmosObserverLoadingArc",
-        "aria-hidden":"true"
+        r:69,cx:0,cy:0,class:"cosmosObserverLoadingArc","aria-hidden":"true"
       });
       og.appendChild(loadingArc);
 
-      // INNER: brewing/progress ring. It is born empty and fills clockwise as
-      // the real client-side work advances through request, response, parsing,
-      // projection materialization and final reveal.
-      const progressRadius=56;
-      const progressCircumference=2*Math.PI*progressRadius;
+      // INNER: use the exact same 49px circle as the normal inner border.
+      // pathLength=100 makes progress deterministic and visually starts from zero.
       const progressValue=clampLoadingProgress(state.loadingProgressValue);
       const progressTrack=svgEl("circle",{
-        r:progressRadius,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
+        r:49,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
       });
       const progressRing=svgEl("circle",{
         id:"cosmosObserverProgress",
-        r:progressRadius,cx:0,cy:0,
+        r:49,cx:0,cy:0,
+        pathLength:100,
         class:"cosmosObserverProgress",
-        "stroke-dasharray":progressCircumference,
-        "stroke-dashoffset":progressCircumference*(1-progressValue/100),
+        "stroke-dasharray":`${progressValue} ${Math.max(0,100-progressValue)}`,
         "aria-hidden":"true"
       });
       og.appendChild(progressTrack);
@@ -4640,15 +4675,37 @@
     return Math.max(0,Math.min(100,Number(value)||0));
   }
 
+  function loadingStageFromProgress(progress){
+    const p=clampLoadingProgress(progress);
+    if(p < 16) return {key:"connecting",title:"Connecting",detail:"Reaching the universe and understanding your request…"};
+    if(p < 38) return {key:"exploring",title:"Exploring",detail:"Searching across the relevant universe…"};
+    if(p < 62) return {key:"distilling",title:"Distilling",detail:"Filtering noise and keeping what belongs to this Coordinate…"};
+    if(p < 84) return {key:"brewing",title:"Brewing Cosmos Essence",detail:"Connecting the strongest evidence into a useful projection…"};
+    if(p < 100) return {key:"essence",title:"Providing the Essence",detail:"Preparing the Station, its nearby paths, and its evidence…"};
+    return {key:"complete",title:"Essence Ready",detail:"The universe around this Coordinate is ready."};
+  }
+
+  function paintLoadingNarrative(){
+    if(!state.universalAnswerPending) return;
+    const stage=loadingStageFromProgress(state.loadingProgressValue);
+    state.loadingStage=stage.key;
+    state.loadingStageDetail=stage.detail;
+    statusEl.textContent=`${Math.round(clampLoadingProgress(state.loadingProgressValue))}% · ${stage.title}`;
+    if(emptyEl){
+      emptyEl.style.display="block";
+      emptyEl.innerHTML=`<div class="cosmosBrewStatus"><strong>${esc(stage.title)}</strong><span>${esc(stage.detail)}</span><em>${Math.round(clampLoadingProgress(state.loadingProgressValue))}% brewed</em></div>`;
+    }
+  }
+
   function paintLoadingProgress(){
     const ring=document.getElementById("cosmosObserverProgress");
-    if(!ring) return;
-    const radius=Number(ring.getAttribute("r")||56);
-    const circumference=2*Math.PI*radius;
     const progress=clampLoadingProgress(state.loadingProgressValue);
-    ring.setAttribute("stroke-dasharray",String(circumference));
-    ring.setAttribute("stroke-dashoffset",String(circumference*(1-progress/100)));
-    ring.style.opacity=progress>0 ? "1" : "0";
+    if(ring){
+      ring.setAttribute("pathLength","100");
+      ring.setAttribute("stroke-dasharray",`${progress} ${Math.max(0,100-progress)}`);
+      ring.style.opacity=progress>0 ? "1" : "0";
+    }
+    paintLoadingNarrative();
   }
 
   function setLoadingProgress(value,ceiling=null){
@@ -4660,19 +4717,22 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=64;
+    state.loadingProgressCeiling=76;
+    state.loadingStage="connecting";
+    state.loadingStageDetail="Reaching the universe and understanding your request…";
+    requestAnimationFrame(paintLoadingProgress);
     state.loadingProgressTimer=setInterval(()=>{
       if(!state.universalAnswerPending){
         clearInterval(state.loadingProgressTimer);
         state.loadingProgressTimer=null;
         return;
       }
-      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||64);
-      if(state.loadingProgressValue>=ceiling-.25) return;
+      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||76);
+      if(state.loadingProgressValue>=ceiling-.2) return;
       const remaining=ceiling-state.loadingProgressValue;
-      state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.55,remaining*.055));
+      state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.42,remaining*.045));
       paintLoadingProgress();
-    },260);
+    },220);
   }
 
   function stopLoadingProgress(reset=true){
@@ -4681,6 +4741,8 @@
     if(reset){
       state.loadingProgressValue=0;
       state.loadingProgressCeiling=0;
+      state.loadingStage="connecting";
+      state.loadingStageDetail="Connecting to Cosmos…";
     }
   }
 
@@ -4705,7 +4767,7 @@
       };
       state.response=loading;
       render();
-      setLoadingProgress(4,64);
+      setLoadingProgress(6,76);
     }
 
     const controller=new AbortController();
@@ -4736,18 +4798,18 @@
         throw new Error(`Cosmos gateway returned ${response.status}`);
       }
 
-      setLoadingProgress(Math.max(state.loadingProgressValue,72),82);
+      setLoadingProgress(Math.max(state.loadingProgressValue,58),82);
       const data=await response.json();
-      setLoadingProgress(Math.max(state.loadingProgressValue,84),90);
+      setLoadingProgress(Math.max(state.loadingProgressValue,78),90);
       if(!data || !String(data.answer||data.short_answer||"").trim()){
         throw new Error("Cosmos gateway returned no answer");
       }
 
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
-      setLoadingProgress(94,94);
-      await new Promise(resolve=>setTimeout(resolve,120));
+      setLoadingProgress(91,96);
+      await new Promise(resolve=>setTimeout(resolve,180));
       setLoadingProgress(100,100);
-      await new Promise(resolve=>setTimeout(resolve,260));
+      await new Promise(resolve=>setTimeout(resolve,420));
 
       state.observer=resolvedObserver;
       state.response=state.observer.response;
