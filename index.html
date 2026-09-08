@@ -174,9 +174,9 @@
 
       <section class="emergence" id="emergence" aria-live="polite">
         <div class="emergenceCard">
-          <div class="eyebrow">Cosmos is resolving your intent</div>
+          <div class="eyebrow">Cosmos is exploring</div>
           <strong id="resolvedLabel">Cosmos</strong>
-          <p id="resolvedText">Preparing the relevant observer and intelligence view…</p>
+          <p id="resolvedText">Following what changed. Connecting what matters…</p>
         </div>
       </section>
 
@@ -205,24 +205,20 @@
 
       function resolveView(question) {
         const q = String(question || "").trim();
-        const lower = q.toLowerCase();
-
         if (!q) return { view: "cosmos_entry", label: "Cosmos" };
-        if (/\b(video|videos|media|watch|youtube)\b/i.test(q)) {
+
+        // M3.2C: normal language always enters universal Cosmos.
+        // Legacy PTD surfaces are opened only by an explicit navigation request;
+        // topic words such as "medicine", "markets", "new developments", or
+        // "global" must never silently route the observer back to a PTD surface.
+        if (/\b(open|go to|take me to|show me)\b.*\b(media|videos?|youtube)\b/i.test(q)) {
           return { view: "media", label: "Media" };
         }
-        if (/\b(map|country|countries|geograph\w*|region|where|united states|u\.?s\.?|usa)\b/i.test(q)) {
+        if (/\b(open|go to|take me to|show me)\b.*\b(global intelligence map|country map|map)\b/i.test(q)) {
           return { view: "global_intelligence_map", label: "Global Intelligence" };
         }
-        if (/\b(group|groups|community|communities|linkedin)\b/i.test(q)) {
+        if (/\b(open|go to|take me to|show me)\b.*\b(groups?|communities|linkedin groups?)\b/i.test(q)) {
           return { view: "communities", label: "Professional Communities" };
-        }
-        if (/\b(market|markets|stock|stocks|outlook|investment|price|prices)\b/i.test(q)) {
-          return { view: "market_pulse", label: "Market Pulse & Outlook" };
-        }
-        if (/\b(today'?s?|daily|latest|new|changed|happened)\b.*\b(intelligence|brief|briefing|signals?|news|developments?)\b/i.test(q) ||
-            /\bwhat changed\b/i.test(q) || /\bwhat happened\b/i.test(q)) {
-          return { view: "daily_intelligence", label: "Daily Intelligence" };
         }
 
         return { view: "cosmos_projection", label: q };
@@ -261,8 +257,8 @@
         resolvedLabel.textContent = resolved.label;
         resolvedText.textContent =
           resolved.view === "cosmos_projection"
-            ? "Creating a Cosmos observer around your question…"
-            : `Materializing ${resolved.label} from your request…`;
+            ? "Following what changed. Connecting what matters…"
+            : `Opening ${resolved.label}…`;
         hint.textContent = "Your question becomes the temporary center.";
 
         window.setTimeout(() => {
