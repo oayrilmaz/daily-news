@@ -196,6 +196,21 @@
       56%{transform:scale(1)}
       66%{transform:scale(1.014)}
     }
+    .cosmosObserverLoadingArc{
+      fill:none;
+      stroke:#a8c5ff;
+      stroke-width:4;
+      stroke-linecap:round;
+      stroke-dasharray:92 350;
+      opacity:.96;
+      transform-box:fill-box;
+      transform-origin:center;
+      filter:drop-shadow(0 0 5px rgba(126,170,255,.72));
+      animation:observerLoadingSweep 1.25s linear infinite
+    }
+    @keyframes observerLoadingSweep{
+      to{transform:rotate(360deg)}
+    }
     .error{color:var(--danger)}
     .footer{text-align:center;color:#718096;font-size:12px;padding:22px}
 
@@ -2395,9 +2410,55 @@
     }catch{}
   }
 
+  function buildUniversalLoadingResponse(question,label=""){
+    const q=String(question||"").trim();
+    const display=String(label||q||"Cosmos").trim();
+    const normalized=normalizeSubject(q);
+    return {
+      id:`response:universal-loading:${normalized.replace(/\s+/g,"-")}`,
+      label:display,
+      response_type:"universal_loading",
+      question:q,
+      answer:"Cosmos is exploring…",
+      short_answer:"",
+      essence:"",
+      current_pulse:[],
+      intent:"universal",
+      epistemic_state:"uncertain",
+      confidence:"",
+      subject_match:null,
+      bullets:[],
+      projection_seed_ids:[],
+      dynamic_projection_ids:[],
+      dynamic_projection_relationship_count:0,
+      source_label:"",
+      knowledge_completion:null,
+      suggested_stations:[],
+      knowledge_gaps:[],
+      coordinate:{
+        focus_type:"investigation",
+        focus_id:normalized?`question:${normalized}`:"cosmos",
+        focus_label:display,
+        time_mode:"live",
+        geography:null,
+        resolution:"",
+        lens:"now",
+        objective:"",
+        epistemic_mode:"know",
+        temporal_request:false,
+        change_first:false
+      }
+    };
+  }
+
   function resolveEntryObserver(){
     if(entry.focus === "question" && entry.question){
-      const response=buildQuestionResponse(entry.question);
+      // M3.2D — Never paint a locally guessed subject while the universal
+      // Coordinate is still being resolved. A transient wrong center (for
+      // example Battery Energy Storage Systems) is more damaging than a sparse
+      // neutral Station. The query itself remains the temporary center until
+      // the governed universal response arrives.
+      const response=buildUniversalLoadingResponse(entry.question,entry.question);
       state.response=response;
       return {
         kind:"response",
@@ -2405,8 +2466,8 @@
         label:entry.question,
         response,
         question:entry.question,
-        semantic_subject_id:response?.subject_match?.id || "",
-        semantic_subject_label:response?.subject_match?.label || "",
+        semantic_subject_id:"",
+        semantic_subject_label:"",
         article_id:entry.article_id
       };
     }
@@ -3863,6 +3924,23 @@
     const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5,class:"cosmosObserverRing"});
     const inner=svgEl("circle",{r:49,fill:"#0d1b31",stroke:"#4e77c7","stroke-width":1.3,class:"cosmosObserverCore"});
     og.appendChild(ring);og.appendChild(inner);
+
+    const observerLoading=Boolean(
+      state.universalAnswerPending ||
+      observer?.response?.response_type==="universal_loading"
+    );
+    if(observerLoading){
+      // Clockwise activity sweep: intentionally indeterminate. It communicates
+      // active work without inventing a percentage-complete value we do not know.
+      const loadingArc=svgEl("circle",{
+        r:69,
+        cx:0,
+        cy:0,
+        class:"cosmosObserverLoadingArc",
+        "aria-hidden":"true"
+      });
+      og.appendChild(loadingArc);
+    }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=projection.station?.focus_label || observerDisplayLabel(observer);
     const chunks=label.match(/.{1,18}(?:\s|$)/g) || [label];
@@ -4421,12 +4499,17 @@
     // Make the transition explicit instead of briefly presenting a deterministic
     // fallback as though it were the final answer.
     if(state.observer?.kind==="response"){
-      state.observer.response={
-        ...state.observer.response,
-        response_type:"universal_loading",
-        answer:"Cosmos is exploring…",
-        knowledge_completion:null
+      const loading=buildUniversalLoadingResponse(question,displayLabel||state.observer.label||question);
+      state.observer={
+        ...state.observer,
+        id:loading.id,
+        label:displayLabel||state.observer.label||question,
+        response:loading,
+        question,
+        semantic_subject_id:"",
+        semantic_subject_label:""
       };
+      state.response=loading;
       render();
     }
 
@@ -4517,23 +4600,19 @@
     // gateway handles the follow-up conversationally; no case-specific route.
     state.history.push(state.observer);
 
-    const provisional=buildQuestionResponse(question);
+    const provisional=buildUniversalLoadingResponse(question,question);
     state.observer={
       kind:"response",
       id:provisional.id,
       label:question,
-      response:{
-        ...provisional,
-        response_type:"universal_loading",
-        answer:"Cosmos is exploring…",
-        knowledge_completion:null
-      },
+      response:provisional,
       question,
-      semantic_subject_id:provisional?.subject_match?.id||"",
-      semantic_subject_label:provisional?.subject_match?.label||"",
+      semantic_subject_id:"",
+      semantic_subject_label:"",
       article_id:entry.article_id,
       via_operation:"ASK"
     };
+    state.response=provisional;
 
     state.universalAnswerLoaded=false;
     state.universalAnswerPending=false;
