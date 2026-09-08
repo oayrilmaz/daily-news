@@ -1022,8 +1022,8 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.5-m3.2i";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.7-m3.7-defensible-bridge";
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 90000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
@@ -4332,7 +4332,7 @@
       emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is preparing this Station.</span></span>`;
     }else{
       emptyEl.style.display="block";
-      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>This Coordinate is intentionally sparse. Use the Cosmos Compass or ask another question to open a new direction.</span></span>`;
+      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is holding this Coordinate open. A path appears only when each bridge can be explained; use the Compass to continue from the strongest supported edge.</span></span>`;
     }
     const completionBlocked =
       observer?.kind==="response" &&
@@ -5237,7 +5237,7 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=72;
+    state.loadingProgressCeiling=76;
     state.loadingStage="connecting";
     state.loadingStageDetail="Reaching the universe and understanding your request…";
     requestAnimationFrame(paintLoadingProgress);
@@ -5247,7 +5247,7 @@
         state.loadingProgressTimer=null;
         return;
       }
-      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||72);
+      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||76);
       if(state.loadingProgressValue>=ceiling-.2) return;
       const remaining=ceiling-state.loadingProgressValue;
       state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.42,remaining*.045));
@@ -5273,9 +5273,9 @@
       id:`response:universal-unavailable:${normalizeSubject(question).replace(/\s+/g,"-")}`,
       label:displayLabel||question||"Cosmos",
       response_type:"universal_unavailable",
-      answer:"Cosmos could not complete this pass without risking an unrelated answer.",
+      answer:"Cosmos preserved this Coordinate, but the bridge could not be completed in the available pass.",
       short_answer:"",
-      essence:"The requested Coordinate is preserved, but Cosmos has not completed a dependable projection for it yet.",
+      essence:"The question remains the Journey entrance. Cosmos has not yet earned enough support to draw the bridge without inventing a step.",
       epistemic_state:"uncertain",
       confidence:"low",
       bullets:[],
@@ -5312,7 +5312,7 @@
       };
       state.response=loading;
       render();
-      setLoadingProgress(6,72);
+      setLoadingProgress(6,76);
     }
 
     const controller=new AbortController();
@@ -5326,6 +5326,7 @@
         context_subject:context,
         journey:freshCoordinate ? [] : journeyContextForGateway(),
         arrival_context:state.observer?.arrival_transition || currentArrivalTransition() || null,
+        interaction_mode:/\b(how (?:could|can|does|would)|how is .* connected|connect .* to|path from|eventually (?:reach|affect|change)|take me from)\b/i.test(question) ? "connection_path" : "auto",
         context_policy:freshCoordinate ? "fresh_open_world_coordinate" : "current_coordinate_only",
         page:{
           url:location.href,
