@@ -805,7 +805,18 @@
     /* Keep old deep diagnostic content available to code, but not on the default human surface. */
     .detail.legacyDetail{display:none}
 
-  </style>
+  
+    /* M4.0 — Invisible Complexity / Simple Cosmos.
+       Complexity stays in the engines; the surface shows only the next meaningful move. */
+    .legend{display:none!important}
+    .projectionInfinity{display:none!important}
+    .projectionContext:empty,.projectionArrival:empty{display:none!important}
+    .projectionArrival{padding:0;margin:10px 0 0;border:0;background:transparent}
+    .projectionArrivalReason{font-size:13px;line-height:1.55;color:#aebbd0;margin:0}
+    .projectionArrivalReason strong{color:#dbe6f8}
+    .projectionPulse{margin-top:14px}
+    .projectionPanel{box-shadow:none}
+</style>
 </head>
 <body>
 <div class="shell">
@@ -828,8 +839,8 @@
       <p>There is no absolute center. Select anything and the universe is projected around it.</p>
     </section>
 
-    <section class="canvasWrap" aria-label="Cosmos Butterfly Effect Grid">
-      <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos relationship grid"></svg>
+    <section class="canvasWrap" aria-label="Cosmos map">
+      <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos map"></svg>
       <div class="legend">
         <span>solid → supported/current</span>
         <span>dashed → scenario/qualified</span>
@@ -1120,7 +1131,9 @@
   }
 
   function restoreKnowledgeStatus(){
-    statusEl.textContent=knowledgeStatusText();
+    // M4.0: counts remain available to the system, but do not occupy the quiet surface.
+    statusEl.textContent="";
+    statusEl.style.display="none";
   }
 
   async function loadKnowledge(){
@@ -3508,14 +3521,10 @@
     const arrival=currentArrivalTransition();
     if(projectionArrival){
       const validArrival=arrival && arrival.from_label && arrival.to_label && normalizedJourneyLabel(arrival.from_label)!==normalizedJourneyLabel(arrival.to_label);
-      if(validArrival){
-        const hasConfidence=arrival.confidence!==null && arrival.confidence!==undefined && arrival.confidence!=="" && Number.isFinite(Number(arrival.confidence)) && Number(arrival.confidence)>0;
-        const confidence=hasConfidence ? ` · ${Math.round(Number(arrival.confidence))}% confidence` : "";
-        const relation=String(arrival.relationship_label||"journey connection");
+      const reason=String(arrival?.reason||"").trim();
+      if(validArrival && reason){
         projectionArrival.style.display="block";
-        const basis=String(arrival.evidence_basis||"").trim();
-        const causalNote=arrival.causal?"supported causal bridge":"journey reasoning — not automatically Butterfly causality";
-        projectionArrival.innerHTML=`<div class="projectionArrivalHead"><span class="miniCosmos" aria-hidden="true"></span><span>Why you arrived here</span></div><div class="projectionArrivalRoute">${esc(arrival.from_label)} → ${esc(arrival.to_label)}</div><p class="projectionArrivalReason">${esc(arrival.reason||"")}</p>${basis?`<div class="projectionArrivalMeta">Basis: ${esc(basis)}</div>`:""}<div class="projectionArrivalMeta">${esc(relation)}${esc(confidence)} · ${esc(causalNote)}.</div>`;
+        projectionArrival.innerHTML=`<p class="projectionArrivalReason"><strong>Why this follows:</strong> ${esc(reason)}</p>`;
       }else{ projectionArrival.style.display="none"; projectionArrival.innerHTML=""; }
     }
 
@@ -3559,142 +3568,12 @@
       }else{ projectionScenario.style.display="none"; projectionScenario.innerHTML=""; }
     }
 
+    // M4.0: Infinite Threads, Energy transformations and Cosmos Compass remain
+    // reasoning capabilities underneath the projection. They no longer require the viewer
+    // to learn product machinery. The graph itself is the invitation to continue.
     if(projectionInfinity){
-      const signature=observer?.response?.cosmos_signature;
-      if(signature && (signature.invitation || signature.unexpected_connection?.available || signature.energy_thread?.available || signature.next_move_question)){
-        const unexpected=signature.unexpected_connection||{};
-        const energy=signature.energy_thread||{};
-        projectionInfinity.style.display="block";
-        const unexpectedCard=unexpected.available && unexpected.label ? `
-          <button type="button" class="infiniteCard" data-infinite-unexpected="1">
-            <div class="infiniteCardLabel">Unexpected connection</div>
-            <div class="infiniteCardText"><strong>${esc(unexpected.label)}</strong>${unexpected.why?` — ${esc(unexpected.why)}`:""}</div>
-          </button>` : "";
-        const energyCard=energy.available ? `
-          <div class="infiniteCard">
-            <div class="infiniteCardLabel">Energy thread · ${esc(String(energy.flow_type||"transformation").replaceAll("_"," "))}</div>
-            <div class="infiniteCardText">${energy.from_label&&energy.to_label?`<strong>${esc(energy.from_label)} → ${esc(energy.to_label)}</strong><br>`:""}${esc(energy.transformation||energy.meaning||"")}${energy.meaning&&energy.meaning!==energy.transformation?`<br>${esc(energy.meaning)}`:""}</div>
-          </div>` : "";
-        const compass=observer?.response?.cosmos_compass||{};
-        const compassDefs=[
-          ["origin","↖","Origin / upstream"],
-          ["consequence","↘","Consequence / downstream"],
-          ["cross_dimension","↗","Across dimensions"],
-          ["time_shift","↔","Through time"]
-        ];
-        const compassMoves=compassDefs.map(([key,arrow,fallback])=>({key,arrow,fallback,move:compass?.[key]||{}})).filter(item=>item.move?.available && item.move?.question);
-        const pathForDiscovery=journeyPathTo(state.journey.current_node_id).filter(node=>node?.observer);
-        const discoveryStart=pathForDiscovery.length?String(pathForDiscovery[0]?.observer?.label||pathForDiscovery[0]?.observer?.question||"").trim():"";
-        const discoveryNow=observerDisplayLabel(observer);
-        const discoveryText=discoveryStart && discoveryNow && normalizedJourneyLabel(discoveryStart)!==normalizedJourneyLabel(discoveryNow)
-          ? `You started at ${discoveryStart}. Cosmos brought you to ${discoveryNow}.`
-          : `This Station is one coordinate in a universe with no fixed center.`;
-
-        projectionInfinity.innerHTML=`
-          <div class="projectionInfinityHead">
-            <div class="projectionInfinityEyebrow"><span class="miniCosmos" aria-hidden="true"></span><span>Infinite threads</span></div>
-            <div class="projectionInfinitySymbol">∞</div>
-          </div>
-          ${signature.invitation?`<p class="infiniteInvitation">${esc(signature.invitation)}</p>`:""}
-          ${(unexpectedCard||energyCard)?`<div class="infiniteGrid">${unexpectedCard}${energyCard}</div>`:""}
-          ${compassMoves.length?`
-            <div class="cosmosCompass">
-              <div class="cosmosCompassHead"><div class="cosmosCompassTitle">Cosmos compass</div><div class="cosmosCompassHint">Four ways to leave this Station</div></div>
-              <div class="cosmosCompassGrid">${compassMoves.map(item=>`
-                <button type="button" class="compassMove" data-compass-key="${esc(item.key)}">
-                  <div class="compassMoveTop"><span class="compassMoveArrow">${esc(item.arrow)}</span><span>${esc(item.move.label||item.fallback)}</span></div>
-                  <div class="compassMoveQuestion">${esc(item.move.question)}</div>
-                  ${item.move.why?`<div class="compassMoveWhy">${esc(item.move.why)}</div>`:""}
-                </button>`).join("")}</div>
-            </div>`:""}
-          ${signature.next_move_question?`<div class="infiniteNext">${esc(signature.next_move_question)}</div>`:""}
-          <div class="cosmosDiscoveryBar">
-            <div class="cosmosDiscoveryText">${esc(discoveryText)}</div>
-            <button type="button" class="cosmosShareDiscovery" data-share-discovery="1">Share this discovery</button>
-          </div>`;
-
-        projectionInfinity.querySelectorAll("[data-compass-key]").forEach(button=>{
-          button.addEventListener("click",()=>{
-            const item=compassMoves.find(row=>row.key===button.dataset.compassKey);
-            const move=item?.move;
-            if(!move?.question) return;
-            const previous=state.observer;
-            const parentJourneyId=state.journey.current_node_id;
-            const label=String(move.label||move.question).trim();
-            const provisional=buildUniversalLoadingResponse(move.question,label);
-            const transition={
-              from_label:observerDisplayLabel(previous),
-              to_label:label,
-              operation:`COMPASS_${String(item.key||"MOVE").toUpperCase()}`,
-              relationship_id:"",
-              relationship_label:`Cosmos Compass · ${String(item.fallback||"move")}`,
-              reason:String(move.why||"").trim(),
-              evidence_basis:"Cosmos Compass — navigation reasoning",
-              epistemic_state:"inference",
-              confidence:null,
-              evidence_refs:[],
-              causal:false
-            };
-            state.history.push(previous);
-            state.observer={
-              kind:"response",
-              id:provisional.id,
-              label,
-              response:provisional,
-              question:move.question,
-              semantic_subject_id:"",
-              semantic_subject_label:"",
-              article_id:"",
-              from_observer_id:previous?.id||"",
-              from_observer_label:observerDisplayLabel(previous),
-              via_operation:transition.operation,
-              arrival_transition:transition
-            };
-            state.response=provisional;
-            state.universalAnswerLoaded=false;
-            state.universalAnswerPending=false;
-            state.expanded=false;
-            const created=addJourneyNode(state.observer,parentJourneyId,true);
-            if(created){ created.transition=transition; created.pending_resolution=true; created.pending_question=move.question; }
-            saveJourney(); saveTrail(); render();
-            hydrateUniversalAnswer(move.question,label);
-          });
-        });
-
-        projectionInfinity.querySelector("[data-share-discovery]")?.addEventListener("click",()=>shareCurrentStation());
-
-        const unexpectedButton=projectionInfinity.querySelector("[data-infinite-unexpected]");
-        if(unexpectedButton){
-          unexpectedButton.addEventListener("click",()=>{
-            const wanted=normalizedJourneyLabel(unexpected.label||"");
-            const candidate=(observer?.response?.dynamic_projection_ids||[]).find(id=>state.entities.has(id) && normalizedJourneyLabel(entityLabel(id))===wanted);
-            if(candidate) recenterEntity(candidate,"ENTER_UNEXPECTED");
-            else if(unexpected.label){
-              const question=`Explore "${unexpected.label}" as a Cosmos Station. Explain why it matters, its major dimensions, and where it can lead next.`;
-              state.history.push(state.observer);
-              state.observer={
-                kind:"response",
-                id:`response:infinite:${Date.now()}`,
-                label:unexpected.label,
-                response:buildUniversalLoadingResponse(question,unexpected.label),
-                question,
-                from_observer_id:observer?.id||"",
-                from_observer_label:observerDisplayLabel(observer),
-                via_operation:"ENTER_UNEXPECTED"
-              };
-              state.response=state.observer.response;
-              state.universalAnswerLoaded=false;
-              state.universalAnswerPending=false;
-              addJourneyNode(state.observer,state.journey.current_node_id,true);
-              saveJourney(); saveTrail(); render();
-              hydrateUniversalAnswer(question,unexpected.label);
-            }
-          });
-        }
-      }else{
-        projectionInfinity.style.display="none";
-        projectionInfinity.innerHTML="";
-      }
+      projectionInfinity.style.display="none";
+      projectionInfinity.innerHTML="";
     }
 
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
@@ -3703,18 +3582,22 @@
     const pulseItems=governedPulse.map(governedPulseDisplay).filter(Boolean);
 
     if(projectionPulse && projectionPulseItems){
-      projectionPulse.style.display="block";
       if(pulseItems.length){
+        projectionPulse.style.display="block";
         projectionPulseItems.innerHTML=pulseItems
           .map(item=>`<div class="projectionPulseItem">${esc(item)}</div>`)
           .join("");
       }else{
-        projectionPulseItems.innerHTML=
-          `<div class="projectionPulseQuiet">No major validated movement is surfacing at this level right now.</div>`;
+        // Silence is valid intelligence. Do not make the observer read a quiet-state diagnostic.
+        projectionPulse.style.display="none";
+        projectionPulseItems.innerHTML="";
       }
     }
 
-    projectionContext.innerHTML=contextRows.map(row=>`
+    const surfaceContextRows=station.primary_change
+      ? contextRows.filter(row=>row.label==="What changed").slice(0,1)
+      : [];
+    projectionContext.innerHTML=surfaceContextRows.map(row=>`
       <div class="projectionContextRow">
         <strong>${esc(row.label)}:</strong> ${esc(row.text)}
       </div>
@@ -3766,8 +3649,8 @@
               ? `${evidence.length} source${evidence.length===1?"":"s"} behind this view`
               : (
                   completion?.completion_required===true
-                    ? "Verified evidence still incomplete"
-                    : `${projection.nodes.length} connected objects`
+                    ? "Evidence still forming"
+                    : "Explore the map"
                 )
           );
     projectionBasis.textContent=evidenceText;
@@ -5236,6 +5119,7 @@
 
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
+    statusEl.style.display="block";
     state.loadingProgressValue=0;
     state.loadingProgressCeiling=76;
     state.loadingStage="connecting";
