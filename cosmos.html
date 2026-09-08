@@ -1907,6 +1907,23 @@
       return {focus_type:"cosmos",focus_id:"cosmos",time_mode:"live",geography:null,lens:"now",epistemic_mode:"know"};
     }
 
+    const responseCoordinate=observer?.response?.coordinate;
+    if(responseCoordinate && typeof responseCoordinate==="object"){
+      return {
+        focus_type:String(responseCoordinate.focus_type||"investigation"),
+        focus_id:String(responseCoordinate.focus_id||observer.semantic_subject_id||observer.id||"cosmos"),
+        focus_label:String(responseCoordinate.focus_label||observer.semantic_subject_label||observer.label||"Cosmos"),
+        time_mode:String(responseCoordinate.time_mode||"live"),
+        geography:String(responseCoordinate.geography||"")||null,
+        resolution:String(responseCoordinate.resolution||""),
+        lens:String(responseCoordinate.lens||"now"),
+        objective:String(responseCoordinate.objective||""),
+        epistemic_mode:String(responseCoordinate.epistemic_mode||"know"),
+        temporal_request:Boolean(responseCoordinate.temporal_request),
+        change_first:Boolean(responseCoordinate.change_first)
+      };
+    }
+
     if(observer.kind==="change" && (observer.change_id||observer.id)){
       return {
         focus_type:"change",
@@ -2333,7 +2350,7 @@
         kind:"response",
         id:response.id,
         label:snap.label||snap.question,
-        response,
+        response:{...response,coordinate:snap.response_coordinate||response.coordinate||null},
         question:snap.question,
         semantic_subject_id:response?.subject_match?.id||"",
         semantic_subject_label:response?.subject_match?.label||""
@@ -2360,6 +2377,7 @@
       question: observer.question || "",
       semantic_subject_id: observer.semantic_subject_id || observer.response?.subject_match?.id || "",
       semantic_subject_label: observer.semantic_subject_label || observer.response?.subject_match?.label || "",
+      response_coordinate: observer.response?.coordinate ? {...observer.response.coordinate} : null,
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || "",
       coordinate: coordinateForObserver(observer),
@@ -2813,10 +2831,16 @@
       observer?.response?.knowledge_completion?.completion_required===true
     ) return [];
 
-    // M3.2C: a universal response owns its own evidence boundary.
-    // Never append PTD daily-brief items merely because lexical words overlap.
     if(observer?.kind==="response" && observer?.response?.response_type==="universal"){
-      return [];
+      return (Array.isArray(observer.response.bullets)?observer.response.bullets:[]).map((item,index)=>({
+        id:item.id||`response-item-${index+1}`,
+        title:item.title||`Source ${index+1}`,
+        summary:item.summary||"",
+        date_display:item.date_display||"",
+        article_id:item.article_id||"",
+        url:item.url||"",
+        seed_ids:item.seed_ids||[]
+      })).slice(0,8);
     }
 
     const query=observer?.question || entry.question || observerDisplayLabel(observer);
@@ -2835,10 +2859,10 @@
         ...(Array.isArray(item?.countries)?item.countries:[])
       ].join(" "));
 
-      for(const token of meaningfulQuestionTokens(query)){
+      for(const token of subjectTokens(query)){
         if(hay.includes(token)) s+=35;
       }
-      for(const token of meaningfulQuestionTokens(label)){
+      for(const token of subjectTokens(label)){
         if(hay.includes(token)) s+=25;
       }
 
@@ -2869,10 +2893,7 @@
 
   function renderAnswerFirst(observer,projection){
     const directAnswer=buildDirectAnswerForObserver(observer);
-    const intelligence=
-      observer?.kind==="response" && observer?.response?.response_type==="universal"
-        ? []
-        : answerFirstRelevantItems(observer);
+    const intelligence=answerFirstRelevantItems(observer);
     const completion=observer?.response?.knowledge_completion || null;
     const completionRequired=completion?.completion_required===true;
 
@@ -3061,26 +3082,16 @@
     const seen=new Set();
     const out=[];
 
-    // M3.2C Coordinate evidence boundary:
-    // Universal/web answers expose only the sources returned for THIS response.
-    // Local PTD daily intelligence is not inherited or appended across Coordinates.
+    // M3.2C — universal evidence is Coordinate-local. Never append PTD daily
+    // briefing items merely because lexical tokens overlap with the question.
     if(observer?.kind==="response" && observer?.response?.response_type==="universal"){
-      const responseSources=Array.isArray(observer?.response?.bullets)
-        ? observer.response.bullets
-        : [];
-
-      for(const item of responseSources){
-        const key=item.url||item.article_id||item.id||item.title;
-        if(!key||seen.has(key)) continue;
-        seen.add(key);
-        out.push({
-          title:item.title||"Evidence",
-          summary:item.summary||"",
-          article_id:item.article_id||"",
-          url:item.url||""
-        });
-      }
-      return out.slice(0,8);
+      const direct=Array.isArray(observer.response.bullets)?observer.response.bullets:[];
+      return direct.map(item=>({
+        title:item.title||"Evidence",
+        summary:item.summary||"",
+        article_id:item.article_id||"",
+        url:item.url||""
+      })).filter(item=>item.title||item.url).slice(0,8);
     }
 
     const answerItems=answerFirstRelevantItems(observer) || [];
@@ -3188,8 +3199,8 @@
       projectionUnknown.innerHTML="";
     }
 
-    // Journey history belongs in Your Journey. Do not leak prior prompts or
-    // origin wording into the current Station's meaning/evidence surface.
+    // Journey provenance is rendered in Your Journey. Do not leak internal
+    // research prompts into the Station Essence layer.
     projectionOrigin.textContent="";
 
     const evidenceText=
@@ -3870,14 +3881,19 @@
     const parentJourneyId=state.journey.current_node_id;
     const label=entity.name||entity.label||id;
 
-    // M3.2C Coordinate isolation:
-    // Arrival history stays in Journey. A newly selected Station becomes the
-    // authority for its own projection and must not inherit the prior prompt.
+    // Temporary projection nodes came from a specific universal answer.
+    // They must never inherit unrelated local PTD summaries. Clicking one
+    // turns it into a new universal station and asks Cosmos to explain the
+    // node in the context from which the viewer reached it.
     if(entity.ephemeral_projection){
       state.history.push(previous);
 
       const previousLabel=observerDisplayLabel(previous);
-      const researchQuestion=`Explain "${label}". What is it and what matters about it?`;
+
+      // M3.2C — Coordinate isolation. Arrival history belongs to Journey only.
+      // A newly selected Station is researched as itself; the previous Station
+      // must not become a hidden semantic constraint on the new projection.
+      const researchQuestion=`Explain "${label}". What is it, what are its major dimensions, and what matters about it?`;
 
       const provisional={
         id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
@@ -3943,7 +3959,7 @@
       history.pushState({cosmos:true},"",url.pathname+url.search);
 
       render();
-      hydrateUniversalAnswer(researchQuestion,label,null);
+      hydrateUniversalAnswer(researchQuestion,label);
       return;
     }
 
@@ -3955,8 +3971,8 @@
       id,
       label,
       entity,
-      article_id:"",
-      question:"",
+      article_id:previous?.article_id||entry.article_id,
+      question:previous?.question||entry.question||"",
       from_observer_id:previous?.id||"",
       from_observer_label:previous?.label||"",
       via_operation:operation
@@ -3974,7 +3990,7 @@
     saveJourney();
 
     edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
-    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}`);
+    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}${state.observer.question?`&question=${encodeURIComponent(state.observer.question)}`:""}`);
     saveTrail();
     render();
   }
@@ -3999,21 +4015,9 @@
 
 
 
-  function questionNeedsCurrentContext(question){
-    const q=String(question||"").trim();
-    if(!q) return false;
-    if(/\b(this|that|it|its|these|those|here|current subject|current station|this station)\b/i.test(q)) return true;
-    const tokens=meaningfulQuestionTokens(q);
-    return tokens.length<=3 &&
-      /^(why|how|risks?|opportunit(?:y|ies)|impacts?|effects?|causes?|drivers?|compare|explain|expand|continue|next)\b/i.test(q);
-  }
-
   function currentContextSubject(){
-    // Current resolved Station always outranks entry/deep-link history.
-    if(state.observer?.context_subject_override){
-      return state.observer.context_subject_override;
-    }
-
+    // M3.2C — the CURRENT Station owns the context boundary. Entry context is
+    // only an initialization fallback and must never override a later Station.
     if(state.observer?.kind==="entity"){
       return {
         id:state.observer.id,
@@ -4024,11 +4028,13 @@
     if(state.observer?.response?.subject_match?.id){
       return {
         id:state.observer.response.subject_match.id,
-        label:state.observer.response.subject_match.label||""
+        label:state.observer.response.subject_match.label||observerDisplayLabel(state.observer)||""
       };
     }
 
-    // Entry context is only an initial fallback, never a permanent session anchor.
+    const context=observerSubjectContext();
+    if(context?.id) return {id:context.id,label:context.label||""};
+
     if(entry.context_id && state.entities.has(entry.context_id)){
       const entity=state.entities.get(entry.context_id);
       return {
@@ -4044,7 +4050,8 @@
     const path=journeyPathTo(state.journey.current_node_id);
     return path.slice(-12).map(node=>({
       label:node?.observer?.label || node?.observer?.question || "",
-      kind:node?.observer?.kind || ""
+      kind:node?.observer?.kind || "",
+      navigation_only:true
     })).filter(item=>item.label);
   }
 
@@ -4342,7 +4349,7 @@
     const suggested=Array.isArray(data?.suggested_stations) ? data.suggested_stations.slice(0,8) : [];
     const dynamicProjection=materializeDynamicProjection(data,responseToken,sources);
 
-    const canonicalSubjectId=subjectEntity?.entity_id || entry.context_id || "";
+    const canonicalSubjectId=subjectEntity?.entity_id || state.observer?.semantic_subject_id || state.observer?.response?.subject_match?.id || "";
     const subjectId=dynamicProjection.subject_id || canonicalSubjectId || "";
 
     // A single subject seed is enough: the temporary relationships let Cosmos
@@ -4365,12 +4372,13 @@
       essence:cleanUniversalAnswerText(data?.essence||""),
       current_pulse:[], // governed Pulse is derived from world-changes-current.json only
       pulse_candidate_count:Number(data?.meta?.discovered_pulse_candidate_count||0),
+      coordinate:(data?.coordinate && typeof data.coordinate==="object") ? {...data.coordinate} : null,
       intent:String(data?.intent||"").trim(),
       epistemic_state:String(data?.epistemic_state||"uncertain"),
       confidence:String(data?.confidence||"low"),
       subject_match: subjectId ? {
         id:subjectId,
-        label:state.entities.get(subjectId)?.name || subjectLabel || entry.context_label || subjectId,
+        label:state.entities.get(subjectId)?.name || subjectLabel || observerDisplayLabel(state.observer) || subjectId,
         entity:state.entities.get(subjectId)||subjectEntity||null
       } : null,
       bullets:sources.map((source,index)=>({
@@ -4390,10 +4398,13 @@
       knowledge_gaps:Array.isArray(data?.knowledge_gaps)?data.knowledge_gaps:[]
     };
 
+    const coordinateLabel=String(response?.coordinate?.focus_label||"").trim();
+    const resolvedObserverLabel=coordinateLabel || displayLabel || subjectLabel || question;
+
     return {
       kind:"response",
       id:response.id,
-      label:displayLabel || question,
+      label:resolvedObserverLabel,
       response,
       question,
       semantic_subject_id:response?.subject_match?.id||"",
@@ -4402,7 +4413,7 @@
     };
   }
 
-  async function hydrateUniversalAnswer(question,displayLabel="",contextOverride=undefined){
+  async function hydrateUniversalAnswer(question,displayLabel=""){
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
@@ -4423,14 +4434,12 @@
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
-      const context =
-        contextOverride !== undefined
-          ? contextOverride
-          : (questionNeedsCurrentContext(question) ? currentContextSubject() : null);
+      const context=currentContextSubject();
       const payload={
         question,
         context_subject:context,
         journey:journeyContextForGateway(),
+        context_policy:"current_coordinate_only",
         page:{
           url:location.href,
           entry_question:entry.question||"",
@@ -4504,10 +4513,8 @@
       return;
     }
 
-    // Preserve Journey history, but carry the current subject only when the
-    // new question genuinely depends on omitted context.
-    const previousContext=currentContextSubject();
-    const followupContext=questionNeedsCurrentContext(question) ? previousContext : null;
+    // Keep the journey and the current subject in memory. The universal
+    // gateway handles the follow-up conversationally; no case-specific route.
     state.history.push(state.observer);
 
     const provisional=buildQuestionResponse(question);
@@ -4524,9 +4531,8 @@
       question,
       semantic_subject_id:provisional?.subject_match?.id||"",
       semantic_subject_label:provisional?.subject_match?.label||"",
-      article_id:"",
-      via_operation:"ASK",
-      context_subject_override:followupContext
+      article_id:entry.article_id,
+      via_operation:"ASK"
     };
 
     state.universalAnswerLoaded=false;
@@ -4538,18 +4544,17 @@
     url.searchParams.set("question",question);
     url.searchParams.set("from","cosmos-projection");
 
-    url.searchParams.delete("context_id");
-    url.searchParams.delete("context_label");
-    if(followupContext?.id){
-      url.searchParams.set("context_id",followupContext.id);
-      if(followupContext.label) url.searchParams.set("context_label",followupContext.label);
+    const context=currentContextSubject();
+    if(context?.id){
+      url.searchParams.set("context_id",context.id);
+      if(context.label) url.searchParams.set("context_label",context.label);
     }
 
     history.pushState({cosmos:true},"",url.pathname+url.search);
     ensureJourneyCurrent(state.observer);
     saveTrail();
     render();
-    hydrateUniversalAnswer(question,"",followupContext);
+    hydrateUniversalAnswer(question);
   });
 
   const SHARED_STATION_PARAM="shared";
