@@ -2509,17 +2509,24 @@
   }
 
   function projectionRelationshipForArrival(previous,targetId){
+    if(!targetId) return null;
     const fromId=focusEntityId(previous);
-    if(!fromId || !targetId) return null;
-    return state.relationships.find(rel=>rel?.ephemeral_projection && (((rel.from_entity_id===fromId)&&(rel.to_entity_id===targetId)) || ((rel.to_entity_id===fromId)&&(rel.from_entity_id===targetId)))) || null;
+    const direct=fromId ? state.relationships.find(rel=>rel?.ephemeral_projection && (((rel.from_entity_id===fromId)&&(rel.to_entity_id===targetId)) || ((rel.to_entity_id===fromId)&&(rel.from_entity_id===targetId)))) : null;
+    if(direct) return direct;
+    // Connection-path projections are sequential. Prefer the incoming edge so
+    // "Why this follows" explains the immediate bridge, not the whole entrance query.
+    return state.relationships.find(rel=>rel?.ephemeral_projection && rel.to_entity_id===targetId) ||
+           state.relationships.find(rel=>rel?.ephemeral_projection && rel.from_entity_id===targetId) || null;
   }
 
   function buildArrivalTransition(previous,targetId,targetLabel,operation="ENTER"){
-    const fromLabel=observerDisplayLabel(previous);
-    if(!previous || !fromLabel || !targetLabel || normalizedJourneyLabel(fromLabel)===normalizedJourneyLabel(targetLabel)) return null;
     const rel=projectionRelationshipForArrival(previous,targetId);
+    const adjacentId=rel ? (rel.to_entity_id===targetId ? rel.from_entity_id : rel.to_entity_id) : "";
+    const adjacent=adjacentId ? state.entities.get(adjacentId) : null;
+    const fromLabel=(adjacent?.name||adjacent?.label||observerDisplayLabel(previous)||"").trim();
+    if(!previous || !fromLabel || !targetLabel || normalizedJourneyLabel(fromLabel)===normalizedJourneyLabel(targetLabel)) return null;
     const relLabel=rel ? relationshipLabel(rel) : "exploratory connection";
-    const reason=String(rel?.reason || rel?.transition_reason || rel?.explanation || "").trim() || (rel ? `Following ${fromLabel} toward ${targetLabel} opens the dimension represented by ${relLabel}. Cosmos is resolving the deeper reason for this transition while keeping ${targetLabel} sovereign as the new Station.` : `${targetLabel} was opened from ${fromLabel} as the next exploratory Station. Cosmos is resolving why that bridge is meaningful without treating navigation itself as Butterfly causality.`);
+    const reason=String(rel?.reason || rel?.transition_reason || rel?.explanation || "").trim() || (rel ? `${fromLabel} opens ${targetLabel} through ${relLabel}.` : `${targetLabel} was opened from ${fromLabel} as the next exploratory Station.`);
     return {from_label:fromLabel,to_label:targetLabel,operation,relationship_id:String(rel?.relationship_id||""),relationship_label:String(relLabel||"exploratory connection"),reason,epistemic_state:String(rel?.epistemic_status||rel?.evidence_mode||"inference"),confidence:confidencePercent(rel?.confidence),evidence_refs:Array.isArray(rel?.source_ids)?rel.source_ids.filter(Boolean):[],causal:false};
   }
 
@@ -4403,7 +4410,9 @@
       // M3.2C — Coordinate isolation. Arrival history belongs to Journey only.
       // A newly selected Station is researched as itself; the previous Station
       // must not become a hidden semantic constraint on the new projection.
-      const researchQuestion=`Explore "${label}" as the current Cosmos Station. Keep "${label}" as the exact center. Explain its essence and reveal the most meaningful peer directions available from here.`;
+      // M4.2 — Station sovereignty: the selected label itself is the gateway input.
+      // Do not turn an internal instruction into the user's visible question/Essence.
+      const researchQuestion=label;
 
       const provisional={
         id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
@@ -5208,7 +5217,8 @@
 
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
-    const freshCoordinate=shouldStartFreshCoordinate(question);
+    const stationNavigationMode=String(requestOptions?.interaction_mode||"").trim()==="station_navigation";
+    const freshCoordinate=stationNavigationMode || shouldStartFreshCoordinate(question);
 
     try{
       const context=freshCoordinate ? null : currentContextSubject();
@@ -5283,7 +5293,7 @@
 
       // Never answer a fresh/open-world Coordinate with the legacy PTD-local
       // fallback. Sparse uncertainty is preferable to topical contamination.
-      const local=freshCoordinate
+      const local=(freshCoordinate || stationNavigationMode)
         ? buildUniversalFailureResponse(question,displayLabel||question,error?.message||error)
         : buildQuestionResponse(question);
       state.response=local;
