@@ -1033,7 +1033,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.8-m3.8-connection-path-reliability";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.1-station-sovereignty-simple-cosmos";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 120000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -4403,7 +4403,7 @@
       // M3.2C — Coordinate isolation. Arrival history belongs to Journey only.
       // A newly selected Station is researched as itself; the previous Station
       // must not become a hidden semantic constraint on the new projection.
-      const researchQuestion=`Explore "${label}" as the current Cosmos Station. Explain its essence, its major dimensions, and the most meaningful directions available from here.`;
+      const researchQuestion=`Explore "${label}" as the current Cosmos Station. Keep "${label}" as the exact center. Explain its essence and reveal the most meaningful peer directions available from here.`;
 
       const provisional={
         id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
@@ -4474,7 +4474,14 @@
       history.pushState({cosmos:true},"",url.pathname+url.search);
 
       render();
-      hydrateUniversalAnswer(researchQuestion,label);
+      hydrateUniversalAnswer(researchQuestion,label,{
+        interaction_mode:"station_navigation",
+        station_navigation:{
+          label,
+          from_label:previousLabel||"",
+          transition_reason:String(arrivalTransition?.reason||arrivalTransition?.explanation||"").trim()
+        }
+      });
       return;
     }
 
@@ -5173,7 +5180,7 @@
     };
   }
 
-  async function hydrateUniversalAnswer(question,displayLabel=""){
+  async function hydrateUniversalAnswer(question,displayLabel="",requestOptions={}){
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
@@ -5210,8 +5217,9 @@
         context_subject:context,
         journey:freshCoordinate ? [] : journeyContextForGateway(),
         arrival_context:state.observer?.arrival_transition || currentArrivalTransition() || null,
-        interaction_mode:/\b(how (?:could|can|does|would)|how is .* connected|connect .* to|path from|eventually (?:reach|affect|change)|take me from)\b/i.test(question) ? "connection_path" : "auto",
-        context_policy:freshCoordinate ? "fresh_open_world_coordinate" : "current_coordinate_only",
+        interaction_mode:String(requestOptions?.interaction_mode||"").trim() || (/\b(how (?:could|can|does|would)|how is .* connected|connect .* to|path from|eventually (?:reach|affect|change)|take me from)\b/i.test(question) ? "connection_path" : "auto"),
+        station_navigation:requestOptions?.station_navigation || null,
+        context_policy:requestOptions?.interaction_mode==="station_navigation" ? "station_navigation_clean_room" : (freshCoordinate ? "fresh_open_world_coordinate" : "current_coordinate_only"),
         page:{
           url:location.href,
           entry_question:entry.question||"",
