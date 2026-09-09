@@ -754,6 +754,8 @@
       color:#7f8da3;
       font-size:10.5px
     }
+    .metroWhy{display:block!important;color:#9eacc2!important;font-size:10px!important;line-height:1.35!important;margin-top:4px!important;max-width:205px;display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .metroBridgeType{color:#7e96ba;font-weight:700}
     .metroRouteBadge{
       display:inline-block;
       margin-left:6px;
@@ -814,6 +816,8 @@
     .projectionArrival{padding:0;margin:10px 0 0;border:0;background:transparent}
     .projectionArrivalReason{font-size:13px;line-height:1.55;color:#aebbd0;margin:0}
     .projectionArrivalReason strong{color:#dbe6f8}
+    .projectionArrivalRoute{font-size:12px;color:#dbe6f8;font-weight:800;margin:0 0 4px}
+    .projectionArrivalType{font-size:10px;color:#7f95b7;text-transform:uppercase;letter-spacing:.08em;margin:0 0 5px}
     .projectionPulse{margin-top:14px}
     .projectionPanel{box-shadow:none}
 </style>
@@ -2527,7 +2531,7 @@
     if(!previous || !fromLabel || !targetLabel || normalizedJourneyLabel(fromLabel)===normalizedJourneyLabel(targetLabel)) return null;
     const relLabel=rel ? relationshipLabel(rel) : "exploratory connection";
     const reason=String(rel?.reason || rel?.transition_reason || rel?.explanation || "").trim() || (rel ? `${fromLabel} opens ${targetLabel} through ${relLabel}.` : `${targetLabel} was opened from ${fromLabel} as the next exploratory Station.`);
-    return {from_label:fromLabel,to_label:targetLabel,operation,relationship_id:String(rel?.relationship_id||""),relationship_label:String(relLabel||"exploratory connection"),reason,epistemic_state:String(rel?.epistemic_status||rel?.evidence_mode||"inference"),confidence:confidencePercent(rel?.confidence),evidence_refs:Array.isArray(rel?.source_ids)?rel.source_ids.filter(Boolean):[],causal:false};
+    return {from_label:fromLabel,to_label:targetLabel,operation,relationship_id:String(rel?.relationship_id||""),relationship_label:String(relLabel||"exploratory connection"),reason,short_reason:String(reason||"").replace(/\s+/g," ").trim().slice(0,120),epistemic_state:String(rel?.epistemic_status||rel?.evidence_mode||"inference"),confidence:confidencePercent(rel?.confidence),evidence_refs:Array.isArray(rel?.source_ids)?rel.source_ids.filter(Boolean):[],causal:false};
   }
 
   function reconcileJourneyWithResolvedObserver(observer){
@@ -3530,8 +3534,12 @@
       const validArrival=arrival && arrival.from_label && arrival.to_label && normalizedJourneyLabel(arrival.from_label)!==normalizedJourneyLabel(arrival.to_label);
       const reason=String(arrival?.reason||"").trim();
       if(validArrival && reason){
+        const bridgeType=String(arrival?.relationship_label||"exploratory bridge").trim();
         projectionArrival.style.display="block";
-        projectionArrival.innerHTML=`<p class="projectionArrivalReason"><strong>Why this follows:</strong> ${esc(reason)}</p>`;
+        projectionArrival.innerHTML=`
+          <p class="projectionArrivalRoute">${esc(arrival.from_label)} → ${esc(arrival.to_label)}</p>
+          <p class="projectionArrivalType">${esc(bridgeType)}</p>
+          <p class="projectionArrivalReason"><strong>Why this follows:</strong> ${esc(reason)}</p>`;
       }else{ projectionArrival.style.display="none"; projectionArrival.innerHTML=""; }
     }
 
@@ -4000,8 +4008,9 @@
             <strong>${esc(label)} ${branchBadge}</strong>
             <span>
               ${current?"you are here":(active?"your route":"saved branch")}
-              ${node.transition?.relationship_label ? ` · via ${esc(node.transition.relationship_label)}` : ""}
+              ${node.transition?.relationship_label ? ` · <span class="metroBridgeType">${esc(node.transition.relationship_label)}</span>` : ""}
             </span>
+            ${node.transition?.short_reason || node.transition?.reason ? `<span class="metroWhy">${esc(node.transition.short_reason || String(node.transition.reason||"").replace(/\s+/g," ").trim().slice(0,120))}</span>` : ""}
           </span>
         </button>
       `;
@@ -4410,7 +4419,7 @@
       // M3.2C — Coordinate isolation. Arrival history belongs to Journey only.
       // A newly selected Station is researched as itself; the previous Station
       // must not become a hidden semantic constraint on the new projection.
-      // M4.2 — Station sovereignty: the selected label itself is the gateway input.
+      // M4.3 — Station sovereignty + explained bridges: the selected label itself is the gateway input.
       // Do not turn an internal instruction into the user's visible question/Essence.
       const researchQuestion=label;
 
@@ -5058,6 +5067,7 @@
       relationship_id:String(state.observer?.arrival_transition?.relationship_id||""),
       relationship_label:String(response.arrival_reason.relationship_type||state.observer?.arrival_transition?.relationship_label||"journey connection"),
       reason:String(response.arrival_reason.reason||state.observer?.arrival_transition?.reason||""),
+      short_reason:String(response.arrival_reason.short_reason||state.observer?.arrival_transition?.short_reason||""),
       evidence_basis:String(response.arrival_reason.evidence_basis||""),
       epistemic_state:String(response.arrival_reason.causal?"causal":"inference"),
       confidence:response.arrival_reason.confidence==="high"?85:(response.arrival_reason.confidence==="medium"?65:(response.arrival_reason.confidence==="low"?40:null)),
