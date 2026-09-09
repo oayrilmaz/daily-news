@@ -3256,7 +3256,7 @@
     }
 
     if(observer?.kind==="response"){
-      // M3.4 — Essence sovereignty: the model's dedicated essence wins.
+      // M3.5 — Essence + temporal projection sovereignty: the model's dedicated essence wins.
       // The long-form direct answer must never become the visible Essence merely
       // because it exists. This is what previously produced article-sized cards.
       const explicitEssence=String(observer.response?.essence||"").trim();
@@ -3388,14 +3388,17 @@
     const pulseItems=governedPulse.map(governedPulseDisplay).filter(Boolean);
 
     if(projectionPulse && projectionPulseItems){
-      projectionPulse.style.display="block";
+      // M3.5 — silence is valid intelligence. A time-bounded Station may summarize
+      // current developments in its Essence without those reports qualifying as
+      // governed World Changes. Never show a contradictory "no movement" message.
       if(pulseItems.length){
+        projectionPulse.style.display="block";
         projectionPulseItems.innerHTML=pulseItems
           .map(item=>`<div class="projectionPulseItem">${esc(item)}</div>`)
           .join("");
       }else{
-        projectionPulseItems.innerHTML=
-          `<div class="projectionPulseQuiet">No major validated movement is surfacing at this level right now.</div>`;
+        projectionPulse.style.display="none";
+        projectionPulseItems.innerHTML="";
       }
     }
 
@@ -3963,6 +3966,11 @@
 
   function render(){
     const observer=state.observer;
+    // M3.5 — progress belongs to brewing, not the finished Station.
+    if(statusEl && !state.universalAnswerPending){
+      statusEl.style.display="none";
+      statusEl.textContent="";
+    }
     const currentStation=stationProjection(observer);
     observerLabel.textContent=currentStation.focus_id ? currentStation.focus_label : observerDisplayLabel(observer);
     syncLivePresence(observer);
@@ -4724,6 +4732,7 @@
 
   function paintLoadingNarrative(){
     if(!state.universalAnswerPending) return;
+    if(statusEl) statusEl.style.display="block";
     const stage=loadingStageFromProgress(state.loadingProgressValue);
     state.loadingStage=stage.key;
     state.loadingStageDetail=stage.detail;
