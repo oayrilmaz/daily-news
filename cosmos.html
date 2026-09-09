@@ -2512,6 +2512,24 @@
     return current?.transition || current?.observer?.arrival_transition || state.observer?.arrival_transition || null;
   }
 
+  function journeyThreadContextForGateway(){
+    const path=journeyPathTo(state.journey.current_node_id);
+    if(!path.length) return null;
+    const origin=path[0];
+    const originLabel=journeyNodeDisplayLabel(origin);
+    const originQuestion=String(origin?.observer?.question || entry.question || originLabel || "").trim();
+    const steps=path.slice(0,12).map((node,index)=>({
+      label:journeyNodeDisplayLabel(node),
+      bridge_type:index===0?"":String(node?.transition?.relationship_label||""),
+      why:index===0?"":String(node?.transition?.reason||node?.transition?.short_reason||"").trim()
+    })).filter(step=>step.label);
+    return {
+      origin_label:originLabel,
+      origin_question:originQuestion,
+      path:steps
+    };
+  }
+
   function projectionRelationshipForArrival(previous,targetId){
     if(!targetId) return null;
     const fromId=focusEntityId(previous);
@@ -3536,10 +3554,15 @@
       if(validArrival && reason){
         const bridgeType=String(arrival?.relationship_label||"exploratory bridge").trim();
         projectionArrival.style.display="block";
+        const thread=observer?.response?.journey_reason;
+        const threadWhy=String(thread?.why_still_relevant||"").trim();
+        const threadOrigin=String(thread?.origin_label||"").trim();
+        const showThread=Boolean(thread?.available && threadWhy && threadOrigin && normalizedJourneyLabel(threadOrigin)!==normalizedJourneyLabel(arrival.from_label));
         projectionArrival.innerHTML=`
           <p class="projectionArrivalRoute">${esc(arrival.from_label)} → ${esc(arrival.to_label)}</p>
           <p class="projectionArrivalType">${esc(bridgeType)}</p>
-          <p class="projectionArrivalReason"><strong>Why this follows:</strong> ${esc(reason)}</p>`;
+          <p class="projectionArrivalReason"><strong>Why this follows:</strong> ${esc(reason)}</p>
+          ${showThread?`<p class="projectionArrivalReason" style="margin-top:8px"><strong>How this connects to ${esc(threadOrigin)}:</strong> ${esc(threadWhy)}</p>`:""}`;
       }else{ projectionArrival.style.display="none"; projectionArrival.innerHTML=""; }
     }
 
@@ -4497,7 +4520,8 @@
         station_navigation:{
           label,
           from_label:previousLabel||"",
-          transition_reason:String(arrivalTransition?.reason||arrivalTransition?.explanation||"").trim()
+          transition_reason:String(arrivalTransition?.reason||arrivalTransition?.explanation||"").trim(),
+          journey_thread:journeyThreadContextForGateway()
         }
       });
       return;
@@ -5054,7 +5078,8 @@
       scenario_fork:(data?.scenario_fork && typeof data.scenario_fork==="object") ? data.scenario_fork : {enabled:false,branches:[]},
       cosmos_signature:(data?.cosmos_signature && typeof data.cosmos_signature==="object") ? data.cosmos_signature : {invitation:"",unexpected_connection:{available:false,label:"",why:"",node_id:""},energy_thread:{available:false,flow_type:"",from_label:"",to_label:"",transformation:"",meaning:""},next_move_question:""},
       cosmos_compass:(data?.cosmos_compass && typeof data.cosmos_compass==="object") ? data.cosmos_compass : {available:false,origin:{available:false,label:"",question:"",why:""},consequence:{available:false,label:"",question:"",why:""},cross_dimension:{available:false,label:"",question:"",why:""},time_shift:{available:false,label:"",question:"",why:""}},
-      arrival_reason:(data?.arrival_reason && typeof data.arrival_reason==="object") ? data.arrival_reason : null
+      arrival_reason:(data?.arrival_reason && typeof data.arrival_reason==="object") ? data.arrival_reason : null,
+      journey_reason:(data?.journey_reason && typeof data.journey_reason==="object") ? data.journey_reason : null
     };
 
     const coordinateLabel=String(response?.coordinate?.focus_label||"").trim();
