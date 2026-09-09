@@ -3220,32 +3220,65 @@
   }
 
 
+  function essenceCompression(value,maxWords=78,maxChars=520){
+    let text=String(value||"").replace(/\s+/g," ").trim();
+    if(!text) return "";
+
+    // Essence is a semantic compression layer. Never let a long-form answer
+    // silently turn the Station into an article. Prefer sentence boundaries.
+    const words=text.split(/\s+/);
+    if(words.length<=maxWords && text.length<=maxChars) return text;
+
+    const sentences=text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
+    let out="";
+    for(const sentence of sentences){
+      const candidate=(out+" "+sentence.trim()).trim();
+      if(candidate.split(/\s+/).length>maxWords || candidate.length>maxChars) break;
+      out=candidate;
+      if(out.split(/\s+/).length>=38) break;
+    }
+    if(out) return out;
+
+    const clipped=words.slice(0,maxWords).join(" ");
+    return clipped.length>maxChars ? clipped.slice(0,maxChars).replace(/[,;:\s]+$/," ").trim()+"…" : clipped+"…";
+  }
+
   function compactEssence(observer){
     if(observer?.kind==="entity"){
       const entity=state.entities.get(observer.id);
       if(entity?.ephemeral_projection){
-        return `This is a temporary Cosmos projection discovered from the previous station. Cosmos will research it before presenting a supported description.`;
+        return `A temporary Cosmos Station discovered from the previous projection. Its meaning is being resolved before deeper claims are surfaced.`;
       }
-      return entity?.summary || entity?.description || entity?.definition ||
-        `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
+      return essenceCompression(
+        entity?.summary || entity?.description || entity?.definition ||
+        `Cosmos is centered on ${observerDisplayLabel(observer)}.`
+      );
     }
 
-    const direct=buildDirectAnswerForObserver(observer);
-    if(direct) return direct;
-
     if(observer?.kind==="response"){
+      // M3.4 — Essence sovereignty: the model's dedicated essence wins.
+      // The long-form direct answer must never become the visible Essence merely
+      // because it exists. This is what previously produced article-sized cards.
       const explicitEssence=String(observer.response?.essence||"").trim();
-      if(explicitEssence) return explicitEssence;
+      if(explicitEssence) return essenceCompression(explicitEssence);
 
       const completion=observer.response?.knowledge_completion;
       if(completion?.completion_required===true){
         const subject=observer.response?.subject_match?.label ||
           observer.semantic_subject_label ||
           "this subject";
-        return `Cosmos has identified ${subject}, but the answer is still outside its verified knowledge.`;
+        return `Cosmos has identified ${subject}, but its supported Essence is still being resolved.`;
       }
-      if(observer.response?.answer) return observer.response.answer;
+
+      const short=String(observer.response?.short_answer||"").trim();
+      if(short) return essenceCompression(short);
+
+      const answer=String(observer.response?.answer||"").trim();
+      if(answer) return essenceCompression(answer);
     }
+
+    const direct=buildDirectAnswerForObserver(observer);
+    if(direct) return essenceCompression(direct);
 
     return `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
   }
@@ -3336,7 +3369,9 @@
     const currentLabel=observerDisplayLabel(observer) || "Cosmos";
     const entryQuestion=observer?.question || entry.question || "";
     const station=projection.station || stationProjection(observer);
-    const title=station.focus_id ? station.focus_label : (entryQuestion || currentLabel);
+    // M3.4 — the Station title is the resolved focus, not the user's prompt.
+    // The question is the entrance; the Station is the destination.
+    const title=station.focus_label || currentLabel || entryQuestion || "Cosmos";
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
     const contextRows=compactCenterContext(observer);
