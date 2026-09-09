@@ -240,6 +240,23 @@
       0%{opacity:0;transform:translateY(7px)}
       100%{opacity:1;transform:translateY(0)}
     }
+
+    /* Living Station v0.4 — the horizon is not a ring of equals. Geometry carries meaning. */
+    .cosmosStationNode circle{transition:stroke .18s ease,filter .18s ease,opacity .18s ease,fill .18s ease}
+    .cosmosStationNode[data-horizon-tier="primary"] circle{
+      filter:drop-shadow(0 0 8px rgba(108,153,229,.12));
+    }
+    .cosmosStationNode[data-horizon-tier="supporting"]{opacity:.88}
+    .cosmosStationNode[data-horizon-tier="supporting"] circle{filter:none}
+    .cosmosStationNode[data-horizon-tier="peripheral"]{opacity:.62}
+    .cosmosStationNode[data-horizon-tier="peripheral"] circle{
+      stroke-dasharray:2 4;
+      filter:drop-shadow(0 0 10px rgba(122,162,255,.08));
+    }
+    .cosmosStationNode[data-horizon-tier="peripheral"] text{opacity:.82}
+    .cosmosRoutePrimary{opacity:.72}
+    .cosmosRouteSupporting{opacity:.48}
+    .cosmosRoutePeripheral{opacity:.28;stroke-dasharray:2 6}
     @media (prefers-reduced-motion:reduce){
       .cosmosObserverRing,.cosmosObserverCore,
       .cosmosCurrentStation.cosmosArrivalMoment .cosmosObserverRing,
@@ -2793,9 +2810,14 @@
       }
     }
 
-    const primaryIds=new Set(primary.map(row=>row.id));
+    // Living Station v0.4 — keep the local horizon intentionally small, but
+    // reserve room for one defensible deeper discovery when the Worker supplied it.
+    const primaryVisible=primary.slice(0,4);
+    const primaryIds=new Set(primaryVisible.map(row=>row.id));
+    const peripheral=secondary.find(row=>!row.parent_id || primaryIds.has(row.parent_id)) || null;
     const visible=[
-      ...primary.slice(0,5)
+      ...primaryVisible.map((row,index)=>({...row,living_horizon_tier:index<2?"primary":"supporting"})),
+      ...(peripheral?[{...peripheral,living_horizon_tier:"peripheral"}]:primary.slice(4,5).map(row=>({...row,living_horizon_tier:"supporting"})))
     ];
     const visibleIds=new Set(visible.map(row=>row.id));
 
@@ -2845,8 +2867,10 @@
       // Source/article phrasing never earns first-ring placement merely because it is directly connected.
       const semantic=state.semanticProjectionCache.get(focusId);
       if(semantic?.primary?.length){
-        const primaryLimit=5;
-        const secondaryLimit=0;
+        // Living Station v0.4 — four close destinations plus, when available,
+        // one quieter deeper possibility. This avoids presenting five equal graph nodes.
+        const primaryLimit=4;
+        const secondaryLimit=1;
         const primary=semantic.primary.slice(0,primaryLimit);
         const primaryIds=new Set(primary.map(row=>row.id));
         const secondary=(semantic.secondary||[])
@@ -2854,17 +2878,29 @@
           .slice(0,secondaryLimit);
 
         const nodes=[
-          ...primary.map(row=>({
+          ...primary.map((row,index)=>({
             id:row.id,label:row.label,distance:0,type:row.type||"Dimension",isSeed:false,
             projection_depth:1,projection_role:"primary",why_shown:row.why_shown||"primary semantic dimension",
-            relationship:row.relationship||null
+            relationship:row.relationship||null,living_horizon_tier:index<2?"primary":"supporting"
           })),
           ...secondary.map(row=>({
             id:row.id,label:row.label,distance:1,type:row.type||"Dimension",isSeed:false,
             projection_depth:2,projection_role:"secondary",parent_id:row.parent_id,
-            why_shown:row.why_shown||"secondary semantic dimension",relationship:row.relationship||null
+            why_shown:row.why_shown||"secondary semantic dimension",relationship:row.relationship||null,
+            living_horizon_tier:"peripheral"
           }))
         ];
+
+        // If there is no deeper semantic candidate, allow one additional primary
+        // destination rather than forcing empty visual symmetry.
+        if(!secondary.length && semantic.primary[4]){
+          const row=semantic.primary[4];
+          nodes.push({
+            id:row.id,label:row.label,distance:0,type:row.type||"Dimension",isSeed:false,
+            projection_depth:1,projection_role:"primary",why_shown:row.why_shown||"primary semantic dimension",
+            relationship:row.relationship||null,living_horizon_tier:"supporting"
+          });
+        }
 
         const visibleIds=new Set(nodes.map(node=>node.id));
         const semanticRelIds=new Set(semantic.relationship_ids||[]);
@@ -2904,7 +2940,8 @@
         seen.add(otherId);
         nearby.push({
           id:otherId,label,distance:0,type:state.entities.get(otherId)?.type||"Object",isSeed:false,
-          projection_depth:1,projection_role:"fallback-primary",why_shown:relationshipLabel(rel),relationship:rel
+          projection_depth:1,projection_role:"fallback-primary",why_shown:relationshipLabel(rel),relationship:rel,
+          living_horizon_tier:nearby.length<2?"primary":"supporting"
         });
         if(nearby.length>=Math.min(limit,5)) break;
       }
@@ -2927,7 +2964,10 @@
     candidateIds=[...new Set(candidateIds)];
     const selected=new Set(candidateIds);
     const edges=state.relationships.filter(r=>selected.has(r.from_entity_id) && selected.has(r.to_entity_id));
-    const nodes=candidateIds.map(id=>({id,label:entityLabel(id),distance:dist.get(id)??0,type:state.entities.get(id)?.type||"Object",isSeed:false}));
+    const nodes=candidateIds.map((id,index)=>({
+      id,label:entityLabel(id),distance:dist.get(id)??0,type:state.entities.get(id)?.type||"Object",isSeed:false,
+      living_horizon_tier:index<2?"primary":"supporting"
+    }));
     return {nodes,edges,centerEdges:[],seeds,station};
   }
 
@@ -2964,9 +3004,13 @@
       sorted.forEach((node,index)=>{
         const angleOffset=-Math.PI/2+(ringIndex%2?0:Math.PI/Math.max(3,sorted.length));
         const angle=angleOffset+index*(Math.PI*2/Math.max(1,sorted.length));
+        const tier=String(node.living_horizon_tier||"");
+        // v0.4 semantic gravity: primary destinations sit closer; supporting
+        // destinations slightly farther; the one peripheral discovery lives at the horizon.
+        const tierRadius=tier==="primary" ? radius*.86 : tier==="peripheral" ? Math.min(maxRadius,radius*1.24) : radius;
         positions.set(node.id,{
-          x:center.x+Math.cos(angle)*radius,
-          y:center.y+Math.sin(angle)*radius
+          x:center.x+Math.cos(angle)*tierRadius,
+          y:center.y+Math.sin(angle)*tierRadius
         });
       });
     }
@@ -4204,9 +4248,13 @@
       const otherId=rel.from_entity_id===focusId ? rel.to_entity_id : rel.from_entity_id;
       const p=positions.get(otherId);
       if(!p) continue;
+      const targetNode=projection.nodes.find(node=>node.id===otherId);
+      const tier=String(targetNode?.living_horizon_tier||"supporting");
+      const routeClass=tier==="primary"?"cosmosRoutePrimary":tier==="peripheral"?"cosmosRoutePeripheral":"cosmosRouteSupporting";
       const line=svgEl("line",{
         x1:center.x,y1:center.y,x2:p.x,y2:p.y,
-        stroke:"#617896","stroke-width":1.5,opacity:.78
+        stroke:"#617896","stroke-width":tier==="primary"?1.7:1.25,
+        class:routeClass
       });
       line.style.cursor="pointer";
       line.addEventListener("click",()=>showEdge(rel,false));
@@ -4237,20 +4285,29 @@
     for(const [nodeIndex,node] of projection.nodes.entries()){
       const p=positions.get(node.id); if(!p) continue;
       const nodeClass=arrivalMoment ? "cosmosStationNode cosmosHorizonEmerging" : "cosmosStationNode";
-      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`,class:nodeClass,tabindex:"0",role:"button","aria-label":`Travel to ${node.label}`});
+      const tier=String(node.living_horizon_tier || ((node.projection_depth===2 || node.projection_role==="secondary")?"peripheral":"supporting"));
+      const g=svgEl("g",{
+        transform:`translate(${p.x} ${p.y})`,class:nodeClass,
+        "data-horizon-tier":tier,tabindex:"0",role:"button","aria-label":`Travel to ${node.label}`
+      });
       if(arrivalMoment) g.style.animationDelay=`${180 + Math.min(nodeIndex,6)*70}ms`;
       g.style.cursor="pointer";
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
-      const radius=node.isSeed?34:(secondary?22:29);
+      const radius=node.isSeed?34:(tier==="primary"?31:tier==="peripheral"?19:25);
       const circle=svgEl("circle",{
         r:radius,
-        fill:node.isSeed?"#173c7a":(secondary?"#0f1d2f":"#142b47"),
-        stroke:node.isSeed?"#7aa2ff":(secondary?"#2b405d":"#5579a8"),
-        "stroke-width":node.isSeed?2.5:(secondary?1.1:1.8),
-        opacity:secondary?0.82:1
+        fill:node.isSeed?"#173c7a":(tier==="primary"?"#163353":tier==="peripheral"?"#0b1728":"#10243c"),
+        stroke:node.isSeed?"#7aa2ff":(tier==="primary"?"#678fbe":tier==="peripheral"?"#334d70":"#496b94"),
+        "stroke-width":node.isSeed?2.5:(tier==="primary"?2:tier==="peripheral"?1:1.35),
+        opacity:tier==="peripheral"?0.72:tier==="supporting"?0.9:1
       });
       g.appendChild(circle);
-      const label=svgEl("text",{"text-anchor":"middle",fill:secondary?"#c2cede":"#f5f7fb","font-size":node.isSeed?11:(secondary?9:10),"font-weight":secondary?600:700});
+      const label=svgEl("text",{
+        "text-anchor":"middle",
+        fill:tier==="primary"?"#f5f7fb":tier==="peripheral"?"#9fb0c8":"#d4deec",
+        "font-size":node.isSeed?11:(tier==="primary"?10.5:tier==="peripheral"?8.5:9.5),
+        "font-weight":tier==="primary"?740:tier==="peripheral"?580:650
+      });
       const words=node.label.split(/\s+/);
       const lines=[];
       let current="";
