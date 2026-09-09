@@ -208,8 +208,45 @@
     .cosmosJourneyTrail line{stroke:#587096;stroke-width:1.25;opacity:.28;stroke-dasharray:3 6}
     .cosmosJourneyTrail circle{fill:#102139;stroke:#7185a5;stroke-width:1.1;opacity:.5}
     .cosmosJourneyTrail text{fill:#8797ad;font-size:9px;font-weight:650;opacity:.62}
+    /* Living Station v0.3 — arrival has one restrained heartbeat; the new horizon emerges after arrival. */
+    .cosmosCurrentStation.cosmosArrivalMoment .cosmosObserverRing{
+      animation:cosmosArrivalPulse .78s cubic-bezier(.2,.75,.25,1) 1!important
+    }
+    .cosmosCurrentStation.cosmosArrivalMoment .cosmosObserverCore{
+      animation:cosmosArrivalCore .78s cubic-bezier(.2,.75,.25,1) 1!important
+    }
+    .cosmosStationNode.cosmosHorizonEmerging{
+      opacity:0;
+      animation:cosmosHorizonEmerge .52s cubic-bezier(.2,.72,.25,1) forwards
+    }
+    .livingEssence.cosmosEssenceArrival{
+      animation:cosmosEssenceReveal .58s ease-out both
+    }
+    @keyframes cosmosArrivalPulse{
+      0%{transform:scale(.93);opacity:.7}
+      45%{transform:scale(1.095);opacity:1}
+      100%{transform:scale(1);opacity:.96}
+    }
+    @keyframes cosmosArrivalCore{
+      0%{transform:scale(.96)}
+      42%{transform:scale(1.045)}
+      100%{transform:scale(1)}
+    }
+    @keyframes cosmosHorizonEmerge{
+      0%{opacity:0;filter:blur(2px)}
+      100%{opacity:1;filter:blur(0)}
+    }
+    @keyframes cosmosEssenceReveal{
+      0%{opacity:0;transform:translateY(7px)}
+      100%{opacity:1;transform:translateY(0)}
+    }
     @media (prefers-reduced-motion:reduce){
-      .cosmosObserverRing,.cosmosObserverCore{animation:none!important}
+      .cosmosObserverRing,.cosmosObserverCore,
+      .cosmosCurrentStation.cosmosArrivalMoment .cosmosObserverRing,
+      .cosmosCurrentStation.cosmosArrivalMoment .cosmosObserverCore,
+      .cosmosStationNode.cosmosHorizonEmerging,
+      .livingEssence.cosmosEssenceArrival{animation:none!important}
+      .cosmosStationNode.cosmosHorizonEmerging{opacity:1!important}
     }
     .cosmosObserverLoadingArc{
       fill:none;
@@ -4038,8 +4075,12 @@
     }
   });
 
+  let stationArrivalPending=false;
+
   function render(){
     const observer=state.observer;
+    const arrivalMoment=stationArrivalPending;
+    stationArrivalPending=false;
     // Living Station v0.1 — progress belongs to resolution, not the finished Station.
     if(statusEl && !state.universalAnswerPending){
       statusEl.style.display="none";
@@ -4074,6 +4115,14 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
+    if(livingEssenceText?.parentElement){
+      const essenceBox=livingEssenceText.parentElement;
+      essenceBox.classList.remove("cosmosEssenceArrival");
+      if(arrivalMoment){
+        void essenceBox.offsetWidth;
+        essenceBox.classList.add("cosmosEssenceArrival");
+      }
+    }
     renderButterflyEffect();
     setButterflyOpen(true);
     renderButterflyJourney();
@@ -4185,9 +4234,11 @@
 
 
 
-    for(const node of projection.nodes){
+    for(const [nodeIndex,node] of projection.nodes.entries()){
       const p=positions.get(node.id); if(!p) continue;
-      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`,class:"cosmosStationNode",tabindex:"0",role:"button","aria-label":`Travel to ${node.label}`});
+      const nodeClass=arrivalMoment ? "cosmosStationNode cosmosHorizonEmerging" : "cosmosStationNode";
+      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`,class:nodeClass,tabindex:"0",role:"button","aria-label":`Travel to ${node.label}`});
+      if(arrivalMoment) g.style.animationDelay=`${180 + Math.min(nodeIndex,6)*70}ms`;
       g.style.cursor="pointer";
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
       const radius=node.isSeed?34:(secondary?22:29);
@@ -4222,7 +4273,7 @@
       svg.appendChild(g);
     }
 
-    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`,class:"cosmosCurrentStation"});
+    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`,class:arrivalMoment?"cosmosCurrentStation cosmosArrivalMoment":"cosmosCurrentStation"});
     const observerLoading=Boolean(
       state.universalAnswerPending ||
       observer?.response?.response_type==="universal_loading"
@@ -4325,7 +4376,9 @@
       }
 
       // The data transition happens only after the physical movement completes.
-      // The next render then preserves the old center as the faint Journey trail.
+      // The next render preserves the old center as the faint Journey trail and
+      // marks one arrival moment so the center pulses once and the new horizon emerges.
+      stationArrivalPending=true;
       recenterEntity(id);
       stationTravelLock=false;
     }
