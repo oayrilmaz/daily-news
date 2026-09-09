@@ -196,6 +196,21 @@
       56%{transform:scale(1)}
       66%{transform:scale(1.014)}
     }
+    /* Living Station v0.2 — motion has meaning. A station only moves when the observer travels. */
+    .cosmosStationNode{will-change:transform,opacity}
+    .cosmosStationNode circle{transition:stroke .18s ease,filter .18s ease,opacity .18s ease}
+    .cosmosStationNode:hover circle,.cosmosStationNode:focus-visible circle{
+      stroke:#9dbbff;
+      filter:drop-shadow(0 0 7px rgba(126,170,255,.34));
+    }
+    .cosmosCurrentStation{will-change:transform,opacity}
+    .cosmosJourneyTrail{pointer-events:none}
+    .cosmosJourneyTrail line{stroke:#587096;stroke-width:1.25;opacity:.28;stroke-dasharray:3 6}
+    .cosmosJourneyTrail circle{fill:#102139;stroke:#7185a5;stroke-width:1.1;opacity:.5}
+    .cosmosJourneyTrail text{fill:#8797ad;font-size:9px;font-weight:650;opacity:.62}
+    @media (prefers-reduced-motion:reduce){
+      .cosmosObserverRing,.cosmosObserverCore{animation:none!important}
+    }
     .cosmosObserverLoadingArc{
       fill:none;
       stroke:#a8c5ff;
@@ -736,6 +751,56 @@
     /* Keep old deep diagnostic content available to code, but not on the default human surface. */
     .detail.legacyDetail{display:none}
 
+
+
+    /* LIVING STATION v0.1 — experience shell only; intelligence contract unchanged. */
+    .intro{display:none}
+    .legend{display:none!important}
+    .toolbar{display:none!important}
+    .effectWrap{display:none!important}
+    .butterflyWrap{display:none!important}
+    .projectionPanel{
+      margin-top:8px;
+      border:0;
+      background:transparent;
+      overflow:visible
+    }
+    .projectionInner{padding:0}
+    .projectionEyebrow,.projectionTitle,.projectionEssence,.projectionPulse,
+    .projectionContext,.projectionUnknown,.projectionOrigin,.projectionMeta,
+    .projectionShareRow{display:none!important}
+    .projectionAsk{margin:10px auto 0;max-width:620px}
+    .projectionDrawer{max-width:620px;margin:10px auto 0}
+    .canvasWrap{border:0;background:transparent;box-shadow:none;overflow:visible}
+    #cosmosCanvas{height:min(66vh,650px);min-height:500px}
+    .livingEssence{
+      position:absolute;
+      left:50%;
+      top:calc(50% + 74px);
+      transform:translateX(-50%);
+      width:min(82%,520px);
+      z-index:4;
+      text-align:center;
+      pointer-events:none
+    }
+    .livingEssence p{
+      margin:0;
+      color:#aebbd0;
+      font-size:13px;
+      line-height:1.48;
+      text-shadow:0 2px 12px rgba(3,8,18,.95)
+    }
+    .observer .kicker{color:#73829a}
+    .observer .label{font-size:13px;color:#dfe8f7}
+    .observer .presence{margin-top:3px}
+    @media(max-width:640px){
+      .topbar{padding:9px 10px}
+      .main{padding-top:6px}
+      #cosmosCanvas{height:62vh;min-height:470px}
+      .livingEssence{top:calc(50% + 72px);width:76%}
+      .livingEssence p{font-size:12px;line-height:1.42}
+    }
+
   </style>
 </head>
 <body>
@@ -743,7 +808,7 @@
   <header class="topbar">
     <button class="iconBtn" id="backBtn" aria-label="Back">←</button>
     <div class="observer">
-      <div class="kicker">Current observer</div>
+      <div class="kicker">You are here</div>
       <div class="label" id="observerLabel">Cosmos</div>
       <div class="presence" id="presenceIndicator" hidden aria-live="polite">
         <span class="presenceDot" aria-hidden="true"></span>
@@ -761,6 +826,9 @@
 
     <section class="canvasWrap" aria-label="Cosmos Butterfly Effect Grid">
       <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos relationship grid"></svg>
+      <div class="livingEssence" id="livingEssence" aria-live="polite">
+        <p id="livingEssenceText">Resolving this station…</p>
+      </div>
       <div class="legend">
         <span>solid → supported/current</span>
         <span>dashed → scenario/qualified</span>
@@ -769,7 +837,7 @@
       </div>
       <div class="status" id="status">loading</div>
       <div class="empty" id="emptyState">
-        <span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is working diligently behind the scenes, brewing the essence of your request.</span></span>
+        <span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is resolving this station…</span></span>
       </div>
     </section>
 
@@ -910,6 +978,7 @@
 
   const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
+  const livingEssenceText = document.getElementById("livingEssenceText");
   const projectionPulse = document.getElementById("projectionPulse");
   const projectionPulseItems = document.getElementById("projectionPulseItems");
   const projectionContext = document.getElementById("projectionContext");
@@ -2683,14 +2752,13 @@
           isSeed:false,distance:0,projection_depth:1,projection_role:"primary",
           why_shown:"resolved for this Coordinate"
         });
-        if(primary.length>=7) break;
+        if(primary.length>=5) break;
       }
     }
 
     const primaryIds=new Set(primary.map(row=>row.id));
     const visible=[
-      ...primary.slice(0,state.expanded?9:7),
-      ...secondary.filter(row=>!row.parent_id || primaryIds.has(row.parent_id)).slice(0,state.expanded?12:7)
+      ...primary.slice(0,5)
     ];
     const visibleIds=new Set(visible.map(row=>row.id));
 
@@ -2740,8 +2808,8 @@
       // Source/article phrasing never earns first-ring placement merely because it is directly connected.
       const semantic=state.semanticProjectionCache.get(focusId);
       if(semantic?.primary?.length){
-        const primaryLimit=state.expanded ? 9 : 7;
-        const secondaryLimit=state.expanded ? 12 : 7;
+        const primaryLimit=5;
+        const secondaryLimit=0;
         const primary=semantic.primary.slice(0,primaryLimit);
         const primaryIds=new Set(primary.map(row=>row.id));
         const secondary=(semantic.secondary||[])
@@ -2814,7 +2882,7 @@
     // projection without pretending the query itself is a resolved Thing.
     const seeds=seedEntityIds(observer);
     const dist=neighbors(seeds,MAX_DISTANCE);
-    const fallbackLimit=state.expanded ? MAX_EXPANDED_NODES : MAX_INITIAL_NODES;
+    const fallbackLimit=5;
     let candidateIds=[...dist.keys()].sort((a,b)=>{
       const da=dist.get(a),db=dist.get(b);
       return da-db || scoreEntity(b,db)-scoreEntity(a,da) || entityLabel(a).localeCompare(entityLabel(b));
@@ -3386,6 +3454,7 @@
 
     projectionTitle.textContent=title;
     projectionEssence.textContent=essence;
+    if(livingEssenceText) livingEssenceText.textContent=essence;
 
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
     // World Changes. Model/web current_pulse text is discovery-only and is never rendered.
@@ -3906,7 +3975,7 @@
       if(presenceIndicator) presenceIndicator.hidden=true;
       return;
     }
-    presenceText.textContent=`${Math.round(n)} here now`;
+    presenceText.textContent=`${Math.round(n)} exploring`;
     presenceIndicator.hidden=false;
   }
 
@@ -3971,7 +4040,7 @@
 
   function render(){
     const observer=state.observer;
-    // M3.5 — progress belongs to brewing, not the finished Station.
+    // Living Station v0.1 — progress belongs to resolution, not the finished Station.
     if(statusEl && !state.universalAnswerPending){
       statusEl.style.display="none";
       statusEl.textContent="";
@@ -4059,6 +4128,25 @@
     marker.appendChild(svgEl("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#617896"}));
     defs.appendChild(marker); svg.appendChild(defs);
 
+    // Living Station v0.2 — preserve where the observer just came from without
+    // reopening the full Journey tree. The path remains data; this is only its
+    // quiet, local projection behind the current Station.
+    const localPath=journeyPathTo(state.journey.current_node_id);
+    if(localPath.length>1){
+      const prior=localPath[localPath.length-2];
+      const priorLabel=String(prior?.observer?.label || prior?.coordinate?.label || "Previous station").trim();
+      const trail=svgEl("g",{class:"cosmosJourneyTrail"});
+      const tx=Math.max(72,center.x-92);
+      const ty=Math.min(height-58,center.y+108);
+      trail.appendChild(svgEl("line",{x1:tx,y1:ty,x2:center.x,y2:center.y}));
+      trail.appendChild(svgEl("circle",{cx:tx,cy:ty,r:13}));
+      const trailText=svgEl("text",{x:tx,y:ty+27,"text-anchor":"middle"});
+      const shortPrior=priorLabel.length>24 ? `${priorLabel.slice(0,22).trim()}…` : priorLabel;
+      trailText.textContent=shortPrior;
+      trail.appendChild(trailText);
+      svg.appendChild(trail);
+    }
+
     const reverseKeys=new Set(projection.edges.map(r=>`${r.from_entity_id}|${r.to_entity_id}`));
 
     // Typed relationships from the Station focus to each nearby stop.
@@ -4099,7 +4187,7 @@
 
     for(const node of projection.nodes){
       const p=positions.get(node.id); if(!p) continue;
-      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`});
+      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`,class:"cosmosStationNode",tabindex:"0",role:"button","aria-label":`Travel to ${node.label}`});
       g.style.cursor="pointer";
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
       const radius=node.isSeed?34:(secondary?22:29);
@@ -4124,17 +4212,23 @@
         t.textContent=line; label.appendChild(t);
       });
       g.appendChild(label);
-      g.addEventListener("click",()=>recenterEntity(node.id));
+      g.addEventListener("click",()=>travelToEntity(node.id,g,p,center));
+      g.addEventListener("keydown",event=>{
+        if(event.key==="Enter" || event.key===" "){
+          event.preventDefault();
+          travelToEntity(node.id,g,p,center);
+        }
+      });
       svg.appendChild(g);
     }
 
-    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`});
+    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`,class:"cosmosCurrentStation"});
     const observerLoading=Boolean(
       state.universalAnswerPending ||
       observer?.response?.response_type==="universal_loading"
     );
 
-    // Keep the normal Cosmos geometry. During brewing the inner border becomes
+    // Keep the normal Cosmos geometry. During resolution the inner border becomes
     // a faint track so the bright progress line can be generated from zero.
     const ring=svgEl("circle",{r:63,fill:"rgba(42,92,193,.22)",stroke:"#8bb1ff","stroke-width":2.5,class:"cosmosObserverRing"});
     const inner=svgEl("circle",{
@@ -4178,6 +4272,64 @@
       t.textContent=line.trim();ot.appendChild(t);
     });
     og.appendChild(ot);svg.appendChild(og);
+  }
+
+  let stationTravelLock=false;
+
+  function easeTravel(t){
+    return 1-Math.pow(1-Math.max(0,Math.min(1,t)),3);
+  }
+
+  function travelToEntity(id,nodeGroup,startPoint,centerPoint){
+    if(stationTravelLock) return;
+    if(!nodeGroup || !startPoint || !centerPoint){
+      recenterEntity(id);
+      return;
+    }
+
+    const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if(reduced){
+      recenterEntity(id);
+      return;
+    }
+
+    stationTravelLock=true;
+    const duration=520;
+    const started=performance.now();
+    const currentGroup=svg.querySelector(".cosmosCurrentStation");
+    const otherNodes=[...svg.querySelectorAll(".cosmosStationNode")].filter(el=>el!==nodeGroup);
+    const edgeEls=[...svg.querySelectorAll("line")].filter(el=>!el.closest(".cosmosJourneyTrail"));
+
+    nodeGroup.parentNode?.appendChild(nodeGroup);
+
+    function frame(now){
+      const raw=Math.min(1,(now-started)/duration);
+      const t=easeTravel(raw);
+      const x=startPoint.x+(centerPoint.x-startPoint.x)*t;
+      const y=startPoint.y+(centerPoint.y-startPoint.y)*t;
+      const scale=1+0.16*t;
+      nodeGroup.setAttribute("transform",`translate(${x} ${y}) scale(${scale})`);
+      nodeGroup.style.opacity=String(1-0.02*t);
+
+      for(const el of otherNodes) el.style.opacity=String(1-0.88*t);
+      for(const el of edgeEls) el.style.opacity=String(Math.max(.04,1-0.94*t));
+      if(currentGroup){
+        const shrink=1-0.19*t;
+        currentGroup.setAttribute("transform",`translate(${centerPoint.x} ${centerPoint.y}) scale(${shrink})`);
+        currentGroup.style.opacity=String(1-0.86*t);
+      }
+
+      if(raw<1){
+        requestAnimationFrame(frame);
+        return;
+      }
+
+      // The data transition happens only after the physical movement completes.
+      // The next render then preserves the old center as the faint Journey trail.
+      recenterEntity(id);
+      stationTravelLock=false;
+    }
+    requestAnimationFrame(frame);
   }
 
   function recenterEntity(id,operation="ENTER"){
