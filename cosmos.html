@@ -1148,10 +1148,11 @@
   function meaningfulQuestionTokens(question){
     const stop=new Set([
       "what","whats","what's","is","are","was","were","the","a","an","of","to","for",
-      "in","on","at","and","or","about","tell","me","show","give","provide","today",
+      "in","on","at","and","or","about","around","tell","me","show","give","provide","some","anything","going","today",
       "todays","today's","latest","current","news","going","happening","happened",
       "brief","briefing","intelligence","signals","signal","developments","development",
-      "please","could","would","can","now","right"
+      "recent","recently","good","positive","encouraging","important","major","strongest","best",
+      "progress","update","updates","please","could","would","can","now","right"
     ]);
     return subjectTokens(question).filter(token=>!stop.has(token) && token.length>2);
   }
@@ -1160,7 +1161,10 @@
     const meaningful=meaningfulQuestionTokens(question);
 
     if(!meaningful.length){
-      return state.dailyBrief.slice(0,limit).map((item,index)=>({item,index,score:0}));
+      // UNIVERSAL-SCOPE DEFAULT: a broad/unqualified question such as
+      // "good news" or "what is happening today?" must not silently inherit
+      // PTD Today's local briefing. The universal gateway owns that Coordinate.
+      return [];
     }
 
     const ranked=state.dailyBrief.map((item,index)=>{
@@ -1178,7 +1182,8 @@
 
     // Answer sovereignty: when the observer named a topic, no match is better than
     // substituting unrelated PTD Today material. Broad "what is happening today"
-    // questions (no meaningful topic tokens) may still use the overall briefing.
+    // broad questions with no meaningful topic tokens are handled by the universal gateway,
+    // never by the overall PTD briefing.
     return ranked.length ? ranked.slice(0,limit) : [];
   }
 
