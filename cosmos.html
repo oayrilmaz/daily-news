@@ -1471,7 +1471,7 @@
     }
 
 
-    /* Living Cosmos v26.0 — Change Destination v0.1.
+    /* Living Cosmos v26.1 — Change Destination v0.1.
        A sufficiently meaningful topology change may temporarily become somewhere
        to stand. Temporary does not mean canonical graph admission. */
     .cosmosChangeDestination .horizonNodeCircle{
@@ -1847,6 +1847,15 @@
       .cosmosSpatialRepairEssenceSafe{max-width:min(86vw,560px)!important;margin-left:auto!important;margin-right:auto!important}
     }
     @media(prefers-reduced-motion:reduce){.cosmosSpatialRepairStation{transition:none!important}}
+
+
+    /* v26.1 — Formation UI correction: motion only, never fake progress. */
+    .cosmosObserverProgressTrack,.cosmosObserverProgress,.cosmosBrewStatus em{display:none!important}
+    .cosmosBrewStatus strong,.cosmosBrewStatus span{display:none!important}
+    .cosmosObserverLoadingArc{
+      stroke-dasharray:72 360!important;
+      animation:observerLoadingSweep 1.05s linear infinite!important;
+    }
 
 </style>
 </head>
@@ -11507,7 +11516,7 @@
     document.body.classList.remove('cosmos-resolved');
     document.body.classList.add('cosmos-forming');
     if(state._spatialRepairFormationTimer) clearTimeout(state._spatialRepairFormationTimer);
-    state._spatialRepairFormationTimer=setTimeout(()=>{spatialRepairFinishFormation();render();},COSMOS_FORMATION_MAX_MS);
+    state._spatialRepairFormationTimer=setTimeout(()=>{spatialRepairFinishFormation();},COSMOS_FORMATION_MAX_MS);
   }
   function spatialRepairHasResolvedContent(){
     const r=state.response||{};
@@ -12199,22 +12208,7 @@
       });
       og.appendChild(loadingArc);
 
-      // INNER: use the exact same 49px circle as the normal inner border.
-      // pathLength=100 makes progress deterministic and visually starts from zero.
-      const progressValue=clampLoadingProgress(state.loadingProgressValue);
-      const progressTrack=svgEl("circle",{
-        r:49,cx:0,cy:0,class:"cosmosObserverProgressTrack","aria-hidden":"true"
-      });
-      const progressRing=svgEl("circle",{
-        id:"cosmosObserverProgress",
-        r:49,cx:0,cy:0,
-        pathLength:100,
-        class:"cosmosObserverProgress",
-        "stroke-dasharray":`${progressValue} ${Math.max(0,100-progressValue)}`,
-        "aria-hidden":"true"
-      });
-      og.appendChild(progressTrack);
-      og.appendChild(progressRing);
+      // No inner progress/fill: formation has no fake percentage.
     }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=state.scenarioTravel?.branch?.to_label || projection.station?.focus_label || observerDisplayLabel(observer);
@@ -12913,26 +12907,22 @@
   }
 
   function paintLoadingNarrative(){
+    const statusEl=document.getElementById("projectionStatus");
+    const emptyEl=document.getElementById("projectionEmpty");
     if(!state.universalAnswerPending) return;
-    if(statusEl) statusEl.style.display="block";
-    const stage=loadingStageFromProgress(state.loadingProgressValue);
-    state.loadingStage=stage.key;
-    state.loadingStageDetail=stage.detail;
-    statusEl.textContent=`${Math.round(clampLoadingProgress(state.loadingProgressValue))}% · ${stage.title}`;
+    if(statusEl){
+      statusEl.style.display="block";
+      statusEl.textContent="Forming Cosmos Essence";
+    }
     if(emptyEl){
-      emptyEl.style.display="block";
-      emptyEl.innerHTML=`<div class="cosmosBrewStatus"><strong>${esc(stage.title)}</strong><span>${esc(stage.detail)}</span><em>${Math.round(clampLoadingProgress(state.loadingProgressValue))}% brewed</em></div>`;
+      emptyEl.style.display="none";
+      emptyEl.innerHTML="";
     }
   }
 
   function paintLoadingProgress(){
-    const ring=document.getElementById("cosmosObserverProgress");
-    const progress=clampLoadingProgress(state.loadingProgressValue);
-    if(ring){
-      ring.setAttribute("pathLength","100");
-      ring.setAttribute("stroke-dasharray",`${progress} ${Math.max(0,100-progress)}`);
-      ring.style.opacity=progress>0 ? "1" : "0";
-    }
+    // Deliberately no percentage, progress fill, or simulated completion.
+    // The outer running arc is the only formation indicator.
     paintLoadingNarrative();
   }
 
