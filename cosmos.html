@@ -624,6 +624,13 @@
       opacity:.42
     }
 
+    .metroRelationLabel{
+      fill:#7890b4;
+      font-size:9px;
+      font-weight:600;
+      opacity:.82;
+      pointer-events:none
+    }
 
     .metroStop{
       position:absolute;
@@ -939,7 +946,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.5-station-boundary";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.6-journey-relations";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -965,8 +972,8 @@
     expanded: false,
     entryObserver: null,
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
-    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_4",
-    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_4",
+    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_5",
+    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_5",
     journey: {
       nodes: [],
       current_node_id: "",
@@ -2269,6 +2276,48 @@
     return coordinateKey(coordinateForObserver(observer));
   }
 
+  function journeySemanticKey(value){
+    const node=value?.observer ? value : null;
+    const observer=node?.observer || value || {};
+    const coordinate=node?.coordinate || observer?.coordinate || coordinateForObserver(observer) || {};
+
+    const semanticId=String(
+      observer?.semantic_subject_id ||
+      observer?.response?.subject_match?.id ||
+      (coordinate?.focus_type==="entity" ? coordinate?.focus_id : "") ||
+      ""
+    ).trim();
+
+    if(semanticId && !semanticId.startsWith("cosmos-projection:")){
+      return `subject:${semanticId.toLowerCase()}`;
+    }
+
+    const label=String(
+      coordinate?.focus_label ||
+      observer?.semantic_subject_label ||
+      observer?.response?.subject_match?.label ||
+      observer?.label ||
+      observer?.question ||
+      ""
+    )
+      .toLowerCase()
+      .replace(/[“”"'`]/g,"")
+      .replace(/^explain\s+/,"")
+      .replace(/\s*[-–—:]?\s*what is it.*$/,"")
+      .replace(/\s*[-–—:]?\s*what are its major dimensions.*$/,"")
+      .replace(/[^a-z0-9]+/g," ")
+      .replace(/\s+/g," ")
+      .trim();
+
+    return label ? `label:${label}` : journeyObserverKey(observer);
+  }
+
+  function sameJourneyStation(a,b){
+    const ka=journeySemanticKey(a);
+    const kb=journeySemanticKey(b);
+    return Boolean(ka && kb && ka===kb);
+  }
+
   function journeyNodeById(id){
     return state.journey.nodes.find(node=>node.node_id===id) || null;
   }
@@ -2293,18 +2342,80 @@
     }catch{}
   }
 
+  function compactJourneyStations(){
+    const nodes=Array.isArray(state.journey?.nodes) ? state.journey.nodes : [];
+    if(nodes.length<2) return;
+
+    const kept=[];
+    const canonicalBySemantic=new Map();
+    const redirect=new Map();
+
+    for(const node of nodes){
+      const semantic=journeySemanticKey(node);
+      const existing=semantic ? canonicalBySemantic.get(semantic) : null;
+
+      if(!existing){
+        kept.push(node);
+        if(semantic) canonicalBySemantic.set(semantic,node);
+        continue;
+      }
+
+      // Prefer the newest/resolved snapshot, but keep the original station identity
+      // and route position so the map does not grow duplicate stops.
+      const existingCoord=existing.coordinate || existing.observer?.coordinate || {};
+      const nodeCoord=node.coordinate || node.observer?.coordinate || {};
+      const nodeMoreResolved=
+        existingCoord?.focus_type==="investigation" &&
+        nodeCoord?.focus_type!=="investigation";
+
+      if(nodeMoreResolved || Number(node.created_at||0)>=Number(existing.created_at||0)){
+        existing.coordinate=node.coordinate || existing.coordinate;
+        existing.observer_key=node.observer_key || existing.observer_key;
+        existing.observer=node.observer || existing.observer;
+        existing.via_operation=node.via_operation || existing.via_operation;
+        existing.arrival_relation=node.arrival_relation || existing.arrival_relation || "";
+        existing.arrival_relation_direction=node.arrival_relation_direction || existing.arrival_relation_direction || "";
+      }
+
+      redirect.set(node.node_id,existing.node_id);
+      if(state.journey.current_node_id===node.node_id){
+        state.journey.current_node_id=existing.node_id;
+      }
+    }
+
+    // Repair links that pointed to a removed duplicate.
+    for(const node of kept){
+      let parent=node.parent_node_id;
+      const seen=new Set();
+      while(parent && redirect.has(parent) && !seen.has(parent)){
+        seen.add(parent);
+        parent=redirect.get(parent);
+      }
+      if(parent===node.node_id) parent="";
+      node.parent_node_id=parent||"";
+    }
+
+    state.journey.nodes=kept;
+    saveJourney();
+  }
+
   function addJourneyNode(observer,parentNodeId="",forceNew=false){
     if(!observer) return null;
     const key=journeyObserverKey(observer);
 
-    // If we are simply returning to a previously visited station, reuse it.
-    if(!forceNew){
-      const existing=state.journey.nodes.find(node=>node.observer_key===key);
-      if(existing){
-        state.journey.current_node_id=existing.node_id;
-        saveJourney();
-        return existing;
-      }
+    // One human-semantic subject = one Journey station.
+    const semanticExisting=state.journey.nodes.find(node=>sameJourneyStation(node,observer));
+    if(semanticExisting){
+      semanticExisting.observer_key=key;
+      semanticExisting.coordinate=coordinateForObserver(observer);
+      semanticExisting.observer=observerSnapshot(observer);
+      semanticExisting.via_operation=observer?.via_operation||semanticExisting.via_operation||"ENTER";
+      semanticExisting.arrival_relation=observer?.from_relationship_label||semanticExisting.arrival_relation||"";
+      semanticExisting.arrival_relation_direction=observer?.from_relationship_direction||semanticExisting.arrival_relation_direction||"";
+      state.journey.current_node_id=semanticExisting.node_id;
+      compactJourneyStations();
+      saveJourney();
+      return semanticExisting;
     }
 
     const parent=parentNodeId || state.journey.current_node_id || "";
@@ -2314,6 +2425,8 @@
       observer_key:key,
       coordinate:coordinateForObserver(observer),
       via_operation:observer?.via_operation||"ENTER",
+      arrival_relation:observer?.from_relationship_label||"",
+      arrival_relation_direction:observer?.from_relationship_direction||"",
       observer:observerSnapshot(observer),
       created_at:Date.now()
     };
@@ -2333,11 +2446,19 @@
     const current=journeyNodeById(state.journey.current_node_id);
     if(current && current.observer_key===journeyObserverKey(observer)) return;
 
-    // Reuse a previously visited station if it exists; otherwise branch from
-    // the current station without deleting any forward history.
-    const existing=state.journey.nodes.find(node=>node.observer_key===journeyObserverKey(observer));
+    // Reuse the semantic station first, exact Coordinate second.
+    const existing=
+      state.journey.nodes.find(node=>sameJourneyStation(node,observer)) ||
+      state.journey.nodes.find(node=>node.observer_key===journeyObserverKey(observer));
+
     if(existing){
+      existing.observer_key=journeyObserverKey(observer);
+      existing.coordinate=coordinateForObserver(observer);
+      existing.observer=observerSnapshot(observer);
+      existing.arrival_relation=observer?.from_relationship_label||existing.arrival_relation||"";
+      existing.arrival_relation_direction=observer?.from_relationship_direction||existing.arrival_relation_direction||"";
       state.journey.current_node_id=existing.node_id;
+      compactJourneyStations();
       saveJourney();
     }else{
       addJourneyNode(observer,state.journey.current_node_id,true);
@@ -2386,7 +2507,13 @@
     if((wasInvestigation && nowResolved) || provisionalAsk){
       current.coordinate=resolvedCoordinate;
       current.observer_key=coordinateKey(resolvedCoordinate);
+      const priorRelation=current.arrival_relation||current.observer?.from_relationship_label||"";
+      const priorDirection=current.arrival_relation_direction||current.observer?.from_relationship_direction||"";
       current.observer=observerSnapshot(observer);
+      if(priorRelation && !current.observer.from_relationship_label) current.observer.from_relationship_label=priorRelation;
+      if(priorDirection && !current.observer.from_relationship_direction) current.observer.from_relationship_direction=priorDirection;
+      current.arrival_relation=priorRelation;
+      current.arrival_relation_direction=priorDirection;
       current.via_operation="ASK";
       state.journey.current_node_id=current.node_id;
 
@@ -2397,11 +2524,13 @@
         node.node_id===keepId || node.observer_key!==resolvedKey
       );
 
+      compactJourneyStations();
       saveJourney();
       return;
     }
 
     ensureJourneyCurrent(observer);
+    compactJourneyStations();
   }
 
   function restoreObserverFromJourneyNode(node){
@@ -2460,6 +2589,8 @@
       response_coordinate: observer.response?.coordinate ? {...observer.response.coordinate} : null,
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || "",
+      from_relationship_label: observer.from_relationship_label || "",
+      from_relationship_direction: observer.from_relationship_direction || "",
       coordinate: coordinateForObserver(observer),
       via_operation: observer.via_operation || ""
     };
@@ -3670,13 +3801,11 @@
     ensureJourneyCurrent(state.observer);
     setButterflyOpen(true);
 
-    // Render one visible stop per resolved Coordinate/label.
-    // Historical duplicate records are suppressed rather than shown as double stations.
+    // First repair the stored Journey itself, then render one semantic Station.
+    compactJourneyStations();
     const seenJourneyKeys=new Set();
     const nodes=state.journey.nodes.filter(node=>{
-      const coordKey=String(node?.observer_key||coordinateKey(node?.coordinate||{}));
-      const labelKey=normalizeSubject(node?.observer?.label || node?.observer?.question || "");
-      const key=coordKey || labelKey;
+      const key=journeySemanticKey(node);
       if(!key || seenJourneyKeys.has(key)) return false;
       seenJourneyKeys.add(key);
       return true;
@@ -3755,6 +3884,13 @@
         b.x+stopXOffset,b.y+stopYOffset,
         isActive?"active":"saved"
       );
+
+      const relation=String(node.arrival_relation||node.observer?.from_relationship_label||"").trim();
+      if(relation){
+        const relationX=Math.round((a.x+b.x)/2)+18;
+        const relationY=Math.round((a.y+b.y)/2)+4;
+        routeSvg += `<text x="${relationX}" y="${relationY}" class="metroRelationLabel">${esc(relation)}</text>`;
+      }
     }
     routeSvg += `</svg>`;
 
@@ -3782,7 +3918,11 @@
           <span class="metroLabel">
             <strong>${esc(label)} ${branchBadge}</strong>
             <span>
-              ${current?"you are here":(active?"your route":"saved branch")}
+              ${current
+                ? "you are here"
+                : (node.arrival_relation
+                    ? `${esc(node.arrival_relation)} · ${active?"your route":"saved branch"}`
+                    : (active?"your route":"saved branch"))}
 
             </span>
           </span>
@@ -3813,7 +3953,9 @@
     const type = observer.kind || "object";
     const source = observer.article_id ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
     const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
-    const arrivedFrom = observer.from_observer_label ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}</p>` : "";
+    const arrivedFrom = observer.from_observer_label
+      ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}${observer.from_relationship_label?` · <strong>Connection:</strong> ${esc(observer.from_relationship_label)}`:""}</p>`
+      : "";
     const intelligence = observer.kind==="entity" ? buildCenterIntelligence(observer.id) : null;
 
     observerDetail.innerHTML = `
@@ -4168,6 +4310,30 @@
     og.appendChild(ot);svg.appendChild(og);
   }
 
+  function travelRelation(previous,targetId){
+    if(!previous || !targetId) return {label:"",direction:""};
+
+    const previousId=focusEntityId(previous) || previous?.semantic_subject_id || "";
+    if(!previousId) return {label:"",direction:""};
+
+    const candidates=state.relationships.filter(rel=>{
+      const from=String(rel?.from_entity_id||rel?.from_id||"");
+      const to=String(rel?.to_entity_id||rel?.to_id||"");
+      return (from===previousId && to===targetId) || (from===targetId && to===previousId);
+    });
+
+    if(!candidates.length) return {label:"",direction:""};
+
+    // Prefer the current temporary projection relationship because it explains
+    // exactly why this destination was shown from the previous station.
+    candidates.sort((a,b)=>Number(Boolean(b?.ephemeral_projection))-Number(Boolean(a?.ephemeral_projection)));
+    const rel=candidates[0];
+    const from=String(rel?.from_entity_id||rel?.from_id||"");
+    const to=String(rel?.to_entity_id||rel?.to_id||"");
+    const direction=(from===previousId && to===targetId) ? "forward" : "reverse";
+    return {label:relationshipLabel(rel),direction};
+  }
+
   function recenterEntity(id,operation="ENTER"){
     const entity=state.entities.get(id);
     if(!entity) return;
@@ -4175,6 +4341,7 @@
     const previous=state.observer;
     const parentJourneyId=state.journey.current_node_id;
     const label=entity.name||entity.label||id;
+    const arrivalRelation=travelRelation(previous,id);
 
     // Temporary projection nodes came from a specific universal answer.
     // They must never inherit unrelated local PTD summaries. Clicking one
@@ -4225,6 +4392,8 @@
         article_id:"",
         from_observer_id:previous?.id||"",
         from_observer_label:previousLabel||"",
+        from_relationship_label:arrivalRelation.label||"",
+        from_relationship_direction:arrivalRelation.direction||"",
         via_operation:"ENTER"
       };
       state.response=provisional;
@@ -4269,7 +4438,9 @@
       article_id:previous?.article_id||entry.article_id,
       question:previous?.question||entry.question||"",
       from_observer_id:previous?.id||"",
-      from_observer_label:previous?.label||"",
+      from_observer_label:observerDisplayLabel(previous)||previous?.label||"",
+      from_relationship_label:arrivalRelation.label||"",
+      from_relationship_direction:arrivalRelation.direction||"",
       via_operation:operation
     };
     state.expanded=false;
