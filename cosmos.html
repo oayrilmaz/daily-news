@@ -1471,7 +1471,7 @@
     }
 
 
-    /* Living Cosmos v26.1 — Change Destination v0.1.
+    /* Living Cosmos v26.2 — Change Destination v0.1.
        A sufficiently meaningful topology change may temporarily become somewhere
        to stand. Temporary does not mean canonical graph admission. */
     .cosmosChangeDestination .horizonNodeCircle{
@@ -1859,7 +1859,7 @@
 
 </style>
 </head>
-<body>
+<body data-cosmos-build="26.2">
 <div class="shell">
   <header class="topbar">
     <button class="iconBtn" id="backBtn" aria-label="Back">←</button>
@@ -2174,7 +2174,7 @@
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
   const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.3-m3.2g";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 32000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
@@ -11495,7 +11495,7 @@
   // Formation is finite; Essence owns a protected reading corridor; supported
   // Butterfly structure can remain visible on the normal surface.
 
-  const COSMOS_FORMATION_MAX_MS=12000;
+  const COSMOS_FORMATION_MAX_MS=32000;
 
   function spatialRepairIsMobile(){
     return !!(window.matchMedia&&window.matchMedia('(max-width:700px)').matches);
@@ -11516,7 +11516,11 @@
     document.body.classList.remove('cosmos-resolved');
     document.body.classList.add('cosmos-forming');
     if(state._spatialRepairFormationTimer) clearTimeout(state._spatialRepairFormationTimer);
-    state._spatialRepairFormationTimer=setTimeout(()=>{spatialRepairFinishFormation();},COSMOS_FORMATION_MAX_MS);
+    // The request lifecycle owns formation. This timer is a last-resort abort,
+    // not a cosmetic timeout that leaves a still-pending loading Station behind.
+    state._spatialRepairFormationTimer=setTimeout(()=>{
+      try{state.universalAnswerController?.abort();}catch(_){}
+    },COSMOS_FORMATION_MAX_MS);
   }
   function spatialRepairHasResolvedContent(){
     const r=state.response||{};
@@ -12935,7 +12939,7 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=76;
+    state.loadingProgressCeiling=0;
     state.loadingStage="connecting";
     state.loadingStageDetail="Reaching the universe and understanding your request…";
     requestAnimationFrame(paintLoadingProgress);
@@ -13033,6 +13037,7 @@
     }
 
     const controller=new AbortController();
+    state.universalAnswerController=controller;
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
@@ -13111,6 +13116,8 @@
       render();
     }finally{
       clearTimeout(timer);
+      if(state.universalAnswerController===controller) state.universalAnswerController=null;
+      spatialRepairFinishFormation();
     }
   }
 
