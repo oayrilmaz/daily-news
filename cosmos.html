@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -998,7 +997,7 @@
     .cosmosCurrentStation .cosmosObserverCore{filter:url(#cosmosInnerDepth)}
     .cosmosStationNode circle{filter:none}
     .cosmosStationNode[data-horizon-tier="primary"] circle{filter:url(#cosmosNodeGlow)}
-    .cosmosStationNode[data-horizon-tier="peripheral"] circle{filter:none}
+.cosmosStationNode[data-horizon-tier="peripheral"] circle{filter:none}
     .cosmosJourneyTrail{opacity:.78}
     .cosmosJourneyTrail line{stroke:#60789f;opacity:.22}
     .cosmosJourneyTrail circle{opacity:.38}
@@ -1471,7 +1470,7 @@
     }
 
 
-    /* Living Cosmos v26.2 — Change Destination v0.1.
+    /* Living Cosmos v26.0 — Change Destination v0.1.
        A sufficiently meaningful topology change may temporarily become somewhere
        to stand. Temporary does not mean canonical graph admission. */
     .cosmosChangeDestination .horizonNodeCircle{
@@ -1849,17 +1848,27 @@
     @media(prefers-reduced-motion:reduce){.cosmosSpatialRepairStation{transition:none!important}}
 
 
-    /* v26.1 — Formation UI correction: motion only, never fake progress. */
-    .cosmosObserverProgressTrack,.cosmosObserverProgress,.cosmosBrewStatus em{display:none!important}
-    .cosmosBrewStatus strong,.cosmosBrewStatus span{display:none!important}
-    .cosmosObserverLoadingArc{
-      stroke-dasharray:72 360!important;
-      animation:observerLoadingSweep 1.05s linear infinite!important;
+    /* Living Station v26.1 — persistent side Metro, readable at phone and desktop sizes. */
+    .cosmosStationRail{pointer-events:none}
+    .cosmosRailLine{stroke:#526d98;stroke-width:1.2;stroke-opacity:.42;stroke-linecap:round}
+    .cosmosRailBridge{fill:none;stroke:#4f6b96;stroke-width:1;stroke-opacity:.16;stroke-dasharray:3 8}
+    .cosmosRailStop,.cosmosButterflyCue{pointer-events:auto;cursor:pointer;outline:none}
+    .cosmosRailDot{fill:#0b1729;stroke:#83a8ea;stroke-width:1.5;filter:drop-shadow(0 0 5px rgba(120,162,235,.24))}
+    .cosmosRailStop:hover .cosmosRailDot,.cosmosRailStop:focus-visible .cosmosRailDot{fill:#1d4383;stroke:#aec7ff}
+    .cosmosRailLabel{fill:#b7c6dc;font-size:9.5px;font-weight:650;letter-spacing:.01em;paint-order:stroke;stroke:#030812;stroke-width:4px;stroke-linejoin:round}
+    .cosmosButterflyWing{fill:rgba(122,162,255,.08);stroke:#7fa8ef;stroke-width:1.25;stroke-opacity:.78}
+    .cosmosButterflyBody{fill:#8fb4f7;opacity:.86}
+    .cosmosButterflyText{fill:#7890b3;font-size:8.5px;font-weight:650;letter-spacing:.035em;paint-order:stroke;stroke:#030812;stroke-width:4px}
+    .cosmosButterflyCue[data-active="true"] .cosmosButterflyWing{stroke:#a9c5ff;stroke-opacity:1;filter:drop-shadow(0 0 5px rgba(122,162,255,.32))}
+    .cosmosObserverProgressTrack,.cosmosObserverProgress{display:none!important}
+    @media(max-width:699px){
+      .cosmosRailLabel{font-size:8.5px}
+      .cosmosButterflyText{font-size:8px}
+      .cosmosRailBridge{stroke-opacity:.11}
     }
-
 </style>
 </head>
-<body data-cosmos-build="26.2">
+<body>
 <div class="shell">
   <header class="topbar">
     <button class="iconBtn" id="backBtn" aria-label="Back">←</button>
@@ -2007,7 +2016,7 @@
         <div>
           <div class="depthEyebrow">Depth</div>
           <h2 class="depthTitle" id="depthTitle">Cosmos</h2>
-        </div>
+</div>
         <button class="depthClose" id="depthClose" type="button" aria-label="Close depth">×</button>
       </div>
       <p class="depthAnswer" id="depthAnswer"></p>
@@ -2174,7 +2183,7 @@
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
   const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.3-m3.2g";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 32000;
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 18000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
@@ -3007,8 +3016,7 @@
   function opportunityAnswerFromKnownEvidence(subject,rows,neighbors){
     const opportunityWords=/\b(opportun|growth|expand|expansion|investment|demand|upgrade|moderniz|efficien|capacity|procurement|market|service|aftermarket|replacement|retrofit|digital|automation|resilien|storage|renewable|data center|manufactur)\b/i;
     const candidates=[];
-
-    for(const row of rows||[]){
+for(const row of rows||[]){
       const item=row.item;
       const title=cleanSentence(dailyItemTitle(item),150);
       const summary=cleanSentence(dailyItemSummary(item),210);
@@ -4007,7 +4015,7 @@
   // this layer it describes a change in the Cosmos projection / observer view;
   // it never upgrades that difference into a claim that the world changed.
   function deriveChangeEvent(node,delta){
-    if(!node||!delta) return null;
+if(!node||!delta) return null;
     const attribution=deltaAttribution(node,delta);
     const changed=[];
     if(delta.added.length||delta.faded.length) changed.push("horizon");
@@ -4553,7 +4561,7 @@
       label:display,
       response_type:"universal_loading",
       question:q,
-      answer:"Forming Cosmos Essence",
+      answer:"",
       short_answer:"",
       essence:"",
       current_pulse:[],
@@ -5006,8 +5014,7 @@
         });
       });
     }
-
-    // Deterministic collision relaxation.
+// Deterministic collision relaxation.
     const ids=nodes.map(n=>n.id);
     const minGap=68;
     for(let pass=0;pass<18;pass++){
@@ -6007,7 +6014,7 @@
       const target=rel.to_entity_id||rel.from_entity_id;
       const consequenceReach=state.relationships.filter(r=>r?.from_entity_id===target||r?.to_entity_id===target).length;
       const uncertainty=scenarioRelationshipIsConditional(rel)?"HIGH":"UNASSIGNED";
-      const action=leverage.score>=3 && agency.score>=3?"ACT CANDIDATE":leverage.score>=3 && agency.score===2?"INFLUENCE CANDIDATE":leverage.score>=3?"WATCH / PREPARE":"OBSERVE";
+const action=leverage.score>=3 && agency.score>=3?"ACT CANDIDATE":leverage.score>=3 && agency.score===2?"INFLUENCE CANDIDATE":leverage.score>=3?"WATCH / PREPARE":"OBSERVE";
       return {rel,target,label:entityLabel(target),leverage,agency,consequenceReach,uncertainty,action};
     }).sort((a,b)=>(b.leverage.score*3+b.agency.score+b.consequenceReach)-(a.leverage.score*3+a.agency.score+a.consequenceReach));
     const seen=new Set();
@@ -7005,9 +7012,7 @@
     // from whatever section the user was reading. The viewport now moves only
     // after an explicit user action (for example tapping "Butterfly map").
   }
-
-
-  // Living Station v1.2 — Map is a pull-back from the Living Station, not a
+// Living Station v1.2 — Map is a pull-back from the Living Station, not a
   // separate knowledge view. Reuse the governed Journey renderer so map
   // geometry never invents travel history. Moving the rendered canvas keeps
   // its station listeners intact.
@@ -8007,7 +8012,7 @@
     const previous=loadLiveButterflyPrevious();
     const comparison=liveButterflyCompare(previous,current);
     if(current) saveLiveButterflySnapshot(current);
-    return {current,previous,comparison};
+return {current,previous,comparison};
   }
 
   function liveButterflyStateForHop(comparison,hop){
@@ -9007,7 +9012,7 @@
     const m=topologyBeatModel(observer);
     if(!m.beat||!m.fingerprint) return m;
     try{localStorage.setItem(topologyBeatStorageKey(observer),m.fingerprint);}catch(_){}
-    return m;
+return m;
   }
 
   function applyTopologyBeat(observer=state.observer){
@@ -9691,9 +9696,9 @@
   }
 
   function metroUniverseVisible(){
-    // Explicit semantic far zoom, or when the existing map mode is open.
+    // v26.1: Journey/Butterfly may be opened directly from the persistent side cue.
     const scale=adaptiveUniverseScale();
-    return scale==='far' || Boolean(state.journeyMapOpen||state.mapOpen||state.map_mode);
+    return scale==='far' || Boolean(state.forceButterfly||state.journeyMapOpen||state.mapOpen||state.map_mode);
   }
 
   function metroTravelTo(node){
@@ -10007,7 +10012,7 @@
     // Journey stops.
     [...svg.querySelectorAll('.cosmosMetroStop')].forEach(g=>{
       const label=String(g.querySelector('text')?.textContent||'').trim();
-      const info=model.stations.find(x=>
+const info=model.stations.find(x=>
         String(x.label||'').slice(0,28).trim().toLowerCase()===label.toLowerCase()
       );
       if(!info) return;
@@ -10268,7 +10273,12 @@
     let mode='station';
     let reason='Current Station and semantic horizon are primary.';
 
-    if(change){
+    if(state.forceButterfly){
+      mode='butterfly';
+      reason=butterfly?.edges?.length
+        ?'Butterfly Effect is open for the current supported route.'
+        :'Butterfly Effect is open; Cosmos will not invent unsupported causal hops.';
+    }else if(change){
       mode='change';
       reason='The observer is standing inside a supported Change Destination.';
     }else if(butterfly?.edges?.length && (
@@ -10427,7 +10437,7 @@
     const q=String(raw||'').trim(); if(!q) return;
     fc.phase='forming'; state.currentIntent=q;
     document.body.dataset.cosmosFirstContact='forming';
-    ensureFirstContactHint().textContent='Forming Cosmos Essence';
+    ensureFirstContactHint().textContent='Cosmos is exploring';
   }
   function applyFirstContact(observer=state.observer){
     const fc=firstContactState(); ensureFirstContactHint();
@@ -10439,7 +10449,7 @@
       fc.awakened=true;fc.phase='forming';document.body.dataset.cosmosFirstContact='forming';
       if(center){center.classList.remove('cosmosFirstContactWake');void center.getBoundingClientRect();center.classList.add('cosmosFirstContactWake');setTimeout(()=>center?.classList.remove('cosmosFirstContactWake'),1050);}
     }
-    const horizon=[...svg?.querySelectorAll('.cosmosHorizonNode')||[]];
+    const horizon=[...svg?.querySelectorAll('.cosmosHorizonNode,.cosmosRailStop')||[]];
     if(horizon.length&&!fc.universeShown){
       fc.universeShown=true;fc.phase='universe';document.body.dataset.cosmosFirstContact='universe';
       svg?.classList.add('cosmosFirstUniverse');
@@ -11006,8 +11016,7 @@
   // Living Cosmos v22.0 — Destination Navigation.
   // CENTER → supported transformations → DESTINATION
   // DESTINATION → required conditions → agency/leverage → smallest meaningful next move.
-
-  function destinationIntentFromState(){
+function destinationIntentFromState(){
     const explicit=state.destinationIntent||state.desiredDestination||null;
     if(explicit) return typeof explicit==='string'?{label:explicit}:explicit;
     const q=String(state.currentIntent||state.lastQuestion||'').trim();
@@ -11495,7 +11504,7 @@
   // Formation is finite; Essence owns a protected reading corridor; supported
   // Butterfly structure can remain visible on the normal surface.
 
-  const COSMOS_FORMATION_MAX_MS=32000;
+  const COSMOS_FORMATION_MAX_MS=12000;
 
   function spatialRepairIsMobile(){
     return !!(window.matchMedia&&window.matchMedia('(max-width:700px)').matches);
@@ -11516,11 +11525,7 @@
     document.body.classList.remove('cosmos-resolved');
     document.body.classList.add('cosmos-forming');
     if(state._spatialRepairFormationTimer) clearTimeout(state._spatialRepairFormationTimer);
-    // The request lifecycle owns formation. This timer is a last-resort abort,
-    // not a cosmetic timeout that leaves a still-pending loading Station behind.
-    state._spatialRepairFormationTimer=setTimeout(()=>{
-      try{state.universalAnswerController?.abort();}catch(_){}
-    },COSMOS_FORMATION_MAX_MS);
+    state._spatialRepairFormationTimer=setTimeout(()=>{spatialRepairFinishFormation();render();},COSMOS_FORMATION_MAX_MS);
   }
   function spatialRepairHasResolvedContent(){
     const r=state.response||{};
@@ -11826,6 +11831,71 @@
 
   let stationArrivalPending=false;
 
+  // Living Station v26.1 — persistent side Metro + Butterfly cue.
+  // The center remains sovereign; nearby destinations become readable stops instead
+  // of overlapping circles. This is a projection of existing supported nodes only.
+  function applyCosmosStationRail(observer,projection,center,width,height){
+    if(!svg||!projection||!center) return;
+    svg.querySelectorAll('.cosmosStationRail').forEach(n=>n.remove());
+
+    const nodes=(projection.nodes||[]).slice(0,6);
+    const hasQuestion=Boolean(String(observer?.question||state.currentIntent||state.lastQuestion||'').trim());
+    if(!nodes.length && !hasQuestion) return;
+
+    // Remove the old radial duplicates/routes. The same nodes remain interactive on the rail.
+    svg.querySelectorAll('.cosmosStationNode,.cosmosSemanticRoute').forEach(n=>n.setAttribute('display','none'));
+
+    const rail=svgEl('g',{class:'cosmosStationRail','aria-label':'Cosmos stations'});
+    const mobile=width<700;
+    const railX=mobile?width-34:width-58;
+    const top=Math.max(112,Math.round(height*.20));
+    const bottom=Math.min(height-145,Math.round(height*.73));
+    const span=Math.max(110,bottom-top);
+
+    if(nodes.length){
+      rail.appendChild(svgEl('line',{x1:railX,y1:top,x2:railX,y2:bottom,class:'cosmosRailLine'}));
+      nodes.forEach((node,index)=>{
+        const y=nodes.length===1?(top+bottom)/2:top+(span*index/(nodes.length-1));
+        const g=svgEl('g',{
+          class:'cosmosRailStop',transform:`translate(${railX} ${y})`,
+          tabindex:'0',role:'button','aria-label':`Travel to ${node.label}`
+        });
+        g.appendChild(svgEl('circle',{r:index===0?7:6,class:'cosmosRailDot'}));
+        const text=svgEl('text',{x:-15,y:3,'text-anchor':'end',class:'cosmosRailLabel'});
+        const raw=String(node.label||'Station');
+        text.textContent=raw.length>(mobile?22:28) ? raw.slice(0,mobile?21:27)+'…' : raw;
+        g.appendChild(text);
+        const travel=()=>{ closeStationWhy?.(); recenterEntity(node.id); };
+        g.addEventListener('click',travel);
+        g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();travel();}});
+        rail.appendChild(g);
+      });
+      // A faint bridge says these stops belong to the current center without creating a second hub.
+      rail.insertBefore(svgEl('path',{
+        d:`M ${center.x+78} ${center.y} C ${center.x+130} ${center.y}, ${railX-82} ${(top+bottom)/2}, ${railX} ${(top+bottom)/2}`,
+        class:'cosmosRailBridge','aria-hidden':'true'
+      }),rail.firstChild);
+    }
+
+    // Persistent Butterfly Effect cue. It is a doorway, not a causal claim.
+    const butterflyY=Math.max(76,top-48);
+    const bg=svgEl('g',{
+      class:'cosmosButterflyCue',transform:`translate(${railX} ${butterflyY})`,
+      tabindex:'0',role:'button','aria-label':'Open Butterfly Effect'
+    });
+    bg.dataset.active=String(Boolean(livingButterflyNetworkModel?.(observer)?.edges?.length));
+    bg.appendChild(svgEl('path',{d:'M -1 0 C -11 -13 -22 -12 -18 -1 C -15 7 -8 8 -1 2',class:'cosmosButterflyWing'}));
+    bg.appendChild(svgEl('path',{d:'M 1 0 C 11 -13 22 -12 18 -1 C 15 7 8 8 1 2',class:'cosmosButterflyWing'}));
+    bg.appendChild(svgEl('circle',{cx:0,cy:1,r:2.2,class:'cosmosButterflyBody'}));
+    const bt=svgEl('text',{x:-15,y:26,'text-anchor':'end',class:'cosmosButterflyText'});
+    bt.textContent='Butterfly Effect'; bg.appendChild(bt);
+    const toggle=()=>{state.forceButterfly=!state.forceButterfly;render();};
+    bg.addEventListener('click',toggle);
+    bg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+    rail.appendChild(bg);
+    svg.appendChild(rail);
+  }
+
   function render(){
     const observer=state.observer;
     const arrivalMoment=stationArrivalPending;
@@ -11990,7 +12060,7 @@
       const line=svgEl("line",{
         x1:center.x,y1:center.y,x2:p.x,y2:p.y,
         stroke:"#617896","stroke-width":tier==="primary"?1.7:1.25,
-        class:routeClass
+        class:`cosmosSemanticRoute ${routeClass}`
       });
       line.style.cursor="pointer";
       line.addEventListener("click",()=>showEdge(rel,false));
@@ -12009,9 +12079,10 @@
         "stroke-width":feedback?2.4:1.5,
         "stroke-dasharray":scenario?"7 6":"",
         opacity:.82,
+        class:"cosmosSemanticRoute",
         "marker-end":"url(#arrow)"
       });
-      line.style.cursor="pointer";
+line.style.cursor="pointer";
       line.addEventListener("click",()=>showEdge(rel,feedback));
       svg.appendChild(line);
     }
@@ -12169,8 +12240,9 @@
       });
     }
 
+    const centerScale=Math.min(1.34,Math.max(1,1+(width-620)/1800));
     const og=svgEl("g",{
-      transform:`translate(${center.x} ${center.y})`,
+      transform:`translate(${center.x} ${center.y}) scale(${centerScale.toFixed(3)})`,
       class:(()=>{
         const classes=["cosmosCurrentStation"];
         if(arrivalMoment) classes.push("cosmosArrivalMoment");
@@ -12212,7 +12284,7 @@
       });
       og.appendChild(loadingArc);
 
-      // No inner progress/fill: formation has no fake percentage.
+      // v26.1: no percentage/fill ring. The orbit is deliberately indeterminate.
     }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=state.scenarioTravel?.branch?.to_label || projection.station?.focus_label || observerDisplayLabel(observer);
@@ -12279,6 +12351,7 @@
     applyLivingRoute(observer);
     applyActionOutcomeLearning(observer);
     applyCalibrationMemory(observer);
+    applyCosmosStationRail(observer,projection,center,width,height);
     applySpatialExperienceRepair(observer);
 
   }
@@ -12382,7 +12455,7 @@
         label,
         response_type:"universal_loading",
         question:researchQuestion,
-        answer:"Forming Cosmos Essence",
+        answer:"",
         short_answer:"",
         intent:"projection_exploration",
         epistemic_state:"uncertain",
@@ -12905,28 +12978,22 @@
     if(p < 16) return {key:"connecting",title:"Connecting",detail:"Reaching the universe and understanding your request…"};
     if(p < 38) return {key:"exploring",title:"Exploring",detail:"Searching across the relevant universe…"};
     if(p < 62) return {key:"distilling",title:"Distilling",detail:"Filtering noise and keeping what belongs to this Coordinate…"};
-    if(p < 84) return {key:"synthesizing",title:"Forming Cosmos Essence",detail:"Connecting the strongest evidence into a useful projection…"};
+    if(p < 84) return {key:"synthesizing",title:"Exploring",detail:"Connecting the strongest evidence into a useful projection…"};
     if(p < 100) return {key:"essence",title:"Providing the Essence",detail:"Preparing the Station, its nearby paths, and its evidence…"};
     return {key:"complete",title:"Essence Ready",detail:"The universe around this Coordinate is ready."};
   }
 
   function paintLoadingNarrative(){
-    const statusEl=document.getElementById("projectionStatus");
-    const emptyEl=document.getElementById("projectionEmpty");
     if(!state.universalAnswerPending) return;
-    if(statusEl){
-      statusEl.style.display="block";
-      statusEl.textContent="Forming Cosmos Essence";
-    }
-    if(emptyEl){
-      emptyEl.style.display="none";
-      emptyEl.innerHTML="";
-    }
+    // v26.1: brewing is motion, not a fake percentage. Keep the surface quiet.
+    if(statusEl){ statusEl.style.display="none"; statusEl.textContent=""; }
+    state.loadingStage="exploring";
+    state.loadingStageDetail="Cosmos is exploring";
+    if(emptyEl){ emptyEl.style.display="none"; emptyEl.innerHTML=""; }
   }
 
   function paintLoadingProgress(){
-    // Deliberately no percentage, progress fill, or simulated completion.
-    // The outer running arc is the only formation indicator.
+    // v26.1: do not paint a filling ring. The continuous outer orbit alone means "running".
     paintLoadingNarrative();
   }
 
@@ -12939,7 +13006,7 @@
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=0;
+    state.loadingProgressCeiling=76;
     state.loadingStage="connecting";
     state.loadingStageDetail="Reaching the universe and understanding your request…";
     requestAnimationFrame(paintLoadingProgress);
@@ -12992,8 +13059,7 @@
     const answer=String(data.answer||data.short_answer||data.essence||"").trim();
     return !isCosmosNonAnswerText(answer);
   }
-
-  function localSovereignFallback(question){
+function localSovereignFallback(question){
     const local=buildQuestionResponse(question);
     const text=String(local?.answer||"").trim();
     if(text && !isCosmosNonAnswerText(text)) return local;
@@ -13021,15 +13087,39 @@
     // Make the transition explicit instead of briefly presenting a deterministic
     // fallback as though it were the final answer.
     if(state.observer?.kind==="response"){
-      const loading=buildUniversalLoadingResponse(question,displayLabel||state.observer.label||question);
+      // v26.1: while the live gateway runs, retain a supported local projection when one
+      // already exists (daily intelligence, known subject, etc.). This prevents the
+      // Station horizon from collapsing to an empty circle during network latency.
+      let preview=null;
+      try{
+        const candidate=buildQuestionResponse(question);
+        const supported=Boolean(
+          candidate && (
+            (Array.isArray(candidate.projection_seed_ids) && candidate.projection_seed_ids.length) ||
+            (Array.isArray(candidate.bullets) && candidate.bullets.length) ||
+            candidate.subject_match?.id
+          )
+        );
+        if(supported){
+          preview={
+            ...candidate,
+            id:`response:preview:${normalizeSubject(question).replace(/\s+/g,"-")}`,
+            label:displayLabel||candidate.label||question,
+            response_type:"preview",
+            answer:"",short_answer:"",essence:"",
+            live_resolution_pending:true
+          };
+        }
+      }catch(_){}
+      const loading=preview||buildUniversalLoadingResponse(question,displayLabel||state.observer.label||question);
       state.observer={
         ...state.observer,
         id:loading.id,
         label:displayLabel||state.observer.label||question,
         response:loading,
         question,
-        semantic_subject_id:"",
-        semantic_subject_label:""
+        semantic_subject_id:loading?.subject_match?.id||"",
+        semantic_subject_label:loading?.subject_match?.label||""
       };
       state.response=loading;
       render();
@@ -13037,7 +13127,6 @@
     }
 
     const controller=new AbortController();
-    state.universalAnswerController=controller;
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
@@ -13116,8 +13205,6 @@
       render();
     }finally{
       clearTimeout(timer);
-      if(state.universalAnswerController===controller) state.universalAnswerController=null;
-      spatialRepairFinishFormation();
     }
   }
 
@@ -13995,7 +14082,7 @@
         epistemic_state:rr.epistemic_state||"uncertain",
         confidence:rr.confidence||"low",
         subject_match:sourceObserver.semantic_subject_id?{
-          id:sourceObserver.semantic_subject_id,
+id:sourceObserver.semantic_subject_id,
           label:sourceObserver.semantic_subject_label||sourceObserver.semantic_subject_id,
           entity:state.entities.get(sourceObserver.semantic_subject_id)||null
         }:null,
