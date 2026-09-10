@@ -1848,7 +1848,7 @@
     @media(prefers-reduced-motion:reduce){.cosmosSpatialRepairStation{transition:none!important}}
 
 
-    /* Living Station v26.2 — semantic station identity + clean Metro, readable at phone and desktop sizes. */
+    /* Living Station v26.3 — recovery fix: explicit intent + resilient Metro, readable at phone and desktop sizes. */
     .cosmosStationRail{pointer-events:none}
     .cosmosRailLine{stroke:#526d98;stroke-width:1.2;stroke-opacity:.42;stroke-linecap:round}
     .cosmosRailBridge{fill:none;stroke:#4f6b96;stroke-width:1;stroke-opacity:.16;stroke-dasharray:3 8}
@@ -11704,8 +11704,8 @@ function destinationIntentFromState(){
   function applySpatialRepairStations(){
     if(!svg) return;
     document.querySelectorAll('.essence,.projectionEssence,.cosmosEssence,[data-essence]').forEach(el=>el.classList.add('cosmosSpatialRepairEssenceSafe'));
-    const groups=[...svg.querySelectorAll('.projectionNode,.suggestedStation,.horizonNode,[data-station-id]')]
-      .filter(el=>!el.closest('.cosmosLivingRouteLayer,.cosmosLearningLayer,.cosmosCalibrationLayer,.cosmosDestinationLayer,.cosmosContinuationChoiceLayer,.cosmosJourneyDeltaLayer'))
+    const groups=[...svg.querySelectorAll('.cosmosStationNode,.projectionNode,.suggestedStation,.horizonNode,[data-station-id]')]
+      .filter(el=>!el.closest('.cosmosStationRail,.cosmosLivingRouteLayer,.cosmosLearningLayer,.cosmosCalibrationLayer,.cosmosDestinationLayer,.cosmosContinuationChoiceLayer,.cosmosJourneyDeltaLayer'))
       .filter(el=>getComputedStyle(el).display!=='none').slice(0,8);
     groups.forEach((g,i)=>{
       const p=spatialRepairStationPosition(i);
@@ -12002,12 +12002,64 @@ function destinationIntentFromState(){
     if(!svg||!projection||!center) return;
     svg.querySelectorAll('.cosmosStationRail').forEach(n=>n.remove());
 
-    const nodes=(projection.nodes||[]).slice(0,6);
-    const hasQuestion=Boolean(String(observer?.question||state.currentIntent||state.lastQuestion||'').trim());
-    if(!nodes.length && !hasQuestion) return;
+    // Living Station v26.3 — build the visible station rail from every supported
+    // source already available to this Coordinate. The rail must not disappear
+    // merely because one projection cache is still resolving.
+    const rawCandidates=[];
+    const pushCandidate=(candidate)=>{
+      if(!candidate) return;
+      const id=String(candidate.id||candidate.entity_id||candidate.node_id||candidate.station_id||"").trim();
+      const label=String(candidate.label||candidate.name||candidate.title||"").trim();
+      if(!id||!label) return;
+      rawCandidates.push({...candidate,id,label});
+    };
 
-    // Remove the old radial duplicates/routes. The same nodes remain interactive on the rail.
-    svg.querySelectorAll('.cosmosStationNode,.cosmosSemanticRoute').forEach(n=>n.setAttribute('display','none'));
+    for(const n of (projection.nodes||[])) pushCandidate(n);
+
+    // Resolved universal answers may expose supported destinations separately
+    // from project(). Keep them available as rail stations.
+    for(const s of (observer?.response?.suggested_stations||state.response?.suggested_stations||[])){
+      if(typeof s==="string"){
+        const e=state.entities?.get?.(s);
+        pushCandidate(e?{...e,id:e.entity_id||s,label:e.name||e.label||entityLabel?.(s)||s}:{id:s,label:entityLabel?.(s)||s});
+      }else pushCandidate(s);
+    }
+
+    for(const id of (observer?.response?.dynamic_projection_ids||state.response?.dynamic_projection_ids||[])){
+      const e=state.entities?.get?.(id);
+      if(e) pushCandidate({...e,id:e.entity_id||id,label:e.name||e.label||entityLabel?.(id)||id});
+    }
+
+    // Semantic dedupe is ONLY for visible candidate stations. Never collapse
+    // unrelated destinations because of technical IDs.
+    const currentKey=journeySemanticKeyFromObserver(observer);
+    const seenKeys=new Set();
+    const nodes=[];
+    for(const node of rawCandidates){
+      const token=semanticStationToken(node.label);
+      const key=token?`label:${token}`:`id:${String(node.id).toLowerCase()}`;
+      if(currentKey && journeyKeysEquivalent(key,currentKey)) continue;
+      let duplicate=false;
+      for(const known of seenKeys){
+        if(journeyKeysEquivalent(key,known)){duplicate=true;break;}
+      }
+      if(duplicate) continue;
+      seenKeys.add(key);
+      nodes.push(node);
+      if(nodes.length>=6) break;
+    }
+
+    const hasQuestion=Boolean(String(observer?.question||state.currentIntent||state.lastQuestion||'').trim());
+    const butterflyModel=(()=>{try{return livingButterflyNetworkModel?.(observer)||null}catch(_){return null}})();
+    const butterflyActive=Boolean(butterflyModel?.edges?.length);
+
+    // Only suppress the old radial nodes when the replacement rail actually
+    // has destinations. This prevents the "empty Cosmos" regression.
+    if(nodes.length){
+      svg.querySelectorAll('.cosmosStationNode,.cosmosSemanticRoute').forEach(n=>n.setAttribute('display','none'));
+    }
+
+    if(!nodes.length && !hasQuestion && !butterflyActive) return;
 
     const rail=svgEl('g',{class:'cosmosStationRail','aria-label':'Cosmos stations'});
     const mobile=width<700;
@@ -12025,35 +12077,60 @@ function destinationIntentFromState(){
           tabindex:'0',role:'button','aria-label':`Travel to ${node.label}`
         });
         g.appendChild(svgEl('circle',{r:index===0?7:6,class:'cosmosRailDot'}));
-        const text=svgEl('text',{x:-15,y:3,'text-anchor':'end',class:'cosmosRailLabel'});
+        const label=svgEl('text',{x:-15,y:3,'text-anchor':'end',class:'cosmosRailLabel'});
         const raw=String(node.label||'Station');
-        text.textContent=raw.length>(mobile?22:28) ? raw.slice(0,mobile?21:27)+'…' : raw;
-        g.appendChild(text);
-        const travel=()=>{ closeStationWhy?.(); recenterEntity(node.id); };
+        label.textContent=raw.length>(mobile?22:28) ? raw.slice(0,mobile?21:27)+'…' : raw;
+        g.appendChild(label);
+
+        const travel=()=>{
+          closeStationWhy?.();
+          const id=String(node.id||"");
+          if(id && state.entities?.has?.(id)){ recenterEntity(id); return; }
+          if(typeof travelPossibility==="function"){
+            try{
+              if(travelPossibility({kind:"supported",source:node,id,label:node.label})) return;
+            }catch(_){}
+          }
+          // Last safe path: ask Cosmos to resolve the selected station itself.
+          if(node.label && projectionAskInput){
+            projectionAskInput.value=`Explain "${node.label}". What is it, what are its major dimensions, and what matters about it?`;
+            projectionAskForm?.requestSubmit?.();
+          }
+        };
         g.addEventListener('click',travel);
         g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();travel();}});
         rail.appendChild(g);
       });
-      // A faint bridge says these stops belong to the current center without creating a second hub.
+
       rail.insertBefore(svgEl('path',{
         d:`M ${center.x+78} ${center.y} C ${center.x+130} ${center.y}, ${railX-82} ${(top+bottom)/2}, ${railX} ${(top+bottom)/2}`,
         class:'cosmosRailBridge','aria-hidden':'true'
       }),rail.firstChild);
     }
 
-    // Persistent Butterfly Effect cue. It is a doorway, not a causal claim.
+    // Butterfly is a doorway into causal topology, never a claim attached to
+    // every station. Active styling is earned only when supported hops exist.
     const butterflyY=Math.max(76,top-48);
     const bg=svgEl('g',{
       class:'cosmosButterflyCue',transform:`translate(${railX} ${butterflyY})`,
-      tabindex:'0',role:'button','aria-label':'Open Butterfly Effect'
+      tabindex:'0',role:'button',
+      'aria-label':butterflyActive?'Open supported Butterfly Effect':'Butterfly Effect — no supported causal route yet'
     });
-    bg.dataset.active=String(Boolean(livingButterflyNetworkModel?.(observer)?.edges?.length));
+    bg.dataset.active=String(butterflyActive);
     bg.appendChild(svgEl('path',{d:'M -1 0 C -11 -13 -22 -12 -18 -1 C -15 7 -8 8 -1 2',class:'cosmosButterflyWing'}));
     bg.appendChild(svgEl('path',{d:'M 1 0 C 11 -13 22 -12 18 -1 C 15 7 8 8 1 2',class:'cosmosButterflyWing'}));
     bg.appendChild(svgEl('circle',{cx:0,cy:1,r:2.2,class:'cosmosButterflyBody'}));
     const bt=svgEl('text',{x:-15,y:26,'text-anchor':'end',class:'cosmosButterflyText'});
-    bt.textContent='Butterfly Effect'; bg.appendChild(bt);
-    const toggle=()=>{state.forceButterfly=!state.forceButterfly;render();};
+    bt.textContent=butterflyActive?'Butterfly Effect':'Butterfly';
+    bg.appendChild(bt);
+    const toggle=()=>{
+      if(butterflyActive){
+        state.forceButterfly=!state.forceButterfly;
+        render();
+      }else{
+        openDepth?.(observer,projection);
+      }
+    };
     bg.addEventListener('click',toggle);
     bg.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
     rail.appendChild(bg);
@@ -14361,15 +14438,41 @@ id:sourceObserver.semantic_subject_id,
     loadJourney();
     loadDiscoveryOutcomes();
 
-    if(await restorePersistentSharedStation()) return;
+    // Living Station v26.3 — explicit URL intent always wins.
+    // A stale Journey/current-node or shared-station residue must never replace
+    // a newly requested ?focus=question&question=... coordinate.
+    const explicitQuestion = entry.focus==="question" && Boolean(String(entry.question||"").trim());
+
+    if(!explicitQuestion && await restorePersistentSharedStation()) return;
 
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
-    ensureJourneyCurrent(state.observer);
+
+    if(explicitQuestion){
+      // Do not let a previously-current Journey node (for example "pen")
+      // become the visible observer for this new question. The Journey is
+      // preserved, but the requested coordinate becomes current immediately.
+      const requestedSemantic=journeySemanticKeyFromObserver(state.observer);
+      const existingRequested=(state.journey?.nodes||[]).find(node=>
+        requestedSemantic && journeyKeysEquivalent(requestedSemantic,journeySemanticKeyFromNode(node))
+      );
+      if(existingRequested){
+        existingRequested.observer=observerSnapshot(state.observer);
+        existingRequested.coordinate=coordinateForObserver(state.observer);
+        existingRequested.observer_key=journeyObserverKey(state.observer);
+        state.journey.current_node_id=existingRequested.node_id;
+        saveJourney();
+      }else{
+        addJourneyNode(state.observer,state.journey.current_node_id||"",true);
+      }
+    }else{
+      ensureJourneyCurrent(state.observer);
+    }
+
     saveTrail();
     render();
 
-    if(entry.focus==="question" && entry.question){
+    if(explicitQuestion){
       hydrateUniversalAnswer(entry.question);
     }
   }).catch(error=>{
