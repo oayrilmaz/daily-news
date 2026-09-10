@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Cosmos — PTD Today</title>
+  <!-- Living Station v26.2 fail-safe journey rail -->
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
   <style>
@@ -1848,7 +1849,7 @@
     @media(prefers-reduced-motion:reduce){.cosmosSpatialRepairStation{transition:none!important}}
 
 
-    /* Living Station v26.1 — persistent side Metro, readable at phone and desktop sizes. */
+    /* Living Station v26.2 — legacy SVG side Metro, readable at phone and desktop sizes. */
     .cosmosStationRail{pointer-events:none}
     .cosmosRailLine{stroke:#526d98;stroke-width:1.2;stroke-opacity:.42;stroke-linecap:round}
     .cosmosRailBridge{fill:none;stroke:#4f6b96;stroke-width:1;stroke-opacity:.16;stroke-dasharray:3 8}
@@ -1866,6 +1867,60 @@
       .cosmosButterflyText{font-size:8px}
       .cosmosRailBridge{stroke-opacity:.11}
     }
+
+
+    /* Living Station v26.2 — FAIL-SAFE JOURNEY RAIL
+       Independent DOM surface: it does not depend on experimental SVG layers completing. */
+    .cosmosJourneyRailV262{
+      position:absolute;right:18px;top:50%;transform:translateY(-52%);z-index:24;
+      width:min(260px,25vw);max-height:64vh;display:flex;flex-direction:column;align-items:flex-end;
+      pointer-events:none;color:#b8c7dc
+    }
+    .cosmosJourneyRailV262[hidden]{display:none!important}
+    .cosmosJourneyRailV262Head{display:flex;align-items:center;gap:8px;margin:0 4px 10px 0;pointer-events:auto}
+    .cosmosJourneyRailV262Butterfly{
+      display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:#7895bf;
+      padding:4px 0;font:inherit;font-size:10px;font-weight:700;letter-spacing:.04em;cursor:pointer
+    }
+    .cosmosJourneyRailV262Butterfly svg{width:23px;height:17px;overflow:visible;filter:drop-shadow(0 0 6px rgba(122,162,255,.18))}
+    .cosmosJourneyRailV262Butterfly path{fill:rgba(122,162,255,.07);stroke:#83a9ed;stroke-width:1.25}
+    .cosmosJourneyRailV262Butterfly circle{fill:#91b5f6}
+    .cosmosJourneyRailV262Track{position:relative;width:100%;display:flex;flex-direction:column;gap:2px;align-items:flex-end}
+    .cosmosJourneyRailV262Track::before{
+      content:"";position:absolute;right:7px;top:14px;bottom:14px;width:1px;background:linear-gradient(180deg,transparent,#526e9b 12%,#526e9b 88%,transparent);opacity:.48
+    }
+    .cosmosJourneyRailV262Stop{
+      position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 15px;align-items:center;gap:9px;
+      width:100%;min-height:42px;padding:5px 0;border:0;background:transparent;color:#afbdd2;
+      text-align:right;font:inherit;font-size:11px;line-height:1.22;cursor:pointer;pointer-events:auto
+    }
+    .cosmosJourneyRailV262Stop span:first-child{
+      overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+      text-shadow:0 2px 8px #030812,0 0 4px #030812
+    }
+    .cosmosJourneyRailV262Dot{
+      width:13px;height:13px;border-radius:50%;border:1.5px solid #789ddc;background:#0a1628;
+      box-shadow:0 0 0 3px rgba(122,162,255,.025),0 0 10px rgba(122,162,255,.10)
+    }
+    .cosmosJourneyRailV262Stop:hover,.cosmosJourneyRailV262Stop:focus-visible{color:#eef4ff;outline:none}
+    .cosmosJourneyRailV262Stop:hover .cosmosJourneyRailV262Dot,.cosmosJourneyRailV262Stop:focus-visible .cosmosJourneyRailV262Dot{background:#244b8e;border-color:#aec7ff}
+    .cosmosJourneyRailV262Empty{font-size:10px;color:#657894;text-align:right;max-width:180px;margin-right:2px}
+    body.cosmos-forming .cosmosJourneyRailV262{opacity:.82}
+    @media(max-width:700px){
+      .cosmosJourneyRailV262{right:8px;width:118px;max-height:58vh;transform:translateY(-50%)}
+      .cosmosJourneyRailV262Head{margin-right:1px;margin-bottom:5px}
+      .cosmosJourneyRailV262Butterfly{font-size:8px;gap:4px}
+      .cosmosJourneyRailV262Butterfly svg{width:18px;height:14px}
+      .cosmosJourneyRailV262Stop{grid-template-columns:minmax(0,1fr) 12px;gap:6px;min-height:37px;font-size:8.5px}
+      .cosmosJourneyRailV262Dot{width:10px;height:10px}
+      .cosmosJourneyRailV262Track::before{right:5px}
+    }
+    @media(max-width:430px){
+      .cosmosJourneyRailV262{width:102px;right:5px;top:48%}
+      .cosmosJourneyRailV262Stop{font-size:8px;min-height:34px}
+      .cosmosJourneyRailV262Butterfly span{display:none}
+    }
+
 </style>
 </head>
 <body>
@@ -1890,6 +1945,15 @@
     </section>
 
     <section class="canvasWrap" aria-label="Cosmos Butterfly Effect Grid">
+      <aside class="cosmosJourneyRailV262" id="cosmosJourneyRailV262" aria-label="Cosmos journey stations">
+        <div class="cosmosJourneyRailV262Head">
+          <button class="cosmosJourneyRailV262Butterfly" id="cosmosJourneyRailV262Butterfly" type="button" aria-label="Follow the Butterfly Effect">
+            <svg viewBox="-24 -15 48 30" aria-hidden="true"><path d="M-2 0C-11-13-22-12-18-1c3 8 10 9 16 3M2 0C11-13 22-12 18-1c-3 8-10 9-16 3"/><circle cx="0" cy="1" r="2.2"/></svg>
+            <span>Butterfly Effect</span>
+          </button>
+        </div>
+        <div class="cosmosJourneyRailV262Track" id="cosmosJourneyRailV262Track"></div>
+      </aside>
       <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos relationship grid"></svg>
       <div class="livingEssence" id="livingEssence" aria-live="polite">
         <p id="livingEssenceText">Resolving this station…</p>
@@ -2146,6 +2210,9 @@
   const sourcesDrawer = document.getElementById("sourcesDrawer");
   const rippleBtn = document.getElementById("rippleBtn");
   const butterflyWrap = document.getElementById("butterflyWrap");
+  const cosmosJourneyRailV262 = document.getElementById("cosmosJourneyRailV262");
+  const cosmosJourneyRailV262Track = document.getElementById("cosmosJourneyRailV262Track");
+  const cosmosJourneyRailV262Butterfly = document.getElementById("cosmosJourneyRailV262Butterfly");
   const butterflyMetro = document.getElementById("butterflyMetro");
   const journeyMapSheet = document.getElementById("journeyMapSheet");
   const butterflyMapSheet = document.getElementById("butterflyMapSheet");
@@ -11896,6 +11963,73 @@ function destinationIntentFromState(){
     svg.appendChild(rail);
   }
 
+
+  // v26.2 — Build stations even while a universal question is still resolving.
+  // Priority: resolved projection -> suggested stations that map to known entities ->
+  // defensible graph entities. The last fallback is navigation only, not a truth claim.
+  function cosmosJourneyRailFallbackNodesV262(observer,projection){
+    const direct=Array.isArray(projection?.nodes)?projection.nodes.filter(n=>n?.id&&n?.label):[];
+    if(direct.length) return direct.slice(0,6);
+
+    const suggestions=Array.isArray(observer?.response?.suggested_stations)
+      ? observer.response.suggested_stations : [];
+    const mapped=[];
+    for(const item of suggestions){
+      const id=String(item?.id||item?.entity_id||item||'');
+      if(id && state.entities?.has(id)) mapped.push({id,label:entityLabel(id)});
+      if(mapped.length>=6) break;
+    }
+    if(mapped.length) return mapped;
+
+    // Broad-question fail-safe. Rank actual loaded entities by supported connectivity.
+    // These are presented as places to travel, never as answers to the question.
+    if(state.entities?.size){
+      const rows=[...state.entities.keys()].map(id=>({
+        id,label:entityLabel(id),score:scoreEntity(id,0)
+      })).filter(r=>r.label && !/^unknown$/i.test(r.label));
+      rows.sort((a,b)=>b.score-a.score || a.label.localeCompare(b.label));
+      const out=[],seen=new Set();
+      for(const r of rows){
+        const key=r.label.toLowerCase();
+        if(seen.has(key)) continue;
+        seen.add(key);out.push(r);
+        if(out.length>=6) break;
+      }
+      return out;
+    }
+    return [];
+  }
+
+  function renderCosmosJourneyRailV262(observer,projection){
+    if(!cosmosJourneyRailV262 || !cosmosJourneyRailV262Track) return;
+    const hasIntent=Boolean(String(observer?.question||state.currentIntent||state.lastQuestion||entry?.question||'').trim());
+    const nodes=cosmosJourneyRailFallbackNodesV262(observer,projection);
+    cosmosJourneyRailV262.hidden=!hasIntent && !nodes.length;
+    if(cosmosJourneyRailV262.hidden) return;
+
+    cosmosJourneyRailV262Track.replaceChildren();
+    if(!nodes.length){
+      const e=document.createElement('div');e.className='cosmosJourneyRailV262Empty';e.textContent='Stations appear as Cosmos resolves.';
+      cosmosJourneyRailV262Track.appendChild(e);return;
+    }
+    nodes.forEach(node=>{
+      const b=document.createElement('button');b.type='button';b.className='cosmosJourneyRailV262Stop';
+      b.setAttribute('aria-label',`Travel to ${node.label}`);
+      const label=document.createElement('span');label.textContent=node.label;
+      const dot=document.createElement('span');dot.className='cosmosJourneyRailV262Dot';dot.setAttribute('aria-hidden','true');
+      b.append(label,dot);
+      b.addEventListener('click',()=>{ if(node.id&&state.entities?.has(node.id)) recenterEntity(node.id); });
+      cosmosJourneyRailV262Track.appendChild(b);
+    });
+  }
+
+  cosmosJourneyRailV262Butterfly?.addEventListener('click',()=>{
+    try{state.forceButterfly=true;}catch(_){}
+    try{setButterflyOpen(true);}catch(_){}
+    try{renderJourneyMap();}catch(_){}
+    try{openJourneyMap?.();}catch(_){}
+  });
+
   function render(){
     const observer=state.observer;
     const arrivalMoment=stationArrivalPending;
@@ -11932,6 +12066,8 @@ function destinationIntentFromState(){
     }
 
     const projection=project(observer);
+    // v26.2: journey rail is rendered before any optional/experimental layer can fail.
+    try{renderCosmosJourneyRailV262(observer,projection);}catch(err){console.warn("Cosmos journey rail",err);}
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
     if(livingEssenceText?.parentElement){
@@ -12351,7 +12487,7 @@ line.style.cursor="pointer";
     applyLivingRoute(observer);
     applyActionOutcomeLearning(observer);
     applyCalibrationMemory(observer);
-    applyCosmosStationRail(observer,projection,center,width,height);
+    // v26.2 DOM rail already owns side stations. Keep legacy SVG rail disabled to prevent duplication.
     applySpatialExperienceRepair(observer);
 
   }
