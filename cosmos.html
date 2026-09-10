@@ -1471,7 +1471,7 @@
     }
 
 
-    /* Living Cosmos v25.0 — Change Destination v0.1.
+    /* Living Cosmos v26.0 — Change Destination v0.1.
        A sufficiently meaningful topology change may temporarily become somewhere
        to stand. Temporary does not mean canonical graph admission. */
     .cosmosChangeDestination .horizonNodeCircle{
@@ -1832,6 +1832,19 @@
     .cosmosCalibrationStop{pointer-events:auto;cursor:pointer;opacity:.66}
     .cosmosCalibrationStop circle{fill:rgba(8,14,23,.88);stroke:rgba(214,229,250,.34);stroke-width:1}
     .cosmosCalibrationStop text{fill:rgba(224,235,250,.58);font-size:7.5px;text-anchor:middle}
+
+
+    /* Living Cosmos v26.0 — Spatial Experience Repair */
+    .cosmosSpatialRepairStation text{paint-order:stroke;stroke:rgba(5,12,23,.94);stroke-width:2.5px;stroke-linejoin:round}
+    .cosmosSpatialRepairButterfly{pointer-events:none}
+    .cosmosSpatialRepairButterfly path{fill:none;stroke:rgba(145,184,255,.48);stroke-width:1.45;stroke-linecap:round}
+    .cosmosSpatialRepairButterfly path[data-state="conditional"]{stroke-dasharray:5 6;opacity:.62}
+    .cosmosSpatialRepairButterfly circle{fill:rgba(7,16,29,.96);stroke:rgba(145,184,255,.58);stroke-width:1.2}
+    .cosmosSpatialRepairButterfly text{fill:rgba(214,229,251,.74);font-size:7px;text-anchor:middle;paint-order:stroke;stroke:rgba(5,12,23,.96);stroke-width:2px}
+    @media(max-width:700px){
+      .cosmosSpatialRepairStation text{font-size:7.1px}
+      .cosmosSpatialRepairButterfly text{font-size:6.5px}
+    }
 
 </style>
 </head>
@@ -5731,6 +5744,7 @@
     const livingRouteViewHtml=livingRouteDepthHtml(observer);
     const actionOutcomeLearningViewHtml=actionOutcomeLearningDepthHtml(observer);
     const calibrationMemoryViewHtml=calibrationMemoryDepthHtml(observer);
+    const spatialExperienceRepairViewHtml=spatialExperienceRepairDepthHtml(observer);
     if(frontierHtml && deltaRows){
       deltaRows.insertAdjacentHTML("beforeend",frontierHtml);
     }
@@ -5868,6 +5882,9 @@
     }
     if(calibrationMemoryViewHtml && deltaRows){
       deltaRows.insertAdjacentHTML("beforeend",calibrationMemoryViewHtml);
+    }
+    if(spatialExperienceRepairViewHtml && deltaRows){
+      deltaRows.insertAdjacentHTML("beforeend",spatialExperienceRepairViewHtml);
     }
 
     const evidence=projectionEvidenceItems(observer).slice(0,8);
@@ -11462,6 +11479,97 @@
   }
 
 
+
+  // Living Cosmos v26.0 — Spatial Experience Repair.
+  // Stations must remain legible, Essence gets protected space, and an earned
+  // Butterfly Effect is visible as a route through stations rather than an icon.
+
+  function spatialRepairMobile(){
+    return (window.matchMedia&&window.matchMedia('(max-width:700px)').matches)||window.innerWidth<=700;
+  }
+  function spatialRepairTranslate(g){
+    const m=String(g.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
+    return m?{x:+m[1],y:+m[2]}:null;
+  }
+  function applyStationSpatialRepair(){
+    if(!svg)return;
+    const mobile=spatialRepairMobile();
+    const protectedBox=mobile?{x1:-155,x2:155,y1:48,y2:245}:{x1:-175,x2:175,y1:58,y2:210};
+    const groups=[...svg.querySelectorAll('g[transform*="translate"]')].filter(g=>{
+      if(g.closest('.cosmosSpatialRepairButterfly'))return false;
+      return !!g.querySelector('circle')&&!!g.querySelector('text');
+    });
+    const placed=[],gap=mobile?80:66;
+    groups.forEach((g,i)=>{
+      const p=spatialRepairTranslate(g);if(!p)return;
+      let {x,y}=p;
+      const inside=()=>x>protectedBox.x1&&x<protectedBox.x2&&y>protectedBox.y1&&y<protectedBox.y2;
+      if(inside()){x=(x<0?-1:1)*(mobile?182:205);y=Math.min(35,y-72);}
+      for(let k=0;k<5;k++){
+        const hit=placed.find(q=>Math.hypot(x-q.x,y-q.y)<gap);
+        if(!hit)break;
+        const a=i*1.618+k*.73;x+=(mobile?34:28)*Math.cos(a);y+=(mobile?29:24)*Math.sin(a);
+        if(inside()){x=(x<0?-1:1)*(mobile?185:210);y-=45;}
+      }
+      if(mobile){x=Math.max(-205,Math.min(205,x));y=Math.max(-215,Math.min(42,y));}
+      placed.push({x,y});
+      g.setAttribute('transform',`translate(${x} ${y})`);
+      g.classList.add('cosmosSpatialRepairStation');
+    });
+  }
+
+  function spatialRepairButterflyModel(observer=state.observer){
+    let n=null;try{n=livingButterflyNetworkModel?.(observer)||null}catch(_){}
+    if(!n)return {visible:false,nodes:[],edges:[]};
+    const rawEdges=n.edges||n.relationships||n.route||[];
+    const rawNodes=n.nodes||n.stops||[];
+    if(!rawEdges.length)return {visible:false,nodes:[],edges:[]};
+    const byId=new Map(rawNodes.map(x=>[String(x.id||x.label||x.name||''),x]));
+    const edges=rawEdges.slice(0,5).map(e=>({
+      a:String(e.source||e.from||e.source_id||e.a||''),
+      b:String(e.target||e.to||e.target_id||e.b||''),
+      conditional:/possible|scenario|conditional|may|could/i.test(String(e.type||e.label||''))
+    })).filter(e=>e.a&&e.b);
+    const ids=[];edges.forEach(e=>{if(!ids.includes(e.a))ids.push(e.a);if(!ids.includes(e.b))ids.push(e.b)});
+    const nodes=ids.slice(0,6).map(id=>{const x=byId.get(id)||{};return{id,label:String(x.label||x.name||id)}});
+    return {visible:!!edges.length,nodes,edges};
+  }
+
+  function applySpatialRepairButterfly(observer=state.observer){
+    if(!svg)return;
+    svg.querySelectorAll('.cosmosSpatialRepairButterfly').forEach(x=>x.remove());
+    const m=spatialRepairButterflyModel(observer);if(!m.visible)return;
+    const mobile=spatialRepairMobile(),layer=svgEl('g',{class:'cosmosSpatialRepairButterfly'}),pos=new Map();
+    m.nodes.forEach((n,i)=>{
+      const t=i/Math.max(1,m.nodes.length-1);
+      pos.set(n.id,{x:(mobile?-185:-235)+t*(mobile?370:470),y:(mobile?-155:-140)+Math.sin(t*Math.PI)*(mobile?52:66)});
+    });
+    m.edges.forEach(e=>{
+      const a=pos.get(e.a),b=pos.get(e.b);if(!a||!b)return;
+      layer.appendChild(svgEl('path',{d:`M ${a.x} ${a.y} Q ${(a.x+b.x)/2} ${(a.y+b.y)/2-18}, ${b.x} ${b.y}`,'data-state':e.conditional?'conditional':'supported'}));
+    });
+    m.nodes.forEach((n,i)=>{
+      const p=pos.get(n.id);if(!p)return;
+      const g=svgEl('g',{transform:`translate(${p.x} ${p.y})`});
+      g.appendChild(svgEl('circle',{r:i===0?8:6}));
+      const t=svgEl('text',{x:0,y:18});t.textContent=n.label.slice(0,mobile?22:29);g.appendChild(t);layer.appendChild(g);
+    });
+    svg.appendChild(layer);
+  }
+
+  function applySpatialExperienceRepair(observer=state.observer){
+    applyStationSpatialRepair();
+    applySpatialRepairButterfly(observer);
+  }
+  function spatialExperienceRepairDepthHtml(observer=state.observer){
+    const b=spatialRepairButterflyModel(observer);
+    return `<div class="depthRow"><strong>Spatial Experience</strong><br><span style="opacity:.70">Station collisions are repaired and the Essence corridor is protected.${b.visible?' The supported Butterfly route is projected directly on the surface.':' No Butterfly route is shown because no supported propagation route currently earns one.'}</span><br><span style="opacity:.58">Butterfly is a path through stations, not decorative imagery. Empty space is preferred to an invented route.</span></div>`;
+  }
+  function resolveSpatialExperienceRepairCommand(raw){
+    const q=String(raw||'').trim().toLowerCase().replace(/[?!.]+$/g,'');
+    return ['show stations','where are the stations','show butterfly','show butterfly effect','show butterfly route','spatial experience','fix overlap','show cosmos routes'].includes(q);
+  }
+
   function renderJourneyMap(){
     if(!journeyMapMetro || !journeyMapSheet) return;
     renderButterflyJourney();
@@ -12171,6 +12279,7 @@
     applyLivingRoute(observer);
     applyActionOutcomeLearning(observer);
     applyCalibrationMemory(observer);
+    applySpatialExperienceRepair(observer);
 
   }
 
@@ -13051,6 +13160,13 @@
       return;
     }
     beginFirstContactIntent(question);
+
+    // Living Cosmos v26.0 — keep stations, Essence and earned Butterfly paths legible.
+    if(resolveSpatialExperienceRepairCommand(question)){
+      projectionAskInput.value="";
+      render();
+      return;
+    }
 
     // Living Cosmos v25.0 — past learning can calibrate future Experience
     // while Truth, evidence and causality remain sovereign.
