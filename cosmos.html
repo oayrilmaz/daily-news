@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="working-package-v4.8-topic-memory" />
+  <meta name="cosmos-build" content="working-package-v4.8.1-topic-memory-fix" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -963,12 +963,13 @@
     view: params.get("view") || "",
     context_id: params.get("context_id") || "",
     context_label: params.get("context_label") || "",
-    topic_id: params.get("topic") || ""
+    topic_id: params.get("topic") || "",
+    new_topic: params.get("new_topic") === "1"
   };
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.8-working-package-topic-memory";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.8.1-working-package-topic-memory-fix";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -2395,7 +2396,9 @@
   }
 
   function topicTopLevelEntry(){
-    if(entry.focus!=="question" || !entry.question || entry.topic_id || entryParams.has("shared")) return false;
+    if(entry.focus!=="question" || !entry.question || entryParams.has("shared")) return false;
+    if(entry.new_topic) return !isInternalStationResearchQuestion(entry.question);
+    if(entry.topic_id) return false;
     const source=String(entry.from||"").toLowerCase();
     return !["cosmos-projection","journey","station","butterfly"].includes(source) &&
       !isInternalStationResearchQuestion(entry.question);
@@ -2415,10 +2418,10 @@
     if(!keepTopic) state.activeTopicId="";
   }
 
-  function beginTopLevelTopic(question){
+  function beginTopLevelTopic(question,requestedTopicId=""){
     clearActiveExplorationSession({keepTopic:false});
     const createdAt=Date.now();
-    const topicId=topicIdFor(question,createdAt);
+    const topicId=String(requestedTopicId||"").trim() || topicIdFor(question,createdAt);
     setActiveTopicId(topicId);
     const rows=topicArchiveLoad();
     rows.unshift({
@@ -5948,13 +5951,13 @@
 
   loadKnowledge().then(async ()=>{
     if(topicTopLevelEntry()){
-      beginTopLevelTopic(entry.question);
+      beginTopLevelTopic(entry.question,entry.topic_id);
     }else{
       loadJourney();
       if(entry.topic_id) setActiveTopicId(entry.topic_id);
     }
 
-    if(entry.topic_id && restoreTopicFromArchive(entry.topic_id)) return;
+    if(entry.topic_id && !entry.new_topic && restoreTopicFromArchive(entry.topic_id)) return;
     if(await restorePersistentSharedStation()) return;
 
     state.observer=resolveEntryObserver();
