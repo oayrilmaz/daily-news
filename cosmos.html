@@ -324,15 +324,8 @@
       color:#91a7c9;
       margin-bottom:7px
     }
-    .projectionTitle{
-      margin:0;
-      font-size:clamp(22px,5vw,32px);
-      line-height:1.16;
-      letter-spacing:-.025em;
-      color:#f6f8fc
-    }
     .projectionEssence{
-      margin:10px 0 0;
+      margin:8px 0 0;
       color:#c5d0e2;
       font-size:15px;
       line-height:1.62
@@ -756,18 +749,6 @@
   }
   .metroBranch,.metroJourneyRow{margin-bottom:12px;}
 
-
-  /* v27.0 — projectionTitle is an internal AI/research title, never viewer-facing */
-  #projectionTitle{
-    display:none !important;
-    visibility:hidden !important;
-    height:0 !important;
-    min-height:0 !important;
-    margin:0 !important;
-    padding:0 !important;
-    overflow:hidden !important;
-  }
-
 </style>
 </head>
 <body>
@@ -814,7 +795,7 @@
     <section class="projectionPanel" aria-label="Cosmos essence">
       <div class="projectionInner">
         <div class="projectionEyebrow"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos essence</span></div>
-        <h2 class="projectionTitle" id="projectionTitle">Cosmos</h2>
+        
         <p class="projectionEssence" id="projectionEssence">Resolving the smallest useful answer from the current Cosmos projection…</p>
 
         <div class="projectionPulse" id="projectionPulse">
@@ -940,7 +921,6 @@
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
-  const projectionTitle = document.getElementById("projectionTitle");
   const projectionEssence = document.getElementById("projectionEssence");
   const projectionPulse = document.getElementById("projectionPulse");
   const projectionPulseItems = document.getElementById("projectionPulseItems");
@@ -978,7 +958,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.1-internal-prompt-ui-boundary";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.2-essence-prompt-removed";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -3567,7 +3547,6 @@
       contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
     }
 
-    projectionTitle.textContent="";
     projectionEssence.textContent=essence;
 
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
