@@ -617,14 +617,6 @@
       opacity:.42
     }
 
-    .metroRelationLabel{
-      fill:#7890b4;
-      font-size:9px;
-      font-weight:600;
-      opacity:.82;
-      pointer-events:none
-    }
-
     .metroStop{
       position:absolute;
       display:grid;
@@ -737,17 +729,20 @@
   /* v26.7 — Journey labels/relationships get breathing room */
   .metroNode,.journeyNode{min-height:68px;}
   .metroStationLabel,.metroNodeLabel{line-height:1.18;overflow-wrap:anywhere;}
-  .metroRelationLabel{
-    display:block!important;
-    position:relative!important;
-    line-height:1.18!important;
-    margin-top:5px!important;
-    margin-bottom:8px!important;
-    white-space:normal!important;
-    overflow-wrap:anywhere!important;
-    max-width:min(380px,calc(100vw - 120px));
-  }
   .metroBranch,.metroJourneyRow{margin-bottom:12px;}
+
+
+  /* v27.3 — Journey text is owned by the station, never by the route line */
+  .metroLabel{
+    min-width:0;
+    padding-bottom:8px;
+  }
+  .metroLabel span{
+    line-height:1.28;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    word-break:normal;
+  }
 
 </style>
 </head>
@@ -958,7 +953,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.3-viewer-essence-boundary";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.5-journey-state-restore";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -984,8 +979,8 @@
     expanded: false,
     entryObserver: null,
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
-    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_6",
-    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_6",
+    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_7",
+    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_7",
     journey: {
       nodes: [],
       current_node_id: "",
@@ -2425,6 +2420,9 @@
       semanticExisting.observer_key=key;
       semanticExisting.coordinate=coordinateForObserver(observer);
       semanticExisting.observer=observerSnapshot(observer);
+      if(observer?.kind==="response" && observer?.response){
+        semanticExisting.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      }
       semanticExisting.via_operation=observer?.via_operation||semanticExisting.via_operation||"ENTER";
       semanticExisting.arrival_relation=observer?.from_relationship_label||semanticExisting.arrival_relation||"";
       semanticExisting.arrival_relation_direction=observer?.from_relationship_direction||semanticExisting.arrival_relation_direction||"";
@@ -2475,6 +2473,9 @@
       existing.observer_key=journeyObserverKey(observer);
       existing.coordinate=coordinateForObserver(observer);
       existing.observer=observerSnapshot(observer);
+      if(observer?.kind==="response" && observer?.response){
+        existing.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      }
       existing.arrival_relation=observer?.from_relationship_label||existing.arrival_relation||"";
       existing.arrival_relation_direction=observer?.from_relationship_direction||existing.arrival_relation_direction||"";
       existing.origin_label=observer?.journey_origin_label||existing.origin_label||"";
@@ -2546,6 +2547,9 @@
       const priorRelation=current.arrival_relation||current.observer?.from_relationship_label||"";
       const priorDirection=current.arrival_relation_direction||current.observer?.from_relationship_direction||"";
       current.observer=observerSnapshot(observer);
+      if(observer?.kind==="response" && observer?.response){
+        current.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      }
       if(priorRelation && !current.observer.from_relationship_label) current.observer.from_relationship_label=priorRelation;
       if(priorDirection && !current.observer.from_relationship_direction) current.observer.from_relationship_direction=priorDirection;
       current.arrival_relation=priorRelation;
@@ -2590,18 +2594,42 @@
       state.butterfly.origin_change_id=state.butterfly.origin_change_id||changeId;
       state.butterfly.status="active";
     }else if(snap.kind==="response" && snap.question){
-      const response=buildQuestionResponse(snap.question);
+      // A Journey stop is a saved Cosmos state, not a new question.
+      // Restore the exact resolved response/projection that was seen at this stop.
+      const savedResponse=snap.response_snapshot
+        ? JSON.parse(JSON.stringify(snap.response_snapshot))
+        : null;
+
+      const response=savedResponse || buildQuestionResponse(snap.question);
+
       state.observer={
         ...snap,
         kind:"response",
-        id:response.id,
-        label:snap.label||snap.question,
-        response:{...response,coordinate:snap.response_coordinate||response.coordinate||null},
+        id:snap.id||response.id,
+        label:snap.label||response.label||snap.question,
+        response:{
+          ...response,
+          coordinate:snap.response_coordinate||response.coordinate||null
+        },
         question:snap.question,
-        semantic_subject_id:response?.subject_match?.id||"",
-        semantic_subject_label:response?.subject_match?.label||""
+        semantic_subject_id:
+          snap.semantic_subject_id ||
+          response?.subject_match?.id ||
+          "",
+        semantic_subject_label:
+          snap.semantic_subject_label ||
+          response?.subject_match?.label ||
+          ""
       };
-      state.response=response;
+
+      state.response=state.observer.response;
+
+      // Revisit must not trigger a second answer or silently change the station.
+      state.universalAnswerPending=false;
+      state.universalAnswerLoaded=Boolean(
+        savedResponse &&
+        savedResponse.response_type!=="universal_loading"
+      );
     }else{
       state.observer={...snap};
     }
@@ -2625,6 +2653,9 @@
       semantic_subject_label: observer.semantic_subject_label || observer.response?.subject_match?.label || "",
       response_type: observer.response?.response_type || "",
       response_coordinate: observer.response?.coordinate ? {...observer.response.coordinate} : null,
+      response_snapshot: observer.kind==="response" && observer.response
+        ? JSON.parse(JSON.stringify(observer.response))
+        : null,
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || "",
       from_relationship_label: observer.from_relationship_label || "",
@@ -3916,10 +3947,19 @@
     for(const node of nodes){
       const row=rows.get(node.node_id)||0;
       const label=String(node.observer?.label || node.observer?.question || "Cosmos");
+      const subtitle=String(
+        node.arrival_relation ||
+        node.previous_station_label ||
+        node.origin_label ||
+        ""
+      );
       const usableLabelWidth=Math.max(145,Math.min(190,width-120));
       const approxCharsPerLine=Math.max(16,Math.floor(usableLabelWidth/7.2));
-      const lines=Math.max(1,Math.ceil(label.length/approxCharsPerLine));
-      const needed=Math.max(rowGap,44+lines*17);
+      const titleLines=Math.max(1,Math.ceil(label.length/approxCharsPerLine));
+      const subtitleLines=subtitle
+        ? Math.max(1,Math.ceil((subtitle.length+18)/approxCharsPerLine))
+        : 1;
+      const needed=Math.max(rowGap,36 + titleLines*17 + subtitleLines*14 + 14);
       rowHeights.set(row,Math.max(rowHeights.get(row)||rowGap,needed));
     }
 
@@ -3964,12 +4004,6 @@
         isActive?"active":"saved"
       );
 
-      const relation=String(node.arrival_relation||node.observer?.from_relationship_label||"").trim();
-      if(relation){
-        const relationX=Math.round((a.x+b.x)/2)+18;
-        const relationY=Math.round((a.y+b.y)/2)+4;
-        routeSvg += `<text x="${relationX}" y="${relationY}" class="metroRelationLabel">${esc(relation)}</text>`;
-      }
     }
     routeSvg += `</svg>`;
 
