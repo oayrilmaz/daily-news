@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="cosmos-build" content="32.2-deep-hotfix" />
+  <meta name="cosmos-build" content="32.3-gateway-resilience" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1182,7 +1182,7 @@
     return;
   }
 
-  const COSMOS_BUILD_ID = "32.2-deep-hotfix";
+  const COSMOS_BUILD_ID = "32.3-gateway-resilience";
   try{
     window.COSMOS_BUILD_ID=COSMOS_BUILD_ID;
     console.info(`Cosmos build ${COSMOS_BUILD_ID}`);
@@ -1254,8 +1254,8 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "8.2-deep-loading-runtime-cache-hotfix";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "8.3-gateway-resilience";
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 80000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
 
@@ -2830,7 +2830,8 @@
     if(
       observer?.kind==="response" &&
       observer?.response &&
-      observer.response.response_type!=="universal_loading"
+      observer.response.response_type!=="universal_loading" &&
+      observer.response.response_type!=="gateway_unavailable"
     ){
       return observerSnapshot(observer);
     }
@@ -6621,6 +6622,90 @@
     }
   }
 
+  async function fetchCosmosGateway(payload,signal){
+    let lastError=null;
+
+    for(let attempt=1;attempt<=2;attempt++){
+      try{
+        const response=await fetch(COSMOS_ASK_ENDPOINT,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload),
+          cache:"no-store",
+          signal
+        });
+
+        if(response.ok) return response;
+
+        const errorBody=await response.json().catch(()=>({}));
+        const error=new Error(
+          String(errorBody?.error||`Cosmos gateway returned ${response.status}`)
+        );
+        error.status=response.status;
+        error.request_id=String(errorBody?.request_id||"");
+        lastError=error;
+
+        // Retry only transient server/provider failures.
+        if(attempt===1 && response.status>=500){
+          await new Promise(resolve=>setTimeout(resolve,450));
+          continue;
+        }
+        throw error;
+      }catch(error){
+        if(error?.name==="AbortError") throw error;
+        lastError=error;
+        if(attempt===1){
+          await new Promise(resolve=>setTimeout(resolve,450));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw lastError||new Error("Cosmos gateway unavailable");
+  }
+
+  function buildGatewayUnavailableResponse(question,label=""){
+    const q=String(question||"").trim();
+    return {
+      id:`response:gateway-unavailable:${normalizeSubject(q).replace(/\s+/g,"-")}`,
+      label:String(label||q||"Cosmos"),
+      response_type:"gateway_unavailable",
+      question:q,
+      answer:"Cosmos could not reach its live reasoning service for this pass. Please try again.",
+      short_answer:"Live reasoning service unavailable for this pass.",
+      essence:"Live reasoning service unavailable for this pass.",
+      current_pulse:[],
+      intent:"universal",
+      epistemic_state:"unavailable",
+      confidence:"",
+      subject_match:null,
+      bullets:[],
+      projection_seed_ids:[],
+      dynamic_projection_ids:[],
+      dynamic_projection_nodes:[],
+      dynamic_projection_relationship_count:0,
+      dynamic_projection_token:"",
+      source_label:"",
+      knowledge_completion:null,
+      suggested_stations:[],
+      knowledge_gaps:[],
+      coordinate:{
+        focus_type:"investigation",
+        focus_id:q?`question:${normalizeSubject(q)}`:"cosmos",
+        focus_label:String(label||q||"Cosmos"),
+        time_mode:"live",
+        geography:null,
+        resolution:"",
+        lens:"now",
+        objective:"retry_live_reasoning",
+        epistemic_mode:"know",
+        temporal_request:false,
+        change_first:false
+      }
+    };
+  }
+
   async function hydrateUniversalAnswer(question,displayLabel=""){
     if(!question || state.universalAnswerLoaded) return;
 
@@ -6666,12 +6751,7 @@
         }
       };
 
-      const response=await fetch(COSMOS_ASK_ENDPOINT,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload),
-        signal:controller.signal
-      });
+      const response=await fetchCosmosGateway(payload,controller.signal);
       if(!requestStillCurrent()) return;
       if(!response.ok) throw new Error(`Cosmos gateway returned ${response.status}`);
 
@@ -6707,19 +6787,20 @@
       state.universalAnswerPending=false;
       stopLoadingProgress(true);
 
-      const local=buildQuestionResponse(question);
+      const unavailable=buildGatewayUnavailableResponse(question,displayLabel||question);
       if(!requestStillCurrent()) return;
-      state.response=local;
+      state.response=unavailable;
       state.observer={
         kind:"response",
-        id:local.id,
+        id:unavailable.id,
         label:displayLabel || question,
-        response:local,
+        response:unavailable,
         question,
-        semantic_subject_id:local?.subject_match?.id||"",
-        semantic_subject_label:local?.subject_match?.label||"",
+        semantic_subject_id:"",
+        semantic_subject_label:"",
         article_id:entry.article_id
       };
+      state.universalAnswerLoaded=false;
       reconcileJourneyWithResolvedObserver(state.observer);
       syncCurrentHistoryToJourney();
       saveTrail();
