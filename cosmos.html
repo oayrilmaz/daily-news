@@ -966,7 +966,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.9-hide-internal-ai-prompt";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.0-clean-essence-title";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -3540,7 +3540,14 @@
     const currentLabel=observerDisplayLabel(observer) || "Cosmos";
     const entryQuestion=observer?.question || entry.question || "";
     const station=projection.station || stationProjection(observer);
-    const title=station.focus_id ? station.focus_label : (entryQuestion || currentLabel);
+
+    // Internal station research prompts are AI instructions, never viewer-facing titles.
+    // The visible Cosmos Essence heading must remain the actual current station/subject.
+    const internalResearchQuestion=isInternalStationResearchQuestion(entryQuestion);
+    const title=station.focus_id
+      ? station.focus_label
+      : (internalResearchQuestion ? currentLabel : (entryQuestion || currentLabel));
+
     const essence=compactEssence(observer);
     const evidence=projectionEvidenceItems(observer);
     const contextRows=compactCenterContext(observer);
