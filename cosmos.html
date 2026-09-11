@@ -953,7 +953,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.5-journey-state-restore";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.6-journey-canonical-state";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -979,8 +979,8 @@
     expanded: false,
     entryObserver: null,
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
-    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_7",
-    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_7",
+    journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_8",
+    journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_8",
     journey: {
       nodes: [],
       current_node_id: "",
@@ -2351,6 +2351,29 @@
     }catch{}
   }
 
+  function resolvedJourneyStateFromObserver(observer){
+    if(
+      observer?.kind==="response" &&
+      observer?.response &&
+      observer.response.response_type!=="universal_loading"
+    ){
+      return observerSnapshot(observer);
+    }
+    return null;
+  }
+
+  function preserveResolvedJourneyState(node,observer){
+    if(!node) return;
+    const resolved=resolvedJourneyStateFromObserver(observer);
+    if(resolved){
+      node.resolved_state=resolved;
+    }
+  }
+
+  function journeyNodeDisplayObserver(node){
+    return node?.resolved_state || node?.observer || null;
+  }
+
   function compactJourneyStations(){
     const nodes=Array.isArray(state.journey?.nodes) ? state.journey.nodes : [];
     if(nodes.length<2) return;
@@ -2377,15 +2400,23 @@
         existingCoord?.focus_type==="investigation" &&
         nodeCoord?.focus_type!=="investigation";
 
+      if(node.resolved_state && !existing.resolved_state){
+        existing.resolved_state=node.resolved_state;
+      }
       if(nodeMoreResolved || Number(node.created_at||0)>=Number(existing.created_at||0)){
         existing.coordinate=node.coordinate || existing.coordinate;
         existing.observer_key=node.observer_key || existing.observer_key;
-        existing.observer=node.observer || existing.observer;
+        if(!existing.resolved_state){
+          existing.observer=node.observer || existing.observer;
+        }
         existing.via_operation=node.via_operation || existing.via_operation;
         existing.arrival_relation=node.arrival_relation || existing.arrival_relation || "";
         existing.arrival_relation_direction=node.arrival_relation_direction || existing.arrival_relation_direction || "";
         existing.origin_label=node.origin_label || existing.origin_label || "";
         existing.previous_station_label=node.previous_station_label || existing.previous_station_label || "";
+      }
+      if(existing.resolved_state){
+        existing.observer=existing.resolved_state;
       }
 
       redirect.set(node.node_id,existing.node_id);
@@ -2419,9 +2450,12 @@
     if(semanticExisting){
       semanticExisting.observer_key=key;
       semanticExisting.coordinate=coordinateForObserver(observer);
-      semanticExisting.observer=observerSnapshot(observer);
-      if(observer?.kind==="response" && observer?.response){
-        semanticExisting.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      preserveResolvedJourneyState(semanticExisting,observer);
+      if(!semanticExisting.resolved_state){
+        semanticExisting.observer=observerSnapshot(observer);
+      }else{
+        // Keep the rich resolved station as the canonical Journey state.
+        semanticExisting.observer=semanticExisting.resolved_state;
       }
       semanticExisting.via_operation=observer?.via_operation||semanticExisting.via_operation||"ENTER";
       semanticExisting.arrival_relation=observer?.from_relationship_label||semanticExisting.arrival_relation||"";
@@ -2446,6 +2480,7 @@
       origin_label:observer?.journey_origin_label||"",
       previous_station_label:observer?.from_observer_label||"",
       observer:observerSnapshot(observer),
+      resolved_state:resolvedJourneyStateFromObserver(observer),
       created_at:Date.now()
     };
     state.journey.nodes.push(node);
@@ -2472,9 +2507,11 @@
     if(existing){
       existing.observer_key=journeyObserverKey(observer);
       existing.coordinate=coordinateForObserver(observer);
-      existing.observer=observerSnapshot(observer);
-      if(observer?.kind==="response" && observer?.response){
-        existing.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      preserveResolvedJourneyState(existing,observer);
+      if(!existing.resolved_state){
+        existing.observer=observerSnapshot(observer);
+      }else{
+        existing.observer=existing.resolved_state;
       }
       existing.arrival_relation=observer?.from_relationship_label||existing.arrival_relation||"";
       existing.arrival_relation_direction=observer?.from_relationship_direction||existing.arrival_relation_direction||"";
@@ -2547,8 +2584,9 @@
       const priorRelation=current.arrival_relation||current.observer?.from_relationship_label||"";
       const priorDirection=current.arrival_relation_direction||current.observer?.from_relationship_direction||"";
       current.observer=observerSnapshot(observer);
-      if(observer?.kind==="response" && observer?.response){
-        current.observer.response_snapshot=JSON.parse(JSON.stringify(observer.response));
+      preserveResolvedJourneyState(current,observer);
+      if(current.resolved_state){
+        current.observer=current.resolved_state;
       }
       if(priorRelation && !current.observer.from_relationship_label) current.observer.from_relationship_label=priorRelation;
       if(priorDirection && !current.observer.from_relationship_direction) current.observer.from_relationship_direction=priorDirection;
@@ -2576,8 +2614,8 @@
   }
 
   function restoreObserverFromJourneyNode(node){
-    if(!node?.observer) return;
-    const snap=node.observer;
+    const snap=journeyNodeDisplayObserver(node);
+    if(!snap) return;
 
     if(snap.kind==="entity" && snap.id && state.entities.has(snap.id)){
       const entity=state.entities.get(snap.id);
@@ -2636,6 +2674,24 @@
 
     state.journey.current_node_id=node.node_id;
     state.expanded=false;
+
+    try{
+      const url=new URL(location.href);
+      if(state.observer?.kind==="response" && state.observer?.question){
+        url.searchParams.set("focus","question");
+        url.searchParams.set("question",state.observer.question);
+        url.searchParams.set("from","journey");
+        url.searchParams.delete("id");
+        url.searchParams.delete("relationship_id");
+      }else if(state.observer?.kind==="entity" && state.observer?.id){
+        url.searchParams.set("focus","entity");
+        url.searchParams.set("id",state.observer.id);
+        url.searchParams.delete("question");
+        url.searchParams.delete("relationship_id");
+      }
+      history.pushState({cosmos:true,journey_node:node.node_id},"",url.pathname+url.search);
+    }catch{}
+
     saveJourney();
     saveTrail();
     render();
@@ -3946,7 +4002,8 @@
     for(let row=0;row<=maxRow;row++) rowHeights.set(row,rowGap);
     for(const node of nodes){
       const row=rows.get(node.node_id)||0;
-      const label=String(node.observer?.label || node.observer?.question || "Cosmos");
+      const displayObserver=journeyNodeDisplayObserver(node);
+      const label=String(displayObserver?.label || displayObserver?.question || "Cosmos");
       const subtitle=String(
         node.arrival_relation ||
         node.previous_station_label ||
