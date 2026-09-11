@@ -756,6 +756,18 @@
   }
   .metroBranch,.metroJourneyRow{margin-bottom:12px;}
 
+
+  /* v27.0 — projectionTitle is an internal AI/research title, never viewer-facing */
+  #projectionTitle{
+    display:none !important;
+    visibility:hidden !important;
+    height:0 !important;
+    min-height:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+    overflow:hidden !important;
+  }
+
 </style>
 </head>
 <body>
@@ -966,7 +978,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.0-clean-essence-title";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.1-internal-prompt-ui-boundary";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -3555,7 +3567,7 @@
       contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
     }
 
-    projectionTitle.textContent=title;
+    projectionTitle.textContent="";
     projectionEssence.textContent=essence;
 
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
