@@ -744,6 +744,274 @@
     word-break:normal;
   }
 
+
+  /* v27.6 — quiet route context: orientation without exposing internal prompts */
+  .projectionOrigin{
+    display:none;
+    margin:10px 0 0;
+    padding:9px 11px;
+    border:1px solid rgba(116,153,214,.22);
+    border-radius:12px;
+    background:rgba(7,19,35,.24);
+    color:#aebbd0;
+    font-size:12px;
+    line-height:1.35;
+  }
+  .projectionOrigin.active{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+  .projectionOrigin strong{color:#e7eefb;font-weight:750}
+  .projectionOrigin .routeArrow{color:#6f8fbe}
+  .projectionOrigin .routeRelation{
+    color:#c3d5f1;
+    padding:2px 7px;
+    border:1px solid rgba(123,160,220,.2);
+    border-radius:999px;
+    background:rgba(25,51,87,.34);
+  }
+  @media(max-width:620px){
+    .projectionOrigin{font-size:11px}
+  }
+
+
+  #branchSelect.action,
+  #arrivalSelect.action{
+    max-width:220px;
+    cursor:pointer;
+    color:#cbd8ec;
+    background-color:rgba(11,24,42,.72);
+  }
+  #branchSelect.action option,
+  #arrivalSelect.action option{
+    background:#0b182a;
+    color:#e7eefb;
+  }
+
+  @media(max-width:520px){
+    .toolbar{
+      align-items:stretch;
+      gap:7px;
+    }
+    .toolbar .action{
+      min-height:40px;
+    }
+    #branchSelect.action,
+    #arrivalSelect.action{
+      flex:1 1 100%;
+      width:100%;
+      max-width:none;
+      min-width:0;
+    }
+  }
+
+
+  /* v28.1 — Journey wayfinding. Visual only; no Journey/state behavior changes. */
+  .metroWayfindingBadge{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    margin-left:7px;
+    padding:2px 6px;
+    border:1px solid rgba(133,174,255,.22);
+    border-radius:999px;
+    color:#9fbaf0;
+    background:rgba(74,122,220,.07);
+    font-size:9px;
+    line-height:1.2;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    vertical-align:1px;
+    white-space:nowrap;
+  }
+  .metroWayfindingBadge.current{
+    color:#e8f1ff;
+    border-color:rgba(133,174,255,.48);
+    background:rgba(74,122,220,.18);
+  }
+  .metroWayfindingBadge.origin{
+    color:#b7c3d6;
+    border-color:rgba(190,205,230,.18);
+    background:rgba(255,255,255,.035);
+  }
+  .metroWayfindingBadge.branch{
+    color:#b8d3ff;
+  }
+  .metroStop.current .metroDot{
+    box-shadow:
+      0 0 0 4px rgba(113,160,255,.11),
+      0 0 18px rgba(113,160,255,.42);
+  }
+
+
+  /* v28.2 — explicit Journey locator; never auto-scrolls during render */
+  .butterflyHead{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+  .butterflyHead>div{min-width:0}
+  .journeyLocateBtn{
+    appearance:none;
+    flex:0 0 auto;
+    border:1px solid rgba(133,174,255,.24);
+    border-radius:999px;
+    background:rgba(74,122,220,.07);
+    color:#b7c9e8;
+    padding:6px 9px;
+    font:inherit;
+    font-size:10px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .journeyLocateBtn:hover{
+    border-color:rgba(133,174,255,.46);
+    background:rgba(74,122,220,.14);
+    color:#e6efff;
+  }
+  .journeyLocateBtn[hidden]{display:none}
+  @media(max-width:520px){
+    .journeyLocateBtn{font-size:9.5px;padding:6px 8px}
+  }
+
+
+  /* v28.3 — compact Journey orientation status */
+  .journeyStatus{
+    margin-top:5px;
+    color:#7f91aa;
+    font-size:10px;
+    line-height:1.35;
+    letter-spacing:.02em;
+  }
+  .journeyStatus strong{
+    color:#b7c9e7;
+    font-weight:650;
+  }
+
+
+  /* v28.4 — active-route visual focus; saved branches remain present */
+  .journeyHeadActions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .journeyFocusBtn{
+    appearance:none;
+    flex:0 0 auto;
+    border:1px solid rgba(133,174,255,.20);
+    border-radius:999px;
+    background:rgba(74,122,220,.055);
+    color:#94a9c8;
+    padding:6px 9px;
+    font:inherit;
+    font-size:10px;
+    line-height:1;
+    cursor:pointer;
+  }
+  .journeyFocusBtn:hover{
+    border-color:rgba(133,174,255,.42);
+    color:#e5efff;
+    background:rgba(74,122,220,.12);
+  }
+  .journeyFocusBtn.active{
+    border-color:rgba(133,174,255,.50);
+    color:#e7f0ff;
+    background:rgba(74,122,220,.18);
+  }
+  .journeyFocusBtn[hidden]{display:none}
+
+  /* Do not remove saved branches from the map: simply quiet them.
+     The viewer can still see that alternate dimensions/routes exist. */
+  .butterflyWrap.routeFocused .metroStop.savedBranch{
+    opacity:.20;
+    filter:saturate(.45);
+  }
+  .butterflyWrap.routeFocused .metroRoutePath.saved{
+    opacity:.10;
+  }
+  .butterflyWrap.routeFocused .metroStop.savedBranch:hover{
+    opacity:.72;
+    filter:none;
+  }
+  .butterflyWrap.routeFocused .metroStop.current,
+  .butterflyWrap.routeFocused .metroRoutePath.active{
+    opacity:1;
+    filter:none;
+  }
+  .butterflyWrap.routeFocused .metroRoutePath.convergence.active{
+    opacity:1;
+    stroke-dasharray:none;
+  }
+
+  @media(max-width:520px){
+    .journeyHeadActions{gap:5px}
+    .journeyFocusBtn{font-size:9.5px;padding:6px 8px}
+  }
+
+
+  /* v28.5 — Butterfly appears on the Journey only for an accepted causal edge */
+  .metroRoutePath.convergence{
+    stroke-dasharray:5 5;
+    stroke-width:1.8;
+    opacity:.58;
+  }
+  .metroRoutePath.convergence.active{
+    stroke-dasharray:none;
+    stroke-width:2.7;
+    opacity:1;
+  }
+  .metroRoutePath.butterflyCausal{
+    stroke:#9bbcff;
+    stroke-width:3;
+    opacity:1;
+  }
+  .metroButterflyMark{
+    pointer-events:none;
+    opacity:.95;
+  }
+  .metroButterflyMark .wing{
+    fill:rgba(128,169,255,.16);
+    stroke:#a9c5ff;
+    stroke-width:1.05;
+  }
+  .metroButterflyMark .body{
+    stroke:#c7d9ff;
+    stroke-width:1.1;
+    stroke-linecap:round;
+  }
+  .metroLegend .convergence i{
+    border-top:1.5px dashed #8aa4cb;
+    width:13px;
+    height:0;
+  }
+  .metroLegend .causal i{
+    position:relative;
+    width:13px;
+    height:9px;
+    border:0;
+    background:transparent;
+  }
+  .metroLegend .causal i::before,
+  .metroLegend .causal i::after{
+    content:"";
+    position:absolute;
+    top:1px;
+    width:6px;
+    height:7px;
+    border:1px solid #a9c5ff;
+    border-radius:70% 45% 70% 45%;
+    background:rgba(128,169,255,.12);
+  }
+  .metroLegend .causal i::before{left:0;transform:rotate(-23deg)}
+  .metroLegend .causal i::after{right:0;transform:scaleX(-1) rotate(-23deg)}
+
+
+  .metroWayfindingBadge.butterfly{
+    color:#c6d9ff;
+    border-color:rgba(158,190,255,.42);
+    background:rgba(85,130,220,.14);
+  }
+
 </style>
 </head>
 <body>
@@ -783,6 +1051,10 @@
 
     <div class="toolbar">
       <button class="action" id="expandBtn" style="display:none">Expand one layer +</button>
+      <button class="action" id="previousStopBtn" type="button" hidden>← Previous stop</button>
+      <button class="action" id="nextStopBtn" type="button" hidden>Next stop →</button>
+      <select class="action" id="branchSelect" hidden aria-label="Choose a saved Journey branch"></select>
+      <select class="action" id="arrivalSelect" hidden aria-label="Choose another route into this station"></select>
       <button class="action" id="resetBtn">Return to entry</button>
       <a class="action primary" href="/" id="articleBtn">Cosmos home</a>
     </div>
@@ -841,12 +1113,21 @@
 
     <section class="butterflyWrap" id="butterflyWrap" aria-label="Your journey">
       <div class="butterflyHead">
-        <h2>Your journey</h2>
-        <span>where you traveled · branches you saved</span>
+        <div>
+          <h2>Your journey</h2>
+          <span>where you traveled · branches you saved</span>
+          <div class="journeyStatus" id="journeyStatus" aria-live="polite"></div>
+        </div>
+        <div class="journeyHeadActions">
+          <button type="button" class="journeyFocusBtn" id="journeyFocusBtn" hidden>Focus route</button>
+          <button type="button" class="journeyLocateBtn" id="journeyLocateBtn" hidden>◎ Locate me</button>
+        </div>
       </div>
       <div class="metroLegend">
         <span><i></i> current route</span>
         <span class="saved"><i></i> saved branch</span>
+        <span class="convergence"><i></i> route convergence</span>
+        <span class="causal"><i></i> supported butterfly</span>
       </div>
       <div class="metro" id="butterflyMetro"></div>
     </section>
@@ -874,6 +1155,7 @@
 
 <script>
   // Cosmos Semantic Knowledge Completion live integration v0.1
+// Consolidated PTD Today Cosmos deployment candidate v32.0
 (function(){
   "use strict";
 
@@ -909,6 +1191,10 @@
   const observerDetail = document.getElementById("observerDetail");
   const edgeDetail = document.getElementById("edgeDetail");
   const expandBtn = document.getElementById("expandBtn");
+  const previousStopBtn = document.getElementById("previousStopBtn");
+  const nextStopBtn = document.getElementById("nextStopBtn");
+  const branchSelect = document.getElementById("branchSelect");
+  const arrivalSelect = document.getElementById("arrivalSelect");
   const resetBtn = document.getElementById("resetBtn");
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
@@ -929,12 +1215,17 @@
   const rippleBtn = document.getElementById("rippleBtn");
   const butterflyWrap = document.getElementById("butterflyWrap");
   const butterflyMetro = document.getElementById("butterflyMetro");
+  const journeyLocateBtn = document.getElementById("journeyLocateBtn");
+  const journeyFocusBtn = document.getElementById("journeyFocusBtn");
+  const journeyStatus = document.getElementById("journeyStatus");
   const effectWrap = document.getElementById("effectWrap");
   const effectStep = document.getElementById("effectStep");
   const projectionAskForm = document.getElementById("projectionAskForm");
   const projectionAskInput = document.getElementById("projectionAskInput");
 
   const params = new URLSearchParams(location.search);
+  let journeyRouteFocused=false;
+
   const entry = {
     focus: params.get("focus") || "development",
     id: params.get("id") || "",
@@ -953,7 +1244,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.6-journey-canonical-state";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "8.0-deployment-candidate-convergence-ui";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -970,6 +1261,10 @@
     observer: null,
     universalAnswerLoaded: false,
     universalAnswerPending: false,
+    universalRequestSerial: 0,
+    universalActiveRequest: null,
+    shareRequestSerial: 0,
+    shareActiveRequest: null,
     loadingProgressValue: 0,
     loadingProgressCeiling: 0,
     loadingProgressTimer: null,
@@ -995,6 +1290,7 @@
     // Each focus can have a high-level PRIMARY ring and a SECONDARY ring beneath it.
     semanticProjectionCache: new Map(),
     semanticProjectionPending: new Map(),
+    semanticProjectionControllers: new Map(),
     semanticProjectionSerial: 0
   };
 
@@ -2337,18 +2633,187 @@
       if(!raw) return;
       const parsed=JSON.parse(raw);
       if(!parsed || !Array.isArray(parsed.nodes)) return;
-      state.journey.nodes=parsed.nodes;
-      state.journey.current_node_id=parsed.current_node_id||"";
-      state.journey.next_id=Number(parsed.next_id)||(
-        parsed.nodes.reduce((m,n)=>Math.max(m,Number(String(n.node_id||"").replace(/\D/g,""))||0),0)+1
+
+      // Treat browser storage as untrusted persisted state. A partially written,
+      // older, or malformed Journey must never create ghost stops, orphan routes,
+      // or a current pointer that cannot be restored.
+      const nodes=[];
+      const ids=new Set();
+
+      for(const rawNode of parsed.nodes){
+        if(!rawNode || typeof rawNode!=="object") continue;
+        const node=JSON.parse(JSON.stringify(rawNode));
+        const nodeId=String(node.node_id||"").trim();
+        if(!nodeId || ids.has(nodeId)) continue;
+        node.node_id=nodeId;
+        node.parent_node_id=String(node.parent_node_id||"").trim();
+        node.last_forward_node_id=String(node.last_forward_node_id||"").trim();
+        ids.add(nodeId);
+        nodes.push(node);
+      }
+
+      // Repair orphan parents first.
+      for(const node of nodes){
+        if(node.parent_node_id && !ids.has(node.parent_node_id)){
+          node.parent_node_id="";
+        }
+      }
+
+      const byId=new Map(nodes.map(node=>[node.node_id,node]));
+
+      // Break parent cycles defensively. A Journey is a tree; no station may
+      // eventually point back to itself through ancestry.
+      for(const node of nodes){
+        const seen=new Set([node.node_id]);
+        let cursor=node;
+        while(cursor?.parent_node_id){
+          const parentId=String(cursor.parent_node_id||"");
+          if(seen.has(parentId)){
+            cursor.parent_node_id="";
+            break;
+          }
+          seen.add(parentId);
+          cursor=byId.get(parentId)||null;
+          if(!cursor) break;
+        }
+      }
+
+      // A remembered forward route is valid only when it is still an immediate
+      // child of that station.
+      for(const node of nodes){
+        if(node.last_forward_node_id){
+          const forward=byId.get(node.last_forward_node_id);
+          if(!forward || forward.parent_node_id!==node.node_id){
+            node.last_forward_node_id="";
+          }
+        }
+
+        const seenArrivals=new Set();
+        node.alternate_arrivals=(Array.isArray(node.alternate_arrivals)?node.alternate_arrivals:[])
+          .filter(arrival=>{
+            const parent=String(arrival?.parent_node_id||"");
+            if(!parent || parent===node.node_id || !byId.has(parent)) return false;
+
+            let cursor=byId.get(parent);
+            const ancestrySeen=new Set();
+            while(cursor && !ancestrySeen.has(cursor.node_id)){
+              ancestrySeen.add(cursor.node_id);
+              if(String(cursor.parent_node_id||"")===node.node_id) return false;
+              cursor=cursor.parent_node_id ? byId.get(cursor.parent_node_id) : null;
+            }
+
+            const key=[parent,String(arrival?.relation||""),String(arrival?.direction||"")].join("|");
+            if(seenArrivals.has(key)) return false;
+            seenArrivals.add(key);
+            return true;
+          })
+          .slice(-12);
+
+        const validArrivalParents=new Set([
+          String(node.parent_node_id||""),
+          ...node.alternate_arrivals.map(arrival=>String(arrival?.parent_node_id||""))
+        ].filter(Boolean));
+        if(node.preferred_arrival_parent_id && !validArrivalParents.has(String(node.preferred_arrival_parent_id))){
+          node.preferred_arrival_parent_id="";
+        }
+      }
+
+      state.journey.nodes=nodes;
+
+      const requestedCurrent=String(parsed.current_node_id||"").trim();
+      state.journey.current_node_id=byId.has(requestedCurrent)
+        ? requestedCurrent
+        : (nodes[nodes.length-1]?.node_id||"");
+
+      const maxNumericId=nodes.reduce(
+        (max,node)=>Math.max(max,Number(String(node.node_id||"").replace(/\D/g,""))||0),
+        0
       );
-    }catch{}
+      state.journey.next_id=Math.max(Number(parsed.next_id)||0,maxNumericId+1,1);
+    }catch(error){
+      console.warn("Cosmos Journey storage could not be restored safely.",error);
+    }
+  }
+
+  function compactProjectionSnapshotForStorage(snapshot){
+    if(!snapshot || typeof snapshot!=="object") return snapshot;
+    const copy=JSON.parse(JSON.stringify(snapshot));
+    if(Array.isArray(copy.entities)){
+      copy.entities=copy.entities.map(entity=>({
+        entity_id:String(entity?.entity_id||""),
+        name:String(entity?.name||entity?.label||entity?.entity_id||""),
+        label:String(entity?.label||entity?.name||entity?.entity_id||""),
+        type:String(entity?.type||"Projected concept"),
+        role:String(entity?.role||""),
+        ephemeral_projection:Boolean(entity?.ephemeral_projection),
+        admitted_to_cosmos:Boolean(entity?.admitted_to_cosmos),
+        projection_version:String(entity?.projection_version||"")
+      }));
+    }
+    return copy;
+  }
+
+  function compactObserverSnapshotForStorage(snapshot){
+    if(!snapshot || typeof snapshot!=="object") return snapshot;
+    const copy=JSON.parse(JSON.stringify(snapshot));
+    if(copy.projection_snapshot){
+      copy.projection_snapshot=compactProjectionSnapshotForStorage(copy.projection_snapshot);
+    }
+    return copy;
+  }
+
+  function dedupeJourneyNodeSnapshotsForStorage(node){
+    if(!node || typeof node!=="object") return node;
+    const copy=JSON.parse(JSON.stringify(node));
+
+    if(copy.resolved_state){
+      // resolved_state is the canonical rich station. observer only needs the
+      // identity/route fields required by older compatibility paths.
+      const source=copy.observer||copy.resolved_state;
+      copy.observer={
+        kind:source?.kind||copy.resolved_state?.kind||"",
+        id:source?.id||copy.resolved_state?.id||"",
+        label:source?.label||copy.resolved_state?.label||"",
+        question:source?.question||copy.resolved_state?.question||"",
+        semantic_subject_id:source?.semantic_subject_id||copy.resolved_state?.semantic_subject_id||"",
+        semantic_subject_label:source?.semantic_subject_label||copy.resolved_state?.semantic_subject_label||"",
+        coordinate:source?.coordinate||copy.resolved_state?.coordinate||null,
+        from_observer_id:source?.from_observer_id||"",
+        from_observer_label:source?.from_observer_label||"",
+        from_relationship_label:source?.from_relationship_label||"",
+        from_relationship_direction:source?.from_relationship_direction||"",
+        journey_origin_label:source?.journey_origin_label||"",
+        via_operation:source?.via_operation||""
+      };
+    }
+    return copy;
+  }
+
+  function compactJourneyForStorage(journey){
+    const copy=JSON.parse(JSON.stringify(journey||{}));
+    copy.nodes=(Array.isArray(copy.nodes)?copy.nodes:[]).map(node=>{
+      node=dedupeJourneyNodeSnapshotsForStorage(node);
+      if(node?.observer) node.observer=compactObserverSnapshotForStorage(node.observer);
+      if(node?.resolved_state) node.resolved_state=compactObserverSnapshotForStorage(node.resolved_state);
+      return node;
+    });
+    return copy;
   }
 
   function saveJourney(){
     try{
       sessionStorage.setItem(state.journeyStorageKey,JSON.stringify(state.journey));
-    }catch{}
+      return true;
+    }catch(error){
+      try{
+        const compact=compactJourneyForStorage(state.journey);
+        sessionStorage.setItem(state.journeyStorageKey,JSON.stringify(compact));
+        return true;
+      }catch(compactError){
+        console.warn("Cosmos Journey could not be persisted in this browser session.",compactError);
+        return false;
+      }
+    }
   }
 
   function resolvedJourneyStateFromObserver(observer){
@@ -2362,16 +2827,119 @@
     return null;
   }
 
+  function journeySnapshotQuality(snapshot){
+    if(!snapshot || snapshot.kind!=="response") return 0;
+    const response=snapshot.response_snapshot||null;
+    if(!response) return 1;
+
+    let score=10;
+    const type=String(response.response_type||snapshot.response_type||"");
+    if(type==="universal") score+=50;
+    else if(type==="shared-station") score+=35;
+    else if(type==="universal_loading") return 0;
+    else score+=15;
+
+    if(String(response.answer||"").trim()) score+=8;
+    if(String(response.essence||"").trim()) score+=6;
+    if(Array.isArray(response.bullets) && response.bullets.length) score+=Math.min(8,response.bullets.length);
+    if(Array.isArray(response.dynamic_projection_ids) && response.dynamic_projection_ids.length) score+=12;
+    if(Array.isArray(response.dynamic_projection_nodes) && response.dynamic_projection_nodes.length) score+=12;
+    if(snapshot.projection_snapshot?.relationships?.length) score+=12;
+    if(response.coordinate?.focus_type && response.coordinate.focus_type!=="investigation") score+=10;
+    if(response.knowledge_completion) score+=3;
+
+    return score;
+  }
+
   function preserveResolvedJourneyState(node,observer){
-    if(!node) return;
+    if(!node) return false;
     const resolved=resolvedJourneyStateFromObserver(observer);
-    if(resolved){
+    if(!resolved) return false;
+
+    const current=node.resolved_state||null;
+    if(!current){
       node.resolved_state=resolved;
+      return true;
     }
+
+    const currentQuality=journeySnapshotQuality(current);
+    const candidateQuality=journeySnapshotQuality(resolved);
+
+    // A canonical station may be upgraded, but never silently downgraded by a
+    // local fallback, sparse response, or later partial re-resolution.
+    if(candidateQuality>currentQuality){
+      node.resolved_state=resolved;
+      return true;
+    }
+
+    return false;
   }
 
   function journeyNodeDisplayObserver(node){
     return node?.resolved_state || node?.observer || null;
+  }
+
+  function redirectJourneyNodeReferences(fromNodeId,toNodeId){
+    const from=String(fromNodeId||"");
+    const to=String(toNodeId||"");
+    if(!from || !to || from===to) return;
+
+    for(const node of state.journey.nodes){
+      if(node.parent_node_id===from){
+        node.parent_node_id=to===node.node_id ? "" : to;
+      }
+      if(node.last_forward_node_id===from){
+        node.last_forward_node_id=to===node.node_id ? "" : to;
+      }
+      if(node.preferred_arrival_parent_id===from){
+        node.preferred_arrival_parent_id=to===node.node_id ? "" : to;
+      }
+      if(Array.isArray(node.alternate_arrivals)){
+        for(const arrival of node.alternate_arrivals){
+          if(arrival?.parent_node_id===from) arrival.parent_node_id=to;
+        }
+      }
+    }
+
+    if(state.journey.current_node_id===from){
+      state.journey.current_node_id=to;
+    }
+  }
+
+  function normalizeJourneyAlternateArrivals(node){
+    if(!node) return;
+    const seen=new Set();
+    node.alternate_arrivals=(Array.isArray(node.alternate_arrivals)?node.alternate_arrivals:[])
+      .filter(arrival=>{
+        const parent=String(arrival?.parent_node_id||"");
+        if(!validAlternateArrivalParent(node,parent)) return false;
+        const key=[
+          parent,
+          String(arrival?.relation||""),
+          String(arrival?.direction||"")
+        ].join("|");
+        if(seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(-12);
+  }
+
+  function recordJourneyAlternateArrival(node,parentNodeId,observer){
+    if(!node) return;
+    const parent=String(parentNodeId||"");
+    if(!parent || parent===node.node_id || parent===String(node.parent_node_id||"")) return;
+    if(!validAlternateArrivalParent(node,parent)) return;
+
+    if(!Array.isArray(node.alternate_arrivals)) node.alternate_arrivals=[];
+    node.alternate_arrivals.push({
+      parent_node_id:parent,
+      relation:String(observer?.from_relationship_label||""),
+      direction:String(observer?.from_relationship_direction||""),
+      previous_station_label:String(observer?.from_observer_label||observerDisplayLabel(journeyNodeDisplayObserver(journeyNodeById(parent)))||""),
+      arrived_at:Date.now()
+    });
+    normalizeJourneyAlternateArrivals(node);
   }
 
   function compactJourneyStations(){
@@ -2400,8 +2968,29 @@
         existingCoord?.focus_type==="investigation" &&
         nodeCoord?.focus_type!=="investigation";
 
-      if(node.resolved_state && !existing.resolved_state){
-        existing.resolved_state=node.resolved_state;
+      if(node.resolved_state){
+        if(!existing.resolved_state || journeySnapshotQuality(node.resolved_state)>journeySnapshotQuality(existing.resolved_state)){
+          existing.resolved_state=node.resolved_state;
+        }
+      }
+
+      if(Array.isArray(node.alternate_arrivals) && node.alternate_arrivals.length){
+        existing.alternate_arrivals=[
+          ...(Array.isArray(existing.alternate_arrivals)?existing.alternate_arrivals:[]),
+          ...node.alternate_arrivals
+        ];
+      }
+      if(node.parent_node_id && node.parent_node_id!==existing.parent_node_id){
+        existing.alternate_arrivals=[
+          ...(Array.isArray(existing.alternate_arrivals)?existing.alternate_arrivals:[]),
+          {
+            parent_node_id:node.parent_node_id,
+            relation:node.arrival_relation||"",
+            direction:node.arrival_relation_direction||"",
+            previous_station_label:node.previous_station_label||"",
+            arrived_at:Number(node.created_at||0)
+          }
+        ];
       }
       if(nodeMoreResolved || Number(node.created_at||0)>=Number(existing.created_at||0)){
         existing.coordinate=node.coordinate || existing.coordinate;
@@ -2435,9 +3024,48 @@
       }
       if(parent===node.node_id) parent="";
       node.parent_node_id=parent||"";
+
+      // Branch memory is part of Journey state too. If the remembered
+      // "Next stop" was a semantic duplicate that compaction removed, follow
+      // the same redirect chain instead of silently losing the viewer's route.
+      let forward=String(node.last_forward_node_id||"");
+      const forwardSeen=new Set();
+      while(forward && redirect.has(forward) && !forwardSeen.has(forward)){
+        forwardSeen.add(forward);
+        forward=redirect.get(forward);
+      }
+      if(forward===node.node_id) forward="";
+      node.last_forward_node_id=forward||"";
+    }
+
+    // A redirected forward target is valid only when it is still an immediate
+    // child of its station after parent repair. This prevents Next stop from
+    // jumping across branches after semantic deduplication.
+    const keptById=new Map(kept.map(node=>[node.node_id,node]));
+    for(const node of kept){
+      if(!node.last_forward_node_id) continue;
+      const forwardNode=keptById.get(node.last_forward_node_id);
+      const validForward=Boolean(
+        forwardNode && (
+          String(forwardNode.parent_node_id||"")===node.node_id ||
+          (Array.isArray(forwardNode.alternate_arrivals) &&
+            forwardNode.alternate_arrivals.some(arrival=>String(arrival?.parent_node_id||"")===node.node_id))
+        )
+      );
+      if(!validForward){
+        node.last_forward_node_id="";
+      }
     }
 
     state.journey.nodes=kept;
+
+    for(const [fromId,toId] of redirect.entries()){
+      redirectJourneyNodeReferences(fromId,toId);
+    }
+    for(const node of state.journey.nodes){
+      normalizeJourneyAlternateArrivals(node);
+    }
+
     saveJourney();
   }
 
@@ -2448,6 +3076,8 @@
     // One human-semantic subject = one Journey station.
     const semanticExisting=state.journey.nodes.find(node=>sameJourneyStation(node,observer));
     if(semanticExisting){
+      const requestedParent=String(parentNodeId||state.journey.current_node_id||"");
+      recordJourneyAlternateArrival(semanticExisting,requestedParent,observer);
       semanticExisting.observer_key=key;
       semanticExisting.coordinate=coordinateForObserver(observer);
       preserveResolvedJourneyState(semanticExisting,observer);
@@ -2484,6 +3114,10 @@
       created_at:Date.now()
     };
     state.journey.nodes.push(node);
+    if(parentNodeId){
+      const parentNode=journeyNodeById(parentNodeId);
+      if(parentNode) parentNode.last_forward_node_id=node.node_id;
+    }
     state.journey.current_node_id=node.node_id;
     saveJourney();
     return node;
@@ -2505,6 +3139,8 @@
       state.journey.nodes.find(node=>node.observer_key===journeyObserverKey(observer));
 
     if(existing){
+      const requestedParent=String(state.journey.current_node_id||"");
+      recordJourneyAlternateArrival(existing,requestedParent,observer);
       existing.observer_key=journeyObserverKey(observer);
       existing.coordinate=coordinateForObserver(observer);
       preserveResolvedJourneyState(existing,observer);
@@ -2523,6 +3159,63 @@
     }else{
       addJourneyNode(observer,state.journey.current_node_id,true);
     }
+    syncCurrentHistoryToJourney();
+  }
+
+  function journeyCanonicalDescendantOf(candidateNodeId,ancestorNodeId){
+    const candidate=String(candidateNodeId||"");
+    const ancestor=String(ancestorNodeId||"");
+    if(!candidate || !ancestor || candidate===ancestor) return candidate===ancestor;
+
+    let node=journeyNodeById(candidate);
+    const seen=new Set();
+    while(node && !seen.has(node.node_id)){
+      seen.add(node.node_id);
+      const parentId=String(node.parent_node_id||"");
+      if(!parentId) return false;
+      if(parentId===ancestor) return true;
+      node=journeyNodeById(parentId);
+    }
+    return false;
+  }
+
+  function validAlternateArrivalParent(node,parentNodeId){
+    if(!node) return false;
+    const parentId=String(parentNodeId||"");
+    if(!parentId || parentId===node.node_id || !journeyNodeById(parentId)) return false;
+
+    // An alternate parent cannot be a canonical descendant of the station,
+    // otherwise selecting it would create a route cycle.
+    if(journeyCanonicalDescendantOf(parentId,node.node_id)) return false;
+    return true;
+  }
+
+  function journeyEffectiveParentNode(node){
+    if(!node) return null;
+
+    const preferred=String(node.preferred_arrival_parent_id||"");
+    if(preferred && validAlternateArrivalParent(node,preferred)){
+      const preferredNode=journeyNodeById(preferred);
+      const represented=
+        preferred===String(node.parent_node_id||"") ||
+        (Array.isArray(node.alternate_arrivals) &&
+          node.alternate_arrivals.some(arrival=>String(arrival?.parent_node_id||"")===preferred));
+      if(preferredNode && represented) return preferredNode;
+    }
+
+    return node.parent_node_id ? journeyNodeById(node.parent_node_id) : null;
+  }
+
+  function journeyCanonicalPathTo(nodeId){
+    const path=[];
+    let node=journeyNodeById(nodeId);
+    const seen=new Set();
+    while(node && !seen.has(node.node_id)){
+      seen.add(node.node_id);
+      path.unshift(node);
+      node=node.parent_node_id ? journeyNodeById(node.parent_node_id) : null;
+    }
+    return path;
   }
 
   function journeyPathTo(nodeId){
@@ -2532,7 +3225,7 @@
     while(node && !seen.has(node.node_id)){
       seen.add(node.node_id);
       path.unshift(node);
-      node=node.parent_node_id ? journeyNodeById(node.parent_node_id) : null;
+      node=journeyEffectiveParentNode(node);
     }
     return path;
   }
@@ -2597,12 +3290,23 @@
       current.via_operation="ASK";
       state.journey.current_node_id=current.node_id;
 
-      // Remove any accidental sibling/history duplicate of this resolved station.
+      // Remove accidental sibling/history duplicates only after redirecting all
+      // references to the canonical node. Otherwise their children become orphans.
       const keepId=current.node_id;
       const resolvedKey=current.observer_key;
-      state.journey.nodes=state.journey.nodes.filter(node=>
-        node.node_id===keepId || node.observer_key!==resolvedKey
+      const duplicates=state.journey.nodes.filter(node=>
+        node.node_id!==keepId && node.observer_key===resolvedKey
       );
+
+      for(const duplicate of duplicates){
+        if(duplicate.parent_node_id && duplicate.parent_node_id!==current.parent_node_id){
+          recordJourneyAlternateArrival(current,duplicate.parent_node_id,journeyNodeDisplayObserver(duplicate));
+        }
+        redirectJourneyNodeReferences(duplicate.node_id,keepId);
+      }
+
+      const duplicateIds=new Set(duplicates.map(node=>node.node_id));
+      state.journey.nodes=state.journey.nodes.filter(node=>!duplicateIds.has(node.node_id));
 
       compactJourneyStations();
       saveJourney();
@@ -2613,8 +3317,244 @@
     compactJourneyStations();
   }
 
-  function restoreObserverFromJourneyNode(node){
+  function currentJourneyParentNode(){
+    const current=journeyNodeById(state.journey.current_node_id);
+    return journeyEffectiveParentNode(current);
+  }
+
+  function journeyNodeCanFollowFrom(child,parentNodeId){
+    if(!child) return false;
+    const parentId=String(parentNodeId||"");
+    if(!parentId) return false;
+    if(String(child.parent_node_id||"")===parentId) return true;
+    return Array.isArray(child.alternate_arrivals) &&
+      child.alternate_arrivals.some(arrival=>String(arrival?.parent_node_id||"")===parentId);
+  }
+
+  function currentJourneyForwardNode(){
+    const current=journeyNodeById(state.journey.current_node_id);
+    const forwardId=String(current?.last_forward_node_id||"").trim();
+    if(!forwardId) return null;
+    const child=journeyNodeById(forwardId);
+    return journeyNodeCanFollowFrom(child,current?.node_id) ? child : null;
+  }
+
+  function currentJourneyAlternateArrivalNodes(){
+    const current=journeyNodeById(state.journey.current_node_id);
+    if(!current) return [];
+    const seen=new Set();
+    return (Array.isArray(current.alternate_arrivals)?current.alternate_arrivals:[])
+      .map(arrival=>{
+        const parentId=String(arrival?.parent_node_id||"");
+        const node=parentId ? journeyNodeById(parentId) : null;
+        return {arrival,node,parentId};
+      })
+      .filter(item=>{
+        if(!item.node || !item.parentId || seen.has(item.parentId)) return false;
+        seen.add(item.parentId);
+        return true;
+      });
+  }
+
+  function journeyOutgoingNodes(parentNodeId){
+    const parentId=String(parentNodeId||"");
+    if(!parentId) return [];
+
+    const rows=[
+      ...journeyChildren(parentId),
+      ...state.journey.nodes.filter(node=>
+        Array.isArray(node.alternate_arrivals) &&
+        node.alternate_arrivals.some(arrival=>String(arrival?.parent_node_id||"")===parentId)
+      )
+    ];
+
+    const seen=new Set();
+    return rows
+      .filter(node=>{
+        if(!node?.node_id || seen.has(node.node_id)) return false;
+        seen.add(node.node_id);
+        return Boolean(journeyNodeDisplayObserver(node));
+      })
+      .sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+  }
+
+  function currentJourneyChildNodes(){
+    const current=journeyNodeById(state.journey.current_node_id);
+    return current ? journeyOutgoingNodes(current.node_id) : [];
+  }
+
+  function renderJourneyDirectionControls(){
+    const parent=currentJourneyParentNode();
+
+    if(previousStopBtn){
+      if(!parent){
+        previousStopBtn.hidden=true;
+        previousStopBtn.removeAttribute("title");
+      }else{
+        const parentObserver=journeyNodeDisplayObserver(parent);
+        const parentLabel=observerDisplayLabel(parentObserver) || "previous station";
+        previousStopBtn.hidden=false;
+        previousStopBtn.title=`Return to ${parentLabel}`;
+        previousStopBtn.setAttribute("aria-label",`Return to previous Cosmos stop: ${parentLabel}`);
+      }
+    }
+
+    if(nextStopBtn){
+      const forward=currentJourneyForwardNode();
+      if(!forward){
+        nextStopBtn.hidden=true;
+        nextStopBtn.removeAttribute("title");
+      }else{
+        const forwardObserver=journeyNodeDisplayObserver(forward);
+        const forwardLabel=observerDisplayLabel(forwardObserver) || "next station";
+        nextStopBtn.hidden=false;
+        nextStopBtn.title=`Continue to ${forwardLabel}`;
+        nextStopBtn.setAttribute("aria-label",`Continue to next Cosmos stop: ${forwardLabel}`);
+      }
+    }
+
+    if(branchSelect){
+      const children=currentJourneyChildNodes();
+      if(children.length<=1){
+        branchSelect.hidden=true;
+        branchSelect.innerHTML="";
+      }else{
+        const forward=currentJourneyForwardNode();
+        branchSelect.hidden=false;
+        branchSelect.innerHTML=
+          `<option value="">Saved branches (${children.length})</option>` +
+          children.map(node=>{
+            const childObserver=journeyNodeDisplayObserver(node);
+            const label=viewerSafeAnswer(
+              observerDisplayLabel(childObserver) || "Cosmos station",
+              childObserver
+            );
+            const suffix=forward?.node_id===node.node_id ? " · current route" : "";
+            return `<option value="${esc(node.node_id)}">${esc(label+suffix)}</option>`;
+          }).join("");
+        branchSelect.value="";
+      }
+    }
+
+    if(arrivalSelect){
+      const arrivals=currentJourneyAlternateArrivalNodes();
+      if(!arrivals.length){
+        arrivalSelect.hidden=true;
+        arrivalSelect.innerHTML="";
+      }else{
+        arrivalSelect.hidden=false;
+        arrivalSelect.innerHTML=
+          `<option value="">Other ways here… (${arrivals.length})</option>` +
+          arrivals.map(({node,arrival})=>{
+            const label=viewerSafeAnswer(
+              observerDisplayLabel(journeyNodeDisplayObserver(node)) || "Cosmos station",
+              journeyNodeDisplayObserver(node)
+            );
+            const relation=viewerSafeAnswer(
+              String(arrival?.relation||"").trim(),
+              journeyNodeDisplayObserver(node)
+            );
+            return `<option value="${esc(node.node_id)}">${esc(label+(relation?` · ${relation}`:""))}</option>`;
+          }).join("");
+        arrivalSelect.value="";
+      }
+    }
+  }
+
+  function canonicalJourneyNodeForObserver(observer){
+    if(!observer) return null;
+
+    const semantic=journeySemanticKey(observer);
+    if(semantic){
+      const semanticNode=state.journey.nodes.find(
+        node=>journeySemanticKey(node)===semantic
+      );
+      if(semanticNode) return semanticNode;
+    }
+
+    const observerKey=journeyObserverKey(observer);
+    if(observerKey){
+      const exactNode=state.journey.nodes.find(
+        node=>node.observer_key===observerKey
+      );
+      if(exactNode) return exactNode;
+    }
+
+    return null;
+  }
+
+  function cosmosHistoryState(extra={}){
+    return {cosmos:true,...extra};
+  }
+
+  function journeyNodeFromBrowserEntry(){
+    const nodeId=String(history.state?.journey_node||"").trim();
+    return nodeId ? journeyNodeById(nodeId) : null;
+  }
+
+  function syncCurrentHistoryToJourney(){
+    const current=journeyNodeById(state.journey?.current_node_id);
+    if(!current) return;
+    try{
+      if(String(history.state?.journey_node||"")!==String(current.node_id||"")){
+        history.replaceState(
+          cosmosHistoryState({journey_node:current.node_id}),
+          "",
+          location.pathname+location.search+location.hash
+        );
+      }
+    }catch{}
+  }
+
+  function entryHasCosmosContinuity(){
+    if(journeyNodeFromBrowserEntry()) return true;
+    const source=String(entry.from||"").trim().toLowerCase();
+    return source==="journey" || source==="cosmos-projection";
+  }
+
+  function startJourneyAtEntryBoundary(){
+    try{
+      sessionStorage.removeItem(state.journeyStorageKey);
+      sessionStorage.removeItem(state.trailStorageKey);
+    }catch{}
+    state.journey={nodes:[],current_node_id:"",next_id:1};
+    state.history=[];
+    saveJourney();
+    saveTrail();
+  }
+
+  function canonicalJourneyNodeForEntry(){
+    const exact=journeyNodeFromBrowserEntry();
+    if(exact) return exact;
+    if(!entryHasCosmosContinuity()) return null;
+
+    if(entry.focus==="question" && entry.question){
+      const target=normalizeSubject(entry.question);
+      return state.journey.nodes.find(node=>{
+        const snap=journeyNodeDisplayObserver(node);
+        return normalizeSubject(snap?.question||snap?.label||"")===target;
+      })||null;
+    }
+    if(entry.focus==="entity" && entry.id){
+      return state.journey.nodes.find(node=>{
+        const snap=journeyNodeDisplayObserver(node);
+        return snap?.kind==="entity" && String(snap?.id||"")===String(entry.id);
+      })||null;
+    }
+    return null;
+  }
+
+  function restoreObserverFromJourneyNode(node,options={}){
+    cancelActiveUniversalRequest();
     const snap=journeyNodeDisplayObserver(node);
+    const targetFocus=String(
+      snap?.semantic_subject_id ||
+      snap?.response_snapshot?.subject_match?.id ||
+      snap?.id ||
+      ""
+    );
+    cancelSemanticProjectionRequestsExcept(targetFocus);
+    const historyMode=options.historyMode||"push";
     if(!snap) return;
 
     if(snap.kind==="entity" && snap.id && state.entities.has(snap.id)){
@@ -2634,11 +3574,13 @@
     }else if(snap.kind==="response" && snap.question){
       // A Journey stop is a saved Cosmos state, not a new question.
       // Restore the exact resolved response/projection that was seen at this stop.
+      restoreResponseProjectionSnapshot(snap.projection_snapshot);
       const savedResponse=snap.response_snapshot
         ? JSON.parse(JSON.stringify(snap.response_snapshot))
         : null;
 
       const response=savedResponse || buildQuestionResponse(snap.question);
+      hydrateProjectionEntitiesFromResponse(response);
 
       state.observer={
         ...snap,
@@ -2689,12 +3631,108 @@
         url.searchParams.delete("question");
         url.searchParams.delete("relationship_id");
       }
-      history.pushState({cosmos:true,journey_node:node.node_id},"",url.pathname+url.search);
+      const historyState=cosmosHistoryState({journey_node:node.node_id});
+      const historyUrl=url.pathname+url.search;
+      if(historyMode==="replace"){
+        history.replaceState(historyState,"",historyUrl);
+      }else if(historyMode!=="none"){
+        history.pushState(historyState,"",historyUrl);
+      }
     }catch{}
 
     saveJourney();
     saveTrail();
     render();
+  }
+
+  function responseProjectionSnapshot(observer){
+    const response=observer?.response;
+    if(observer?.kind!=="response" || !response) return null;
+    const ids=Array.isArray(response.dynamic_projection_ids)
+      ? [...new Set(response.dynamic_projection_ids.filter(Boolean))]
+      : [];
+    if(!ids.length) return null;
+    const idSet=new Set(ids);
+    const token=String(
+      response.dynamic_projection_token ||
+      inferProjectionTokenFromIds(ids) ||
+      ""
+    );
+    return {
+      token,
+      entity_ids:ids,
+      entities:ids.map(id=>state.entities.get(id)).filter(Boolean).map(e=>JSON.parse(JSON.stringify(e))),
+      relationships:state.relationships.filter(rel=>{
+        if(!rel?.ephemeral_projection) return false;
+        if(!idSet.has(rel.from_entity_id)||!idSet.has(rel.to_entity_id)) return false;
+        return token ? String(rel?.projection_owner_token||"")===token : true;
+      }).map(rel=>JSON.parse(JSON.stringify(rel)))
+    };
+  }
+
+  function restoreResponseProjectionSnapshot(snapshot){
+    if(!snapshot || typeof snapshot!=="object") return;
+    for(const entity of (Array.isArray(snapshot.entities)?snapshot.entities:[])){
+      const id=String(entity?.entity_id||"");
+      if(!id) continue;
+
+      // Response-local rendering metadata lives in dynamic_projection_nodes.
+      // Restoring an old station must not replace a live/canonical entity record
+      // with snapshot-local fields from another response.
+      if(!state.entities.has(id)){
+        state.entities.set(id,JSON.parse(JSON.stringify(entity)));
+      }
+    }
+    const allowedEntityIds=new Set(
+      Array.isArray(snapshot.entity_ids) ? snapshot.entity_ids.map(String) : []
+    );
+    const incoming=Array.isArray(snapshot.relationships)
+      ? snapshot.relationships
+          .filter(rel=>{
+            const from=String(rel?.from_entity_id||"");
+            const to=String(rel?.to_entity_id||"");
+            return from && to && (
+              !allowedEntityIds.size ||
+              (allowedEntityIds.has(from) && allowedEntityIds.has(to))
+            );
+          })
+          .map(rel=>JSON.parse(JSON.stringify(rel)))
+      : [];
+    if(incoming.length){
+      const incomingIds=new Set(incoming.map(rel=>String(rel?.relationship_id||"")).filter(Boolean));
+      state.relationships=[
+        ...state.relationships.filter(rel=>!incomingIds.has(String(rel?.relationship_id||""))),
+        ...incoming
+      ];
+    }
+  }
+
+  function hydrateProjectionEntitiesFromResponse(response){
+    if(!response || !Array.isArray(response.dynamic_projection_nodes)) return;
+    for(const node of response.dynamic_projection_nodes){
+      const id=String(node?.id||"");
+      if(!id) continue;
+      const existing=state.entities.get(id)||{
+        entity_id:id,
+        ephemeral_projection:true,
+        admitted_to_cosmos:false
+      };
+      state.entities.set(id,{
+        ...existing,
+        entity_id:id,
+        name:String(existing?.name||node?.label||id),
+        label:String(existing?.label||node?.label||id),
+        type:String(existing?.type||node?.type||"Projected concept"),
+        role:String(node?.role||existing?.role||""),
+        projection_depth:Number.isFinite(Number(node?.projection_depth))
+          ? Number(node.projection_depth)
+          : existing?.projection_depth,
+        projection_role:String(node?.projection_role||existing?.projection_role||""),
+        projection_parent_id:String(node?.projection_parent_id||existing?.projection_parent_id||""),
+        ephemeral_projection:true,
+        admitted_to_cosmos:false
+      });
+    }
   }
 
   function observerSnapshot(observer){
@@ -2712,6 +3750,7 @@
       response_snapshot: observer.kind==="response" && observer.response
         ? JSON.parse(JSON.stringify(observer.response))
         : null,
+      projection_snapshot: responseProjectionSnapshot(observer),
       from_observer_id: observer.from_observer_id || "",
       from_observer_label: observer.from_observer_label || "",
       from_relationship_label: observer.from_relationship_label || "",
@@ -2723,13 +3762,32 @@
   }
 
   function saveTrail(){
+    const payload={
+      entryObserver: observerSnapshot(state.entryObserver),
+      currentObserver: observerSnapshot(state.observer),
+      history: state.history
+        .slice(-24)
+        .map(observerSnapshot)
+        .filter(Boolean)
+    };
+
     try{
-      sessionStorage.setItem(state.trailStorageKey,JSON.stringify({
-        entryObserver: observerSnapshot(state.entryObserver),
-        currentObserver: observerSnapshot(state.observer),
-        history: state.history.map(observerSnapshot).filter(Boolean)
-      }));
-    }catch{}
+      sessionStorage.setItem(state.trailStorageKey,JSON.stringify(payload));
+      return true;
+    }catch(error){
+      try{
+        const compact={
+          entryObserver:compactObserverSnapshotForStorage(payload.entryObserver),
+          currentObserver:compactObserverSnapshotForStorage(payload.currentObserver),
+          history:payload.history.map(compactObserverSnapshotForStorage).filter(Boolean)
+        };
+        sessionStorage.setItem(state.trailStorageKey,JSON.stringify(compact));
+        return true;
+      }catch(compactError){
+        console.warn("Cosmos observer trail could not be persisted in this browser session.",compactError);
+        return false;
+      }
+    }
   }
 
   function buildUniversalLoadingResponse(question,label=""){
@@ -2752,7 +3810,9 @@
       bullets:[],
       projection_seed_ids:[],
       dynamic_projection_ids:[],
+      dynamic_projection_nodes:[],
       dynamic_projection_relationship_count:0,
+      dynamic_projection_token:"",
       source_label:"",
       knowledge_completion:null,
       suggested_stations:[],
@@ -2834,7 +3894,12 @@
   }
 
   function incident(entityId){
-    return state.relationships.filter(r => r.from_entity_id === entityId || r.to_entity_id === entityId);
+    return state.relationships.filter(rel=>{
+      if(rel.from_entity_id!==entityId && rel.to_entity_id!==entityId) return false;
+      const semanticOwner=String(rel?.semantic_scope_focus_id||"");
+      if(semanticOwner && semanticOwner!==String(entityId||"")) return false;
+      return true;
+    });
   }
 
   function neighbors(seedIds,maxDistance){
@@ -2898,6 +3963,15 @@
     return 1000 - distance*170 + maxConfidence + Math.min(rels.length,20)*2;
   }
 
+  function inferProjectionTokenFromIds(ids){
+    const tokens=new Set();
+    for(const id of (Array.isArray(ids)?ids:[])){
+      const match=String(id||"").match(/^ephemeral:([^:]+):/);
+      if(match?.[1]) tokens.add(match[1]);
+    }
+    return tokens.size===1 ? [...tokens][0] : "";
+  }
+
   function projectionFromResolvedUniversalResponse(observer,station){
     const response=observer?.response;
     if(observer?.kind!=="response" || response?.response_type!=="universal") return null;
@@ -2909,18 +3983,29 @@
 
     const idSet=new Set(ids);
     const subjectId=String(response?.subject_match?.id||station?.focus_id||"");
+    const projectionToken=String(
+      response?.dynamic_projection_token ||
+      inferProjectionTokenFromIds(ids) ||
+      ""
+    );
+    const responseNodeById=new Map(
+      (Array.isArray(response?.dynamic_projection_nodes)?response.dynamic_projection_nodes:[])
+        .filter(node=>node?.id)
+        .map(node=>[String(node.id),node])
+    );
     const primary=[];
     const secondary=[];
 
     for(const id of ids){
       if(id===subjectId) continue;
       const entity=state.entities.get(id);
-      const depth=Number(entity?.projection_depth);
-      const role=String(entity?.projection_role||entity?.role||"").toLowerCase();
+      const ownedNode=responseNodeById.get(String(id))||null;
+      const depth=Number(ownedNode?.projection_depth ?? entity?.projection_depth);
+      const role=String(ownedNode?.projection_role||ownedNode?.role||entity?.projection_role||entity?.role||"").toLowerCase();
       const row={
         id,
-        label:entityLabel(id),
-        type:entity?.type||"Dimension",
+        label:String(ownedNode?.label||entityLabel(id)),
+        type:String(ownedNode?.type||entity?.type||"Dimension"),
         isSeed:false,
         why_shown:"resolved for this Coordinate"
       };
@@ -2932,7 +4017,7 @@
           distance:1,
           projection_depth:2,
           projection_role:"secondary",
-          parent_id:String(entity?.projection_parent_id||"")
+          parent_id:String(ownedNode?.projection_parent_id||entity?.projection_parent_id||"")
         });
       }
     }
@@ -2943,9 +4028,12 @@
       for(const id of ids){
         if(id===subjectId) continue;
         const entity=state.entities.get(id);
-        if(String(entity?.role||"").toLowerCase()==="subject") continue;
+        const ownedNode=responseNodeById.get(String(id))||null;
+        if(String(ownedNode?.role||entity?.role||"").toLowerCase()==="subject") continue;
         primary.push({
-          id,label:entityLabel(id),type:entity?.type||"Projected concept",
+          id,
+          label:String(ownedNode?.label||entityLabel(id)),
+          type:String(ownedNode?.type||entity?.type||"Projected concept"),
           isSeed:false,distance:0,projection_depth:1,projection_role:"primary",
           why_shown:"resolved for this Coordinate"
         });
@@ -2960,11 +4048,12 @@
     ];
     const visibleIds=new Set(visible.map(row=>row.id));
 
-    const rels=state.relationships.filter(rel=>
-      rel?.ephemeral_projection &&
-      idSet.has(rel.from_entity_id) &&
-      idSet.has(rel.to_entity_id)
-    );
+    const rels=state.relationships.filter(rel=>{
+      if(!rel?.ephemeral_projection) return false;
+      if(!idSet.has(rel.from_entity_id) || !idSet.has(rel.to_entity_id)) return false;
+      const owner=String(rel?.projection_owner_token||"");
+      return projectionToken ? owner===projectionToken : true;
+    });
     const centerEdges=rels.filter(rel=>
       subjectId && (
         (rel.from_entity_id===subjectId && visibleIds.has(rel.to_entity_id)) ||
@@ -3715,9 +4804,64 @@
       projectionUnknown.innerHTML="";
     }
 
-    // Journey provenance is rendered in Your Journey. Do not leak internal
-    // research prompts into the Station Essence layer.
-    projectionOrigin.textContent="";
+    // Quiet route orientation. This uses only saved Journey metadata and never
+    // exposes the private station-research prompt.
+    if(projectionOrigin){
+      const currentJourney=journeyNodeById(state.journey.current_node_id);
+      const parentJourney=currentJourneyParentNode();
+      const rootJourney=journeyRootNode(state.journey.current_node_id);
+
+      const currentJourneyObserver=journeyNodeDisplayObserver(currentJourney);
+      const parentJourneyObserver=journeyNodeDisplayObserver(parentJourney);
+      const rootJourneyObserver=journeyNodeDisplayObserver(rootJourney);
+
+      const currentJourneyLabel=observerDisplayLabel(currentJourneyObserver);
+      const parentJourneyLabel=observerDisplayLabel(parentJourneyObserver);
+      const rootJourneyLabel=observerDisplayLabel(rootJourneyObserver);
+      const selectedArrivalParentId=String(currentJourney?.preferred_arrival_parent_id||"");
+      const selectedArrival=selectedArrivalParentId
+        ? (Array.isArray(currentJourney?.alternate_arrivals)
+            ? currentJourney.alternate_arrivals.find(
+                arrival=>String(arrival?.parent_node_id||"")===selectedArrivalParentId
+              )
+            : null)
+        : null;
+      const relation=String(
+        selectedArrival?.relation ||
+        currentJourney?.arrival_relation ||
+        currentJourneyObserver?.from_relationship_label ||
+        ""
+      ).trim();
+
+      const hasPrevious=Boolean(
+        parentJourney &&
+        parentJourneyLabel &&
+        normalizeSubject(parentJourneyLabel)!==normalizeSubject(currentJourneyLabel)
+      );
+
+      const hasDistinctOrigin=Boolean(
+        rootJourney &&
+        rootJourneyLabel &&
+        normalizeSubject(rootJourneyLabel)!==normalizeSubject(currentJourneyLabel) &&
+        normalizeSubject(rootJourneyLabel)!==normalizeSubject(parentJourneyLabel)
+      );
+
+      if(hasPrevious){
+        projectionOrigin.classList.add("active");
+        projectionOrigin.innerHTML=
+          `<span>From <strong>${esc(parentJourneyLabel)}</strong></span>` +
+          (relation
+            ? `<span class="routeArrow">→</span><span class="routeRelation">${esc(relation)}</span><span class="routeArrow">→</span>`
+            : `<span class="routeArrow">→</span>`) +
+          `<span><strong>${esc(currentJourneyLabel)}</strong></span>` +
+          (hasDistinctOrigin
+            ? `<span>· Origin: <strong>${esc(rootJourneyLabel)}</strong></span>`
+            : "");
+      }else{
+        projectionOrigin.classList.remove("active");
+        projectionOrigin.textContent="";
+      }
+    }
 
     const evidenceText=
       observer?.response?.response_type==="outlook"
@@ -3776,6 +4920,7 @@
   }
 
   function recenterChange(changeId,operation="FOLLOW_EFFECT"){
+    cancelActiveUniversalRequest();
     const change=state.changes.get(changeId);
     if(!change) return;
     const previous=state.observer;
@@ -3955,6 +5100,34 @@
     return laneById;
   }
 
+  function journeySupportedCausalEdge(parentNode,childNode){
+    if(!parentNode || !childNode) return null;
+
+    const parentObserver=journeyNodeDisplayObserver(parentNode);
+    const childObserver=journeyNodeDisplayObserver(childNode);
+    if(!parentObserver || !childObserver) return null;
+
+    const parentChange=stationProjection(parentObserver)?.primary_change;
+    const childChange=stationProjection(childObserver)?.primary_change;
+    if(!parentChange?.change_id || !childChange?.change_id) return null;
+    if(parentChange.change_id===childChange.change_id) return null;
+
+    return acceptedCausalEdgesFrom(parentChange)
+      .find(edge=>
+        edge.from_change_id===parentChange.change_id &&
+        edge.to_change_id===childChange.change_id
+      ) || null;
+  }
+
+  function journeyButterflyMark(x,y){
+    return `
+      <g class="metroButterflyMark" transform="translate(${x} ${y})" aria-hidden="true">
+        <path class="wing" d="M -1 -1 C -5 -8,-11 -7,-10 -1 C -9 4,-5 5,-1 2 Z"/>
+        <path class="wing" d="M 1 -1 C 5 -8,11 -7,10 -1 C 9 4,5 5,1 2 Z"/>
+        <path class="body" d="M 0 -3 L 0 4"/>
+      </g>`;
+  }
+
   function routePath(x1,y1,x2,y2,klass){
     const midY=(y1+y2)/2;
     const d = Math.abs(x2-x1) < 6
@@ -3977,12 +5150,46 @@
       return true;
     });
     if(!nodes.length){
+      if(journeyLocateBtn) journeyLocateBtn.hidden=true;
+      if(journeyFocusBtn) journeyFocusBtn.hidden=true;
+      if(butterflyWrap) butterflyWrap.classList.remove("routeFocused");
+      if(journeyStatus) journeyStatus.textContent="";
       butterflyMetro.innerHTML=`<div class="metroEmpty">Your path through Cosmos will appear here as you travel.</div>`;
       return;
     }
+    if(journeyLocateBtn) journeyLocateBtn.hidden=nodes.length<2;
+    const hasSavedBranches=nodes.some(node=>journeyOutgoingNodes(node.node_id).length>1);
+    const hasConvergence=nodes.some(node=>Array.isArray(node.alternate_arrivals) && node.alternate_arrivals.length>0);
+    const hasAlternateRoutes=hasSavedBranches || hasConvergence;
+    if(journeyFocusBtn){
+      journeyFocusBtn.hidden=!hasAlternateRoutes;
+      journeyFocusBtn.classList.toggle("active",journeyRouteFocused);
+      journeyFocusBtn.textContent=journeyRouteFocused ? "Show all routes" : "Focus route";
+      journeyFocusBtn.setAttribute("aria-pressed",journeyRouteFocused ? "true" : "false");
+    }
+    if(butterflyWrap){
+      butterflyWrap.classList.toggle("routeFocused",journeyRouteFocused && hasAlternateRoutes);
+    }
 
     const activePath=journeyPathTo(state.journey.current_node_id);
+    if(journeyStatus){
+      const branchPoints=nodes.filter(node=>journeyOutgoingNodes(node.node_id).length>1).length;
+      const convergencePoints=nodes.filter(node=>Array.isArray(node.alternate_arrivals) && node.alternate_arrivals.length>0).length;
+      const stopNumber=Math.max(1,activePath.length);
+      const totalStations=nodes.length;
+      // Status contains only numeric counts and fixed UI copy; no model text is interpolated here.
+      journeyStatus.innerHTML=
+        `<strong>Stop ${stopNumber}</strong> on current route · ` +
+        `${totalStations} saved station${totalStations===1?"":"s"}` +
+        (branchPoints ? ` · ${branchPoints} branch point${branchPoints===1?"":"s"}` : "") +
+        (convergencePoints ? ` · ${convergencePoints} convergence${convergencePoints===1?"":"s"}` : "") +
+        (journeyNodeById(state.journey.current_node_id)?.preferred_arrival_parent_id ? " · alternate route active" : "");
+    }
     const activeIds=new Set(activePath.map(n=>n.node_id));
+    const activeEdgeKeys=new Set();
+    for(let i=1;i<activePath.length;i++){
+      activeEdgeKeys.add(`${activePath[i-1].node_id}|${activePath[i].node_id}`);
+    }
     const lanes=branchLaneMap();
 
     const rowGap=86;
@@ -4054,14 +5261,74 @@
       const b=positions.get(node.node_id);
       if(!a||!b) continue;
 
-      const isActive=activeIds.has(node.node_id) && activeIds.has(parent.node_id);
-      routeSvg += routePath(
-        a.x+stopXOffset,a.y+stopYOffset,
-        b.x+stopXOffset,b.y+stopYOffset,
-        isActive?"active":"saved"
-      );
+      const isActive=activeEdgeKeys.has(`${parent.node_id}|${node.node_id}`);
+      const causalEdge=journeySupportedCausalEdge(parent,node);
+      const routeClass=[
+        isActive?"active":"saved",
+        causalEdge?"butterflyCausal":""
+      ].filter(Boolean).join(" ");
+
+      const x1=a.x+stopXOffset;
+      const y1=a.y+stopYOffset;
+      const x2=b.x+stopXOffset;
+      const y2=b.y+stopYOffset;
+
+      routeSvg += routePath(x1,y1,x2,y2,routeClass);
+
+      // The butterfly is intentionally absent unless Cosmos has an accepted
+      // directional causal edge from this exact parent station to this child.
+      if(causalEdge){
+        routeSvg += journeyButterflyMark(
+          Math.round((x1+x2)/2),
+          Math.round((y1+y2)/2)
+        );
+      }
 
     }
+
+    // Convergence edges are real Journey routes too, but they are not canonical
+    // parent links. Draw them separately so the viewer can see routes rejoin.
+    const seenConvergenceEdges=new Set();
+    for(const node of nodes){
+      for(const arrival of (Array.isArray(node.alternate_arrivals)?node.alternate_arrivals:[])){
+        const parentId=String(arrival?.parent_node_id||"");
+        const edgeKey=`${parentId}|${node.node_id}`;
+        if(
+          !parentId ||
+          parentId===String(node.parent_node_id||"") ||
+          seenConvergenceEdges.has(edgeKey)
+        ) continue;
+        seenConvergenceEdges.add(edgeKey);
+
+        const parent=journeyNodeById(parentId);
+        const a=positions.get(parentId);
+        const b=positions.get(node.node_id);
+        if(!parent || !a || !b) continue;
+
+        const isActive=activeEdgeKeys.has(edgeKey);
+        const causalEdge=journeySupportedCausalEdge(parent,node);
+        const routeClass=[
+          "convergence",
+          isActive?"active":"saved",
+          causalEdge?"butterflyCausal":""
+        ].filter(Boolean).join(" ");
+
+        const x1=a.x+stopXOffset;
+        const y1=a.y+stopYOffset;
+        const x2=b.x+stopXOffset;
+        const y2=b.y+stopYOffset;
+
+        routeSvg += routePath(x1,y1,x2,y2,routeClass);
+
+        if(causalEdge){
+          routeSvg += journeyButterflyMark(
+            Math.round((x1+x2)/2),
+            Math.round((y1+y2)/2)
+          );
+        }
+      }
+    }
+
     routeSvg += `</svg>`;
 
     let html=`<div class="metroCanvas" style="width:${width}px;height:${height}px">${routeSvg}`;
@@ -4070,28 +5337,54 @@
       const p=positions.get(node.node_id);
       const current=node.node_id===state.journey.current_node_id;
       const active=activeIds.has(node.node_id);
-      const children=journeyChildren(node.node_id);
-      const c=node.coordinate || node.observer?.coordinate || null;
+      const children=journeyOutgoingNodes(node.node_id);
+      const displayObserver=journeyNodeDisplayObserver(node);
+      const c=node.coordinate || displayObserver?.coordinate || node.observer?.coordinate || null;
       const label=(c?.focus_type==="entity" && state.entities.has(c.focus_id))
         ? entityLabel(c.focus_id)
-        : (node.observer?.label || node.observer?.question || "Cosmos");
+        : (displayObserver?.label || displayObserver?.question || "Cosmos");
       const branchBadge=children.length>1
-        ? `<span class="metroRouteBadge">${children.length} routes</span>`
+        ? `<span class="metroRouteBadge">${children.length} ways onward</span>`
+        : "";
+      const originBadge=!node.parent_node_id
+        ? `<span class="metroWayfindingBadge origin">Origin</span>`
+        : "";
+      const currentBadge=current
+        ? `<span class="metroWayfindingBadge current">You are here</span>`
+        : "";
+      const branchPointBadge=children.length>1
+        ? `<span class="metroWayfindingBadge branch">Branch point</span>`
+        : "";
+      const convergenceBadge=Array.isArray(node.alternate_arrivals) && node.alternate_arrivals.length
+        ? `<span class="metroWayfindingBadge branch">${node.alternate_arrivals.length+1} ways here</span>`
+        : "";
+      const parentNode=journeyEffectiveParentNode(node);
+      const causalArrival=parentNode ? journeySupportedCausalEdge(parentNode,node) : null;
+      const causalBadge=causalArrival
+        ? `<span class="metroWayfindingBadge butterfly">Butterfly</span>`
         : "";
 
       html += `
         <button type="button"
           class="metroStop ${current?"current":""} ${active?"":"savedBranch"} ${children.length>1?"branchPoint":""}"
           style="left:${p.x}px;top:${p.y}px"
-          data-journey-node="${esc(node.node_id)}">
+          data-journey-node="${esc(node.node_id)}"
+          ${current?'aria-current="location"':""}
+          title="${esc(current?"Current Cosmos station":`Travel to ${label}`)}">
           <span class="metroDot"></span>
           <span class="metroLabel">
-            <strong>${esc(label)} ${branchBadge}</strong>
+            <strong>${esc(label)} ${originBadge}${currentBadge}${branchPointBadge}${convergenceBadge}${causalBadge} ${branchBadge}</strong>
             <span>
               ${current
-                ? (node.origin_label && normalizeSubject(node.origin_label)!==normalizeSubject(label)
-                    ? `you are here · origin: ${esc(node.origin_label)}`
-                    : "you are here")
+                ? (node.preferred_arrival_parent_id
+                    ? `arrived via ${esc(observerDisplayLabel(journeyNodeDisplayObserver(journeyNodeById(node.preferred_arrival_parent_id)))||"alternate route")}${(()=>{
+                        const selected=(Array.isArray(node.alternate_arrivals)?node.alternate_arrivals:[])
+                          .find(arrival=>String(arrival?.parent_node_id||"")===String(node.preferred_arrival_parent_id||""));
+                        return selected?.relation ? ` · ${esc(selected.relation)}` : "";
+                      })()}`
+                    : (node.origin_label && normalizeSubject(node.origin_label)!==normalizeSubject(label)
+                        ? `origin: ${esc(node.origin_label)}`
+                        : "current station"))
                 : (node.arrival_relation
                     ? `${esc(node.arrival_relation)} · ${active?"your route":"saved branch"}`
                     : (node.previous_station_label
@@ -4111,6 +5404,19 @@
       button.addEventListener("click",()=>{
         const node=journeyNodeById(button.dataset.journeyNode);
         if(!node || node.node_id===state.journey.current_node_id) return;
+
+        const currentId=String(state.journey.current_node_id||"");
+        if(
+          currentId &&
+          Array.isArray(node.alternate_arrivals) &&
+          node.alternate_arrivals.some(arrival=>String(arrival?.parent_node_id||"")===currentId)
+        ){
+          node.preferred_arrival_parent_id=currentId;
+          const current=journeyNodeById(currentId);
+          if(current) current.last_forward_node_id=node.node_id;
+          saveJourney();
+        }
+
         restoreObserverFromJourneyNode(node);
       });
     });
@@ -4122,6 +5428,21 @@
     // from whatever section the user was reading. The viewport now moves only
     // after an explicit user action (for example tapping "Butterfly map").
   }
+
+  journeyFocusBtn?.addEventListener("click",()=>{
+    journeyRouteFocused=!journeyRouteFocused;
+    renderButterflyJourney();
+  });
+
+  journeyLocateBtn?.addEventListener("click",()=>{
+    const current=butterflyMetro?.querySelector(".metroStop.current");
+    if(!current) return;
+    current.scrollIntoView({
+      behavior:"smooth",
+      block:"center",
+      inline:"nearest"
+    });
+  });
 
   function renderObserverDetails(observer,projection){
     const type = observer.kind || "object";
@@ -4174,7 +5495,9 @@
   const presenceState={
     station_key:"",
     timer:null,
-    request_serial:0
+    request_serial:0,
+    controller:null,
+    failure_logged_for:""
   };
 
   function presenceSessionId(){
@@ -4205,7 +5528,8 @@
       if(presenceIndicator) presenceIndicator.hidden=true;
       return;
     }
-    presenceText.textContent=`${Math.round(n)} here now`;
+    const visibleCount=Math.max(1,Math.floor(n));
+    presenceText.textContent=`${visibleCount} here now`;
     presenceIndicator.hidden=false;
   }
 
@@ -4214,6 +5538,12 @@
     if(!stationKey || document.visibilityState==="hidden") return;
 
     const serial=++presenceState.request_serial;
+    if(presenceState.controller){
+      try{ presenceState.controller.abort(); }catch{}
+    }
+    const controller=new AbortController();
+    presenceState.controller=controller;
+
     try{
       const response=await fetch(COSMOS_PRESENCE_ENDPOINT,{
         method:"POST",
@@ -4222,19 +5552,30 @@
           station_key:stationKey,
           session_id:PRESENCE_SESSION_ID
         }),
-        cache:"no-store"
+        cache:"no-store",
+        signal:controller.signal
       });
       if(!response.ok) throw new Error(`Presence returned ${response.status}`);
       const data=await response.json();
 
       // Ignore a late response if the observer already moved elsewhere.
       if(serial!==presenceState.request_serial || stationKey!==presenceState.station_key) return;
+      presenceState.failure_logged_for="";
       renderPresenceCount(data?.count);
     }catch(error){
+      if(error?.name==="AbortError") return;
       if(stationKey===presenceState.station_key && presenceIndicator){
         presenceIndicator.hidden=true;
       }
-      console.warn("Cosmos live presence unavailable.",error);
+      // Avoid flooding the console every heartbeat during an outage.
+      if(presenceState.failure_logged_for!==stationKey){
+        presenceState.failure_logged_for=stationKey;
+        console.warn("Cosmos live presence unavailable.",error);
+      }
+    }finally{
+      if(presenceState.controller===controller){
+        presenceState.controller=null;
+      }
     }
   }
 
@@ -4252,6 +5593,11 @@
 
     presenceState.station_key=nextKey;
     presenceState.request_serial++;
+    presenceState.failure_logged_for="";
+    if(presenceState.controller){
+      try{ presenceState.controller.abort(); }catch{}
+      presenceState.controller=null;
+    }
     clearInterval(presenceState.timer);
     presenceState.timer=null;
     if(presenceIndicator) presenceIndicator.hidden=true;
@@ -4263,9 +5609,28 @@
   }
 
   document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="visible" && presenceState.station_key){
+    if(document.visibilityState==="hidden"){
+      if(presenceState.controller){
+        try{ presenceState.controller.abort(); }catch{}
+        presenceState.controller=null;
+      }
+      return;
+    }
+    if(presenceState.station_key){
       heartbeatPresence(presenceState.station_key);
     }
+  });
+
+  window.addEventListener("pagehide",()=>{
+    cancelActiveUniversalRequest();
+    cancelActiveShareRequest();
+    cancelSemanticProjectionRequestsExcept("");
+    if(presenceState.controller){
+      try{ presenceState.controller.abort(); }catch{}
+      presenceState.controller=null;
+    }
+    clearInterval(presenceState.timer);
+    presenceState.timer=null;
   });
 
   function render(){
@@ -4281,6 +5646,7 @@
     }
 
     const semanticFocusId=focusEntityId(observer);
+    cancelSemanticProjectionRequestsExcept(semanticFocusId);
     const hasResolvedResponseProjection=
       observer?.kind==="response" &&
       observer?.response?.response_type==="universal" &&
@@ -4302,6 +5668,7 @@
     renderButterflyEffect();
     setButterflyOpen(true);
     renderButterflyJourney();
+    renderJourneyDirectionControls();
     const semanticWorking =
       Boolean(semanticFocusId) &&
       !hasResolvedResponseProjection &&
@@ -4508,6 +5875,7 @@
   }
 
   function recenterEntity(id,operation="ENTER"){
+    cancelActiveUniversalRequest();
     const entity=state.entities.get(id);
     if(!entity) return;
 
@@ -4605,7 +5973,8 @@
       url.searchParams.set("focus","question");
       url.searchParams.set("question",researchQuestion);
       url.searchParams.set("from","cosmos-projection");
-      history.pushState({cosmos:true},"",url.pathname+url.search);
+      history.pushState(cosmosHistoryState(),"",url.pathname+url.search);
+      syncCurrentHistoryToJourney();
 
       render();
       hydrateUniversalAnswer(researchQuestion,label);
@@ -4642,7 +6011,8 @@
     saveJourney();
 
     edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
-    history.pushState({cosmos:true},"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}${state.observer.question?`&question=${encodeURIComponent(state.observer.question)}`:""}`);
+    history.pushState(cosmosHistoryState(),"",`?focus=entity&id=${encodeURIComponent(id)}${state.observer.article_id?`&article_id=${encodeURIComponent(state.observer.article_id)}`:""}${state.observer.question?`&question=${encodeURIComponent(state.observer.question)}`:""}`);
+    syncCurrentHistoryToJourney();
     saveTrail();
     render();
   }
@@ -4794,6 +6164,16 @@
       `The source provides knowledge; the projection decides the map.`;
   }
 
+  function cancelSemanticProjectionRequestsExcept(focusId=""){
+    const keep=String(focusId||"");
+    for(const [id,controller] of state.semanticProjectionControllers.entries()){
+      if(id===keep) continue;
+      try{ controller?.abort?.(); }catch{}
+      state.semanticProjectionControllers.delete(id);
+      state.semanticProjectionPending.delete(id);
+    }
+  }
+
   async function hydrateSemanticStationProjection(entityId,label){
     const focusId=String(entityId||"").trim();
     if(!focusId || !state.entities.has(focusId)) return;
@@ -4804,6 +6184,7 @@
     if(focusEntityId(state.observer)===focusId) render();
 
     const controller=new AbortController();
+    state.semanticProjectionControllers.set(focusId,controller);
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
     try{
       const question=semanticProjectionQuestion(label||entityLabel(focusId));
@@ -4824,6 +6205,10 @@
       const dynamic=materializeDynamicProjection(data,responseToken,sources);
       const relPrefix=`ephemeral-rel:${responseToken}:`;
       const rels=state.relationships.filter(rel=>String(rel?.relationship_id||"").startsWith(relPrefix));
+      for(const rel of rels){
+        rel.semantic_scope_focus_id=focusId;
+        rel.semantic_scope_kind="semantic_altitude";
+      }
       const root=(dynamic.subject_id && state.entities.has(dynamic.subject_id)) ? dynamic.subject_id : focusId;
 
       // The Worker now returns explicit semantic altitude. Prefer that governed
@@ -4915,10 +6300,15 @@
         });
       }
     }catch(error){
-      console.warn("Cosmos semantic-altitude projection unavailable; using sparse local fallback.",error);
+      if(error?.name!=="AbortError" && focusEntityId(state.observer)===focusId){
+        console.warn("Cosmos semantic-altitude projection unavailable; using sparse local fallback.",error);
+      }
     }finally{
       clearTimeout(timer);
-      state.semanticProjectionPending.delete(focusId);
+      if(state.semanticProjectionControllers.get(focusId)===controller){
+        state.semanticProjectionControllers.delete(focusId);
+        state.semanticProjectionPending.delete(focusId);
+      }
       if(focusEntityId(state.observer)===focusId) render();
     }
   }
@@ -5002,6 +6392,7 @@
         source_ids:evidenceUrls,
         ephemeral_projection:true,
         admitted_to_cosmos:false,
+        projection_owner_token:String(responseToken||""),
         projection_version:COSMOS_DYNAMIC_PROJECTION_VERSION
       });
     });
@@ -5061,10 +6452,25 @@
       }
     }
 
+    const projectionNodes=[...new Set(materializedIds)].map(id=>{
+      const entity=state.entities.get(id);
+      return {
+        id,
+        label:entityLabel(id),
+        type:String(entity?.type||"Projected concept"),
+        role:String(entity?.role||""),
+        projection_depth:Number.isFinite(Number(entity?.projection_depth)) ? Number(entity.projection_depth) : null,
+        projection_role:String(entity?.projection_role||""),
+        projection_parent_id:String(entity?.projection_parent_id||"")
+      };
+    });
+
     return {
       ids:[...new Set(materializedIds)],
+      nodes:projectionNodes,
       subject_id:subjectProjectionId||"",
-      relationship_count:ephemeralRelationships.length
+      relationship_count:ephemeralRelationships.length,
+      projection_token:String(responseToken||"")
     };
   }
 
@@ -5130,7 +6536,9 @@
       })),
       projection_seed_ids:[...new Set(projectionSeedIds)],
       dynamic_projection_ids:dynamicProjection.ids,
+      dynamic_projection_nodes:Array.isArray(dynamicProjection.nodes)?dynamicProjection.nodes:[],
       dynamic_projection_relationship_count:dynamicProjection.relationship_count,
+      dynamic_projection_token:dynamicProjection.projection_token||responseToken,
       source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
       knowledge_completion:null,
       suggested_stations:suggested,
@@ -5152,95 +6560,69 @@
     };
   }
 
-  function clampLoadingProgress(value){
-    return Math.max(0,Math.min(100,Number(value)||0));
-  }
-
-  function loadingStageFromProgress(progress){
-    const p=clampLoadingProgress(progress);
-    if(p < 16) return {key:"connecting",title:"Connecting",detail:"Reaching the universe and understanding your request…"};
-    if(p < 38) return {key:"exploring",title:"Exploring",detail:"Searching across the relevant universe…"};
-    if(p < 62) return {key:"distilling",title:"Distilling",detail:"Filtering noise and keeping what belongs to this Coordinate…"};
-    if(p < 84) return {key:"brewing",title:"Brewing Cosmos Essence",detail:"Connecting the strongest evidence into a useful projection…"};
-    if(p < 100) return {key:"essence",title:"Providing the Essence",detail:"Preparing the Station, its nearby paths, and its evidence…"};
-    return {key:"complete",title:"Essence Ready",detail:"The universe around this Coordinate is ready."};
-  }
-
   function paintLoadingNarrative(){
     if(!state.universalAnswerPending) return;
-    const stage=loadingStageFromProgress(state.loadingProgressValue);
-    state.loadingStage=stage.key;
-    state.loadingStageDetail=stage.detail;
-
-    // Running state only: no fake percentage and no "x% brewed" text.
+    state.loadingStage="running";
+    state.loadingStageDetail="Following connections across the relevant universe…";
     if(statusEl){
       statusEl.style.display="none";
       statusEl.textContent="";
     }
     if(emptyEl){
       emptyEl.style.display="block";
-      emptyEl.innerHTML=`<div class="cosmosBrewStatus"><strong>Cosmos is exploring</strong><span>${esc(stage.detail)}</span></div>`;
+      emptyEl.innerHTML=`<div class="cosmosBrewStatus"><strong>Cosmos is exploring</strong><span>${esc(state.loadingStageDetail)}</span></div>`;
     }
   }
 
   function paintLoadingProgress(){
-    // The animated sweep/orbit already communicates activity.
-    // Never use a filling progress ring for an indeterminate AI request.
+    // Indeterminate request: movement means activity, never fabricated completion.
     const ring=document.getElementById("cosmosObserverProgress");
     if(ring){
-      ring.setAttribute("stroke-dasharray","0 100");
-      ring.setAttribute("stroke-dashoffset","0");
-      ring.style.opacity="0";
+      ring.removeAttribute("stroke-dasharray");
+      ring.removeAttribute("stroke-dashoffset");
     }
     paintLoadingNarrative();
   }
 
-  function setLoadingProgress(value,ceiling=null){
-    state.loadingProgressValue=clampLoadingProgress(value);
-    if(ceiling!==null) state.loadingProgressCeiling=clampLoadingProgress(ceiling);
-    requestAnimationFrame(paintLoadingProgress);
+  function setLoadingProgress(){
+    // Legacy callers may remain in older code paths; intentionally ignore numeric values.
+    paintLoadingNarrative();
   }
 
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
+    state.loadingProgressTimer=null;
     state.loadingProgressValue=0;
-    state.loadingProgressCeiling=58;
-    state.loadingStage="connecting";
-    state.loadingStageDetail="Reaching the universe and understanding your request…";
+    state.loadingProgressCeiling=0;
+    state.loadingStage="running";
+    state.loadingStageDetail="Following connections across the relevant universe…";
     requestAnimationFrame(paintLoadingProgress);
-    state.loadingProgressTimer=setInterval(()=>{
-      if(!state.universalAnswerPending){
-        clearInterval(state.loadingProgressTimer);
-        state.loadingProgressTimer=null;
-        return;
-      }
-      const ceiling=Math.max(state.loadingProgressValue,state.loadingProgressCeiling||58);
-      if(state.loadingProgressValue>=ceiling-.2) return;
-      const remaining=ceiling-state.loadingProgressValue;
-      state.loadingProgressValue=Math.min(ceiling,state.loadingProgressValue+Math.max(.42,remaining*.045));
-      paintLoadingProgress();
-    },220);
   }
 
   function stopLoadingProgress(reset=true){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressTimer=null;
+    state.loadingProgressValue=0;
+    state.loadingProgressCeiling=0;
     if(reset){
-      state.loadingProgressValue=0;
-      state.loadingProgressCeiling=0;
       state.loadingStage="connecting";
       state.loadingStageDetail="Connecting to Cosmos…";
     }
   }
 
   async function hydrateUniversalAnswer(question,displayLabel=""){
-    if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
+    if(!question || state.universalAnswerLoaded) return;
 
+    cancelActiveUniversalRequest();
+    const requestId=++state.universalRequestSerial;
+    const requestQuestion=String(question);
+    const controller=new AbortController();
+    state.universalActiveRequest={id:requestId,question:requestQuestion,controller};
     state.universalAnswerPending=true;
     startLoadingProgress();
 
-    // Make the transition explicit instead of briefly presenting a deterministic
-    // fallback as though it were the final answer.
+    const requestStillCurrent=()=>universalRequestOwnsScreen(requestId,requestQuestion);
+
     if(state.observer?.kind==="response"){
       const loading=buildUniversalLoadingResponse(question,displayLabel||state.observer.label||question);
       state.observer={
@@ -5254,10 +6636,8 @@
       };
       state.response=loading;
       render();
-      setLoadingProgress(6,58);
     }
 
-    const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
@@ -5281,24 +6661,19 @@
         body:JSON.stringify(payload),
         signal:controller.signal
       });
+      if(!requestStillCurrent()) return;
+      if(!response.ok) throw new Error(`Cosmos gateway returned ${response.status}`);
 
-      if(!response.ok){
-        throw new Error(`Cosmos gateway returned ${response.status}`);
-      }
-
-      setLoadingProgress(Math.max(state.loadingProgressValue,64),76);
       const data=await response.json();
-      setLoadingProgress(Math.max(state.loadingProgressValue,78),88);
+      if(!requestStillCurrent()) return;
       if(!data || !String(data.answer||data.short_answer||"").trim()){
         throw new Error("Cosmos gateway returned no answer");
       }
 
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
-      setLoadingProgress(92,97);
-      await new Promise(resolve=>setTimeout(resolve,180));
-      setLoadingProgress(100,100);
-      await new Promise(resolve=>setTimeout(resolve,420));
+      if(!requestStillCurrent()) return;
 
+      // Real response is shown immediately: no fake completion delay.
       state.observer=resolvedObserver;
       state.response=state.observer.response;
       state.universalAnswerLoaded=true;
@@ -5306,16 +6681,20 @@
       stopLoadingProgress(true);
 
       reconcileJourneyWithResolvedObserver(state.observer);
+      syncCurrentHistoryToJourney();
       saveTrail();
       render();
       restoreKnowledgeStatus();
     }catch(error){
-      console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
+      if(!requestStillCurrent()) return;
+      if(error?.name!=="AbortError"){
+        console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
+      }
       state.universalAnswerPending=false;
       stopLoadingProgress(true);
 
-      // Restore deterministic/local response as graceful fallback.
       const local=buildQuestionResponse(question);
+      if(!requestStillCurrent()) return;
       state.response=local;
       state.observer={
         kind:"response",
@@ -5328,10 +6707,15 @@
         article_id:entry.article_id
       };
       reconcileJourneyWithResolvedObserver(state.observer);
+      syncCurrentHistoryToJourney();
+      saveTrail();
       render();
       restoreKnowledgeStatus();
     }finally{
       clearTimeout(timer);
+      if(universalRequestOwnsScreen(requestId,requestQuestion)){
+        state.universalActiveRequest=null;
+      }
     }
   }
 
@@ -5347,6 +6731,7 @@
 
   projectionAskForm.addEventListener("submit",event=>{
     event.preventDefault();
+    cancelActiveUniversalRequest();
     const question=String(projectionAskInput.value||"").trim();
     if(!question){
       projectionAskInput.focus();
@@ -5390,8 +6775,9 @@
       url.searchParams.delete("context_label");
     }
 
-    history.pushState({cosmos:true},"",url.pathname+url.search);
+    history.pushState(cosmosHistoryState(),"",url.pathname+url.search);
     ensureJourneyCurrent(state.observer);
+    syncCurrentHistoryToJourney();
     saveTrail();
     render();
     hydrateUniversalAnswer(question);
@@ -5399,6 +6785,196 @@
 
   const SHARED_STATION_PARAM="shared";
   const SHARED_GATEWAY_PARAM="gateway";
+
+  function viewerSafeShareText(value,observer=state.observer){
+    return viewerSafeAnswer(String(value||""),observer);
+  }
+
+  function viewerSafeShareQuestion(value,observer=state.observer){
+    const raw=String(value||"").trim();
+    const safe=viewerSafeAnswer(raw,observer).trim();
+    if(!safe || /^(build|explain) the structural cosmos map/i.test(safe)) {
+      return observerDisplayLabel(observer);
+    }
+    return safe;
+  }
+
+  function viewerSafeExternalUrl(value){
+    const raw=String(value||"").trim();
+    if(!raw) return "";
+    try{
+      const url=new URL(raw,location.origin);
+      if(url.protocol==="http:" || url.protocol==="https:") return url.href;
+    }catch{}
+    return "";
+  }
+
+  function viewerSafePublicBullet(item,observer=state.observer){
+    if(!item || typeof item!=="object") return null;
+    return {
+      ...item,
+      title:viewerSafeShareText(item.title||"",observer),
+      summary:viewerSafeShareText(item.summary||"",observer),
+      note:viewerSafeShareText(item.note||"",observer),
+      url:viewerSafeExternalUrl(item.url||"")
+    };
+  }
+
+  function viewerSafeKnowledgeGap(item,observer=state.observer){
+    if(typeof item==="string") return viewerSafeShareText(item,observer);
+    if(!item || typeof item!=="object") return item;
+    const copy={...item};
+    for(const key of ["title","label","summary","description","question","prompt","research_question","instruction"]){
+      if(key in copy){
+        copy[key]=viewerSafeShareText(copy[key]||"",observer);
+      }
+    }
+    return copy;
+  }
+
+  function viewerSafeProjectionEntity(entity,observer=state.observer){
+    if(!entity || typeof entity!=="object") return entity;
+    const copy=JSON.parse(JSON.stringify(entity));
+    for(const key of ["name","label","title","summary","description","question","prompt","research_question"]){
+      if(key in copy){
+        copy[key]=viewerSafeShareText(copy[key]||"",observer);
+      }
+    }
+    return copy;
+  }
+
+  function viewerSafeProjectionRelationship(rel,observer=state.observer){
+    if(!rel || typeof rel!=="object") return rel;
+    const copy=JSON.parse(JSON.stringify(rel));
+    for(const key of ["label","summary","description","mechanism","question","prompt","research_question"]){
+      if(key in copy){
+        copy[key]=viewerSafeShareText(copy[key]||"",observer);
+      }
+    }
+    return copy;
+  }
+
+  function publicSuggestedStation(item){
+    if(!item || typeof item!=="object") return item;
+    const copy={...item};
+    for(const key of ["question","research_question","prompt"]){
+      if(key in copy){
+        const safe=viewerSafeShareQuestion(copy[key],state.observer);
+        if(safe) copy[key]=safe;
+        else delete copy[key];
+      }
+    }
+    return copy;
+  }
+
+  function publicJourneySnapshot(node){
+    const copy=JSON.parse(JSON.stringify(node||{}));
+    const sanitize=snap=>{
+      if(!snap) return snap;
+      snap.question=viewerSafeShareQuestion(snap.question||"",snap);
+      if(snap.response_snapshot){
+        snap.response_snapshot.question=viewerSafeShareQuestion(snap.response_snapshot.question||snap.question,snap);
+        snap.response_snapshot.answer=viewerSafeShareText(snap.response_snapshot.answer||"",snap);
+        snap.response_snapshot.short_answer=viewerSafeShareText(snap.response_snapshot.short_answer||"",snap);
+        snap.response_snapshot.essence=viewerSafeShareText(snap.response_snapshot.essence||"",snap);
+        if(Array.isArray(snap.response_snapshot.bullets)){
+          snap.response_snapshot.bullets=snap.response_snapshot.bullets
+            .map(item=>viewerSafePublicBullet(item,snap))
+            .filter(Boolean);
+        }
+        if(Array.isArray(snap.response_snapshot.suggested_stations)){
+          snap.response_snapshot.suggested_stations=snap.response_snapshot.suggested_stations.map(publicSuggestedStation);
+        }
+        if(Array.isArray(snap.response_snapshot.knowledge_gaps)){
+          snap.response_snapshot.knowledge_gaps=snap.response_snapshot.knowledge_gaps
+            .map(item=>viewerSafeKnowledgeGap(item,snap));
+        }
+      }
+      if(snap.projection_snapshot){
+        if(Array.isArray(snap.projection_snapshot.entities)){
+          snap.projection_snapshot.entities=snap.projection_snapshot.entities
+            .map(entity=>viewerSafeProjectionEntity(entity,snap));
+        }
+        if(Array.isArray(snap.projection_snapshot.relationships)){
+          snap.projection_snapshot.relationships=snap.projection_snapshot.relationships
+            .map(rel=>viewerSafeProjectionRelationship(rel,snap));
+        }
+      }
+      return snap;
+    };
+    copy.observer=sanitize(copy.observer);
+    copy.resolved_state=sanitize(copy.resolved_state);
+    for(const key of ["arrival_relation","origin_label","previous_station_label"]){
+      if(key in copy){
+        copy[key]=viewerSafeShareText(copy[key]||"",copy.resolved_state||copy.observer||state.observer);
+      }
+    }
+    if(Array.isArray(copy.alternate_arrivals)){
+      copy.alternate_arrivals=copy.alternate_arrivals.map(arrival=>({
+        ...arrival,
+        relation:viewerSafeShareText(arrival?.relation||"",copy.resolved_state||copy.observer||state.observer),
+        direction:viewerSafeShareText(arrival?.direction||"",copy.resolved_state||copy.observer||state.observer),
+        previous_station_label:viewerSafeShareText(arrival?.previous_station_label||"",copy.resolved_state||copy.observer||state.observer)
+      }));
+    }
+    const publicArrivalParents=new Set([
+      String(copy.parent_node_id||""),
+      ...(Array.isArray(copy.alternate_arrivals)
+        ? copy.alternate_arrivals.map(arrival=>String(arrival?.parent_node_id||""))
+        : [])
+    ].filter(Boolean));
+    if(copy.preferred_arrival_parent_id && !publicArrivalParents.has(String(copy.preferred_arrival_parent_id))){
+      copy.preferred_arrival_parent_id="";
+    }
+    return copy;
+  }
+
+  function shareJourneyNodes(maxNodes=48){
+    const all=Array.isArray(state.journey?.nodes)?state.journey.nodes:[];
+    const currentId=String(state.journey?.current_node_id||"");
+    if(!all.length || !currentId) return [];
+    const ancestry=journeyPathTo(currentId);
+    const selected=[];
+    const selectedIds=new Set();
+
+    const addNode=node=>{
+      if(node?.node_id && !selectedIds.has(node.node_id)){
+        selected.push(node);
+        selectedIds.add(node.node_id);
+      }
+    };
+
+    for(const node of ancestry) addNode(node);
+
+    // The viewer's active route may use alternate parents. Also include the
+    // canonical ancestry of every selected station so the exported graph never
+    // references a parent that was omitted.
+    for(const activeNode of [...selected]){
+      for(const canonicalNode of journeyCanonicalPathTo(activeNode.node_id)){
+        addNode(canonicalNode);
+      }
+    }
+
+    const ancestryCount=selected.length;
+    const optionalBudget=Math.max(0,maxNodes-ancestryCount);
+    let optionalAdded=0;
+    let changed=true;
+
+    while(changed && optionalAdded<optionalBudget){
+      changed=false;
+      for(const node of all){
+        if(optionalAdded>=optionalBudget) break;
+        if(!node?.node_id || selectedIds.has(node.node_id)) continue;
+        if(node.parent_node_id && selectedIds.has(node.parent_node_id)){
+          selected.push(node);
+          selectedIds.add(node.node_id);
+          optionalAdded+=1;
+          changed=true;
+        }
+      }
+    }
+    return selected.map(publicJourneySnapshot);
+  }
 
   function currentStationPersistentPayload(){
     const o=state.observer;
@@ -5411,36 +6987,48 @@
     // research question is retained separately so Cosmos can reconstruct the
     // station exactly when somebody opens the shared link.
     const station=stationProjection(o);
-    const shareTitle=String(
-      station.focus_id ? station.focus_label : (
-        currentJourneyNode?.observer?.label ||
-        o.label ||
-        o.semantic_subject_label ||
-        r?.subject_match?.label ||
-        r?.label ||
-        o.question ||
-        "Current Cosmos stop"
-      )
-    ).replace(/\s+/g," ").trim();
+    const shareTitle=viewerSafeShareText(
+      String(
+        station.focus_id ? station.focus_label : (
+          currentJourneyNode?.observer?.label ||
+          o.label ||
+          o.semantic_subject_label ||
+          r?.subject_match?.label ||
+          r?.label ||
+          o.question ||
+          "Current Cosmos stop"
+        )
+      ),
+      o
+    ).replace(/\s+/g," ").trim() || "Current Cosmos stop";
 
-    const researchQuestion=String(
-      o.question || r?.question || currentJourneyNode?.observer?.question || shareTitle
+    const researchQuestion=viewerSafeShareQuestion(
+      o.question || r?.question || currentJourneyNode?.observer?.question || shareTitle,
+      o
     ).replace(/\s+/g," ").trim();
 
     const ids=Array.isArray(r?.dynamic_projection_ids)?r.dynamic_projection_ids:[];
-    const entities=ids.map(id=>state.entities.get(id)).filter(Boolean).map(e=>({...e}));
+    const entities=ids
+      .map(id=>state.entities.get(id))
+      .filter(Boolean)
+      .map(entity=>viewerSafeProjectionEntity(entity,o));
     const idSet=new Set(ids);
-    const relationships=state.relationships.filter(rel=>
-      rel?.ephemeral_projection &&
-      idSet.has(rel.from_entity_id||rel.from_id) &&
-      idSet.has(rel.to_entity_id||rel.to_id)
-    ).map(rel=>({...rel}));
+    const projectionToken=String(
+      r?.dynamic_projection_token ||
+      inferProjectionTokenFromIds(ids) ||
+      ""
+    );
+    const relationships=state.relationships.filter(rel=>{
+      if(!rel?.ephemeral_projection) return false;
+      if(!idSet.has(rel.from_entity_id||rel.from_id) || !idSet.has(rel.to_entity_id||rel.to_id)) return false;
+      return projectionToken ? String(rel?.projection_owner_token||"")===projectionToken : true;
+    }).map(rel=>viewerSafeProjectionRelationship(rel,o));
 
     const sources=Array.isArray(r?.bullets)
       ? r.bullets.map(item=>({
-          title:String(item?.title||""),
-          url:String(item?.url||""),
-          note:String(item?.summary||"")
+          title:viewerSafeShareText(item?.title||"",o),
+          url:viewerSafeExternalUrl(item?.url||""),
+          note:viewerSafeShareText(item?.summary||"",o)
         })).filter(item=>item.title||item.url)
       : [];
 
@@ -5449,13 +7037,13 @@
       current_station_label:shareTitle,
       question:researchQuestion,
       label:shareTitle,
-      subject:o.semantic_subject_label||r?.subject_match?.label||shareTitle,
+      subject:viewerSafeShareText(o.semantic_subject_label||r?.subject_match?.label||shareTitle,o),
       coordinate:station.coordinate,
       intent:r?.intent||"",
-      short_answer:r?.short_answer||"",
-      essence:r?.essence||"",
+      short_answer:viewerSafeShareText(r?.short_answer||"",o),
+      essence:viewerSafeShareText(r?.essence||"",o),
       current_pulse:governedPulseForObserver(o).map(governedPulseDisplay).filter(Boolean).slice(0,5),
-      answer:r?.answer||"",
+      answer:viewerSafeShareText(r?.answer||"",o),
       sources,
       observer:{
         kind:o.kind||"",
@@ -5467,22 +7055,42 @@
       },
       response:r?{
         label:shareTitle,
-        question:r.question||researchQuestion,
-        answer:r.answer||"",
-        short_answer:r.short_answer||"",
+        response_type:String(r.response_type||""),
+        question:viewerSafeShareQuestion(r.question||researchQuestion,o)||researchQuestion,
+        answer:viewerSafeShareText(r.answer||"",o),
+        short_answer:viewerSafeShareText(r.short_answer||"",o),
+        essence:viewerSafeShareText(r.essence||"",o),
+        coordinate:(r.coordinate && typeof r.coordinate==="object")?JSON.parse(JSON.stringify(r.coordinate)):null,
         intent:r.intent||"",
         epistemic_state:r.epistemic_state||"",
         confidence:r.confidence||"",
+        pulse_candidate_count:Number(r.pulse_candidate_count||0),
         source_label:r.source_label||"",
-        bullets:Array.isArray(r.bullets)?r.bullets.slice(0,10):[],
+        knowledge_completion:r.knowledge_completion
+          ? JSON.parse(JSON.stringify(r.knowledge_completion))
+          : null,
+        bullets:Array.isArray(r.bullets)
+          ? r.bullets.slice(0,10).map(item=>viewerSafePublicBullet(item,o)).filter(Boolean)
+          : [],
         projection_seed_ids:Array.isArray(r.projection_seed_ids)?r.projection_seed_ids:[],
         dynamic_projection_ids:ids,
+        dynamic_projection_nodes:Array.isArray(r.dynamic_projection_nodes)
+          ? r.dynamic_projection_nodes.map(node=>({
+              ...node,
+              label:viewerSafeShareText(node?.label||"",o),
+              type:viewerSafeShareText(node?.type||"",o),
+              role:viewerSafeShareText(node?.role||"",o)
+            }))
+          : [],
         dynamic_projection_relationship_count:Number(r.dynamic_projection_relationship_count||relationships.length),
-        suggested_stations:Array.isArray(r.suggested_stations)?r.suggested_stations.slice(0,8):[],
-        knowledge_gaps:Array.isArray(r.knowledge_gaps)?r.knowledge_gaps.slice(0,8):[]
+        dynamic_projection_token:String(r.dynamic_projection_token||""),
+        suggested_stations:Array.isArray(r.suggested_stations)?r.suggested_stations.slice(0,8).map(publicSuggestedStation):[],
+        knowledge_gaps:Array.isArray(r.knowledge_gaps)
+          ? r.knowledge_gaps.slice(0,8).map(item=>viewerSafeKnowledgeGap(item,o))
+          : []
       }:null,
       projection:{entities,relationships},
-      journey:Array.isArray(state.journey?.nodes)?state.journey.nodes.slice(-24).map(n=>({...n})):[],
+      journey:shareJourneyNodes(),
       journey_current_node_id:state.journey?.current_node_id||""
     };
   }
@@ -5494,21 +7102,49 @@
     shareNotice.timer=setTimeout(()=>shareStationStatus.hidden=true,3200);
   }
 
+  function cancelActiveShareRequest(){
+    const active=state.shareActiveRequest;
+    if(active?.controller){
+      try{ active.controller.abort(); }catch{}
+    }
+    state.shareActiveRequest=null;
+  }
+
   async function createPersistentStation(){
     const payload=currentStationPersistentPayload();
     if(!payload) throw new Error("No current station to share.");
 
-    const response=await fetch(`${COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"")}/api/cosmos/share`,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(payload)
-    });
+    cancelActiveShareRequest();
+    const requestId=++state.shareRequestSerial;
+    const controller=new AbortController();
+    state.shareActiveRequest={id:requestId,controller};
+    const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok || !data?.share_url){
-      throw new Error(data?.error||"Could not create shared station.");
+    try{
+      const response=await fetch(`${COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"")}/api/cosmos/share`,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(payload),
+        signal:controller.signal
+      });
+
+      if(state.shareActiveRequest?.id!==requestId){
+        throw new DOMException("Superseded share request","AbortError");
+      }
+
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok || !data?.share_url){
+        throw new Error(data?.error||"Could not create shared station.");
+      }
+      const safeShareUrl=viewerSafeExternalUrl(data.share_url);
+      if(!safeShareUrl) throw new Error("Shared station returned an invalid URL.");
+      return {...data,share_url:safeShareUrl};
+    }finally{
+      clearTimeout(timer);
+      if(state.shareActiveRequest?.id===requestId){
+        state.shareActiveRequest=null;
+      }
     }
-    return data;
   }
 
   function wrapCanvasText(ctx,text,maxWidth,maxLines=3){
@@ -5607,6 +7243,11 @@
   }
 
   async function shareCurrentStation(){
+    if(currentStopShare?.disabled) return;
+    if(currentStopShare){
+      currentStopShare.disabled=true;
+      currentStopShare.setAttribute("aria-busy","true");
+    }
     shareNotice("Preparing current stop…");
     try{
       const data=await createPersistentStation();
@@ -5644,9 +7285,15 @@
       }
       shareNotice("Share sheet opened.");
     }catch(error){
-      if(error?.name==="AbortError") return;
-      console.warn("Station sharing failed",error);
-      shareNotice(error?.message||"Could not share this stop.");
+      if(error?.name!=="AbortError"){
+        console.warn("Station sharing failed",error);
+        shareNotice(error?.message||"Could not share this stop.");
+      }
+    }finally{
+      if(currentStopShare){
+        currentStopShare.disabled=false;
+        currentStopShare.removeAttribute("aria-busy");
+      }
     }
   }
 
@@ -5657,23 +7304,50 @@
     const stationId=params.get(SHARED_STATION_PARAM);
     if(!stationId) return false;
 
-    const gateway=params.get(SHARED_GATEWAY_PARAM) ||
+    const requestedGateway=params.get(SHARED_GATEWAY_PARAM) ||
       COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"");
+    const gateway=viewerSafeExternalUrl(requestedGateway).replace(/\/$/,"");
+    if(!gateway) return false;
+
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
 
     try{
-      const response=await fetch(`${gateway}/api/cosmos/station/${encodeURIComponent(stationId)}`);
+      const response=await fetch(
+        `${gateway}/api/cosmos/station/${encodeURIComponent(stationId)}`,
+        {cache:"no-store",signal:controller.signal}
+      );
       const p=await response.json();
       if(!response.ok) throw new Error(p?.error||"Shared station unavailable.");
 
       for(const e of (p.projection?.entities||[])){
-        if(e?.entity_id) state.entities.set(e.entity_id,e);
+        const id=String(e?.entity_id||"");
+        if(id && !state.entities.has(id)){
+          state.entities.set(id,JSON.parse(JSON.stringify(e)));
+        }
       }
 
       if(Array.isArray(p.projection?.relationships)&&p.projection.relationships.length){
-        const incoming=new Set(p.projection.relationships.map(r=>r.relationship_id).filter(Boolean));
+        const sharedEntityIds=new Set(
+          (Array.isArray(p.projection?.entities)?p.projection.entities:[])
+            .map(entity=>String(entity?.entity_id||""))
+            .filter(Boolean)
+        );
+        const safeRelationships=p.projection.relationships
+          .filter(rel=>{
+            const from=String(rel?.from_entity_id||rel?.from_id||"");
+            const to=String(rel?.to_entity_id||rel?.to_id||"");
+            return from && to && (
+              !sharedEntityIds.size ||
+              (sharedEntityIds.has(from) && sharedEntityIds.has(to))
+            );
+          })
+          .map(rel=>JSON.parse(JSON.stringify(rel)));
+
+        const incoming=new Set(safeRelationships.map(r=>r.relationship_id).filter(Boolean));
         state.relationships=[
           ...state.relationships.filter(r=>!incoming.has(r.relationship_id)),
-          ...p.projection.relationships
+          ...safeRelationships
         ];
       }
 
@@ -5682,13 +7356,23 @@
       const restoredResponse=rr?{
         id:`response:shared:${stationId}`,
         label:rr.label||p.label||p.question||"Shared station",
-        response_type:"shared-station",
+        response_type:String(
+          rr.response_type ||
+          (Array.isArray(rr.dynamic_projection_ids) && rr.dynamic_projection_ids.length ? "universal" : "shared-station")
+        ),
         question:rr.question||p.question||"",
         answer:rr.answer||p.answer||"",
         short_answer:rr.short_answer||p.short_answer||"",
+        essence:rr.essence||p.essence||"",
+        coordinate:(rr.coordinate && typeof rr.coordinate==="object")
+          ? JSON.parse(JSON.stringify(rr.coordinate))
+          : ((p.coordinate && typeof p.coordinate==="object")
+              ? JSON.parse(JSON.stringify(p.coordinate))
+              : null),
         intent:rr.intent||p.intent||"",
         epistemic_state:rr.epistemic_state||"uncertain",
         confidence:rr.confidence||"low",
+        pulse_candidate_count:Number(rr.pulse_candidate_count||0),
         subject_match:sourceObserver.semantic_subject_id?{
           id:sourceObserver.semantic_subject_id,
           label:sourceObserver.semantic_subject_label||sourceObserver.semantic_subject_id,
@@ -5697,9 +7381,15 @@
         bullets:Array.isArray(rr.bullets)?rr.bullets:[],
         projection_seed_ids:Array.isArray(rr.projection_seed_ids)?rr.projection_seed_ids:[],
         dynamic_projection_ids:Array.isArray(rr.dynamic_projection_ids)?rr.dynamic_projection_ids:[],
+        dynamic_projection_nodes:Array.isArray(rr.dynamic_projection_nodes)
+          ? rr.dynamic_projection_nodes.map(node=>({...node}))
+          : [],
         dynamic_projection_relationship_count:Number(rr.dynamic_projection_relationship_count||0),
+        dynamic_projection_token:String(rr.dynamic_projection_token||""),
         source_label:rr.source_label||"Shared Cosmos station",
-        knowledge_completion:null,
+        knowledge_completion:rr.knowledge_completion
+          ? JSON.parse(JSON.stringify(rr.knowledge_completion))
+          : null,
         suggested_stations:Array.isArray(rr.suggested_stations)?rr.suggested_stations:[],
         knowledge_gaps:Array.isArray(rr.knowledge_gaps)?rr.knowledge_gaps:[]
       }:null;
@@ -5728,28 +7418,146 @@
       state.universalAnswerPending=false;
 
       if(Array.isArray(p.journey)&&p.journey.length){
-        state.journey.nodes=p.journey;
+        const importedNodes=[];
+        const importedIds=new Set();
+
+        for(const rawNode of p.journey){
+          if(!rawNode || typeof rawNode!=="object") continue;
+          const node=JSON.parse(JSON.stringify(rawNode));
+          const nodeId=String(node?.node_id||"").trim();
+          if(!nodeId || importedIds.has(nodeId)) continue;
+          node.node_id=nodeId;
+          node.parent_node_id=String(node.parent_node_id||"").trim();
+          node.last_forward_node_id=String(node.last_forward_node_id||"").trim();
+          importedIds.add(nodeId);
+          importedNodes.push(node);
+        }
+
+        for(const node of importedNodes){
+          if(node.parent_node_id && !importedIds.has(node.parent_node_id)){
+            node.parent_node_id="";
+          }
+        }
+
+        const importedById=new Map(importedNodes.map(node=>[node.node_id,node]));
+
+        for(const node of importedNodes){
+          const seen=new Set([node.node_id]);
+          let cursor=node;
+          while(cursor?.parent_node_id){
+            const parentId=String(cursor.parent_node_id||"");
+            if(seen.has(parentId)){
+              cursor.parent_node_id="";
+              break;
+            }
+            seen.add(parentId);
+            cursor=importedById.get(parentId)||null;
+            if(!cursor) break;
+          }
+        }
+
+        for(const node of importedNodes){
+          if(node.last_forward_node_id){
+            const forward=importedById.get(node.last_forward_node_id);
+            if(!forward || forward.parent_node_id!==node.node_id){
+              node.last_forward_node_id="";
+            }
+          }
+
+          const seenArrivals=new Set();
+          node.alternate_arrivals=(Array.isArray(node.alternate_arrivals)?node.alternate_arrivals:[])
+            .filter(arrival=>{
+              const parent=String(arrival?.parent_node_id||"");
+              if(!parent || parent===node.node_id || !importedById.has(parent)) return false;
+
+              let cursor=importedById.get(parent);
+              const ancestrySeen=new Set();
+              while(cursor && !ancestrySeen.has(cursor.node_id)){
+                ancestrySeen.add(cursor.node_id);
+                if(String(cursor.parent_node_id||"")===node.node_id) return false;
+                cursor=cursor.parent_node_id ? importedById.get(cursor.parent_node_id) : null;
+              }
+
+              const key=[parent,String(arrival?.relation||""),String(arrival?.direction||"")].join("|");
+              if(seenArrivals.has(key)) return false;
+              seenArrivals.add(key);
+              return true;
+            })
+            .slice(-12);
+
+          const validArrivalParents=new Set([
+            String(node.parent_node_id||""),
+            ...node.alternate_arrivals.map(arrival=>String(arrival?.parent_node_id||""))
+          ].filter(Boolean));
+          if(node.preferred_arrival_parent_id && !validArrivalParents.has(String(node.preferred_arrival_parent_id))){
+            node.preferred_arrival_parent_id="";
+          }
+        }
+
+        state.journey.nodes=importedNodes;
         const requestedCurrent=String(p.journey_current_node_id||"");
-        const requestedExists=p.journey.some(node=>node?.node_id===requestedCurrent);
-        state.journey.current_node_id=requestedExists
+        state.journey.current_node_id=importedById.has(requestedCurrent)
           ? requestedCurrent
-          : (p.journey[p.journey.length-1]?.node_id || p.journey[p.journey.length-1]?.id || "");
-        state.journey.next_id=p.journey.reduce((m,n)=>Math.max(m,Number(String(n?.node_id||"").replace(/\D/g,""))||0),0)+1;
+          : (importedNodes[importedNodes.length-1]?.node_id||"");
+        state.journey.next_id=importedNodes.reduce(
+          (m,n)=>Math.max(m,Number(String(n?.node_id||"").replace(/\D/g,""))||0),
+          0
+        )+1;
+
+        const importedCurrent=journeyNodeById(state.journey.current_node_id);
+        const importedSnap=journeyNodeDisplayObserver(importedCurrent);
+        restoreResponseProjectionSnapshot(importedSnap?.projection_snapshot);
+
+        // Prefer the exact canonical response saved in Journey over a compact
+        // top-level share transport representation.
+        if(importedCurrent && importedSnap?.kind==="response" && importedSnap?.response_snapshot){
+          const exactResponse=JSON.parse(JSON.stringify(importedSnap.response_snapshot));
+          hydrateProjectionEntitiesFromResponse(exactResponse);
+          state.observer={
+            ...importedSnap,
+            kind:"response",
+            response:exactResponse,
+            id:importedSnap.id||exactResponse.id||restoredResponse?.id||`response:shared:${stationId}`,
+            label:importedSnap.label||exactResponse.label||state.observer?.label||"Shared station",
+            question:importedSnap.question||exactResponse.question||state.observer?.question||"",
+            semantic_subject_id:importedSnap.semantic_subject_id||exactResponse?.subject_match?.id||"",
+            semantic_subject_label:importedSnap.semantic_subject_label||exactResponse?.subject_match?.label||""
+          };
+          state.response=state.observer.response;
+          state.entryObserver=state.observer;
+        }
       }
 
+      hydrateProjectionEntitiesFromResponse(state.observer?.response);
+      state.response=state.observer?.response||restoredResponse||null;
       ensureJourneyCurrent(state.observer);
       saveJourney();
       saveTrail();
+      syncCurrentHistoryToJourney();
       render();
       return true;
     }catch(error){
-      console.warn("Shared Cosmos station could not be restored.",error);
+      if(error?.name!=="AbortError"){
+        console.warn("Shared Cosmos station could not be restored.",error);
+      }
       return false;
+    }finally{
+      clearTimeout(timer);
     }
   }
 
 
   function startFreshCosmos(){
+    cancelActiveUniversalRequest();
+    cancelActiveShareRequest();
+    cancelSemanticProjectionRequestsExcept("");
+    if(presenceState.controller){
+      try{ presenceState.controller.abort(); }catch{}
+      presenceState.controller=null;
+    }
+    clearInterval(presenceState.timer);
+    presenceState.timer=null;
+    presenceState.station_key="";
     // Clicking the Cosmos title is an intentional new beginning.
     // Remove only observer/journey session state; canonical Cosmos knowledge is untouched.
     try{
@@ -5775,32 +7583,228 @@
   });
 
   expandBtn.addEventListener("click",()=>{state.expanded=true;render()});
+  previousStopBtn?.addEventListener("click",()=>{
+    const current=journeyNodeById(state.journey.current_node_id);
+    const parent=currentJourneyParentNode();
+    if(parent && current){
+      parent.last_forward_node_id=current.node_id;
+      saveJourney();
+      restoreObserverFromJourneyNode(parent);
+    }
+  });
+
+  nextStopBtn?.addEventListener("click",()=>{
+    const forward=currentJourneyForwardNode();
+    if(forward) restoreObserverFromJourneyNode(forward);
+  });
+
+  branchSelect?.addEventListener("change",()=>{
+    const nodeId=String(branchSelect.value||"").trim();
+    if(!nodeId) return;
+    const current=journeyNodeById(state.journey.current_node_id);
+    const target=journeyNodeById(nodeId);
+    if(current && target && journeyNodeCanFollowFrom(target,current.node_id)){
+      current.last_forward_node_id=target.node_id;
+
+      if(String(target.parent_node_id||"")!==current.node_id){
+        target.preferred_arrival_parent_id=current.node_id;
+      }
+
+      saveJourney();
+      restoreObserverFromJourneyNode(target);
+    }
+    branchSelect.value="";
+  });
+
+  arrivalSelect?.addEventListener("change",()=>{
+    const nodeId=String(arrivalSelect.value||"").trim();
+    arrivalSelect.value="";
+    if(!nodeId) return;
+
+    const current=journeyNodeById(state.journey.current_node_id);
+    if(!current) return;
+    const allowed=new Set(
+      (Array.isArray(current.alternate_arrivals)?current.alternate_arrivals:[])
+        .map(arrival=>String(arrival?.parent_node_id||""))
+        .filter(Boolean)
+    );
+    if(!allowed.has(nodeId)) return;
+
+    const parent=journeyNodeById(nodeId);
+    if(!parent) return;
+    current.preferred_arrival_parent_id=nodeId;
+    parent.last_forward_node_id=current.node_id;
+    saveJourney();
+    restoreObserverFromJourneyNode(parent);
+  });
+
   resetBtn.addEventListener("click",()=>{
+    cancelActiveUniversalRequest();
+    // Return to the canonical saved Journey origin when available.
+    // This prevents the entry station from regressing to an early/loading
+    // representation after its richer resolved state has already been saved.
+    const root=journeyRootNode(state.journey.current_node_id);
+    if(root){
+      state.history.push(state.observer);
+      restoreObserverFromJourneyNode(root);
+      return;
+    }
+
+    // Defensive fallback for a session with no Journey root yet.
     if(!state.entryObserver)return;
     state.history.push(state.observer);
     state.observer=state.entryObserver;
     state.expanded=false;
     ensureJourneyCurrent(state.observer);
     saveTrail();
-    history.pushState({cosmos:true},"",location.pathname+location.search);
+    history.pushState(cosmosHistoryState(),"",location.pathname+location.search);
+    syncCurrentHistoryToJourney();
     render();
   });
   backBtn.addEventListener("click",()=>{
     const previous=state.history.pop();
     if(previous){
+      // History entries can be older provisional/loading observer snapshots.
+      // Resolve them back to the Journey's canonical saved station before
+      // rendering so Back cannot resurrect a stale answer or old graph.
+      const canonicalNode=canonicalJourneyNodeForObserver(previous);
+      if(canonicalNode){
+        restoreObserverFromJourneyNode(canonicalNode,{historyMode:"replace"});
+        return;
+      }
+
+      // Defensive fallback for a state that predates Journey persistence.
+      cancelActiveUniversalRequest();
       state.observer=previous;
       state.expanded=false;
       ensureJourneyCurrent(state.observer);
       saveTrail();
       render();
-    }else history.back();
+      return;
+    }
+    history.back();
   });
+  function ensureJourneyAtHistoryBoundary(observer){
+    if(!observer) return null;
+    const existing=
+      state.journey.nodes.find(node=>sameJourneyStation(node,observer)) ||
+      state.journey.nodes.find(node=>node.observer_key===journeyObserverKey(observer));
+    if(existing){
+      state.journey.current_node_id=existing.node_id;
+      preserveResolvedJourneyState(existing,observer);
+      if(!existing.resolved_state) existing.observer=observerSnapshot(observer);
+      saveJourney();
+      return existing;
+    }
+
+    const previousCurrent=state.journey.current_node_id;
+    state.journey.current_node_id="";
+    const node=addJourneyNode(observer,"",true);
+    // addJourneyNode with empty current produces a true root.
+    if(!node){
+      state.journey.current_node_id=previousCurrent;
+      return null;
+    }
+    saveJourney();
+    return node;
+  }
+
+  window.addEventListener("popstate",event=>{
+    cancelActiveUniversalRequest();
+
+    // Native browser position is authoritative. A stale custom Back stack must
+    // not replay the station the browser has just left.
+    state.history=[];
+    saveTrail();
+
+    const nodeId=String(event.state?.journey_node||"").trim();
+    const node=nodeId ? journeyNodeById(nodeId) : null;
+    if(node){
+      restoreObserverFromJourneyNode(node,{historyMode:"none"});
+      return;
+    }
+
+    // Older entries may not have had a Journey tag. Resolve from the current URL
+    // without manufacturing a parent/child edge.
+    try{
+      const url=new URL(location.href);
+      const focus=String(url.searchParams.get("focus")||"");
+      const question=String(url.searchParams.get("question")||"");
+      const id=String(url.searchParams.get("id")||"");
+
+      let fallback=null;
+      if(focus==="question" && question){
+        const target=normalizeSubject(question);
+        fallback=state.journey.nodes.find(candidate=>{
+          const snap=journeyNodeDisplayObserver(candidate);
+          return normalizeSubject(snap?.question||snap?.label||"")===target;
+        })||null;
+      }else if(focus==="entity" && id){
+        fallback=state.journey.nodes.find(candidate=>{
+          const snap=journeyNodeDisplayObserver(candidate);
+          return snap?.kind==="entity" && String(snap?.id||"")===id;
+        })||null;
+      }
+
+      if(fallback){
+        restoreObserverFromJourneyNode(fallback,{historyMode:"none"});
+        return;
+      }
+
+      if(focus==="entity" && id && state.entities.has(id)){
+        const entity=state.entities.get(id);
+        state.observer={kind:"entity",id,label:entity?.name||entity?.label||id,entity,article_id:""};
+        state.response=null;
+        state.expanded=false;
+        ensureJourneyAtHistoryBoundary(state.observer);
+        saveTrail();
+        render();
+        return;
+      }
+
+      if(focus==="question" && question){
+        const loading=buildUniversalLoadingResponse(question,question);
+        state.observer={
+          kind:"response",
+          id:loading.id,
+          label:question,
+          response:loading,
+          question,
+          semantic_subject_id:"",
+          semantic_subject_label:"",
+          article_id:""
+        };
+        state.response=loading;
+        state.universalAnswerLoaded=false;
+        state.universalAnswerPending=false;
+        ensureJourneyAtHistoryBoundary(state.observer);
+        saveTrail();
+        render();
+        hydrateUniversalAnswer(question,question);
+      }
+    }catch{}
+  });
+
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
   loadKnowledge().then(async ()=>{
     loadJourney();
 
     if(await restorePersistentSharedStation()) return;
+
+    const savedEntryNode=canonicalJourneyNodeForEntry();
+    if(savedEntryNode){
+      state.entryObserver=journeyNodeDisplayObserver(savedEntryNode);
+      restoreObserverFromJourneyNode(savedEntryNode,{historyMode:"replace"});
+      syncCurrentHistoryToJourney();
+      return;
+    }
+
+    // A fresh/deep-linked page entry is not automatically a continuation of
+    // whatever Journey happened to be stored in this browser session.
+    if(!entryHasCosmosContinuity()){
+      startJourneyAtEntryBoundary();
+    }
 
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
