@@ -7,7 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <meta name="cosmos-build" content="stable-v27.8-20260911" />
+  <meta name="cosmos-build" content="stable-v27.9-20260911" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -894,8 +894,11 @@
     return;
   }
 
-  const COSMOS_BUILD_ID = "stable-v27.8-20260911";
-  try{ window.COSMOS_BUILD_ID=COSMOS_BUILD_ID; console.info(`Cosmos build ${COSMOS_BUILD_ID}`); }catch{}
+  const COSMOS_BUILD_ID = "stable-v27.9-20260911";
+  try{
+    window.COSMOS_BUILD_ID=COSMOS_BUILD_ID;
+    console.info(`Cosmos build ${COSMOS_BUILD_ID}`);
+  }catch{}
 
   const MAX_INITIAL_NODES = 10;
   const MAX_EXPANDED_NODES = 18;
@@ -955,7 +958,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.8-stable-working-baseline";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.9-stable-working-baseline";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -2430,6 +2433,7 @@
       const response=snap.response_snapshot
         ? JSON.parse(JSON.stringify(snap.response_snapshot))
         : buildQuestionResponse(snap.question);
+
       state.observer={
         ...snap,
         kind:"response",
@@ -2441,8 +2445,9 @@
         semantic_subject_label:response?.subject_match?.label||snap.semantic_subject_label||""
       };
       state.response=response;
-      state.universalAnswerLoaded=
-        Boolean(response && response.response_type!=="universal_loading");
+      state.universalAnswerLoaded=Boolean(
+        response && response.response_type!=="universal_loading"
+      );
     }else{
       state.observer={...snap};
     }
@@ -3041,12 +3046,18 @@
     );
 
     if(
-      /projection_depth|projection_role|primary_dimension|secondary_dimension|source provides knowledge/i.test(text) &&
-      /structural Cosmos map|semantic navigation|parent_id/i.test(text)
+      /projection_depth|projection_role|primary_dimension|secondary_dimension|parent_id/i.test(text) &&
+      /structural Cosmos map|semantic navigation|source provides knowledge/i.test(text)
     ){
-      const response=observer?.response;
-      const fallback=String(response?.short_answer||response?.essence||"").trim();
-      if(fallback && fallback!==text) return viewerSafeAnswer(fallback,{...observer,response:null});
+      const fallback=String(
+        observer?.response?.short_answer ||
+        observer?.response?.essence ||
+        ""
+      ).trim();
+
+      if(fallback && fallback!==text){
+        return viewerSafeAnswer(fallback,{...observer,response:null});
+      }
       return "";
     }
 
@@ -4154,10 +4165,14 @@
       });
       og.appendChild(loadingArc);
 
-      // INNER: use the exact same 49px circle as the normal inner border.
-      // pathLength=100 makes progress deterministic and visually starts from zero.
-      // Indeterminate activity only: no percentage/filler ring.
-      const stageTitle=svgEl("text",{x:0,y:91,"text-anchor":"middle",fill:"#dce8ff","font-size":10,"font-weight":800,"letter-spacing":"1.1"});
+      // No fabricated completion ring. The rotating outer arc is the activity cue.
+      const stageTitle=svgEl("text",{
+        x:0,y:91,"text-anchor":"middle",
+        fill:"#dce8ff",
+        "font-size":10,
+        "font-weight":800,
+        "letter-spacing":"1.1"
+      });
       stageTitle.textContent="EXPLORING";
       og.appendChild(stageTitle);
       og.appendChild(stagePct);
@@ -4762,18 +4777,23 @@
 
   function paintLoadingNarrative(){
     if(!state.universalAnswerPending) return;
+
     state.loadingStage="exploring";
     state.loadingStageDetail="Following connections across the relevant universe…";
     statusEl.textContent="exploring";
+
     if(emptyEl){
       emptyEl.style.display="block";
       emptyEl.innerHTML=
-        `<div class="cosmosBrewStatus"><strong>Exploring</strong>` +
-        `<span>${esc(state.loadingStageDetail)}</span></div>`;
+        `<div class="cosmosBrewStatus">` +
+        `<strong>Exploring</strong>` +
+        `<span>${esc(state.loadingStageDetail)}</span>` +
+        `</div>`;
     }
   }
 
   function paintLoadingProgress(){
+    // Compatibility name retained. Loading is intentionally indeterminate.
     paintLoadingNarrative();
   }
 
@@ -4811,6 +4831,7 @@
   function stopLoadingProgress(reset=true){
     clearInterval(state.loadingProgressTimer);
     state.loadingProgressTimer=null;
+
     if(reset){
       state.loadingProgressValue=0;
       state.loadingProgressCeiling=0;
@@ -4838,14 +4859,20 @@
     if(!question || state.universalAnswerLoaded) return;
 
     cancelActiveUniversalRequest();
+
     const requestId=++state.universalRequestSerial;
     const requestQuestion=String(question);
     const controller=new AbortController();
-    state.universalActiveRequest={id:requestId,question:requestQuestion,controller};
     const requestStillCurrent=()=>Boolean(
       state.universalActiveRequest?.id===requestId &&
       state.universalActiveRequest?.question===requestQuestion
     );
+
+    state.universalActiveRequest={
+      id:requestId,
+      question:requestQuestion,
+      controller
+    };
 
     state.universalAnswerPending=true;
     startLoadingProgress();
@@ -4892,7 +4919,6 @@
         signal:controller.signal
       });
 
-      if(!requestStillCurrent()) return;
       if(!response.ok){
         throw new Error(`Cosmos gateway returned ${response.status}`);
       }
