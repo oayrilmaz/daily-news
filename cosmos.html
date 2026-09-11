@@ -1,10 +1,11 @@
 
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="working-package-v3.6.1-safe-update" />
+  <meta name="cosmos-build" content="working-package-v4.8-topic-memory" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -888,7 +889,19 @@
     entryParams.has("article_id") ||
     entryParams.has("from_id") ||
     entryParams.has("to_id") ||
-    entryParams.has("shared");
+    entryParams.has("shared") ||
+    entryParams.has("topic");
+
+  const navigationEntry = performance.getEntriesByType?.("navigation")?.[0];
+  const isPageReload = navigationEntry?.type === "reload" ||
+    (performance.navigation && performance.navigation.type === 1);
+
+  // Refresh ends the active exploration and returns to the quiet Cosmos entrance.
+  // Shared public stations remain refreshable because they are explicit public links.
+  if (hasExplicitObserver && isPageReload && !entryParams.has("shared")) {
+    location.replace("/");
+    return;
+  }
 
   // Fresh Cosmos visits always begin at the single living Cosmos entrance at /.
   // Only explicit observer/deep-link requests stay in the Cosmos explorer.
@@ -949,15 +962,19 @@
     question: params.get("question") || "",
     view: params.get("view") || "",
     context_id: params.get("context_id") || "",
-    context_label: params.get("context_label") || ""
+    context_label: params.get("context_label") || "",
+    topic_id: params.get("topic") || ""
   };
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.6.1-working-package-safe-update";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.8-working-package-topic-memory";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
+  const TOPIC_ARCHIVE_STORAGE_KEY = "ptdtoday_cosmos_topic_archive_v0_1";
+  const ACTIVE_TOPIC_SESSION_KEY = "ptdtoday_cosmos_active_topic_v0_1";
+  const TOPIC_ARCHIVE_MAX = 240;
 
   const state = {
     entities: new Map(),
@@ -982,6 +999,9 @@
     trailStorageKey: "ptdtoday_cosmos_observer_trail_v0_1",
     journeyStorageKey: "ptdtoday_cosmos_journey_tree_v0_8",
     journeyViewStorageKey: "ptdtoday_cosmos_journey_view_open_v0_8",
+    topicArchiveStorageKey: TOPIC_ARCHIVE_STORAGE_KEY,
+    activeTopicSessionKey: ACTIVE_TOPIC_SESSION_KEY,
+    activeTopicId: "",
     journey: {
       nodes: [],
       current_node_id: "",
@@ -2328,6 +2348,153 @@
     return Boolean(ka && kb && ka===kb);
   }
 
+  // Topic Memory v0.1 — top-level asks persist independently from temporary exploration.
+  // Journey stations remain inside a topic; they never become separate archive topics.
+  function topicArchiveLoad(){
+    try{
+      const parsed=JSON.parse(localStorage.getItem(state.topicArchiveStorageKey)||"[]");
+      return Array.isArray(parsed) ? parsed.filter(row=>row && row.topic_id && row.question) : [];
+    }catch{
+      return [];
+    }
+  }
+
+  function topicArchiveSave(rows){
+    try{
+      const clean=(Array.isArray(rows)?rows:[])
+        .filter(row=>row && row.topic_id && row.question)
+        .sort((a,b)=>Number(b.updated_at||b.created_at||0)-Number(a.updated_at||a.created_at||0))
+        .slice(0,TOPIC_ARCHIVE_MAX);
+      localStorage.setItem(state.topicArchiveStorageKey,JSON.stringify(clean));
+    }catch{}
+  }
+
+  function topicQuestionKey(question){
+    return normalizeSubject(String(question||"")).slice(0,220);
+  }
+
+  function topicIdFor(question,createdAt=Date.now()){
+    const stem=topicQuestionKey(question).replace(/\s+/g,"-").slice(0,54)||"cosmos";
+    return `t${createdAt.toString(36)}-${stem}`;
+  }
+
+  function activeTopicId(){
+    if(state.activeTopicId) return state.activeTopicId;
+    try{
+      state.activeTopicId=String(sessionStorage.getItem(state.activeTopicSessionKey)||"");
+    }catch{}
+    return state.activeTopicId;
+  }
+
+  function setActiveTopicId(topicId){
+    state.activeTopicId=String(topicId||"");
+    try{
+      if(state.activeTopicId) sessionStorage.setItem(state.activeTopicSessionKey,state.activeTopicId);
+      else sessionStorage.removeItem(state.activeTopicSessionKey);
+    }catch{}
+  }
+
+  function topicTopLevelEntry(){
+    if(entry.focus!=="question" || !entry.question || entry.topic_id || entryParams.has("shared")) return false;
+    const source=String(entry.from||"").toLowerCase();
+    return !["cosmos-projection","journey","station","butterfly"].includes(source) &&
+      !isInternalStationResearchQuestion(entry.question);
+  }
+
+  function clearActiveExplorationSession({keepTopic=false}={}){
+    try{
+      sessionStorage.removeItem(state.journeyStorageKey);
+      sessionStorage.removeItem(state.trailStorageKey);
+      sessionStorage.removeItem(state.journeyViewStorageKey);
+      if(!keepTopic) sessionStorage.removeItem(state.activeTopicSessionKey);
+    }catch{}
+    state.journey={nodes:[],current_node_id:"",next_id:1};
+    state.history=[];
+    state.universalAnswerLoaded=false;
+    state.universalAnswerPending=false;
+    if(!keepTopic) state.activeTopicId="";
+  }
+
+  function beginTopLevelTopic(question){
+    clearActiveExplorationSession({keepTopic:false});
+    const createdAt=Date.now();
+    const topicId=topicIdFor(question,createdAt);
+    setActiveTopicId(topicId);
+    const rows=topicArchiveLoad();
+    rows.unshift({
+      topic_id:topicId,
+      question:String(question||"").trim(),
+      question_key:topicQuestionKey(question),
+      created_at:createdAt,
+      updated_at:createdAt,
+      year:new Date(createdAt).getFullYear(),
+      month:new Date(createdAt).getMonth()+1,
+      current_node_id:"",
+      journey:[],
+      entry_observer:null,
+      current_observer:null
+    });
+    topicArchiveSave(rows);
+    return topicId;
+  }
+
+  function persistCurrentTopicSnapshot(){
+    const topicId=activeTopicId();
+    if(!topicId) return;
+    const rows=topicArchiveLoad();
+    const index=rows.findIndex(row=>row.topic_id===topicId);
+    if(index<0) return;
+    const now=Date.now();
+    const current=rows[index];
+    rows[index]={
+      ...current,
+      updated_at:now,
+      current_node_id:state.journey?.current_node_id||"",
+      journey:JSON.parse(JSON.stringify(state.journey?.nodes||[])),
+      entry_observer:observerSnapshot(state.entryObserver),
+      current_observer:observerSnapshot(state.observer)
+    };
+    topicArchiveSave(rows);
+  }
+
+  function restoreTopicFromArchive(topicId){
+    const record=topicArchiveLoad().find(row=>row.topic_id===topicId);
+    if(!record) return false;
+    setActiveTopicId(record.topic_id);
+    state.journey.nodes=Array.isArray(record.journey)
+      ? JSON.parse(JSON.stringify(record.journey))
+      : [];
+    state.journey.current_node_id=String(record.current_node_id||"");
+    state.journey.next_id=state.journey.nodes.reduce(
+      (m,n)=>Math.max(m,Number(String(n?.node_id||"").replace(/\D/g,""))||0),0
+    )+1;
+
+    let snap=record.current_observer ||
+      journeyNodeDisplayObserver(journeyNodeById(state.journey.current_node_id)) ||
+      record.entry_observer;
+    if(!snap) return false;
+
+    // Reuse the same canonical restore path used by Journey navigation whenever possible.
+    const currentNode=journeyNodeById(state.journey.current_node_id);
+    if(currentNode){
+      restoreObserverFromJourneyNode(currentNode,{skipHistory:true});
+    }else{
+      state.observer={...snap};
+      if(snap.kind==="response" && snap.response_snapshot){
+        state.observer.response=JSON.parse(JSON.stringify(snap.response_snapshot));
+        state.response=state.observer.response;
+        state.universalAnswerLoaded=state.observer.response?.response_type!=="universal_loading";
+      }
+      state.entryObserver=record.entry_observer ? {...record.entry_observer} : state.observer;
+      ensureJourneyCurrent(state.observer);
+      saveTrail();
+      render();
+    }
+    state.entryObserver=record.entry_observer || journeyNodeDisplayObserver(journeyRootNode()) || state.entryObserver || state.observer;
+    persistCurrentTopicSnapshot();
+    return true;
+  }
+
   function journeyNodeById(id){
     return state.journey.nodes.find(node=>node.node_id===id) || null;
   }
@@ -2350,6 +2517,7 @@
     try{
       sessionStorage.setItem(state.journeyStorageKey,JSON.stringify(state.journey));
     }catch{}
+    persistCurrentTopicSnapshot();
   }
 
   function resolvedJourneyStateFromObserver(observer){
@@ -2614,7 +2782,7 @@
     compactJourneyStations();
   }
 
-  function restoreObserverFromJourneyNode(node){
+  function restoreObserverFromJourneyNode(node,options={}){
     const snap=journeyNodeDisplayObserver(node);
     if(!snap) return;
 
@@ -2690,7 +2858,10 @@
         url.searchParams.delete("question");
         url.searchParams.delete("relationship_id");
       }
-      history.pushState({cosmos:true,journey_node:node.node_id},"",url.pathname+url.search);
+      if(!options.skipHistory){
+        url.searchParams.set("topic",activeTopicId()||entry.topic_id||"");
+        history.pushState({cosmos:true,journey_node:node.node_id},"",url.pathname+url.search);
+      }
     }catch{}
 
     saveJourney();
@@ -5292,6 +5463,7 @@
 
       reconcileJourneyWithResolvedObserver(state.observer);
       saveTrail();
+      persistCurrentTopicSnapshot();
       render();
       restoreKnowledgeStatus();
     }catch(error){
@@ -5313,6 +5485,7 @@
         article_id:entry.article_id
       };
       reconcileJourneyWithResolvedObserver(state.observer);
+      persistCurrentTopicSnapshot();
       render();
       restoreKnowledgeStatus();
     }finally{
@@ -5375,9 +5548,12 @@
       url.searchParams.delete("context_label");
     }
 
+    const currentTopic=activeTopicId();
+    if(currentTopic) url.searchParams.set("topic",currentTopic);
     history.pushState({cosmos:true},"",url.pathname+url.search);
     ensureJourneyCurrent(state.observer);
     saveTrail();
+    persistCurrentTopicSnapshot();
     render();
     hydrateUniversalAnswer(question);
   });
@@ -5735,22 +5911,10 @@
 
 
   function startFreshCosmos(){
-    // Clicking the Cosmos title is an intentional new beginning.
-    // Remove only observer/journey session state; canonical Cosmos knowledge is untouched.
-    try{
-      sessionStorage.removeItem(state.journeyStorageKey);
-      sessionStorage.removeItem(state.trailStorageKey);
-      sessionStorage.removeItem(state.journeyViewStorageKey);
-    }catch{}
-
-    state.journey={
-      nodes:[],
-      current_node_id:"",
-      next_id:1
-    };
-    state.history=[];
-    state.universalAnswerLoaded=false;
-    state.universalAnswerPending=false;
+    // Exploration is temporary; Topic Memory is not. Preserve the current topic
+    // before returning to the quiet Cosmos entrance, then clear only session state.
+    persistCurrentTopicSnapshot();
+    clearActiveExplorationSession({keepTopic:false});
   }
 
   cosmosHomeLink.addEventListener("click",(event)=>{
@@ -5783,14 +5947,21 @@
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
   loadKnowledge().then(async ()=>{
-    loadJourney();
+    if(topicTopLevelEntry()){
+      beginTopLevelTopic(entry.question);
+    }else{
+      loadJourney();
+      if(entry.topic_id) setActiveTopicId(entry.topic_id);
+    }
 
+    if(entry.topic_id && restoreTopicFromArchive(entry.topic_id)) return;
     if(await restorePersistentSharedStation()) return;
 
     state.observer=resolveEntryObserver();
     state.entryObserver=state.observer;
     ensureJourneyCurrent(state.observer);
     saveTrail();
+    persistCurrentTopicSnapshot();
     render();
 
     if(entry.focus==="question" && entry.question){
