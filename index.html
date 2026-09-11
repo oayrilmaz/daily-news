@@ -221,9 +221,30 @@
       const topicMemory=document.getElementById("topicMemory");
       const topicYears=document.getElementById("topicYears");
       const topicMemoryCount=document.getElementById("topicMemoryCount");
-      const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_memory_v1";
+      const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
 
+      function recoverLastTopicFromSession(){
+        try{
+          const existing=JSON.parse(localStorage.getItem(TOPIC_MEMORY_KEY)||"[]");
+          if(Array.isArray(existing) && existing.length) return;
+          const trail=JSON.parse(sessionStorage.getItem("ptdtoday_cosmos_observer_trail_v0_1")||"null");
+          const journeyState=JSON.parse(sessionStorage.getItem("ptdtoday_cosmos_journey_tree_v0_8")||"null");
+          const snap=trail?.currentObserver || trail?.entryObserver;
+          const question=String(snap?.question||"").trim();
+          if(!question) return;
+          const now=Date.now();
+          const topicId=`recovered-${now.toString(36)}`;
+          localStorage.setItem(TOPIC_MEMORY_KEY,JSON.stringify([{
+            topic_id:topicId,question,created_at:now,updated_at:now,
+            year:new Date(now).getFullYear(),month:new Date(now).getMonth()+1,
+            current_node_id:String(journeyState?.current_node_id||""),
+            journey:Array.isArray(journeyState?.nodes)?journeyState.nodes:[],
+            entry_observer:trail?.entryObserver||null,current_observer:snap
+          }]));
+        }catch(_){}
+      }
       function readTopicMemory(){
+        recoverLastTopicFromSession();
         try{const p=JSON.parse(localStorage.getItem(TOPIC_MEMORY_KEY)||"[]");return Array.isArray(p)?p:(Array.isArray(p?.topics)?p.topics:[])}catch(_){return[]}
       }
       function topicTimestamp(x){const r=x?.updated_at||x?.created_at||x?.last_opened_at||x?.timestamp||x?.saved_at,n=Number(r);if(Number.isFinite(n)&&n>0)return n;const d=Date.parse(String(r||""));return Number.isFinite(d)?d:0}
