@@ -966,7 +966,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.8-clean-essence-journey";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "2.9-hide-internal-ai-prompt";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -3288,6 +3288,16 @@
       }));
   }
 
+  function isInternalStationResearchQuestion(value){
+    const q=String(value||"").trim();
+    return /^Explain\s+["“].+["”]\s+as the next Cosmos station reached from\s+["“]/i.test(q)
+      || (
+        /^Explain\s+["“]/i.test(q) &&
+        /previous station/i.test(q) &&
+        /origin scenario/i.test(q)
+      );
+  }
+
   function renderAnswerFirst(observer,projection){
     const directAnswer=buildDirectAnswerForObserver(observer);
     const intelligence=answerFirstRelevantItems(observer);
@@ -3376,7 +3386,9 @@
       <div class="answerFirst">
         <div class="answerHero">
           <div class="answerEyebrow">Answer</div>
-          <h3>${esc(observer?.question || entry.question || observerDisplayLabel(observer))}</h3>
+          ${isInternalStationResearchQuestion(observer?.question)
+            ? ""
+            : `<h3>${esc(observer?.question || entry.question || observerDisplayLabel(observer))}</h3>`}
           <p>${esc(answerText)}</p>
           ${answerBasis}
         </div>
@@ -4003,7 +4015,9 @@
   function renderObserverDetails(observer,projection){
     const type = observer.kind || "object";
     const source = observer.article_id ? `<p><strong>Article:</strong> ${esc(observer.article_id)}</p>` : "";
-    const question = observer.question ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>` : "";
+    const question = observer.question && !isInternalStationResearchQuestion(observer.question)
+      ? `<p><strong>Entry question:</strong> ${esc(observer.question)}</p>`
+      : "";
     const arrivedFrom = observer.from_observer_label
       ? `<p><strong>You arrived here from:</strong> ${esc(observer.from_observer_label)}${observer.from_relationship_label?` · <strong>Connection:</strong> ${esc(observer.from_relationship_label)}`:""}</p>`
       : "";
