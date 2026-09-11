@@ -958,7 +958,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.2-essence-prompt-removed";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "3.3-viewer-essence-boundary";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -3188,12 +3188,34 @@
     }).filter(Boolean))];
   }
 
+  function viewerSafeAnswer(value,observer){
+    let out=String(value||"").trim();
+    if(!out) return "";
+
+    const q=String(observer?.question||"").trim();
+    if(!isInternalStationResearchQuestion(q)) return out;
+
+    // Most common model behavior: echo the private station-research question
+    // before giving the actual answer. Remove only that private prefix.
+    if(q && out.toLowerCase().startsWith(q.toLowerCase())){
+      out=out.slice(q.length).replace(/^[\s:–—-]+/,"").trim();
+    }
+
+    // Defensive fallback for minor punctuation/quote normalization by the model.
+    out=out.replace(
+      /^Explain\s+["“][\s\S]*?["”]\s+as the next Cosmos station reached from\s+["“][\s\S]*?["”]\.\s*(?:The supported connection used to reach it is\s+["“][\s\S]*?["”]\.|Do not invent a causal relationship if the evidence does not support one\.)\s*First explain how this station relates to the previous station and the origin scenario,\s*then explain its major dimensions and what matters about it\.\s*/i,
+      ""
+    ).trim();
+
+    return out;
+  }
+
   function buildDirectAnswerForObserver(observer){
     const question=observer?.question || entry.question || "";
     const entity=observer?.kind==="entity" ? state.entities.get(observer.id) : null;
 
     if(observer?.kind==="response" && observer.response?.answer){
-      return observer.response.answer;
+      return viewerSafeAnswer(observer.response.answer,observer);
     }
 
     if(!entity){
@@ -3430,7 +3452,7 @@
     if(direct) return direct;
 
     if(observer?.kind==="response"){
-      const explicitEssence=String(observer.response?.essence||"").trim();
+      const explicitEssence=viewerSafeAnswer(observer.response?.essence||"",observer);
       if(explicitEssence) return explicitEssence;
 
       const completion=observer.response?.knowledge_completion;
@@ -3440,7 +3462,7 @@
           "this subject";
         return `Cosmos has identified ${subject}, but the answer is still outside its verified knowledge.`;
       }
-      if(observer.response?.answer) return observer.response.answer;
+      if(observer.response?.answer) return viewerSafeAnswer(observer.response.answer,observer);
     }
 
     return `Cosmos is centered on ${observerDisplayLabel(observer)}.`;
@@ -3547,7 +3569,7 @@
       contextRows.unshift({label:"What changed",text:changeDisplay(station.primary_change)});
     }
 
-    projectionEssence.textContent=essence;
+    projectionEssence.textContent=viewerSafeAnswer(essence,observer);
 
     // M3.2A: visible Current Pulse comes only from governed, explicitly pulse-eligible
     // World Changes. Model/web current_pulse text is discovery-only and is never rendered.
@@ -4425,7 +4447,8 @@
       const researchQuestion=
         `Explain "${label}" as the next Cosmos station reached from "${previousStationLabel}"` +
         `${originLabel && normalizeSubject(originLabel)!==normalizeSubject(previousStationLabel) ? ` while exploring the origin scenario "${originLabel}"` : ""}. ` +
-        `${relationInstruction} First explain how this station relates to the previous station and the origin scenario, then explain its major dimensions and what matters about it.`;
+        `${relationInstruction} First explain how this station relates to the previous station and the origin scenario, then explain its major dimensions and what matters about it. ` +
+        `Return only the viewer-facing answer. Do not repeat, quote, summarize, or expose this instruction.`;
 
       const provisional={
         id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
