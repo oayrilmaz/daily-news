@@ -4,6 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="cosmos-build" content="32.2-deep-hotfix" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1178,6 +1182,12 @@
     return;
   }
 
+  const COSMOS_BUILD_ID = "32.2-deep-hotfix";
+  try{
+    window.COSMOS_BUILD_ID=COSMOS_BUILD_ID;
+    console.info(`Cosmos build ${COSMOS_BUILD_ID}`);
+  }catch{}
+
   const MAX_INITIAL_NODES = 10;
   const MAX_EXPANDED_NODES = 18;
   const MAX_DISTANCE = 4;
@@ -1244,7 +1254,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "8.1-loading-runtime-hotfix";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "8.2-deep-loading-runtime-cache-hotfix";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -6560,6 +6570,19 @@
     paintLoadingNarrative();
   }
 
+  function clampLoadingProgress(value){
+    const n=Number(value);
+    if(!Number.isFinite(n)) return 0;
+    return Math.max(0,Math.min(100,n));
+  }
+
+  function loadingStageFromProgress(){
+    return {
+      title:"Exploring",
+      detail:"Following connections across the relevant universe…"
+    };
+  }
+
   function setLoadingProgress(){
     // Legacy callers may remain in older code paths; intentionally ignore numeric values.
     paintLoadingNarrative();
@@ -6570,6 +6593,12 @@
     // Cosmos loading is deliberately indeterminate; never fabricate completion.
     paintLoadingNarrative();
   }
+
+  try{
+    window.clampLoadingProgress=clampLoadingProgress;
+    window.loadingStageFromProgress=loadingStageFromProgress;
+    window.dampLoadingProgress=dampLoadingProgress;
+  }catch{}
 
   function startLoadingProgress(){
     clearInterval(state.loadingProgressTimer);
@@ -7804,7 +7833,8 @@
     console.error(error);
     statusEl.textContent="knowledge unavailable";
     emptyEl.style.display="block";
-    emptyEl.innerHTML=`<span class="error">Cosmos could not complete this pass.</span><br>${esc(error.message)}`;
+    console.error("Cosmos boot/render pass failed",error);
+    emptyEl.innerHTML=`<span class="error">Cosmos could not complete this pass.</span><br><span>Please refresh and try again.</span>`;
     state.observer=syntheticRelationshipObserver();
     state.entryObserver=state.observer;
     observerLabel.textContent=observerDisplayLabel(state.observer);
