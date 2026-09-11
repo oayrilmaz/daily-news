@@ -1,5 +1,6 @@
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -131,6 +132,17 @@
       .orbHalo{width:min(90vw,430px)}
       .ask input{font-size:15px}
     }
+
+    /* Cosmos Topic Memory */
+    .topicMemory{width:min(800px,100%);margin:0 auto;display:none}.topicMemory.active{display:block}
+    .topicMemoryHeader{display:flex;justify-content:space-between;gap:12px;margin:0 2px 9px;color:#8793a8;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.topicMemoryCount{letter-spacing:0;text-transform:none;color:#68758c}
+    .topicYears{display:grid;gap:8px}.topicYear,.topicMonth{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(7,15,29,.48);overflow:hidden}
+    .topicYear>summary,.topicMonth>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#cbd5e4}.topicYear>summary::-webkit-details-marker,.topicMonth>summary::-webkit-details-marker{display:none}
+    .topicYear>summary{padding:11px 14px;font-size:13px}.topicMonth{margin:0 8px 8px;background:rgba(10,20,37,.54)}.topicMonth>summary{padding:10px 12px;font-size:12px;color:#aebbd0}
+    .topicSummaryLeft{display:flex;align-items:center;gap:8px;min-width:0}.topicChevron{font-size:10px;color:#6f7d95;transition:transform .18s ease}details[open]>summary .topicChevron{transform:rotate(90deg)}.topicSummaryCount{color:#65738b;font-size:11px;white-space:nowrap}
+    .topicList{display:grid;border-top:1px solid rgba(255,255,255,.055)}.topicItem{appearance:none;border:0;border-bottom:1px solid rgba(255,255,255,.045);background:transparent;color:#dce5f3;text-align:left;padding:11px 12px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.topicItem:last-child{border-bottom:0}.topicItem:hover,.topicItem:focus-visible{background:rgba(110,168,255,.07);outline:none}.topicQuestion{min-width:0;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topicResume{font-size:11px;color:#72819a}
+    @media (max-width:640px){body{overflow:auto}.stage{align-content:start;padding-top:calc(74px + env(safe-area-inset-top));padding-bottom:calc(34px + env(safe-area-inset-bottom))}.topicQuestion{font-size:12.5px}}
+
   </style>
   <script>
     (() => {
@@ -171,6 +183,10 @@
       </form>
 
       <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
+      <section class="topicMemory" id="topicMemory" aria-label="Your Cosmos journeys">
+        <div class="topicMemoryHeader"><span>Your Cosmos</span><span class="topicMemoryCount" id="topicMemoryCount"></span></div>
+        <div class="topicYears" id="topicYears"></div>
+      </section>
 
       <section class="emergence" id="emergence" aria-live="polite">
         <div class="emergenceCard">
@@ -202,6 +218,43 @@
       const resolvedLabel = document.getElementById("resolvedLabel");
       const resolvedText = document.getElementById("resolvedText");
       const hint = document.getElementById("hint");
+      const topicMemory=document.getElementById("topicMemory");
+      const topicYears=document.getElementById("topicYears");
+      const topicMemoryCount=document.getElementById("topicMemoryCount");
+      const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_memory_v1";
+
+      function readTopicMemory(){
+        try{const p=JSON.parse(localStorage.getItem(TOPIC_MEMORY_KEY)||"[]");return Array.isArray(p)?p:(Array.isArray(p?.topics)?p.topics:[])}catch(_){return[]}
+      }
+      function topicTimestamp(x){const r=x?.updated_at||x?.created_at||x?.last_opened_at||x?.timestamp||x?.saved_at,n=Number(r);if(Number.isFinite(n)&&n>0)return n;const d=Date.parse(String(r||""));return Number.isFinite(d)?d:0}
+      function topicQuestion(x){return String(x?.question||x?.title||x?.label||x?.observer?.question||"").trim()}
+      function topicId(x){return String(x?.topic_id||x?.id||x?.journey_id||"").trim()}
+      function topicResumeUrl(x){const e=String(x?.resume_url||x?.url||"").trim();if(e)return e;const p=new URLSearchParams({focus:"question",view:"cosmos_projection",question:topicQuestion(x),resume:"1"}),id=topicId(x);if(id)p.set("topic",id);return `/cosmos.html?${p}`}
+      function monthName(i){return new Intl.DateTimeFormat(undefined,{month:"long"}).format(new Date(2026,i,1))}
+      function renderTopicMemory(){
+        if(!topicMemory||!topicYears)return;
+        const topics=readTopicMemory().filter(x=>topicQuestion(x)).sort((a,b)=>topicTimestamp(b)-topicTimestamp(a));
+        topicYears.textContent="";
+        if(!topics.length){topicMemory.classList.remove("active");return}
+        const now=new Date(),g=new Map();
+        topics.forEach(x=>{const d=new Date(topicTimestamp(x)||Date.now()),y=d.getFullYear(),m=d.getMonth();if(!g.has(y))g.set(y,new Map());if(!g.get(y).has(m))g.get(y).set(m,[]);g.get(y).get(m).push(x)});
+        [...g.entries()].sort((a,b)=>b[0]-a[0]).forEach(([y,months])=>{
+          const yd=document.createElement("details");yd.className="topicYear";yd.open=y===now.getFullYear();
+          const ys=document.createElement("summary"),total=[...months.values()].reduce((s,l)=>s+l.length,0);
+          ys.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${y}</span></span><span class="topicSummaryCount">${total} ${total===1?"journey":"journeys"}</span>`;yd.appendChild(ys);
+          [...months.entries()].sort((a,b)=>b[0]-a[0]).forEach(([m,list])=>{
+            const md=document.createElement("details");md.className="topicMonth";md.open=y===now.getFullYear()&&m===now.getMonth();
+            const ms=document.createElement("summary");ms.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${monthName(m)}</span></span><span class="topicSummaryCount">${list.length}</span>`;md.appendChild(ms);
+            const box=document.createElement("div");box.className="topicList";
+            list.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="topicItem";b.dataset.resumeUrl=topicResumeUrl(x);const q=document.createElement("span");q.className="topicQuestion";q.textContent=topicQuestion(x);const r=document.createElement("span");r.className="topicResume";r.textContent="Resume ›";b.append(q,r);b.onclick=()=>location.href=b.dataset.resumeUrl;box.appendChild(b)});
+            md.appendChild(box);yd.appendChild(md)
+          });topicYears.appendChild(yd)
+        });
+        topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active")
+      }
+      window.addEventListener("pageshow",renderTopicMemory);
+      window.addEventListener("storage",e=>{if(e.key===TOPIC_MEMORY_KEY)renderTopicMemory()});
+      renderTopicMemory();
 
       function resolveView(question) {
         const q = String(question || "").trim();
@@ -266,7 +319,10 @@
         hint.textContent = "Your question becomes the temporary center.";
 
         window.setTimeout(() => {
-          location.href = cosmosUrl(question, resolved);
+          const url=new URL(cosmosUrl(question,resolved),location.origin);
+          url.searchParams.set("new_topic","1");
+          url.searchParams.set("topic",`topic-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`);
+          location.href=url.pathname+url.search;
         }, 120);
       });
 
