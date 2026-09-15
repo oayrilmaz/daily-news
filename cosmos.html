@@ -969,7 +969,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.9-working-package-persistent-journey-resume";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.9.1-working-package-fresh-today-history-toggle";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -5963,6 +5963,12 @@
   });
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
+  function entryRequiresFreshCurrentAnswer(){
+    const q=String(entry.question||"").trim();
+    if(!q) return false;
+    return /\b(today(?:\'s)?|latest|current|right now|now|this morning|this afternoon|this evening|tonight|what changed|developments?|happening|news|daily)\b/i.test(q);
+  }
+
   loadKnowledge().then(async ()=>{
     if(topicTopLevelEntry()){
       beginTopLevelTopic(entry.question,entry.topic_id);
@@ -5971,7 +5977,10 @@
       if(entry.topic_id) setActiveTopicId(entry.topic_id);
     }
 
-    if(entry.topic_id && !entry.new_topic && restoreTopicFromArchive(entry.topic_id)) return;
+    // A saved Journey is canonical for stable subjects, but a time-sensitive
+    // question such as "today" must be refreshed when reopened. Never present
+    // an old dated snapshot as today's answer.
+    if(entry.topic_id && !entry.new_topic && !entryRequiresFreshCurrentAnswer() && restoreTopicFromArchive(entry.topic_id)) return;
     if(await restorePersistentSharedStation()) return;
 
     state.observer=resolveEntryObserver();
