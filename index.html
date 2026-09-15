@@ -135,7 +135,7 @@
 
     /* Cosmos Topic Memory */
     .topicMemory{width:min(800px,100%);margin:0 auto;display:none}.topicMemory.active{display:block}
-    .topicMemoryHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 9px;color:#8793a8;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.topicMemoryActions{display:flex;align-items:center;gap:12px}.topicMemoryCount{letter-spacing:0;text-transform:none;color:#68758c}.topicHistoryToggle{appearance:none;border:0;background:transparent;color:#91a5c4;font:inherit;letter-spacing:.02em;text-transform:none;cursor:pointer;padding:4px 0}.topicHistoryToggle:hover,.topicHistoryToggle:focus-visible{color:#dce8ff;outline:none}.topicMemory:not(.historyExpanded) .topicItem:nth-child(n+3){display:none}.topicMemory:not(.historyExpanded) .topicYear:nth-child(n+2){display:none}.topicMemory.historyExpanded{padding-bottom:28px}body.historyExpanded{overflow:auto}
+    .topicMemoryHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 9px;color:#8793a8;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.topicMemoryActions{display:flex;align-items:center;gap:12px}.topicMemoryCount{letter-spacing:0;text-transform:none;color:#68758c}.topicHistoryToggle{appearance:none;border:0;background:transparent;color:#91a5c4;font:inherit;letter-spacing:.02em;text-transform:none;cursor:pointer;padding:4px 0}.topicHistoryToggle:hover,.topicHistoryToggle:focus-visible{color:#dce8ff;outline:none}.topicMemory:not(.historyExpanded) .topicYears{display:none}.topicMemory.historyExpanded{padding-bottom:28px}body.historyExpanded{overflow:auto}.topicPeriod{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(7,15,29,.48);overflow:hidden}.topicPeriodTitle{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;color:#cbd7e9;font-size:14px}.topicPeriodTitle .topicSummaryCount{font-size:12px;color:#6f7e96}.topicPeriod+.topicPeriod{margin-top:8px}
     .topicYears{display:grid;gap:8px}.topicYear,.topicMonth{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(7,15,29,.48);overflow:hidden}
     .topicYear>summary,.topicMonth>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#cbd5e4}.topicYear>summary::-webkit-details-marker,.topicMonth>summary::-webkit-details-marker{display:none}
     .topicYear>summary{padding:11px 14px;font-size:13px}.topicMonth{margin:0 8px 8px;background:rgba(10,20,37,.54)}.topicMonth>summary{padding:10px 12px;font-size:12px;color:#aebbd0}
@@ -223,6 +223,7 @@
       const topicMemoryCount=document.getElementById("topicMemoryCount");
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
+      const INDEX_BUILD="v4.9.2-time-distance-history";
 
       function recoverLastTopicFromSession(){
         try{
@@ -257,34 +258,57 @@
       function topicCurrentLabel(x){return String(x?.current_label||x?.current_observer?.label||x?.current_observer?.question||topicQuestion(x)).trim()}
       function topicResumeUrl(x){const e=String(x?.resume_url||x?.url||"").trim();if(e)return e;const p=new URLSearchParams({focus:"question",view:"cosmos_projection",question:topicQuestion(x),resume:"1"}),id=topicId(x);if(id)p.set("topic",id);return `/cosmos.html?${p}`}
       function monthName(i){return new Intl.DateTimeFormat(undefined,{month:"long"}).format(new Date(2026,i,1))}
+      function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
+      function startOfWeek(d){const x=startOfDay(d),day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x}
+      function sameMonth(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()}
+      function appendTopicButton(box,x){
+        const b=document.createElement("button");b.type="button";b.className="topicItem";b.dataset.resumeUrl=topicResumeUrl(x);
+        const q=document.createElement("span");q.className="topicQuestion";q.textContent=topicQuestion(x);
+        const meta=document.createElement("span");meta.className="topicMeta";
+        const count=topicStationCount(x),current=topicCurrentLabel(x);
+        meta.textContent=count>1?`${count} stations · Continue from ${current}`:`Continue from ${current}`;
+        const r=document.createElement("span");r.className="topicResume";r.textContent="Resume ›";
+        b.append(q,meta,r);b.onclick=()=>location.href=b.dataset.resumeUrl;box.appendChild(b)
+      }
+      function appendFlatPeriod(label,list){
+        if(!list.length)return;
+        const section=document.createElement("section");section.className="topicPeriod";
+        const head=document.createElement("div");head.className="topicPeriodTitle";head.innerHTML=`<span>${label}</span><span class="topicSummaryCount">${list.length}</span>`;
+        const box=document.createElement("div");box.className="topicList";list.forEach(x=>appendTopicButton(box,x));section.append(head,box);topicYears.appendChild(section)
+      }
+      function appendWeekDetails(parent,label,list,open=false){
+        if(!list.length)return;
+        const wd=document.createElement("details");wd.className="topicMonth";wd.open=open;
+        const ws=document.createElement("summary");ws.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${label}</span></span><span class="topicSummaryCount">${list.length}</span>`;wd.appendChild(ws);
+        const box=document.createElement("div");box.className="topicList";list.forEach(x=>appendTopicButton(box,x));wd.appendChild(box);parent.appendChild(wd)
+      }
       function renderTopicMemory(){
         if(!topicMemory||!topicYears)return;
         const topics=readTopicMemory().filter(x=>topicQuestion(x)).sort((a,b)=>topicTimestamp(b)-topicTimestamp(a));
         topicYears.textContent="";
         if(!topics.length){topicMemory.classList.remove("active");return}
-        const now=new Date(),g=new Map();
-        topics.forEach(x=>{const d=new Date(topicTimestamp(x)||Date.now()),y=d.getFullYear(),m=d.getMonth();if(!g.has(y))g.set(y,new Map());if(!g.get(y).has(m))g.get(y).set(m,[]);g.get(y).get(m).push(x)});
-        [...g.entries()].sort((a,b)=>b[0]-a[0]).forEach(([y,months])=>{
-          const yd=document.createElement("details");yd.className="topicYear";yd.open=y===now.getFullYear();
-          const ys=document.createElement("summary"),total=[...months.values()].reduce((s,l)=>s+l.length,0);
-          ys.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${y}</span></span><span class="topicSummaryCount">${total} ${total===1?"journey":"journeys"}</span>`;yd.appendChild(ys);
-          [...months.entries()].sort((a,b)=>b[0]-a[0]).forEach(([m,list])=>{
-            const md=document.createElement("details");md.className="topicMonth";md.open=y===now.getFullYear()&&m===now.getMonth();
-            const ms=document.createElement("summary");ms.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${monthName(m)}</span></span><span class="topicSummaryCount">${list.length}</span>`;md.appendChild(ms);
-            const box=document.createElement("div");box.className="topicList";
-            list.forEach(x=>{
-              const b=document.createElement("button");b.type="button";b.className="topicItem";b.dataset.resumeUrl=topicResumeUrl(x);
-              const q=document.createElement("span");q.className="topicQuestion";q.textContent=topicQuestion(x);
-              const meta=document.createElement("span");meta.className="topicMeta";
-              const count=topicStationCount(x),current=topicCurrentLabel(x);
-              meta.textContent=count>1?`${count} stations · Continue from ${current}`:`Continue from ${current}`;
-              const r=document.createElement("span");r.className="topicResume";r.textContent="Resume ›";
-              b.append(q,meta,r);b.onclick=()=>location.href=b.dataset.resumeUrl;box.appendChild(b)
-            });
-            md.appendChild(box);yd.appendChild(md)
-          });topicYears.appendChild(yd)
+        topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active");
+        if(!topicMemory.classList.contains("historyExpanded"))return;
+
+        const now=new Date(),today=startOfDay(now),weekStart=startOfWeek(now);
+        const todayList=[],thisWeek=[],currentMonthOlder=[],older=[];
+        topics.forEach(x=>{const d=new Date(topicTimestamp(x)||Date.now()),day=startOfDay(d);if(day>=today)todayList.push(x);else if(day>=weekStart)thisWeek.push(x);else if(sameMonth(d,now))currentMonthOlder.push(x);else older.push(x)});
+        appendFlatPeriod("Today",todayList);
+        appendFlatPeriod("This week",thisWeek);
+
+        if(currentMonthOlder.length){
+          const md=document.createElement("details");md.className="topicYear";
+          const ms=document.createElement("summary");ms.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${monthName(now.getMonth())}</span></span><span class="topicSummaryCount">${currentMonthOlder.length}</span>`;md.appendChild(ms);
+          const weeks=new Map();currentMonthOlder.forEach(x=>{const d=new Date(topicTimestamp(x)),w=startOfWeek(d),k=w.getTime();if(!weeks.has(k))weeks.set(k,[]);weeks.get(k).push(x)});
+          [...weeks.entries()].sort((a,b)=>b[0]-a[0]).forEach(([stamp,list])=>{const w=new Date(Number(stamp)),e=new Date(w);e.setDate(e.getDate()+6);appendWeekDetails(md,`Week of ${monthName(w.getMonth()).slice(0,3)} ${w.getDate()}–${e.getDate()}`,list)});topicYears.appendChild(md)
+        }
+
+        const years=new Map();older.forEach(x=>{const d=new Date(topicTimestamp(x)),y=d.getFullYear(),m=d.getMonth();if(!years.has(y))years.set(y,new Map());if(!years.get(y).has(m))years.get(y).set(m,[]);years.get(y).get(m).push(x)});
+        [...years.entries()].sort((a,b)=>b[0]-a[0]).forEach(([y,months])=>{
+          const yd=document.createElement("details");yd.className="topicYear";
+          const total=[...months.values()].reduce((n,a)=>n+a.length,0),ys=document.createElement("summary");ys.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${y}</span></span><span class="topicSummaryCount">${total} ${total===1?"journey":"journeys"}</span>`;yd.appendChild(ys);
+          [...months.entries()].sort((a,b)=>b[0]-a[0]).forEach(([m,list])=>{const md=document.createElement("details");md.className="topicMonth";const ms=document.createElement("summary");ms.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${monthName(m)}</span></span><span class="topicSummaryCount">${list.length}</span>`;md.appendChild(ms);const weeks=new Map();list.forEach(x=>{const w=startOfWeek(new Date(topicTimestamp(x))),k=w.getTime();if(!weeks.has(k))weeks.set(k,[]);weeks.get(k).push(x)});[...weeks.entries()].sort((a,b)=>b[0]-a[0]).forEach(([stamp,wl])=>{const w=new Date(Number(stamp)),e=new Date(w);e.setDate(e.getDate()+6);appendWeekDetails(md,`Week of ${monthName(w.getMonth()).slice(0,3)} ${w.getDate()}–${e.getDate()}`,wl)});yd.appendChild(md)});topicYears.appendChild(yd)
         });
-        topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active")
       }
       function setHistoryExpanded(expanded){
         if(!topicMemory||!topicHistoryToggle)return;
@@ -292,9 +316,7 @@
         document.body.classList.toggle("historyExpanded",expanded);
         topicHistoryToggle.setAttribute("aria-expanded",expanded?"true":"false");
         topicHistoryToggle.textContent=expanded?"Hide history ↑":"History ›";
-        if(expanded){
-          topicMemory.querySelectorAll("details").forEach(d=>d.open=true);
-        }
+        renderTopicMemory();
       }
       topicHistoryToggle?.addEventListener("click",()=>{
         const expanded=!topicMemory.classList.contains("historyExpanded");
