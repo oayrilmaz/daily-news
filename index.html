@@ -185,7 +185,7 @@
       <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
       <section class="topicMemory" id="topicMemory" aria-label="Your Cosmos journeys">
         <div class="topicMemoryHeader"><span>Your Cosmos</span><span class="topicMemoryActions"><span class="topicMemoryCount" id="topicMemoryCount"></span><button class="topicHistoryToggle" id="topicHistoryToggle" type="button" aria-expanded="false">History ›</button></span></div>
-        <div class="topicYears" id="topicYears"></div>
+        <div class="topicYears" id="topicYears" hidden></div>
       </section>
 
       <section class="emergence" id="emergence" aria-live="polite">
@@ -223,7 +223,7 @@
       const topicMemoryCount=document.getElementById("topicMemoryCount");
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v4.9.2-time-distance-history";
+      const INDEX_BUILD="v4.9.3-history-hide-fix";
 
       function recoverLastTopicFromSession(){
         try{
@@ -313,6 +313,8 @@
       function setHistoryExpanded(expanded){
         if(!topicMemory||!topicHistoryToggle)return;
         topicMemory.classList.toggle("historyExpanded",expanded);
+        topicYears.hidden=!expanded;
+        topicYears.style.display=expanded?"grid":"none";
         document.body.classList.toggle("historyExpanded",expanded);
         topicHistoryToggle.setAttribute("aria-expanded",expanded?"true":"false");
         topicHistoryToggle.textContent=expanded?"Hide history ↑":"History ›";
