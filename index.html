@@ -135,7 +135,7 @@
 
     /* Cosmos Topic Memory */
     .topicMemory{width:min(800px,100%);margin:0 auto;display:none}.topicMemory.active{display:block}
-    .topicMemoryHeader{display:flex;justify-content:space-between;gap:12px;margin:0 2px 9px;color:#8793a8;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.topicMemoryCount{letter-spacing:0;text-transform:none;color:#68758c}
+    .topicMemoryHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 9px;color:#8793a8;font-size:11px;letter-spacing:.08em;text-transform:uppercase}.topicMemoryActions{display:flex;align-items:center;gap:12px}.topicMemoryCount{letter-spacing:0;text-transform:none;color:#68758c}.topicHistoryToggle{appearance:none;border:0;background:transparent;color:#91a5c4;font:inherit;letter-spacing:.02em;text-transform:none;cursor:pointer;padding:4px 0}.topicHistoryToggle:hover,.topicHistoryToggle:focus-visible{color:#dce8ff;outline:none}.topicMemory:not(.historyExpanded) .topicItem:nth-child(n+3){display:none}.topicMemory:not(.historyExpanded) .topicYear:nth-child(n+2){display:none}.topicMemory.historyExpanded{padding-bottom:28px}body.historyExpanded{overflow:auto}
     .topicYears{display:grid;gap:8px}.topicYear,.topicMonth{border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(7,15,29,.48);overflow:hidden}
     .topicYear>summary,.topicMonth>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#cbd5e4}.topicYear>summary::-webkit-details-marker,.topicMonth>summary::-webkit-details-marker{display:none}
     .topicYear>summary{padding:11px 14px;font-size:13px}.topicMonth{margin:0 8px 8px;background:rgba(10,20,37,.54)}.topicMonth>summary{padding:10px 12px;font-size:12px;color:#aebbd0}
@@ -184,7 +184,7 @@
 
       <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
       <section class="topicMemory" id="topicMemory" aria-label="Your Cosmos journeys">
-        <div class="topicMemoryHeader"><span>Your Cosmos</span><span class="topicMemoryCount" id="topicMemoryCount"></span></div>
+        <div class="topicMemoryHeader"><span>Your Cosmos</span><span class="topicMemoryActions"><span class="topicMemoryCount" id="topicMemoryCount"></span><button class="topicHistoryToggle" id="topicHistoryToggle" type="button" aria-expanded="false">History ›</button></span></div>
         <div class="topicYears" id="topicYears"></div>
       </section>
 
@@ -221,6 +221,7 @@
       const topicMemory=document.getElementById("topicMemory");
       const topicYears=document.getElementById("topicYears");
       const topicMemoryCount=document.getElementById("topicMemoryCount");
+      const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
 
       function recoverLastTopicFromSession(){
@@ -285,6 +286,21 @@
         });
         topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active")
       }
+      function setHistoryExpanded(expanded){
+        if(!topicMemory||!topicHistoryToggle)return;
+        topicMemory.classList.toggle("historyExpanded",expanded);
+        document.body.classList.toggle("historyExpanded",expanded);
+        topicHistoryToggle.setAttribute("aria-expanded",expanded?"true":"false");
+        topicHistoryToggle.textContent=expanded?"Hide history ↑":"History ›";
+        if(expanded){
+          topicMemory.querySelectorAll("details").forEach(d=>d.open=true);
+        }
+      }
+      topicHistoryToggle?.addEventListener("click",()=>{
+        const expanded=!topicMemory.classList.contains("historyExpanded");
+        setHistoryExpanded(expanded);
+        if(expanded) topicMemory.scrollIntoView({behavior:"smooth",block:"start"});
+      });
       window.addEventListener("pageshow",renderTopicMemory);
       window.addEventListener("storage",e=>{if(e.key===TOPIC_MEMORY_KEY)renderTopicMemory()});
       renderTopicMemory();
