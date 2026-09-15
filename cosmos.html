@@ -969,7 +969,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.8.1-working-package-topic-memory-fix";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "4.9-working-package-persistent-journey-resume";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -2423,7 +2423,7 @@
     const createdAt=Date.now();
     const topicId=String(requestedTopicId||"").trim() || topicIdFor(question,createdAt);
     setActiveTopicId(topicId);
-    const rows=topicArchiveLoad();
+    const rows=topicArchiveLoad().filter(row=>String(row?.topic_id||"")!==topicId);
     rows.unshift({
       topic_id:topicId,
       question:String(question||"").trim(),
@@ -2434,6 +2434,9 @@
       month:new Date(createdAt).getMonth()+1,
       current_node_id:"",
       journey:[],
+      station_count:0,
+      current_label:String(question||"").trim(),
+      last_opened_at:createdAt,
       entry_observer:null,
       current_observer:null
     });
@@ -2452,8 +2455,11 @@
     rows[index]={
       ...current,
       updated_at:now,
+      last_opened_at:now,
       current_node_id:state.journey?.current_node_id||"",
       journey:JSON.parse(JSON.stringify(state.journey?.nodes||[])),
+      station_count:Array.isArray(state.journey?.nodes)?state.journey.nodes.length:0,
+      current_label:observerDisplayLabel(state.observer)||String(current.question||""),
       entry_observer:observerSnapshot(state.entryObserver),
       current_observer:observerSnapshot(state.observer)
     };
@@ -2494,6 +2500,14 @@
       render();
     }
     state.entryObserver=record.entry_observer || journeyNodeDisplayObserver(journeyRootNode()) || state.entryObserver || state.observer;
+    // Keep the address tied to the saved Cosmos without replaying the original question.
+    try{
+      const url=new URL(location.href);
+      url.searchParams.set("topic",record.topic_id);
+      url.searchParams.set("resume","1");
+      url.searchParams.delete("new_topic");
+      history.replaceState({cosmos:true,topic:record.topic_id,journey_node:state.journey.current_node_id},"",url.pathname+url.search);
+    }catch{}
     persistCurrentTopicSnapshot();
     return true;
   }
