@@ -140,7 +140,7 @@
     .topicYear>summary,.topicMonth>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#cbd5e4}.topicYear>summary::-webkit-details-marker,.topicMonth>summary::-webkit-details-marker{display:none}
     .topicYear>summary{padding:11px 14px;font-size:13px}.topicMonth{margin:0 8px 8px;background:rgba(10,20,37,.54)}.topicMonth>summary{padding:10px 12px;font-size:12px;color:#aebbd0}
     .topicSummaryLeft{display:flex;align-items:center;gap:8px;min-width:0}.topicChevron{font-size:10px;color:#6f7d95;transition:transform .18s ease}details[open]>summary .topicChevron{transform:rotate(90deg)}.topicSummaryCount{color:#65738b;font-size:11px;white-space:nowrap}
-    .topicList{display:grid;border-top:1px solid rgba(255,255,255,.055)}.topicItem{appearance:none;border:0;border-bottom:1px solid rgba(255,255,255,.045);background:transparent;color:#dce5f3;text-align:left;padding:11px 12px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.topicItem:last-child{border-bottom:0}.topicItem:hover,.topicItem:focus-visible{background:rgba(110,168,255,.07);outline:none}.topicQuestion{min-width:0;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topicResume{font-size:11px;color:#72819a}
+    .topicList{display:grid;border-top:1px solid rgba(255,255,255,.055)}.topicItem{appearance:none;border:0;border-bottom:1px solid rgba(255,255,255,.045);background:transparent;color:#dce5f3;text-align:left;padding:11px 12px;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.topicItem:last-child{border-bottom:0}.topicItem:hover,.topicItem:focus-visible{background:rgba(110,168,255,.07);outline:none}.topicQuestion{min-width:0;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topicMeta{grid-column:1/2;color:#68758c;font-size:10.5px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.topicResume{grid-row:1/3;grid-column:2;align-self:center;font-size:11px;color:#72819a}
     @media (max-width:640px){body{overflow:auto}.stage{align-content:start;padding-top:calc(74px + env(safe-area-inset-top));padding-bottom:calc(34px + env(safe-area-inset-bottom))}.topicQuestion{font-size:12.5px}}
 
   </style>
@@ -239,6 +239,8 @@
             year:new Date(now).getFullYear(),month:new Date(now).getMonth()+1,
             current_node_id:String(journeyState?.current_node_id||""),
             journey:Array.isArray(journeyState?.nodes)?journeyState.nodes:[],
+            station_count:Array.isArray(journeyState?.nodes)?journeyState.nodes.length:0,
+            current_label:String(snap?.label||snap?.question||question),last_opened_at:now,
             entry_observer:trail?.entryObserver||null,current_observer:snap
           }]));
         }catch(_){}
@@ -250,6 +252,8 @@
       function topicTimestamp(x){const r=x?.updated_at||x?.created_at||x?.last_opened_at||x?.timestamp||x?.saved_at,n=Number(r);if(Number.isFinite(n)&&n>0)return n;const d=Date.parse(String(r||""));return Number.isFinite(d)?d:0}
       function topicQuestion(x){return String(x?.question||x?.title||x?.label||x?.observer?.question||"").trim()}
       function topicId(x){return String(x?.topic_id||x?.id||x?.journey_id||"").trim()}
+      function topicStationCount(x){return Number.isFinite(Number(x?.station_count))?Number(x.station_count):(Array.isArray(x?.journey)?x.journey.length:0)}
+      function topicCurrentLabel(x){return String(x?.current_label||x?.current_observer?.label||x?.current_observer?.question||topicQuestion(x)).trim()}
       function topicResumeUrl(x){const e=String(x?.resume_url||x?.url||"").trim();if(e)return e;const p=new URLSearchParams({focus:"question",view:"cosmos_projection",question:topicQuestion(x),resume:"1"}),id=topicId(x);if(id)p.set("topic",id);return `/cosmos.html?${p}`}
       function monthName(i){return new Intl.DateTimeFormat(undefined,{month:"long"}).format(new Date(2026,i,1))}
       function renderTopicMemory(){
@@ -267,7 +271,15 @@
             const md=document.createElement("details");md.className="topicMonth";md.open=y===now.getFullYear()&&m===now.getMonth();
             const ms=document.createElement("summary");ms.innerHTML=`<span class="topicSummaryLeft"><span class="topicChevron">›</span><span>${monthName(m)}</span></span><span class="topicSummaryCount">${list.length}</span>`;md.appendChild(ms);
             const box=document.createElement("div");box.className="topicList";
-            list.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="topicItem";b.dataset.resumeUrl=topicResumeUrl(x);const q=document.createElement("span");q.className="topicQuestion";q.textContent=topicQuestion(x);const r=document.createElement("span");r.className="topicResume";r.textContent="Resume ›";b.append(q,r);b.onclick=()=>location.href=b.dataset.resumeUrl;box.appendChild(b)});
+            list.forEach(x=>{
+              const b=document.createElement("button");b.type="button";b.className="topicItem";b.dataset.resumeUrl=topicResumeUrl(x);
+              const q=document.createElement("span");q.className="topicQuestion";q.textContent=topicQuestion(x);
+              const meta=document.createElement("span");meta.className="topicMeta";
+              const count=topicStationCount(x),current=topicCurrentLabel(x);
+              meta.textContent=count>1?`${count} stations · Continue from ${current}`:`Continue from ${current}`;
+              const r=document.createElement("span");r.className="topicResume";r.textContent="Resume ›";
+              b.append(q,meta,r);b.onclick=()=>location.href=b.dataset.resumeUrl;box.appendChild(b)
+            });
             md.appendChild(box);yd.appendChild(md)
           });topicYears.appendChild(yd)
         });
