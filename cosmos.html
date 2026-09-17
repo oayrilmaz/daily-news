@@ -790,7 +790,7 @@
   .projectionMeta{justify-content:center!important;margin-top:18px!important}.projectionMeta button,.projectionMeta span{background:rgba(255,255,255,.055)!important;border-color:rgba(167,194,237,.18)!important;color:#aac2e6!important}
   .projectionShareRow{justify-content:center!important}.currentStopShare{background:rgba(255,255,255,.055)!important;border-color:rgba(167,194,237,.18)!important;color:#b9cbe5!important}
   .projectionAsk{width:min(650px,100%)!important;margin:18px auto 0!important}.projectionAsk input{background:rgba(255,255,255,.06)!important;border-color:rgba(167,194,237,.18)!important;color:#fff!important}.projectionAsk input::placeholder{color:#8197b7!important}
-  .projectionDrawer{position:fixed!important;z-index:95!important;inset:70px 18px 78px!important;width:min(760px,calc(100% - 36px));margin:auto!important;border:1px solid rgba(167,194,237,.20)!important;border-radius:20px!important;background:rgba(5,15,30,.97)!important;overflow:auto!important;text-align:left!important;box-shadow:0 28px 90px rgba(0,0,0,.44)}
+  .projectionDrawer{position:fixed!important;z-index:95!important;inset:70px 18px 78px!important;width:min(760px,calc(100% - 36px));margin:auto!important;border:1px solid rgba(167,194,237,.22)!important;border-radius:20px!important;background:rgba(10,26,51,.97)!important;overflow:auto!important;text-align:left!important;box-shadow:0 28px 90px rgba(0,0,0,.32)}
   .projectionDrawer.active{display:block!important}
 
   .spatialJourney{
@@ -859,19 +859,21 @@
 
   .cosmosNodeReveal{
     opacity:0;
-    animation:cosmosNodeMaterialize .78s cubic-bezier(.2,.72,.25,1) forwards;
-    will-change:opacity,filter
+    transform-box:fill-box;
+    transform-origin:center;
+    animation:cosmosNodeMaterialize 1.06s cubic-bezier(.18,.74,.22,1) forwards;
+    will-change:opacity,filter,transform
   }
   @keyframes cosmosNodeMaterialize{
-    0%{opacity:0;filter:blur(7px)}
-    45%{opacity:.46;filter:blur(2px)}
-    100%{opacity:1;filter:blur(0)}
+    0%{opacity:0;filter:blur(8px);transform:scale(.82)}
+    48%{opacity:.54;filter:blur(2px);transform:scale(.94)}
+    100%{opacity:1;filter:blur(0);transform:scale(1)}
   }
   .cosmosSatelliteCircle{filter:drop-shadow(0 5px 14px rgba(75,105,165,.10))}
 
   /* Only the answer text scrolls in Essence. The page, controls and journey rail stay fixed. */
   .projectionPanel{
-    background:radial-gradient(circle at 50% 38%,#102a50 0,#081426 49%,#030812 100%)!important;
+    background:radial-gradient(circle at 50% 36%,#234784 0,#163562 26%,#0d2548 54%,#091b35 82%,#08162a 100%)!important;
     overflow:hidden!important
   }
   body.spatialEssenceOpen .projectionPanel{display:flex!important;align-items:stretch!important;justify-content:center!important}
@@ -927,7 +929,7 @@
   /* Keep back/home available above the Essence overlay. */
   body.spatialEssenceOpen .topbar{
     z-index:115!important;
-    background:linear-gradient(180deg,rgba(3,8,18,.88),rgba(3,8,18,.34),rgba(3,8,18,0))!important
+    background:linear-gradient(180deg,rgba(8,21,40,.90),rgba(8,21,40,.42),rgba(8,21,40,0))!important
   }
   body.spatialEssenceOpen .observer .kicker{color:#7890b4!important}
   body.spatialEssenceOpen .observer .label{color:#dce8fb!important}
@@ -1086,9 +1088,7 @@
         <span>inner → primary · outer → secondary</span>
       </div>
       <div class="status" id="status">loading</div>
-      <div class="empty" id="emptyState">
-        <span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos is working diligently behind the scenes, brewing the essence of your request.</span></span>
-      </div>
+      <div class="empty" id="emptyState"></div>
     </section>
 
     <div class="toolbar">
@@ -4858,15 +4858,15 @@
     marker.appendChild(svgEl("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#8495aa"}));
     defs.appendChild(marker);
 
-    const coreGradient=svgEl("radialGradient",{id:"cosmosCoreGradient",cx:"50%",cy:"46%",r:"64%"});
+    const coreGradient=svgEl("radialGradient",{id:"cosmosCoreGradient",cx:"50%",cy:"48%",r:"78%"});
     [
-      ["0%","#456bc0"],["18%","#284a91"],["45%","#183769"],["74%","#10284d"],["100%","#0a1a36"]
+      ["0%","#5b7de8"],["9%","#4768c6"],["24%","#3552a7"],["48%","#1d356f"],["76%","#0d2248"],["100%","#07142b"]
     ].forEach(([offset,color])=>coreGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
     defs.appendChild(coreGradient);
 
-    const irisGradient=svgEl("radialGradient",{id:"cosmosIrisGradient",cx:"50%",cy:"50%",r:"60%"});
+    const irisGradient=svgEl("radialGradient",{id:"cosmosIrisGradient",cx:"50%",cy:"50%",r:"72%"});
     [
-      ["0%","#f4f7ff"],["12%","#aec6ff"],["34%","#758ce8"],["62%","#745fc8"],["100%","rgba(69,78,161,0)"]
+      ["0%","rgba(244,247,255,0.98)"],["8%","rgba(169,196,255,0.88)"],["24%","rgba(111,132,246,0.78)"],["52%","rgba(83,66,191,0.26)"],["74%","rgba(42,68,145,0.04)"],["100%","rgba(42,68,145,0)"]
     ].forEach(([offset,color])=>irisGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
     defs.appendChild(irisGradient);
 
@@ -4881,6 +4881,48 @@
     defs.appendChild(nodeSecondaryGradient);
 
     svg.appendChild(defs);
+
+    function appendCosmosGlyph(group,{radius=29,secondary=false,seed=false,center=false}={}){
+      const halo=svgEl("circle",{
+        r:radius*1.78,
+        fill:center?"rgba(118,146,232,.16)":(secondary?"rgba(118,146,232,.08)":"rgba(118,146,232,.12)"),
+        opacity:center ? 1 : (secondary ? .78 : 1)
+      });
+      const orbit=svgEl("circle",{
+        r:radius*1.48,
+        fill:"none",
+        stroke:"rgba(192,180,255,.42)",
+        "stroke-width":center?1.15:1,
+        opacity:center ? .70 : (secondary ? .42 : .56)
+      });
+      const core=svgEl("circle",{
+        r:radius,
+        fill:"url(#cosmosCoreGradient)",
+        stroke:seed?"#7ea4ff":"#7b9fe7",
+        "stroke-width":seed?1.95:1.45,
+        class:"cosmosObserverCore"
+      });
+      const iris=svgEl("ellipse",{
+        rx:radius*0.58,
+        ry:radius*0.24,
+        fill:"url(#cosmosIrisGradient)",
+        opacity:secondary ? .50 : .64,
+        class:"cosmosObserverIris",
+        "aria-hidden":"true"
+      });
+      const heart=svgEl("circle",{
+        r:Math.max(3.3,radius*0.13),
+        fill:"#eef4ff",
+        opacity:secondary ? .48 : .58,
+        class:"cosmosObserverHeart",
+        "aria-hidden":"true"
+      });
+      group.appendChild(halo);
+      group.appendChild(orbit);
+      group.appendChild(core);
+      group.appendChild(iris);
+      group.appendChild(heart);
+    }
 
     const reverseKeys=new Set(projection.edges.map(r=>`${r.from_entity_id}|${r.to_entity_id}`));
 
@@ -4927,17 +4969,9 @@
       g.style.cursor="pointer";
       g.style.animationDelay=`${Math.min(nodeRevealIndex++,10)*180}ms`;
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
-      const radius=node.isSeed?34:(secondary?22:29);
-      const circle=svgEl("circle",{
-        r:radius,
-        fill:secondary?"url(#nodeSecondaryGradient)":"url(#nodePrimaryGradient)",
-        stroke:node.isSeed?"#668fe0":(secondary?"#aebbd0":"#7b98d0"),
-        "stroke-width":node.isSeed?2.5:(secondary?1.1:1.8),
-        opacity:secondary?0.80:1,
-        class:"cosmosSatelliteCircle"
-      });
-      g.appendChild(circle);
-      const label=svgEl("text",{"text-anchor":"middle",fill:secondary?"#617188":"#24344d","font-size":node.isSeed?11:(secondary?9:10),"font-weight":secondary?600:700});
+      const radius=node.isSeed?33:(secondary?18:24);
+      appendCosmosGlyph(g,{radius,secondary,seed:node.isSeed});
+      const label=svgEl("text",{"text-anchor":"middle",fill:"#f8fbff","font-size":node.isSeed?10.5:(secondary?8.2:9.3),"font-weight":secondary?650:720});
       const words=node.label.split(/\s+/);
       const lines=[];
       let current="";
@@ -4960,22 +4994,11 @@
       observer?.response?.response_type==="universal_loading"
     );
 
-    // The center uses the same calm blue/violet living identity as index.html.
-    // No black pupil and no panic/loading label.
-    const ring=svgEl("circle",{r:63,fill:"rgba(74,112,221,.15)",stroke:"#789dff","stroke-width":2.2,class:"cosmosObserverRing"});
-    const inner=svgEl("circle",{
-      r:49,
-      fill:"url(#cosmosCoreGradient)",
-      stroke:observerLoading?"rgba(104,143,233,.30)":"#5f87db",
-      "stroke-width":observerLoading?2.0:1.3,
-      class:"cosmosObserverCore"
-    });
-    const iris=svgEl("ellipse",{rx:29,ry:12,fill:"url(#cosmosIrisGradient)",opacity:.62,class:"cosmosObserverIris","aria-hidden":"true"});
-    const heart=svgEl("circle",{r:6.5,fill:"#dfe8ff",opacity:.58,class:"cosmosObserverHeart","aria-hidden":"true"});
-    og.appendChild(ring);og.appendChild(inner);og.appendChild(iris);og.appendChild(heart);
+    // The center uses the exact same living Cosmos language as index.html.
+    appendCosmosGlyph(og,{radius:49,seed:true,center:true});
 
     if(observerLoading){
-      // Keep activity implicit in the calm breathing/heartbeat. No "EXPLORING" label.
+      // Keep activity implicit in the calm breathing/heartbeat. No loading headline.
     }
     const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
     const label=projection.station?.focus_label || observerDisplayLabel(observer);
@@ -5678,20 +5701,17 @@
   function paintLoadingNarrative(){
     if(!state.universalAnswerPending) return;
 
-    // Viewer-facing loading is intentionally indeterminate.
-    // Keep the working internal progress machinery untouched for compatibility.
+    // Viewer-facing loading stays calm and visual only.
     state.loadingStage="exploring";
-    state.loadingStageDetail="Following connections across the relevant universe…";
+    state.loadingStageDetail="";
 
     if(statusEl){
       statusEl.style.display="none";
       statusEl.textContent="";
     }
     if(emptyEl){
-      emptyEl.style.display="block";
-      emptyEl.innerHTML=
-        `<div class="cosmosBrewStatus"><strong>Cosmos is exploring</strong>` +
-        `<span>${esc(state.loadingStageDetail)}</span></div>`;
+      emptyEl.style.display="none";
+      emptyEl.innerHTML="";
     }
   }
 
@@ -6324,18 +6344,16 @@
 
   function renderSpatialJourneyBar(){
     if(!spatialJourney) return;
-    const path=journeyPathTo(state.journey.current_node_id);
-    if(!path.length){spatialJourney.hidden=true;spatialJourney.innerHTML="";return;}
+    const nodes=[...(Array.isArray(state.journey?.nodes)?state.journey.nodes:[])].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+    if(!nodes.length){spatialJourney.hidden=true;spatialJourney.innerHTML="";return;}
     spatialJourney.hidden=false;
-    const visible=path.length>6 ? path.slice(-6) : path;
     let html=`<span class="spatialJourneyTitle">Journey</span>`;
-    if(path.length>visible.length) html+=`<span class="spatialEllipsis">…</span><span class="spatialRailLine" aria-hidden="true"></span>`;
-    visible.forEach((node,index)=>{
+    nodes.forEach((node,index)=>{
       const snap=journeyNodeDisplayObserver(node);
       const label=observerDisplayLabel(snap)||"Cosmos";
       const current=node.node_id===state.journey.current_node_id;
       html+=`<button type="button" class="spatialStation ${current?"current":""}" data-spatial-journey="${esc(node.node_id)}" title="${esc(label)}"><span class="spatialStationDot" aria-hidden="true"></span><span class="spatialStationLabel">${esc(label)}</span>${current?`<span class="youAreHere">you are here</span>`:""}</button>`;
-      if(index<visible.length-1) html+=`<span class="spatialRailLine" aria-hidden="true"></span>`;
+      if(index<nodes.length-1) html+=`<span class="spatialRailLine" aria-hidden="true"></span>`;
     });
     spatialJourney.innerHTML=html;
     spatialJourney.querySelectorAll("[data-spatial-journey]").forEach(button=>{
@@ -6347,6 +6365,7 @@
         restoreObserverFromJourneyNode(node);
       });
     });
+    spatialJourney.querySelector(".spatialStation.current")?.scrollIntoView({block:"nearest",inline:"center"});
   }
 
   spatialZoomButton?.addEventListener("click",()=>setSpatialEssence(!spatialEssenceOpen));
