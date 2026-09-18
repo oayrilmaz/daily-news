@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v5.1-calm-living-spatial" />
+  <meta name="cosmos-build" content="v5.3-identical-dom-cosmos-light-essence" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1056,6 +1056,130 @@
     .spatialZoomButton{bottom:calc(78px + env(safe-area-inset-bottom))!important}
   }
 
+
+  /* v5.3 — EXACT shared Cosmos visual language.
+     Every station uses the same structure/colors/proportions as the index.html Cosmos;
+     only --core changes with station importance. */
+  #cosmosCanvas{position:relative!important;z-index:1!important}
+  .cosmosGlyphLayer{
+    position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden
+  }
+  .cosmosGlyphButton{
+    --core:68px;--label:9.5px;
+    position:absolute;left:0;top:0;transform:translate(-50%,-50%);
+    width:calc(var(--core) * 1.3721);height:calc(var(--core) * 1.3721);
+    padding:0;border:0;background:transparent;appearance:none;
+    pointer-events:auto;cursor:pointer;touch-action:none;color:#fff;
+    -webkit-tap-highlight-color:transparent
+  }
+  .cosmosGlyphButton:focus-visible{outline:2px solid rgba(74,116,214,.62);outline-offset:4px;border-radius:50%}
+  .cosmosGlyphHalo,.cosmosGlyphOrbit,.cosmosGlyphCore{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+  .cosmosGlyphHalo{
+    width:calc(var(--core) * 1.3721);height:calc(var(--core) * 1.3721);
+    background:radial-gradient(circle,rgba(44,105,231,.24) 0 28%,rgba(92,86,230,.14) 40%,rgba(82,36,153,.06) 58%,transparent 72%);
+    filter:blur(calc(var(--core) * .014));
+    animation:glyphHaloBreath 6.8s ease-in-out infinite
+  }
+  .cosmosGlyphOrbit{
+    width:calc(var(--core) * 1.3023);height:calc(var(--core) * 1.3023);
+    border:1px solid rgba(110,168,255,.28);
+    box-shadow:0 0 calc(var(--core) * .065) rgba(75,119,255,.24),inset 0 0 calc(var(--core) * .065) rgba(154,121,255,.10);
+    animation:glyphSpin 42s linear infinite
+  }
+  .cosmosGlyphOrbit::before,.cosmosGlyphOrbit::after{
+    content:"";position:absolute;inset:7%;border-radius:50%;border:1px solid rgba(154,121,255,.24);transform:rotate(21deg)
+  }
+  .cosmosGlyphOrbit::after{inset:15%;border-color:rgba(255,209,138,.20);transform:rotate(-31deg)}
+  .cosmosGlyphCore{
+    isolation:isolate;overflow:hidden;display:grid;place-items:center;
+    width:var(--core);height:var(--core);
+    background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.48) 0 7%,rgba(61,85,197,.42) 13%,rgba(34,53,125,.52) 27%,rgba(15,34,75,.96) 55%,#091a38 78%,#07142b 100%);
+    border:1px solid rgba(110,154,255,.56);
+    box-shadow:0 0 0 calc(var(--core) * .035) rgba(68,111,221,.035),0 0 calc(var(--core) * .112) rgba(70,116,240,.30),0 0 calc(var(--core) * .279) rgba(103,78,220,.18),inset 0 0 calc(var(--core) * .149) rgba(86,124,237,.20);
+    animation:glyphCoreBreath 7.8s ease-in-out infinite
+  }
+  .cosmosGlyphCore::before{
+    content:"";position:absolute;z-index:1;left:50%;top:50%;width:56%;height:25%;
+    transform:translate(-50%,-50%) scale(.98);border-radius:50%;
+    background:radial-gradient(ellipse at center,rgba(232,240,255,.96) 0 5%,rgba(154,183,255,.78) 7%,rgba(98,114,236,.50) 20%,rgba(112,80,208,.25) 42%,rgba(42,68,145,.04) 68%,transparent 74%);
+    filter:blur(.3px) drop-shadow(0 0 calc(var(--core) * .042) rgba(117,147,255,.38));
+    opacity:.70;animation:glyphLivingIris 8.8s ease-in-out infinite
+  }
+  .cosmosGlyphCore::after{
+    content:"";position:absolute;z-index:2;left:50%;top:50%;width:12%;aspect-ratio:1;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle,#f5f8ff 0 12%,#a9c4ff 24%,rgba(111,132,246,.78) 45%,rgba(83,66,191,.18) 72%,transparent 76%);
+    box-shadow:0 0 calc(var(--core) * .051) rgba(151,180,255,.44),0 0 calc(var(--core) * .107) rgba(119,91,226,.22);
+    opacity:.56;animation:glyphCalmHeart 6.6s ease-in-out infinite
+  }
+  .cosmosGlyphLabel{
+    position:relative;z-index:4;width:82%;max-height:64%;overflow:hidden;
+    color:#f7f9fc;text-align:center;font-size:var(--label);font-weight:760;line-height:1.08;
+    text-shadow:0 1px 5px rgba(1,8,23,.72);overflow-wrap:anywhere
+  }
+  .cosmosGlyphButton.center{z-index:3}
+  .cosmosGlyphButton.node{z-index:2}
+  .cosmosGlyphReveal{opacity:0;filter:blur(7px);animation:glyphMaterialize 1.22s cubic-bezier(.18,.74,.22,1) forwards}
+  @keyframes glyphMaterialize{0%{opacity:0;filter:blur(8px);transform:translate(-50%,-50%) scale(.78)}55%{opacity:.62;filter:blur(2px);transform:translate(-50%,-50%) scale(.95)}100%{opacity:1;filter:blur(0);transform:translate(-50%,-50%) scale(1)}}
+  @keyframes glyphSpin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+  @keyframes glyphHaloBreath{0%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.74}50%{transform:translate(-50%,-50%) scale(1.04);opacity:1}}
+  @keyframes glyphCoreBreath{0%,100%{transform:translate(-50%,-50%) scale(.992)}50%{transform:translate(-50%,-50%) scale(1.012)}}
+  @keyframes glyphLivingIris{0%,100%{transform:translate(-50%,-50%) scale(.94);opacity:.54}50%{transform:translate(-50%,-50%) scale(1.045);opacity:.78}}
+  @keyframes glyphCalmHeart{0%,72%,100%{transform:translate(-50%,-50%) scale(.96);opacity:.48}78%{transform:translate(-50%,-50%) scale(1.05);opacity:.66}84%{transform:translate(-50%,-50%) scale(.985);opacity:.54}90%{transform:translate(-50%,-50%) scale(1.025);opacity:.62}}
+
+  /* v5.3 — zooming INTO a Cosmos is text-depth, not a black page.
+     The universe remains one screen; only the text pane can scroll. */
+  .projectionPanel{
+    background:radial-gradient(circle at 50% 38%,rgba(82,126,225,.085),transparent 30%),radial-gradient(circle at 67% 28%,rgba(154,121,255,.045),transparent 22%),#fff!important;
+    color:#17243b!important;overflow:hidden!important
+  }
+  body.spatialEssenceOpen .projectionPanel{display:flex!important;align-items:stretch!important;justify-content:center!important}
+  .projectionInner{
+    width:min(900px,calc(100% - 44px))!important;height:100dvh!important;max-height:none!important;
+    padding:calc(82px + env(safe-area-inset-top)) 12px calc(104px + env(safe-area-inset-bottom))!important;
+    display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:13px!important;overflow:hidden!important
+  }
+  .projectionEyebrow{display:none!important}
+  .projectionEssence{
+    flex:0 1 auto!important;width:min(800px,100%)!important;max-width:800px!important;max-height:min(48dvh,500px)!important;
+    overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+    margin:0 auto!important;padding:2px 18px 4px 0!important;
+    text-align:left!important;color:#1b2941!important;font-size:clamp(17px,2vw,21px)!important;line-height:1.67!important;
+    display:block!important;-webkit-line-clamp:unset!important;-webkit-box-orient:unset!important;text-wrap:wrap!important;hyphens:none!important;
+    scrollbar-width:thin;scrollbar-color:rgba(79,111,170,.36) transparent
+  }
+  .projectionEssence::-webkit-scrollbar{width:5px}.projectionEssence::-webkit-scrollbar-track{background:transparent}.projectionEssence::-webkit-scrollbar-thumb{background:rgba(79,111,170,.34);border-radius:999px}
+  .projectionMeta,.projectionShareRow,.projectionAsk{flex:0 0 auto!important;width:min(800px,100%)!important}
+  .projectionMeta{justify-content:flex-start!important;margin:1px 0 0!important}
+  .projectionMeta button,.projectionMeta span,.currentStopShare{background:#f7f9fd!important;border-color:rgba(39,67,108,.12)!important;color:#58709a!important}
+  .projectionShareRow{justify-content:flex-start!important;margin:0!important}
+  .projectionAsk{margin:2px auto 0!important}
+  .projectionAsk input{background:#fff!important;border-color:rgba(39,67,108,.15)!important;color:#17243b!important;box-shadow:0 10px 34px rgba(31,56,91,.07)!important}
+  .projectionAsk input::placeholder{color:#8390a4!important}
+  .projectionAsk button{background:linear-gradient(135deg,#426de1,#7180d8)!important;border-color:rgba(75,105,190,.28)!important;color:#fff!important}
+  .projectionDrawer{background:#fff!important;color:#24334b!important;border-color:rgba(39,67,108,.13)!important;box-shadow:0 26px 80px rgba(31,56,91,.18)!important}
+  .projectionDrawer h3,.projectionDrawer p,.sourceItem strong,.sourceItem p{color:#33455f!important}
+  .sourceItem{background:#fbfcff!important;border-color:rgba(39,67,108,.10)!important}
+  body.spatialEssenceOpen .topbar{z-index:115!important;background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,255,255,.72),rgba(255,255,255,0))!important}
+  body.spatialEssenceOpen .observer .kicker{color:#8995a6!important}
+  body.spatialEssenceOpen .observer .label{color:#26354d!important}
+  body.spatialEssenceOpen .iconBtn{background:rgba(255,255,255,.90)!important;border-color:rgba(39,67,108,.12)!important;color:#31425b!important}
+  body.spatialEssenceOpen .spatialJourney{background:rgba(255,255,255,.95)!important;border-color:rgba(47,73,112,.11)!important}
+  body.spatialEssenceOpen .spatialJourneyTitle{color:#7d899b!important}
+  body.spatialEssenceOpen .spatialJourney .spatialStation{color:#627087!important}
+  body.spatialEssenceOpen .spatialStation.current{color:#244f98!important}
+  body.spatialEssenceOpen .spatialStationDot{background:#fff!important;border-color:#8196b8!important}
+  body.spatialEssenceOpen .spatialStation.current .spatialStationDot{background:#6f8fe1!important;border-color:#6f8fe1!important}
+  body.spatialEssenceOpen .spatialRailLine{background:linear-gradient(90deg,#aab7ca,#8fa3c4)!important}
+  body.spatialEssenceOpen .spatialJourney .youAreHere{color:#6f86ad!important}
+  body.spatialEssenceOpen .spatialZoomButton{background:rgba(255,255,255,.92)!important;border-color:rgba(39,67,108,.13)!important;color:#40516c!important}
+
+  @media(max-width:640px){
+    .projectionInner{width:calc(100% - 22px)!important;padding:calc(70px + env(safe-area-inset-top)) 6px calc(98px + env(safe-area-inset-bottom))!important;gap:10px!important}
+    .projectionEssence,.projectionMeta,.projectionShareRow,.projectionAsk{width:calc(100% - 8px)!important}
+    .projectionEssence{max-height:48dvh!important;font-size:16px!important;line-height:1.58!important;padding-right:10px!important}
+  }
+
 </style>
 </head>
 <body>
@@ -1081,6 +1205,7 @@
 
     <section class="canvasWrap" aria-label="Cosmos Butterfly Effect Grid">
       <svg id="cosmosCanvas" role="img" aria-label="Interactive Cosmos relationship grid"></svg>
+      <div class="cosmosGlyphLayer" id="cosmosGlyphLayer" aria-label="Cosmos stations"></div>
       <div class="legend">
         <span>solid → supported/current</span>
         <span>dashed → scenario/qualified</span>
@@ -1227,6 +1352,8 @@
   const MAX_DISTANCE = 4;
 
   const svg = document.getElementById("cosmosCanvas");
+  const canvasWrapEl=document.querySelector(".canvasWrap");
+  const cosmosGlyphLayer=document.getElementById("cosmosGlyphLayer");
   const statusEl = document.getElementById("status");
   const emptyEl = document.getElementById("emptyState");
   const observerLabel = document.getElementById("observerLabel");
@@ -1285,7 +1412,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.1-calm-living-spatial";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.3-identical-dom-cosmos-light-essence";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -4826,8 +4953,8 @@
       emptyEl.style.display="none";
       emptyEl.innerHTML="";
     }else{
-      emptyEl.style.display="block";
-      emptyEl.innerHTML=`<span class="cosmosWorking"><span class="miniCosmos" aria-hidden="true"></span><span>Cosmos has finished this pass. No additional defensible nearby stations are ready to surface yet.</span></span>`;
+      emptyEl.style.display="none";
+      emptyEl.innerHTML="";
     }
     const completionBlocked =
       observer?.kind==="response" &&
@@ -4849,6 +4976,10 @@
     svg.style.height=state.expanded ? "780px" : "";
     svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
     svg.innerHTML="";
+    if(cosmosGlyphLayer){
+      cosmosGlyphLayer.innerHTML="";
+      cosmosGlyphLayer.style.height=`${height}px`;
+    }
 
     const positions=layout(projection.nodes,width,height);
     const center=positions.get("__observer__");
@@ -4857,72 +4988,7 @@
     const marker=svgEl("marker",{id:"arrow",viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"5",markerHeight:"5",orient:"auto-start-reverse"});
     marker.appendChild(svgEl("path",{d:"M 0 0 L 10 5 L 0 10 z",fill:"#8495aa"}));
     defs.appendChild(marker);
-
-    const coreGradient=svgEl("radialGradient",{id:"cosmosCoreGradient",cx:"50%",cy:"48%",r:"78%"});
-    [
-      ["0%","#5b7de8"],["9%","#4768c6"],["24%","#3552a7"],["48%","#1d356f"],["76%","#0d2248"],["100%","#07142b"]
-    ].forEach(([offset,color])=>coreGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
-    defs.appendChild(coreGradient);
-
-    const irisGradient=svgEl("radialGradient",{id:"cosmosIrisGradient",cx:"50%",cy:"50%",r:"72%"});
-    [
-      ["0%","rgba(244,247,255,0.98)"],["8%","rgba(169,196,255,0.88)"],["24%","rgba(111,132,246,0.78)"],["52%","rgba(83,66,191,0.26)"],["74%","rgba(42,68,145,0.04)"],["100%","rgba(42,68,145,0)"]
-    ].forEach(([offset,color])=>irisGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
-    defs.appendChild(irisGradient);
-
-    const nodePrimaryGradient=svgEl("radialGradient",{id:"nodePrimaryGradient",cx:"42%",cy:"35%",r:"75%"});
-    [["0%","#f8faff"],["54%","#e8efff"],["100%","#d8e4ff"]]
-      .forEach(([offset,color])=>nodePrimaryGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
-    defs.appendChild(nodePrimaryGradient);
-
-    const nodeSecondaryGradient=svgEl("radialGradient",{id:"nodeSecondaryGradient",cx:"42%",cy:"35%",r:"75%"});
-    [["0%","#ffffff"],["60%","#f4f6fc"],["100%","#e9edf6"]]
-      .forEach(([offset,color])=>nodeSecondaryGradient.appendChild(svgEl("stop",{offset,"stop-color":color})));
-    defs.appendChild(nodeSecondaryGradient);
-
     svg.appendChild(defs);
-
-    function appendCosmosGlyph(group,{radius=29,secondary=false,seed=false,center=false}={}){
-      const halo=svgEl("circle",{
-        r:radius*1.78,
-        fill:center?"rgba(118,146,232,.16)":(secondary?"rgba(118,146,232,.08)":"rgba(118,146,232,.12)"),
-        opacity:center ? 1 : (secondary ? .78 : 1)
-      });
-      const orbit=svgEl("circle",{
-        r:radius*1.48,
-        fill:"none",
-        stroke:"rgba(192,180,255,.42)",
-        "stroke-width":center?1.15:1,
-        opacity:center ? .70 : (secondary ? .42 : .56)
-      });
-      const core=svgEl("circle",{
-        r:radius,
-        fill:"url(#cosmosCoreGradient)",
-        stroke:seed?"#7ea4ff":"#7b9fe7",
-        "stroke-width":seed?1.95:1.45,
-        class:"cosmosObserverCore"
-      });
-      const iris=svgEl("ellipse",{
-        rx:radius*0.58,
-        ry:radius*0.24,
-        fill:"url(#cosmosIrisGradient)",
-        opacity:secondary ? .50 : .64,
-        class:"cosmosObserverIris",
-        "aria-hidden":"true"
-      });
-      const heart=svgEl("circle",{
-        r:Math.max(3.3,radius*0.13),
-        fill:"#eef4ff",
-        opacity:secondary ? .48 : .58,
-        class:"cosmosObserverHeart",
-        "aria-hidden":"true"
-      });
-      group.appendChild(halo);
-      group.appendChild(orbit);
-      group.appendChild(core);
-      group.appendChild(iris);
-      group.appendChild(heart);
-    }
 
     const reverseKeys=new Set(projection.edges.map(r=>`${r.from_entity_id}|${r.to_entity_id}`));
 
@@ -4962,57 +5028,50 @@
 
 
 
+    function addDomCosmosGlyph({x,y,label,coreSize,labelSize,secondary=false,center=false,nodeId="",delay=0}){
+      if(!cosmosGlyphLayer) return;
+      const button=document.createElement("button");
+      button.type="button";
+      button.className=`cosmosGlyphButton ${center?"center":"node"} ${secondary?"secondary":""} ${center?"":"cosmosGlyphReveal"}`;
+      button.style.left=`${x}px`;
+      button.style.top=`${y}px`;
+      button.style.setProperty("--core",`${coreSize}px`);
+      button.style.setProperty("--label",`${labelSize}px`);
+      if(!center) button.style.animationDelay=`${delay}ms`;
+      button.setAttribute("aria-label",center?`Zoom into ${label}`:`Travel to ${label}`);
+      button.title=label;
+      button.innerHTML=`<span class="cosmosGlyphHalo"></span><span class="cosmosGlyphOrbit"></span><span class="cosmosGlyphCore"><span class="cosmosGlyphLabel">${esc(label)}</span></span>`;
+      if(center){
+        button.addEventListener("click",()=>setSpatialEssence(true));
+      }else{
+        button.dataset.nodeId=nodeId;
+        button.addEventListener("click",()=>recenterEntity(nodeId));
+      }
+      cosmosGlyphLayer.appendChild(button);
+    }
+
     let nodeRevealIndex=0;
     for(const node of projection.nodes){
       const p=positions.get(node.id); if(!p) continue;
-      const g=svgEl("g",{transform:`translate(${p.x} ${p.y})`,class:"cosmosNodeReveal"});
-      g.style.cursor="pointer";
-      g.style.animationDelay=`${Math.min(nodeRevealIndex++,10)*180}ms`;
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
-      const radius=node.isSeed?33:(secondary?18:24);
-      appendCosmosGlyph(g,{radius,secondary,seed:node.isSeed});
-      const label=svgEl("text",{"text-anchor":"middle",fill:"#f8fbff","font-size":node.isSeed?10.5:(secondary?8.2:9.3),"font-weight":secondary?650:720});
-      const words=node.label.split(/\s+/);
-      const lines=[];
-      let current="";
-      for(const word of words){
-        if((current+" "+word).trim().length>16 && current){lines.push(current);current=word}else current=(current+" "+word).trim();
-      }
-      if(current)lines.push(current);
-      lines.slice(0,3).forEach((line,i)=>{
-        const t=svgEl("tspan",{x:0,dy:i===0?`${-(Math.min(lines.length,3)-1)*6}px`:"12px"});
-        t.textContent=line; label.appendChild(t);
+      const coreSize=node.isSeed?74:(secondary?48:62);
+      const labelSize=node.isSeed?9.4:(secondary?7.3:8.3);
+      addDomCosmosGlyph({
+        x:p.x,y:p.y,label:node.label,coreSize,labelSize,secondary,nodeId:node.id,
+        delay:Math.min(nodeRevealIndex++,12)*330
       });
-      g.appendChild(label);
-      g.addEventListener("click",()=>recenterEntity(node.id));
-      svg.appendChild(g);
     }
 
-    const og=svgEl("g",{transform:`translate(${center.x} ${center.y})`});
     const observerLoading=Boolean(
       state.universalAnswerPending ||
       observer?.response?.response_type==="universal_loading"
     );
-
-    // The center uses the exact same living Cosmos language as index.html.
-    appendCosmosGlyph(og,{radius:49,seed:true,center:true});
+    const centerLabel=projection.station?.focus_label || observerDisplayLabel(observer);
+    addDomCosmosGlyph({x:center.x,y:center.y,label:centerLabel,coreSize:118,labelSize:12.2,center:true});
 
     if(observerLoading){
-      // Keep activity implicit in the calm breathing/heartbeat. No loading headline.
+      // Calm living Cosmos is the only viewer-facing activity cue.
     }
-    const ot=svgEl("text",{"text-anchor":"middle",fill:"#fff","font-size":12,"font-weight":800});
-    const label=projection.station?.focus_label || observerDisplayLabel(observer);
-    const chunks=label.match(/.{1,18}(?:\s|$)/g) || [label];
-    chunks.slice(0,4).forEach((line,i)=>{
-      const t=svgEl("tspan",{x:0,dy:i===0?`${-(Math.min(chunks.length,4)-1)*7}px`:"14px"});
-      t.textContent=line.trim();ot.appendChild(t);
-    });
-    og.appendChild(ot);
-    og.style.cursor="zoom-in";
-    og.setAttribute("role","button");
-    og.setAttribute("aria-label","Zoom into Cosmos essence");
-    og.addEventListener("click",()=>setSpatialEssence(true));
-    svg.appendChild(og);
   }
 
   function travelRelation(previous,targetId){
@@ -6365,7 +6424,11 @@
         restoreObserverFromJourneyNode(node);
       });
     });
-    spatialJourney.querySelector(".spatialStation.current")?.scrollIntoView({block:"nearest",inline:"center"});
+    const currentButton=spatialJourney.querySelector(".spatialStation.current");
+    if(currentButton){
+      const left=currentButton.offsetLeft-(spatialJourney.clientWidth-currentButton.offsetWidth)/2;
+      spatialJourney.scrollTo({left:Math.max(0,left),behavior:"smooth"});
+    }
   }
 
   spatialZoomButton?.addEventListener("click",()=>setSpatialEssence(!spatialEssenceOpen));
@@ -6421,7 +6484,7 @@
 
   // Mouse wheel and laptop trackpad. Trackpad pinch is normally delivered as ctrl+wheel;
   // ordinary wheel is also accepted because the Cosmos owns the viewport and never page-scrolls.
-  svg.addEventListener("wheel",event=>{
+  (canvasWrapEl||svg).addEventListener("wheel",event=>{
     event.preventDefault();
     const now=performance.now();
     if(now-spatialWheelLock<260) return;
@@ -6437,13 +6500,13 @@
     if(pts.length<2) return 0;
     return Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
   }
-  svg.addEventListener("pointerdown",event=>{
+  (canvasWrapEl||svg).addEventListener("pointerdown",event=>{
     if(event.pointerType!=="touch") return;
     spatialPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    try{svg.setPointerCapture(event.pointerId)}catch{}
+    try{(canvasWrapEl||svg).setPointerCapture(event.pointerId)}catch{}
     if(spatialPointers.size===2){spatialPinchStart=spatialPointerDistance();spatialPinchConsumed=false;}
   });
-  svg.addEventListener("pointermove",event=>{
+  (canvasWrapEl||svg).addEventListener("pointermove",event=>{
     if(!spatialPointers.has(event.pointerId)) return;
     spatialPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     if(spatialPointers.size!==2 || !spatialPinchStart || spatialPinchConsumed) return;
@@ -6457,8 +6520,8 @@
     spatialPointers.delete(event.pointerId);
     if(spatialPointers.size<2){spatialPinchStart=0;spatialPinchConsumed=false;}
   };
-  svg.addEventListener("pointerup",clearSpatialPointer);
-  svg.addEventListener("pointercancel",clearSpatialPointer);
+  (canvasWrapEl||svg).addEventListener("pointerup",clearSpatialPointer);
+  (canvasWrapEl||svg).addEventListener("pointercancel",clearSpatialPointer);
 
   // Safari gesture events provide an additional native pinch path on iPhone/iPad/Mac trackpads.
   let safariGestureScale=1;
