@@ -305,11 +305,13 @@
     }
     .historyBackdrop[hidden]{display:none!important}
 
-    body.historyExpanded .orbWrap,
+    body.historyExpanded .orbHalo,
+    body.historyExpanded .orbit,
+    body.historyExpanded .orb,
     body.historyExpanded .ask,
     body.historyExpanded .hint{
       filter:blur(6px);
-      opacity:.38;
+      opacity:.30;
       pointer-events:none;
       transition:filter .18s ease,opacity .18s ease
     }
@@ -539,18 +541,24 @@
     .topicSphereNode.noLabel .topicSphereNodeLabel{visibility:hidden}
     .topicSphereOrigin{
       position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;pointer-events:none;
-      width:88px;height:56px;display:grid;place-items:center;text-align:center;color:#66778f
+      width:82px;height:82px;border-radius:50%;display:grid;place-items:center;text-align:center;
+      isolation:isolate;overflow:visible;
+      background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.50) 0 7%,rgba(61,85,197,.44) 13%,rgba(34,53,125,.54) 27%,rgba(15,34,75,.98) 55%,#091a38 78%,#07142b 100%);
+      border:1px solid rgba(110,154,255,.62);
+      box-shadow:0 0 0 9px rgba(68,111,221,.045),0 0 30px rgba(70,116,240,.30),0 0 66px rgba(103,78,220,.17),inset 0 0 24px rgba(86,124,237,.22);
+      animation:cosmosBreath 7.8s ease-in-out infinite
     }
     .topicSphereOrigin::before{
-      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:30px;border-radius:50%;
-      background:radial-gradient(ellipse at center,#f7f9ff 0 7%,#c4d5ff 14%,rgba(111,137,238,.84) 28%,rgba(84,71,198,.28) 54%,rgba(70,99,169,.05) 76%,transparent 82%);
-      box-shadow:0 0 24px rgba(111,143,225,.30),0 0 52px rgba(104,88,220,.12);opacity:.96
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:118%;height:118%;border-radius:50%;
+      border:1px solid rgba(110,168,255,.28);box-shadow:0 0 24px rgba(75,119,255,.18),inset 0 0 20px rgba(154,121,255,.08);
+      background:radial-gradient(circle,rgba(44,105,231,.08) 0 32%,rgba(92,86,230,.045) 48%,transparent 72%)
     }
     .topicSphereOrigin::after{
-      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#6f8fe1;
-      box-shadow:0 0 0 7px rgba(111,143,225,.10),0 0 22px rgba(91,124,216,.36)
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:12%;aspect-ratio:1;border-radius:50%;
+      background:#eef4ff;box-shadow:0 0 14px rgba(151,180,255,.58),0 0 30px rgba(119,91,226,.22);opacity:.62;
+      animation:cosmosCalmHeart 6.6s ease-in-out infinite
     }
-    .topicSphereOrigin span{position:absolute;top:44px;font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7a89a0;white-space:nowrap}
+    .topicSphereOrigin span{position:relative;z-index:4;color:#f7f9fc;font-size:10px;letter-spacing:-.01em;text-transform:none;font-weight:700;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,.52)}
     .topicSphereHint{
       position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:10;pointer-events:none;
       color:#7d8b9f;font-size:9px;letter-spacing:.02em;white-space:nowrap;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.74);backdrop-filter:blur(8px)
@@ -559,6 +567,38 @@
       .topicSphereNode{width:64px;height:64px}.topicSphereNodeHalo{width:64px;height:64px}.topicSphereNodeCore{width:44px;height:44px}.topicSphereNodeLabel{font-size:6.4px}
       .topicSphereOrigin{width:76px;height:50px}.topicSphereOrigin::before{width:66px;height:27px}.topicSphereOrigin span{top:39px;font-size:7px}
       .topicSphereHint{bottom:5px;font-size:8px;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+    }
+
+
+    /* v5.9 — the living Cosmos stays on the landing page.
+       History opens the topic-ray sphere as its own view instead of replacing Cosmos. */
+    .orbWrap.topicSphereActive .orbHalo,
+    .orbWrap.topicSphereActive .orbit,
+    .orbWrap.topicSphereActive .orb{
+      opacity:1!important;visibility:visible!important;pointer-events:auto!important
+    }
+    body:not(.historyExpanded) .topicSphere{display:none!important}
+    body.historyExpanded .topicYears{display:none!important}
+    body.historyExpanded .topicSphere{
+      display:block!important;position:fixed!important;z-index:54!important;
+      top:calc(88px + env(safe-area-inset-top))!important;right:18px!important;bottom:18px!important;left:18px!important;
+      width:auto!important;height:auto!important;border:1px solid rgba(39,67,108,.10);border-radius:28px;
+      background:radial-gradient(circle at 50% 50%,rgba(104,139,231,.085) 0 4%,rgba(98,126,212,.025) 18%,rgba(255,255,255,.98) 52%),#fff!important;
+      box-shadow:0 28px 90px rgba(31,56,91,.16);overflow:hidden!important;cursor:grab
+    }
+    body.historyExpanded .topicMemory.historyExpanded .topicMemoryHeader{
+      top:calc(18px + env(safe-area-inset-top))!important;right:18px!important;width:min(500px,calc(100vw - 36px))!important;
+      border-radius:24px!important;border-bottom:1px solid rgba(39,67,108,.11)!important
+    }
+    body.historyExpanded .topicSphereHint{bottom:14px!important}
+    @media(max-width:640px){
+      body.historyExpanded .topicSphere{
+        top:calc(72px + env(safe-area-inset-top))!important;right:10px!important;bottom:calc(10px + env(safe-area-inset-bottom))!important;left:10px!important;border-radius:22px
+      }
+      body.historyExpanded .topicMemory.historyExpanded .topicMemoryHeader{
+        top:calc(10px + env(safe-area-inset-top))!important;right:10px!important;width:calc(100vw - 20px)!important
+      }
+      .topicSphereOrigin{width:68px;height:68px}.topicSphereOrigin span{font-size:8.6px}
     }
 
   </style>
@@ -652,7 +692,7 @@
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v5.8-topic-ray-sphere";
+      const INDEX_BUILD="v5.9-beating-entry-history-sphere";
 
       function recoverLastTopicFromSession(){
         try{
@@ -738,8 +778,9 @@
       function renderTopicSphere(list=readTopicMemory()){
         if(!topicSphere||!topicSphereRoutes||!topicSphereNodes||!orbWrap)return;
         const topics=uniqueTopicSphereTopics(list.filter(x=>topicQuestion(x)));
-        if(!topics.length){topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;return;}
-        topicSphere.hidden=false;orbWrap.classList.add("topicSphereActive");
+        const historyOpen=Boolean(topicMemory?.classList.contains("historyExpanded"));
+        if(!topics.length||!historyOpen){topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");if(!topics.length){topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;}return;}
+        topicSphere.hidden=false;orbWrap.classList.remove("topicSphereActive");
         if(topics.length!==topicSphereLastCount){orientTopicSphereToward(topicSphereVector(Math.max(0,topics.length-1)));topicSphereLastCount=topics.length;}
         const rect=topicSphere.getBoundingClientRect(),width=Math.max(280,rect.width||innerWidth),height=Math.max(240,rect.height||420);
         const projected=topics.map((topic,index)=>({topic,index,p:topicSphereProject(topicSphereVector(index),width,height)}));
