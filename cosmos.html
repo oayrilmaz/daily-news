@@ -1,11 +1,12 @@
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v5.3-identical-dom-cosmos-light-essence" />
+  <meta name="cosmos-build" content="v5.4-larger-essence-text-scroll" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1180,6 +1181,84 @@
     .projectionEssence{max-height:48dvh!important;font-size:16px!important;line-height:1.58!important;padding-right:10px!important}
   }
 
+
+
+  /* v5.4 — larger, calmer Essence reading.
+     The page remains fixed; ONLY the answer text pane scrolls vertically. */
+  body.spatialEssenceOpen .projectionInner{
+    width:min(960px,calc(100% - 44px))!important;
+    gap:12px!important;
+  }
+  body.spatialEssenceOpen .projectionEssence{
+    width:min(860px,100%)!important;
+    max-width:860px!important;
+    max-height:min(52dvh,620px)!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    overscroll-behavior:contain!important;
+    -webkit-overflow-scrolling:touch;
+    font-size:clamp(24px,2.45vw,30px)!important;
+    line-height:1.54!important;
+    letter-spacing:-.012em;
+    padding:4px 20px 6px 0!important;
+    margin:0 auto!important;
+    touch-action:pan-y;
+  }
+  body.spatialEssenceOpen .projectionMeta,
+  body.spatialEssenceOpen .projectionShareRow,
+  body.spatialEssenceOpen .projectionAsk{
+    width:min(860px,100%)!important;
+  }
+  body.spatialEssenceOpen .projectionMeta button,
+  body.spatialEssenceOpen .projectionMeta span,
+  body.spatialEssenceOpen .currentStopShare{
+    font-size:13px!important;
+  }
+  body.spatialEssenceOpen .projectionAsk input{
+    font-size:17px!important;
+  }
+  body.spatialEssenceOpen .projectionAsk button{
+    width:48px!important;
+    height:48px!important;
+    font-size:20px!important;
+  }
+
+  @media(max-width:640px){
+    body.spatialEssenceOpen .projectionInner{
+      width:calc(100% - 18px)!important;
+      padding:calc(70px + env(safe-area-inset-top)) 5px calc(98px + env(safe-area-inset-bottom))!important;
+      gap:9px!important;
+    }
+    body.spatialEssenceOpen .projectionEssence{
+      width:calc(100% - 8px)!important;
+      max-width:none!important;
+      max-height:49dvh!important;
+      font-size:23px!important;
+      line-height:1.52!important;
+      letter-spacing:-.012em!important;
+      padding:3px 12px 5px 0!important;
+    }
+    body.spatialEssenceOpen .projectionMeta,
+    body.spatialEssenceOpen .projectionShareRow,
+    body.spatialEssenceOpen .projectionAsk{
+      width:calc(100% - 8px)!important;
+    }
+    body.spatialEssenceOpen .projectionMeta button,
+    body.spatialEssenceOpen .projectionMeta span,
+    body.spatialEssenceOpen .currentStopShare{
+      font-size:12.5px!important;
+    }
+    body.spatialEssenceOpen .projectionAsk input{
+      font-size:16.5px!important;
+      min-height:52px!important;
+    }
+    body.spatialEssenceOpen .projectionAsk button{
+      width:52px!important;
+      height:52px!important;
+      font-size:21px!important;
+    }
+  }
+
 </style>
 </head>
 <body>
@@ -1412,7 +1491,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.3-identical-dom-cosmos-light-essence";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.4-larger-essence-text-scroll";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
