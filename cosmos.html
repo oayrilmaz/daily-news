@@ -6,7 +6,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v5.7-eye-center-rayburst-journey" />
+  <meta name="cosmos-build" content="v5.8-route-ray-branching-journey" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1344,8 +1344,10 @@
   .journeySphereFieldRay.near{stroke-width:1.05;opacity:.88}
   /* Every visited station owns a radial track from the viewer's eye. */
   .journeySphereSightline{fill:none;stroke:#9eafd0;stroke-width:1.25;opacity:.62;stroke-linecap:round}
-  .journeySphereSightline.active{stroke:#6f91df;stroke-width:2.05;opacity:.96;filter:drop-shadow(0 0 3px rgba(92,128,220,.22))}
-  .journeySphereSightline.branch{stroke:#a59bd6;opacity:.62}
+  .journeySphereSightline.active{stroke:#5f86df;stroke-width:2.35;opacity:.98;filter:drop-shadow(0 0 4px rgba(92,128,220,.28))}
+  .journeySphereSightline.branch{stroke:#9f9ad1;stroke-width:1.45;opacity:.54}
+  .journeySphereStation.activeRoute .journeySphereStationCore{border-color:#90aff3;box-shadow:0 0 31px rgba(74,117,224,.34),0 0 62px rgba(112,82,226,.15),inset 0 0 24px rgba(86,124,237,.23)}
+  .journeySphereStation.savedRoute{opacity:.86}
   .journeySphereStations{position:absolute;inset:0;z-index:4;pointer-events:none}
   .journeySphereStation{
     --sphere-scale:1;position:absolute;left:0;top:0;transform:translate(-50%,-50%) scale(var(--sphere-scale));
@@ -1569,7 +1571,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>you are here</span></div>
-      <div class="journeySphereHint">drag 360° to look around · rays begin at you · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° · one route stays on one ray · alternate choices build neighboring rays</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -6740,9 +6742,35 @@
   function sphereCross(a,b){return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
   function sphereAdd(a,b,weight=1){return {x:a.x+b.x*weight,y:a.y+b.y*weight,z:a.z+b.z*weight};}
 
-  /* Stable tree-aware directions. Related stations remain spatially near one another,
-     so a route reads like a constellation instead of random points on a globe. */
-  function journeySphereVectorMap(nodes){
+  /* v5.8 — route rays, not scattered stations.
+     First-child continuation stays on exactly the same ray. If the viewer returns to an
+     earlier station and chooses a different child, that sibling opens a nearby ray and its
+     own first-child descendants stay on that ray. This makes each explored route visually
+     persistent while alternative routes build beside it. */
+  function offsetJourneyRouteVector(parentVector,branchOrdinal,treeDepth){
+    const parent=sphereNormalize(parentVector||{x:-.34,y:.16,z:.93});
+    const reference=Math.abs(parent.y)<.84?{x:0,y:1,z:0}:{x:1,y:0,z:0};
+    const u=sphereNormalize(sphereCross(reference,parent));
+    const v=sphereNormalize(sphereCross(parent,u));
+    const ordinal=Math.max(1,Number(branchOrdinal)||1);
+    const ring=Math.ceil(ordinal/4);
+    const slot=(ordinal-1)%4;
+    const phases=[0,Math.PI,Math.PI/2,-Math.PI/2];
+    const phase=phases[slot] + (treeDepth%2 ? .12 : -.08);
+    const spread=Math.min(.44,.115 + ring*.065 + Math.min(6,treeDepth)*.007);
+    const tangent={
+      x:u.x*Math.cos(phase)+v.x*Math.sin(phase),
+      y:u.y*Math.cos(phase)+v.y*Math.sin(phase),
+      z:u.z*Math.cos(phase)+v.z*Math.sin(phase)
+    };
+    return sphereNormalize({
+      x:parent.x*Math.cos(spread)+tangent.x*Math.sin(spread),
+      y:parent.y*Math.cos(spread)+tangent.y*Math.sin(spread),
+      z:parent.z*Math.cos(spread)+tangent.z*Math.sin(spread)
+    });
+  }
+
+  function journeySphereRouteLayout(nodes,currentId=state.journey.current_node_id){
     const ordered=[...nodes].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
     const byParent=new Map();
     for(const node of ordered){
@@ -6750,48 +6778,105 @@
       if(!byParent.has(parent)) byParent.set(parent,[]);
       byParent.get(parent).push(node);
     }
-    const vectors=new Map();
-    const depth=new Map();
+    for(const list of byParent.values()) list.sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+
+    const layout=new Map();
     const roots=ordered.filter(node=>!node.parent_node_id || !journeyNodeById(node.parent_node_id));
+
+    function assignBranch(parentNode){
+      const parentEntry=layout.get(parentNode.node_id);
+      if(!parentEntry) return;
+      const children=byParent.get(String(parentNode.node_id))||[];
+      children.forEach((child,index)=>{
+        const continuation=index===0;
+        const vector=continuation
+          ? parentEntry.vector
+          : offsetJourneyRouteVector(parentEntry.vector,index,parentEntry.treeDepth+1);
+        const laneId=continuation ? parentEntry.laneId : `lane:${child.node_id}`;
+        layout.set(child.node_id,{
+          vector,
+          laneId,
+          treeDepth:parentEntry.treeDepth+1,
+          branchRootId:continuation?parentEntry.branchRootId:child.node_id,
+          parentLaneId:parentEntry.laneId,
+          isContinuation:continuation
+        });
+        assignBranch(child);
+      });
+    }
+
     roots.forEach((root,index)=>{
-      vectors.set(root.node_id,index===0?{x:0,y:0,z:1}:journeySphereBaseVector(index+2));
-      depth.set(root.node_id,0);
+      const vector=index===0
+        ? sphereNormalize({x:-.34,y:.16,z:.93})
+        : journeySphereBaseVector(index+7);
+      layout.set(root.node_id,{
+        vector,
+        laneId:`lane:${root.node_id}`,
+        treeDepth:0,
+        branchRootId:root.node_id,
+        parentLaneId:"",
+        isContinuation:true
+      });
+      assignBranch(root);
     });
 
-    let guard=0;
-    while(vectors.size<ordered.length && guard++<ordered.length+4){
-      let progressed=false;
-      for(const node of ordered){
-        if(vectors.has(node.node_id)) continue;
-        const parent=vectors.get(node.parent_node_id);
-        if(!parent) continue;
-        const siblings=byParent.get(String(node.parent_node_id||""))||[node];
-        const siblingIndex=Math.max(0,siblings.findIndex(s=>s.node_id===node.node_id));
-        const siblingCount=Math.max(1,siblings.length);
-        const d=(depth.get(node.parent_node_id)||0)+1;
-        const reference=Math.abs(parent.y)<.82?{x:0,y:1,z:0}:{x:1,y:0,z:0};
-        const u=sphereNormalize(sphereCross(reference,parent));
-        const v=sphereNormalize(sphereCross(parent,u));
-        const phase=(Math.PI*2*(siblingIndex+.5))/siblingCount + d*.71;
-        const spread=Math.min(.76,.40+d*.065);
-        const tangent={
-          x:u.x*Math.cos(phase)+v.x*Math.sin(phase),
-          y:u.y*Math.cos(phase)+v.y*Math.sin(phase),
-          z:u.z*Math.cos(phase)+v.z*Math.sin(phase)
-        };
-        const child=sphereNormalize({
-          x:parent.x*Math.cos(spread)+tangent.x*Math.sin(spread),
-          y:parent.y*Math.cos(spread)+tangent.y*Math.sin(spread),
-          z:parent.z*Math.cos(spread)+tangent.z*Math.sin(spread)
-        });
-        vectors.set(node.node_id,child);
-        depth.set(node.node_id,d);
-        progressed=true;
-      }
-      if(!progressed) break;
+    ordered.forEach((node,index)=>{
+      if(layout.has(node.node_id)) return;
+      layout.set(node.node_id,{
+        vector:journeySphereBaseVector(index+11),
+        laneId:`lane:${node.node_id}`,
+        treeDepth:0,
+        branchRootId:node.node_id,
+        parentLaneId:"",
+        isContinuation:true
+      });
+    });
+
+    const distances=journeySphereGraphDistances(ordered,currentId);
+    const lanes=new Map();
+    for(const node of ordered){
+      if(node.node_id===currentId) continue;
+      const entry=layout.get(node.node_id);
+      if(!entry) continue;
+      if(!lanes.has(entry.laneId)) lanes.set(entry.laneId,[]);
+      lanes.get(entry.laneId).push(node);
     }
-    ordered.forEach((node,index)=>{if(!vectors.has(node.node_id)) vectors.set(node.node_id,journeySphereBaseVector(index+3));});
-    return vectors;
+
+    for(const laneNodes of lanes.values()){
+      laneNodes.sort((a,b)=>{
+        const da=distances.has(a.node_id)?distances.get(a.node_id):999;
+        const db=distances.has(b.node_id)?distances.get(b.node_id):999;
+        return da-db || (a.created_at||0)-(b.created_at||0);
+      });
+      const count=laneNodes.length;
+      laneNodes.forEach((node,index)=>{
+        const entry=layout.get(node.node_id);
+        if(!entry) return;
+        let trackFraction;
+        if(count===1) trackFraction=.49;
+        else{
+          const inner=count>=4?.24:.29;
+          const outer=count>=5?.86:.82;
+          trackFraction=inner+(outer-inner)*(index/Math.max(1,count-1));
+        }
+        entry.trackFraction=trackFraction;
+        entry.graphDistance=distances.get(node.node_id)??999;
+        entry.laneRank=index;
+        entry.laneCount=count;
+      });
+    }
+
+    const currentEntry=layout.get(currentId);
+    if(currentEntry){
+      currentEntry.trackFraction=0;
+      currentEntry.graphDistance=0;
+    }
+    return layout;
+  }
+
+  function journeySphereVectorMap(nodes){
+    const layout=journeySphereRouteLayout(nodes,state.journey.current_node_id);
+    return new Map([...layout.entries()].map(([id,entry])=>[id,entry.vector]));
   }
 
   let journeySphereYaw=0;
@@ -6814,7 +6899,7 @@
     return {x:x1,y:y2,z:z2};
   }
 
-  function projectSphereVector(vector,width,height){
+  function projectSphereVector(vector,width,height,trackFraction=null){
     const r=rotateSphereVector(vector);
     const z=Math.max(-1,Math.min(1,r.z));
     const theta=Math.acos(z);
@@ -6827,18 +6912,22 @@
     const edgeX=Math.abs(dx)>.0001?halfW/Math.abs(dx):Infinity;
     const edgeY=Math.abs(dy)>.0001?halfH/Math.abs(dy):Infinity;
     const edgeRadius=Math.min(edgeX,edgeY);
-    // Inside-out fisheye: directions move from the eye toward the rectangular periphery.
-    // No globe boundary is ever drawn.
     const normalized=Math.max(0,Math.min(1,theta/journeySphereFov));
-    const radial=Math.pow(normalized,.72)*edgeRadius*.91;
+    // Ambient rays keep the fisheye depth cue. Journey stations instead use a fixed
+    // distance on their lane so multiple stations can line up on the exact same ray.
+    const lanePosition=Number.isFinite(Number(trackFraction))
+      ? Math.max(.12,Math.min(.90,Number(trackFraction)))
+      : Math.pow(normalized,.72)*.91;
+    const radial=edgeRadius*lanePosition;
+    const scale=.72 + Math.max(0,z)*.20 + (1-lanePosition)*.12;
     return {
-      ...r,visible:true,azimuth,edgeRadius,
+      ...r,visible:true,azimuth,edgeRadius,lanePosition,
       x:width/2 + dx*radial,
       y:height/2 + dy*radial,
       rayX:width/2 + dx*edgeRadius*.995,
       rayY:height/2 + dy*edgeRadius*.995,
-      scale:.72 + Math.max(0,z)*.38,
-      opacity:.40 + Math.max(0,z)*.60
+      scale,
+      opacity:.42 + Math.max(0,z)*.48
     };
   }
 
@@ -6906,13 +6995,14 @@
     const rect=journeySphereViewport.getBoundingClientRect();
     const width=Math.max(280,rect.width||innerWidth);
     const height=Math.max(260,rect.height||innerHeight);
-    const vectorMap=journeySphereVectorMap(nodes);
+    const routeLayout=journeySphereRouteLayout(nodes,currentId);
     const projected=new Map();
 
     for(const node of nodes){
       if(node.node_id===currentId) continue;
-      const base=vectorMap.get(node.node_id)||{x:0,y:0,z:1};
-      projected.set(node.node_id,projectSphereVector(base,width,height));
+      const lane=routeLayout.get(node.node_id);
+      const base=lane?.vector||{x:-.34,y:.16,z:.93};
+      projected.set(node.node_id,projectSphereVector(base,width,height,lane?.trackFraction));
     }
 
     // Keep every visible station core. Collision handling only hides a label, never a station.
@@ -6943,21 +7033,43 @@
       ray.setAttribute("x1",center.x);ray.setAttribute("y1",center.y);ray.setAttribute("x2",p.rayX);ray.setAttribute("y2",p.rayY);
       const tone=i%11===0?"gold":(i%7===0?"violet":"");
       ray.setAttribute("class",`journeySphereFieldRay ${tone} ${p.z>.58?"near":""}`.trim());
-      const opacity=.16+Math.max(0,p.z)*.18;
+      const opacity=.085+Math.max(0,p.z)*.10;
       ray.setAttribute("opacity",String(opacity));
       journeySphereRoutes.appendChild(ray);
     }
 
-    // Every visited station gets its own radial track from the viewer/origin all the way outward.
-    // Active ancestry is strongest; saved/alternate branches remain visible but quieter.
+    // One explored route = one persistent ray. Stations that continue along that route
+    // are placed at increasing distances on the same exact line. A sibling branch creates
+    // one neighboring ray, rather than scattering every station onto a new direction.
+    const laneSummary=new Map();
     for(const node of nodes){
       if(node.node_id===currentId) continue;
-      const p=projected.get(node.node_id);
+      const entry=routeLayout.get(node.node_id);
+      if(!entry) continue;
+      if(!laneSummary.has(entry.laneId)){
+        laneSummary.set(entry.laneId,{vector:entry.vector,active:false,count:0});
+      }
+      const lane=laneSummary.get(entry.laneId);
+      lane.count+=1;
+      if(activeIds.has(node.node_id)) lane.active=true;
+    }
+    const currentEntry=routeLayout.get(currentId);
+    const currentLaneId=currentEntry?.laneId||"";
+    // The current station is the viewer/eye, but its route must still be visible immediately.
+    // This is what makes a newly chosen alternative appear as a new neighboring ray at once,
+    // even before the viewer travels to a second station on that branch.
+    if(currentEntry && currentLaneId && !laneSummary.has(currentLaneId)){
+      laneSummary.set(currentLaneId,{vector:currentEntry.vector,active:true,count:0,current:true});
+    }
+    if(currentLaneId && laneSummary.has(currentLaneId)) laneSummary.get(currentLaneId).active=true;
+
+    for(const lane of laneSummary.values()){
+      const p=projectSphereVector(lane.vector,width,height);
       if(!p?.visible) continue;
       const ray=document.createElementNS("http://www.w3.org/2000/svg","line");
       ray.setAttribute("x1",center.x);ray.setAttribute("y1",center.y);ray.setAttribute("x2",p.rayX);ray.setAttribute("y2",p.rayY);
-      const isActive=activeIds.has(node.node_id);
-      ray.setAttribute("class",`journeySphereSightline ${isActive?"active":"branch"}`);
+      ray.setAttribute("class",`journeySphereSightline ${lane.active?"active":"branch"}`);
+      ray.setAttribute("data-stations",String(lane.count));
       journeySphereRoutes.appendChild(ray);
     }
 
@@ -6969,7 +7081,9 @@
       const label=observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos";
       const button=document.createElement("button");
       button.type="button";
-      button.className=`journeySphereStation ${p.z>.56?"near":""}`;
+      const laneEntry=routeLayout.get(node.node_id);
+      const isActiveRoute=activeIds.has(node.node_id);
+      button.className=`journeySphereStation ${p.z>.56?"near":""} ${isActiveRoute?"activeRoute":"savedRoute"}`.trim();
       button.dataset.journeySphereNode=node.node_id;
       button.style.left=`${p.x}px`;
       button.style.top=`${p.y}px`;
