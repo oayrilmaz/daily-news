@@ -480,6 +480,87 @@
       .orb p{font-size:clamp(14px,1.75dvh,16px)!important}
     }
 
+
+    /* v5.8 — YOUR COSMOS TOPIC SPHERE.
+       Index = one persistent ray per top-level Cosmos question.
+       A topic node sits at the end of its ray. Dragging rotates the inside-out field. */
+    .orbWrap.topicSphereActive .orbHalo,
+    .orbWrap.topicSphereActive .orbit,
+    .orbWrap.topicSphereActive .orb{
+      opacity:0!important;pointer-events:none!important;visibility:hidden!important
+    }
+    .topicSphere{
+      position:absolute;inset:0;z-index:5;overflow:hidden;touch-action:none;cursor:grab;
+      user-select:none;-webkit-user-select:none;
+      background:
+        radial-gradient(circle at 50% 50%,rgba(104,139,231,.10) 0 3%,rgba(98,126,212,.035) 12%,rgba(255,255,255,0) 36%),
+        linear-gradient(180deg,rgba(250,252,255,.18),rgba(255,255,255,.02))
+    }
+    .topicSphere[hidden]{display:none!important}
+    .topicSphere.dragging{cursor:grabbing}
+    .topicSphere::before{
+      content:"";position:absolute;inset:4% 2%;pointer-events:none;
+      background:repeating-radial-gradient(circle at 50% 50%,rgba(91,122,193,.024) 0 1px,transparent 1px 72px);
+      mask-image:radial-gradient(circle,black 0 74%,transparent 96%);
+      -webkit-mask-image:radial-gradient(circle,black 0 74%,transparent 96%)
+    }
+    .topicSphereRoutes{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:visible}
+    .topicSphereRay{stroke:#8fa7d6;stroke-width:1.15;stroke-linecap:round;opacity:.50}
+    .topicSphereRay.recent{stroke:#6e91df;stroke-width:1.8;opacity:.82;filter:drop-shadow(0 0 3px rgba(92,128,220,.18))}
+    .topicSphereNodes{position:absolute;inset:0;z-index:4;pointer-events:none}
+    .topicSphereNode{
+      --topic-scale:1;position:absolute;left:0;top:0;transform:translate(-50%,-50%) scale(var(--topic-scale));
+      width:74px;height:74px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;
+      -webkit-tap-highlight-color:transparent;transition:opacity .12s linear,filter .12s linear
+    }
+    .topicSphereNodeHalo,.topicSphereNodeCore{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+    .topicSphereNodeHalo{
+      width:74px;height:74px;background:radial-gradient(circle,rgba(44,105,231,.18) 0 27%,rgba(92,86,230,.10) 42%,rgba(82,36,153,.035) 60%,transparent 74%)
+    }
+    .topicSphereNodeCore{
+      isolation:isolate;overflow:hidden;width:50px;height:50px;display:grid;place-items:center;
+      background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.48) 0 7%,rgba(61,85,197,.42) 13%,rgba(34,53,125,.52) 27%,rgba(15,34,75,.96) 55%,#091a38 78%,#07142b 100%);
+      border:1px solid rgba(110,154,255,.56);
+      box-shadow:0 0 18px rgba(70,116,240,.20),0 0 38px rgba(103,78,220,.09),inset 0 0 18px rgba(86,124,237,.18)
+    }
+    .topicSphereNodeCore::before{
+      content:"";position:absolute;left:50%;top:50%;width:56%;height:25%;transform:translate(-50%,-50%);border-radius:50%;
+      background:radial-gradient(ellipse at center,rgba(232,240,255,.94) 0 5%,rgba(154,183,255,.72) 8%,rgba(98,114,236,.42) 22%,rgba(112,80,208,.20) 43%,transparent 72%)
+    }
+    .topicSphereNodeCore::after{
+      content:"";position:absolute;left:50%;top:50%;width:11%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+      background:#edf4ff;box-shadow:0 0 11px rgba(151,180,255,.52);opacity:.62
+    }
+    .topicSphereNodeLabel{
+      position:relative;z-index:4;width:82%;max-height:70%;overflow:hidden;text-align:center;color:#fff;
+      font-size:7px;line-height:1.07;font-weight:760;text-shadow:0 1px 4px rgba(0,0,0,.78);
+      overflow-wrap:normal;word-break:normal;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4
+    }
+    .topicSphereNode.noLabel .topicSphereNodeLabel{visibility:hidden}
+    .topicSphereOrigin{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:8;pointer-events:none;
+      width:88px;height:56px;display:grid;place-items:center;text-align:center;color:#66778f
+    }
+    .topicSphereOrigin::before{
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:30px;border-radius:50%;
+      background:radial-gradient(ellipse at center,#f7f9ff 0 7%,#c4d5ff 14%,rgba(111,137,238,.84) 28%,rgba(84,71,198,.28) 54%,rgba(70,99,169,.05) 76%,transparent 82%);
+      box-shadow:0 0 24px rgba(111,143,225,.30),0 0 52px rgba(104,88,220,.12);opacity:.96
+    }
+    .topicSphereOrigin::after{
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#6f8fe1;
+      box-shadow:0 0 0 7px rgba(111,143,225,.10),0 0 22px rgba(91,124,216,.36)
+    }
+    .topicSphereOrigin span{position:absolute;top:44px;font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7a89a0;white-space:nowrap}
+    .topicSphereHint{
+      position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:10;pointer-events:none;
+      color:#7d8b9f;font-size:9px;letter-spacing:.02em;white-space:nowrap;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.74);backdrop-filter:blur(8px)
+    }
+    @media(max-width:640px){
+      .topicSphereNode{width:64px;height:64px}.topicSphereNodeHalo{width:64px;height:64px}.topicSphereNodeCore{width:44px;height:44px}.topicSphereNodeLabel{font-size:6.4px}
+      .topicSphereOrigin{width:76px;height:50px}.topicSphereOrigin::before{width:66px;height:27px}.topicSphereOrigin span{top:39px;font-size:7px}
+      .topicSphereHint{bottom:5px;font-size:8px;max-width:90%;overflow:hidden;text-overflow:ellipsis}
+    }
+
   </style>
   <script>
     (() => {
@@ -508,6 +589,12 @@
             <h1>Cosmos</h1>
             <p>Everything is connected.<br>Ask anything. Explore everything.</p>
           </div>
+        </div>
+        <div class="topicSphere" id="topicSphere" aria-label="Your Cosmos topic sphere" hidden>
+          <svg class="topicSphereRoutes" id="topicSphereRoutes" aria-hidden="true"></svg>
+          <div class="topicSphereNodes" id="topicSphereNodes"></div>
+          <div class="topicSphereOrigin" aria-hidden="true"><span>Cosmos</span></div>
+          <div class="topicSphereHint">drag 360° · one ray per first question · tap a topic to enter</div>
         </div>
       </section>
 
@@ -550,6 +637,9 @@
 
       const form = document.getElementById("askForm");
       const orbWrap = document.getElementById("orbWrap");
+      const topicSphere=document.getElementById("topicSphere");
+      const topicSphereRoutes=document.getElementById("topicSphereRoutes");
+      const topicSphereNodes=document.getElementById("topicSphereNodes");
       const input = document.getElementById("askInput");
       const voiceButton = document.getElementById("voiceButton");
       const emergence = document.getElementById("emergence");
@@ -562,7 +652,7 @@
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v5.5-desktop-cosmos-journey-sphere";
+      const INDEX_BUILD="v5.8-topic-ray-sphere";
 
       function recoverLastTopicFromSession(){
         try{
@@ -596,6 +686,98 @@
       function topicStationCount(x){return Number.isFinite(Number(x?.station_count))?Number(x.station_count):(Array.isArray(x?.journey)?x.journey.length:0)}
       function topicCurrentLabel(x){return String(x?.current_label||x?.current_observer?.label||x?.current_observer?.question||topicQuestion(x)).trim()}
       function topicResumeUrl(x){const e=String(x?.resume_url||x?.url||"").trim();if(e)return e;const p=new URLSearchParams({focus:"question",view:"cosmos_projection",question:topicQuestion(x),resume:"1"}),id=topicId(x);if(id)p.set("topic",id);return `/cosmos.html?${p}`}
+      let topicSphereYaw=0;
+      let topicSpherePitch=0;
+      let topicSphereFov=1.48;
+      let topicSphereDrag=null;
+      let topicSphereDidDrag=false;
+      let topicSphereLastDragAt=0;
+      let topicSphereLastCount=0;
+      const topicSpherePointers=new Map();
+      let topicSpherePinchStart=0;
+      let topicSpherePinchFovStart=1.48;
+
+      function topicSphereVector(index){
+        const golden=2.399963229728653;
+        const phase=index*golden+.83;
+        const z=.72*(1-2*((index*.754877666+.23)%1));
+        const r=Math.sqrt(Math.max(0,1-z*z));
+        return {x:r*Math.cos(phase),y:r*Math.sin(phase),z};
+      }
+      function topicSphereNormalize(v){const m=Math.hypot(v?.x||0,v?.y||0,v?.z||0)||1;return{x:(v?.x||0)/m,y:(v?.y||0)/m,z:(v?.z||0)/m}}
+      function topicSphereNormalizeAngle(v){const t=Math.PI*2;v%=t;if(v>Math.PI)v-=t;if(v<-Math.PI)v+=t;return v}
+      function topicSphereRotate(v){
+        const cy=Math.cos(topicSphereYaw),sy=Math.sin(topicSphereYaw),cp=Math.cos(topicSpherePitch),sp=Math.sin(topicSpherePitch);
+        const x1=cy*v.x+sy*v.z,z1=-sy*v.x+cy*v.z;
+        return {x:x1,y:cp*v.y-sp*z1,z:sp*v.y+cp*z1};
+      }
+      function topicSphereProject(v,width,height){
+        const r=topicSphereRotate(v),z=Math.max(-1,Math.min(1,r.z)),theta=Math.acos(z);
+        if(theta>topicSphereFov)return{...r,visible:false};
+        const az=Math.atan2(r.y,r.x),dx=Math.cos(az),dy=Math.sin(az);
+        const padX=Math.max(40,width*.055),padY=Math.max(36,height*.09);
+        const halfW=Math.max(90,width/2-padX),halfH=Math.max(80,height/2-padY);
+        const edgeX=Math.abs(dx)>.0001?halfW/Math.abs(dx):Infinity,edgeY=Math.abs(dy)>.0001?halfH/Math.abs(dy):Infinity;
+        const edge=Math.min(edgeX,edgeY);
+        const n=Math.max(0,Math.min(1,theta/topicSphereFov));
+        const radial=(.27+.66*Math.pow(n,.76))*edge;
+        return {...r,visible:true,x:width/2+dx*radial,y:height/2+dy*radial,scale:.78+Math.max(0,z)*.28,opacity:.42+Math.max(0,z)*.58};
+      }
+      function orientTopicSphereToward(v){
+        const n=topicSphereNormalize(v),yaw=Math.atan2(-n.x,n.z),cy=Math.cos(yaw),sy=Math.sin(yaw),z1=-sy*n.x+cy*n.z;
+        topicSphereYaw=topicSphereNormalizeAngle(yaw+.34);
+        topicSpherePitch=topicSphereNormalizeAngle(Math.atan2(n.y,Math.max(.0001,z1))-.12);
+      }
+      function uniqueTopicSphereTopics(list){
+        const seen=new Set();
+        return [...list].sort((a,b)=>topicTimestamp(a)-topicTimestamp(b)).filter(x=>{
+          const key=topicId(x)||`q:${topicQuestion(x).toLowerCase().replace(/\s+/g," ")}`;
+          if(!key||seen.has(key))return false;seen.add(key);return true;
+        });
+      }
+      function renderTopicSphere(list=readTopicMemory()){
+        if(!topicSphere||!topicSphereRoutes||!topicSphereNodes||!orbWrap)return;
+        const topics=uniqueTopicSphereTopics(list.filter(x=>topicQuestion(x)));
+        if(!topics.length){topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;return;}
+        topicSphere.hidden=false;orbWrap.classList.add("topicSphereActive");
+        if(topics.length!==topicSphereLastCount){orientTopicSphereToward(topicSphereVector(Math.max(0,topics.length-1)));topicSphereLastCount=topics.length;}
+        const rect=topicSphere.getBoundingClientRect(),width=Math.max(280,rect.width||innerWidth),height=Math.max(240,rect.height||420);
+        const projected=topics.map((topic,index)=>({topic,index,p:topicSphereProject(topicSphereVector(index),width,height)}));
+        topicSphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);topicSphereRoutes.innerHTML="";
+        topicSphereNodes.innerHTML="";
+        const center={x:width/2,y:height/2};
+        const accepted=[];
+        projected.filter(row=>row.p?.visible).sort((a,b)=>(b.p.z||0)-(a.p.z||0)).forEach(row=>{
+          const p=row.p,minGap=58*Math.max(.78,p.scale||1),collision=accepted.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<minGap);p.labelVisible=!collision;if(!collision)accepted.push(p);
+        });
+        projected.forEach(({topic,index,p})=>{
+          if(!p?.visible)return;
+          const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+          line.setAttribute("x1",center.x);line.setAttribute("y1",center.y);line.setAttribute("x2",p.x);line.setAttribute("y2",p.y);
+          line.setAttribute("class",`topicSphereRay ${index===topics.length-1?"recent":""}`);topicSphereRoutes.appendChild(line);
+          const q=topicQuestion(topic),count=topicStationCount(topic),button=document.createElement("button");
+          button.type="button";button.className=`topicSphereNode ${p.labelVisible?"":"noLabel"}`;button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;button.style.opacity=String(p.opacity);button.style.setProperty("--topic-scale",String(p.scale));button.style.zIndex=String(20+Math.round((p.z+1)*20));
+          button.title=q;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}`);
+          button.innerHTML=`<span class="topicSphereNodeHalo"></span><span class="topicSphereNodeCore"><span class="topicSphereNodeLabel">${q.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</span></span>`;
+          button.addEventListener("click",event=>{event.stopPropagation();if(performance.now()-topicSphereLastDragAt<180)return;location.href=topicResumeUrl(topic)});
+          topicSphereNodes.appendChild(button);
+        });
+      }
+      function topicSpherePointerDistance(){const pts=[...topicSpherePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)}
+      topicSphere?.addEventListener("pointerdown",event=>{
+        topicSpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});try{topicSphere.setPointerCapture(event.pointerId)}catch{}
+        if(topicSpherePointers.size===1){topicSphereDrag={x:event.clientX,y:event.clientY,yaw:topicSphereYaw,pitch:topicSpherePitch};topicSphereDidDrag=false;topicSphere.classList.add("dragging")}
+        else if(topicSpherePointers.size===2){topicSpherePinchStart=topicSpherePointerDistance();topicSpherePinchFovStart=topicSphereFov}
+      });
+      topicSphere?.addEventListener("pointermove",event=>{
+        if(!topicSpherePointers.has(event.pointerId))return;topicSpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+        if(topicSpherePointers.size===2&&topicSpherePinchStart){const d=topicSpherePointerDistance();if(d){const ratio=d/topicSpherePinchStart;topicSphereFov=Math.max(1.12,Math.min(1.55,topicSpherePinchFovStart/Math.max(.78,Math.min(1.28,ratio))));topicSphereDidDrag=true;renderTopicSphere()}return}
+        if(!topicSphereDrag)return;const dx=event.clientX-topicSphereDrag.x,dy=event.clientY-topicSphereDrag.y;if(Math.hypot(dx,dy)>5)topicSphereDidDrag=true;topicSphereYaw=topicSphereNormalizeAngle(topicSphereDrag.yaw+dx*.0065);topicSpherePitch=topicSphereNormalizeAngle(topicSphereDrag.pitch-dy*.0058);renderTopicSphere();
+      });
+      function clearTopicSpherePointer(event){topicSpherePointers.delete(event.pointerId);if(topicSpherePointers.size<2){topicSpherePinchStart=0;topicSpherePinchFovStart=topicSphereFov}if(!topicSpherePointers.size){if(topicSphereDidDrag)topicSphereLastDragAt=performance.now();topicSphereDrag=null;topicSphere.classList.remove("dragging");setTimeout(()=>{topicSphereDidDrag=false},190)}}
+      topicSphere?.addEventListener("pointerup",clearTopicSpherePointer);topicSphere?.addEventListener("pointercancel",clearTopicSpherePointer);
+      topicSphere?.addEventListener("wheel",event=>{event.preventDefault();const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;topicSphereFov=Math.max(1.12,Math.min(1.55,topicSphereFov+Math.sign(delta)*.035));renderTopicSphere()},{passive:false});
+      window.addEventListener("resize",()=>{if(topicSphere&&!topicSphere.hidden)requestAnimationFrame(()=>renderTopicSphere())});
       function monthName(i){return new Intl.DateTimeFormat(undefined,{month:"long"}).format(new Date(2026,i,1))}
       function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
       function startOfWeek(d){const x=startOfDay(d),day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x}
@@ -624,6 +806,7 @@
       function renderTopicMemory(){
         if(!topicMemory||!topicYears)return;
         const topics=readTopicMemory().filter(x=>topicQuestion(x)).sort((a,b)=>topicTimestamp(b)-topicTimestamp(a));
+        renderTopicSphere(topics);
         topicYears.textContent="";
         if(!topics.length){topicMemory.classList.remove("active");return}
         topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active");
@@ -731,6 +914,8 @@
         }
 
         const resolved = resolveView(question);
+        orbWrap.classList.remove("topicSphereActive");
+        if(topicSphere) topicSphere.hidden=true;
         orbWrap.dataset.state = "resolving";
         emergence.classList.remove("active");
         hint.textContent = "Entering Cosmos…";
