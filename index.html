@@ -1,6 +1,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -605,7 +606,61 @@
     /* v6.0 — History sphere readability + direct return gestures.
        Larger topic Cosmos nodes, larger labels, custom pinch/wheel zoom,
        and tapping empty space or the center Cosmos closes History. */
-  </style>
+  
+
+    /* v6.1 — HISTORY AS A 3D TIME-SPHERE.
+       One saved first question = one ray. The mini-Cosmos at the end of that ray
+       sits on the time shell where the first question was created. */
+    .topicSphereNode{width:112px!important;height:112px!important}
+    .topicSphereNodeHalo{
+      width:112px!important;height:112px!important;
+      background:radial-gradient(circle,rgba(44,105,231,.18) 0 26%,rgba(92,86,230,.09) 41%,rgba(82,36,153,.035) 58%,transparent 74%)!important
+    }
+    .topicSphereNodeOrbit{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;
+      width:88px;height:88px;border-radius:50%;border:1px solid rgba(110,168,255,.34);
+      box-shadow:0 0 18px rgba(75,119,255,.16),inset 0 0 16px rgba(154,121,255,.07);
+      animation:topicMiniOrbitSpin 38s linear infinite
+    }
+    .topicSphereNodeOrbit::before,.topicSphereNodeOrbit::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+    .topicSphereNodeOrbit::before{inset:8%;border:1px solid rgba(154,121,255,.26);transform:rotate(23deg)}
+    .topicSphereNodeOrbit::after{inset:17%;border:1px solid rgba(135,164,232,.20);transform:rotate(-31deg)}
+    .topicSphereNodeCore{width:72px!important;height:72px!important}
+    .topicSphereNodeLabel{
+      width:80%!important;max-height:68%!important;font-size:10.5px!important;line-height:1.04!important;-webkit-line-clamp:4!important
+    }
+    .topicSphereOrigin{width:106px!important;height:106px!important}
+    .topicSphereOrigin::before{
+      width:122%!important;height:122%!important;
+      box-shadow:0 0 24px rgba(75,119,255,.18),inset 0 0 20px rgba(154,121,255,.08),
+                 0 0 0 10px rgba(154,121,255,.035),0 0 0 20px rgba(110,168,255,.025)!important
+    }
+    .topicSphereOrigin span{font-size:12px!important}
+    .topicSphereTimeShell{fill:none;stroke:rgba(86,113,176,.14);stroke-width:1;vector-effect:non-scaling-stroke}
+    .topicSphereTimeShell.current{stroke:rgba(87,125,218,.24);stroke-width:1.2}
+    .topicSphereTimeLabel{
+      fill:#8794a8;font-size:10px;font-weight:720;letter-spacing:.11em;
+      paint-order:stroke;stroke:rgba(255,255,255,.94);stroke-width:4px;stroke-linejoin:round
+    }
+    .topicSphereTimeLabelCount{
+      fill:#a2acbb;font-size:8.5px;font-weight:650;letter-spacing:.03em;
+      paint-order:stroke;stroke:rgba(255,255,255,.94);stroke-width:4px;stroke-linejoin:round
+    }
+    .topicSphereRay{opacity:.42!important}
+    .topicSphereRay.recent{opacity:.86!important}
+    @keyframes topicMiniOrbitSpin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+    @media(max-width:640px){
+      .topicSphereNode{width:104px!important;height:104px!important}
+      .topicSphereNodeHalo{width:104px!important;height:104px!important}
+      .topicSphereNodeOrbit{width:82px!important;height:82px!important}
+      .topicSphereNodeCore{width:68px!important;height:68px!important}
+      .topicSphereNodeLabel{font-size:10px!important;line-height:1.03!important}
+      .topicSphereOrigin{width:96px!important;height:96px!important}
+      .topicSphereOrigin span{font-size:10.5px!important}
+      .topicSphereTimeLabel{font-size:8.5px!important}
+      .topicSphereTimeLabelCount{font-size:7.5px!important}
+    }
+</style>
   <script>
     (() => {
       const incoming = new URLSearchParams(location.search);
@@ -638,7 +693,7 @@
           <svg class="topicSphereRoutes" id="topicSphereRoutes" aria-hidden="true"></svg>
           <div class="topicSphereNodes" id="topicSphereNodes"></div>
           <button class="topicSphereOrigin" id="topicSphereOrigin" type="button" aria-label="Return to the main Cosmos"><span>Cosmos</span></button>
-          <div class="topicSphereHint">drag 360° · pinch / wheel to zoom · tap a topic to enter · tap empty space to close</div>
+          <div class="topicSphereHint">drag 360° · pinch / wheel to zoom · time flows outward · tap a topic to enter · tap empty space to close</div>
         </div>
       </section>
 
@@ -697,7 +752,7 @@
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v6.0-history-sphere-readable-zoom-close";
+      const INDEX_BUILD="v6.1-history-time-shells-mini-cosmos";
 
       function recoverLastTopicFromSession(){
         try{
@@ -744,11 +799,20 @@
       let topicSpherePinchFovStart=1.48;
       let topicSpherePinchZoomStart=1.18;
 
-      function topicSphereVector(index){
-        const golden=2.399963229728653;
-        const phase=index*golden+.83;
-        const z=.72*(1-2*((index*.754877666+.23)%1));
+      function topicStringHash(value){
+        let h=2166136261>>>0;
+        const s=String(value||"");
+        for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
+        return h>>>0;
+      }
+      function topicSphereVector(topic,index){
+        const key=topicId(topic)||topicQuestion(topic)||String(index);
+        const a=topicStringHash(key),b=topicStringHash(`${key}|cosmos-time-sphere`);
+        const u=((a%100003)+.5)/100003;
+        const v=((b%100019)+.5)/100019;
+        const z=.78*(1-2*u);
         const r=Math.sqrt(Math.max(0,1-z*z));
+        const phase=Math.PI*2*v+.37;
         return {x:r*Math.cos(phase),y:r*Math.sin(phase),z};
       }
       function topicSphereNormalize(v){const m=Math.hypot(v?.x||0,v?.y||0,v?.z||0)||1;return{x:(v?.x||0)/m,y:(v?.y||0)/m,z:(v?.z||0)/m}}
@@ -758,24 +822,50 @@
         const x1=cy*v.x+sy*v.z,z1=-sy*v.x+cy*v.z;
         return {x:x1,y:cp*v.y-sp*z1,z:sp*v.y+cp*z1};
       }
-      function topicSphereProject(v,width,height){
-        const r=topicSphereRotate(v),z=Math.max(-1,Math.min(1,r.z)),theta=Math.acos(z);
-        if(theta>topicSphereFov)return{...r,visible:false};
+      function topicSphereProject(v,width,height,shellRadius=.58){
+        const r=topicSphereRotate(topicSphereNormalize(v));
         const az=Math.atan2(r.y,r.x),dx=Math.cos(az),dy=Math.sin(az);
-        const padX=Math.max(40,width*.055),padY=Math.max(36,height*.09);
-        const halfW=Math.max(90,width/2-padX),halfH=Math.max(80,height/2-padY);
-        const edgeX=Math.abs(dx)>.0001?halfW/Math.abs(dx):Infinity,edgeY=Math.abs(dy)>.0001?halfH/Math.abs(dy):Infinity;
-        const edge=Math.min(edgeX,edgeY);
-        const n=Math.max(0,Math.min(1,theta/topicSphereFov));
-        const radialBase=(.24+.64*Math.pow(n,.76))*edge;
-        const radial=Math.min(edge*.97,radialBase*(.92+Math.min(1.55,topicSphereZoom)*.11));
-        const depthScale=.82+Math.max(0,z)*.30;
-        return {...r,visible:true,x:width/2+dx*radial,y:height/2+dy*radial,scale:depthScale*topicSphereZoom,opacity:.46+Math.max(0,z)*.54};
+        const front=(Math.max(-1,Math.min(1,r.z))+1)/2;
+        const maxR=Math.max(90,Math.min(width*.455,height*.425));
+        const zoomFactor=.84+Math.min(2.65,Math.max(.90,topicSphereZoom))*.16;
+        const normalizedRadius=Math.max(.18,Math.min(.98,shellRadius));
+        const radial=maxR*normalizedRadius*zoomFactor;
+        const ySquash=.86;
+        const scale=(.76+.34*front)*Math.min(2.25,Math.max(.88,topicSphereZoom));
+        return {...r,visible:true,x:width/2+dx*radial,y:height/2+dy*radial*ySquash,scale,opacity:.34+.66*front,front,az,radial,maxR,ySquash};
       }
       function orientTopicSphereToward(v){
         const n=topicSphereNormalize(v),yaw=Math.atan2(-n.x,n.z),cy=Math.cos(yaw),sy=Math.sin(yaw),z1=-sy*n.x+cy*n.z;
         topicSphereYaw=topicSphereNormalizeAngle(yaw+.34);
         topicSpherePitch=topicSphereNormalizeAngle(Math.atan2(n.y,Math.max(.0001,z1))-.12);
+      }
+      function topicTimeBand(topic,now=new Date()){
+        const stamp=topicTimestamp(topic)||Date.now();
+        const d=new Date(stamp),today=startOfDay(now),day=startOfDay(d),week=startOfWeek(now);
+        const currentYear=now.getFullYear();
+        if(day>=today) return {key:"today",label:"TODAY",kind:"today"};
+        if(day>=week) return {key:"week",label:"THIS WEEK",kind:"week"};
+        if(sameMonth(d,now)) return {key:"month",label:monthName(now.getMonth()).toUpperCase(),kind:"month"};
+        if(d.getFullYear()===currentYear) return {key:`year-${currentYear}`,label:String(currentYear),kind:"year",year:currentYear};
+        return {key:`year-${d.getFullYear()}`,label:String(d.getFullYear()),kind:"year",year:d.getFullYear()};
+      }
+      function topicTimeShells(topics){
+        const now=new Date(),currentYear=now.getFullYear();
+        const baseline=[
+          {key:"today",label:"TODAY",radius:.24},
+          {key:"week",label:"THIS WEEK",radius:.40},
+          {key:"month",label:monthName(now.getMonth()).toUpperCase(),radius:.57},
+          {key:`year-${currentYear}`,label:String(currentYear),radius:.73}
+        ];
+        const oldYears=[...new Set(topics.map(x=>topicTimeBand(x,now)).filter(b=>b.year&&b.year<currentYear).map(b=>b.year))].sort((a,b)=>b-a);
+        const visibleYears=oldYears.slice(0,4);
+        visibleYears.forEach((year,index)=>{
+          const span=Math.max(1,visibleYears.length-1);
+          baseline.push({key:`year-${year}`,label:String(year),radius:.82+(index/span)*.12});
+        });
+        if(oldYears.length>4) baseline.push({key:"older",label:"OLDER",radius:.96});
+        const byKey=new Map(baseline.map(b=>[b.key,b]));
+        return {now,shells:baseline,byKey,oldYears};
       }
       function uniqueTopicSphereTopics(list){
         const seen=new Set();
@@ -788,27 +878,62 @@
         if(!topicSphere||!topicSphereRoutes||!topicSphereNodes||!orbWrap)return;
         const topics=uniqueTopicSphereTopics(list.filter(x=>topicQuestion(x)));
         const historyOpen=Boolean(topicMemory?.classList.contains("historyExpanded"));
-        if(!topics.length||!historyOpen){topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");if(!topics.length){topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;}return;}
+        if(!topics.length||!historyOpen){
+          topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");
+          if(!topics.length){topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;}
+          return;
+        }
         topicSphere.hidden=false;orbWrap.classList.remove("topicSphereActive");
-        if(topics.length!==topicSphereLastCount){orientTopicSphereToward(topicSphereVector(Math.max(0,topics.length-1)));topicSphereLastCount=topics.length;}
+        if(topics.length!==topicSphereLastCount){
+          orientTopicSphereToward(topicSphereVector(topics[Math.max(0,topics.length-1)],Math.max(0,topics.length-1)));
+          topicSphereLastCount=topics.length;
+        }
         const rect=topicSphere.getBoundingClientRect(),width=Math.max(280,rect.width||innerWidth),height=Math.max(240,rect.height||420);
-        const projected=topics.map((topic,index)=>({topic,index,p:topicSphereProject(topicSphereVector(index),width,height)}));
-        topicSphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);topicSphereRoutes.innerHTML="";
-        topicSphereNodes.innerHTML="";
         const center={x:width/2,y:height/2};
-        const accepted=[];
-        projected.filter(row=>row.p?.visible).sort((a,b)=>(b.p.z||0)-(a.p.z||0)).forEach(row=>{
-          const p=row.p,minGap=82*Math.max(.82,Math.min(1.55,p.scale||1)),collision=accepted.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<minGap);p.labelVisible=!collision;if(!collision)accepted.push(p);
+        const time=topicTimeShells(topics),currentYear=time.now.getFullYear();
+        const olderFallback=time.shells.find(s=>s.key==="older");
+        const counts=new Map();
+        const rows=topics.map((topic,index)=>{
+          const band=topicTimeBand(topic,time.now);
+          let shell=time.byKey.get(band.key);
+          if(!shell&&band.year<currentYear) shell=olderFallback||time.shells[time.shells.length-1];
+          shell=shell||time.shells[0];
+          counts.set(shell.key,(counts.get(shell.key)||0)+1);
+          return {topic,index,band,shell,p:topicSphereProject(topicSphereVector(topic,index),width,height,shell.radius)};
         });
-        projected.forEach(({topic,index,p})=>{
-          if(!p?.visible)return;
+
+        topicSphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);
+        topicSphereRoutes.innerHTML="";topicSphereNodes.innerHTML="";
+        const maxR=Math.max(90,Math.min(width*.455,height*.425));
+        const zoomFactor=.84+Math.min(2.65,Math.max(.90,topicSphereZoom))*.16;
+        time.shells.forEach((shell,shellIndex)=>{
+          const count=counts.get(shell.key)||0,rx=maxR*shell.radius*zoomFactor,ry=rx*.86;
+          const ellipse=document.createElementNS("http://www.w3.org/2000/svg","ellipse");
+          ellipse.setAttribute("cx",center.x);ellipse.setAttribute("cy",center.y);ellipse.setAttribute("rx",rx);ellipse.setAttribute("ry",ry);
+          ellipse.setAttribute("class",`topicSphereTimeShell ${shellIndex===0?"current":""}`);topicSphereRoutes.appendChild(ellipse);
+          const label=document.createElementNS("http://www.w3.org/2000/svg","text");
+          const lx=Math.min(width-14,center.x+rx*.73),ly=Math.max(18,center.y-ry*.66);
+          label.setAttribute("x",lx);label.setAttribute("y",ly);label.setAttribute("text-anchor","start");label.setAttribute("class","topicSphereTimeLabel");label.textContent=shell.label;topicSphereRoutes.appendChild(label);
+          if(count){
+            const c=document.createElementNS("http://www.w3.org/2000/svg","text");
+            c.setAttribute("x",lx);c.setAttribute("y",ly+11);c.setAttribute("text-anchor","start");c.setAttribute("class","topicSphereTimeLabelCount");c.textContent=`${count} ${count===1?"COSMOS":"COSMOSES"}`;topicSphereRoutes.appendChild(c);
+          }
+        });
+
+        const accepted=[];
+        rows.sort((a,b)=>(a.p.front||0)-(b.p.front||0)).forEach(row=>{
+          const p=row.p,minGap=88*Math.max(.78,Math.min(1.8,p.scale||1));
+          const collision=accepted.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<minGap);
+          p.labelVisible=!collision;if(!collision)accepted.push(p);
+        });
+        rows.forEach(({topic,index,p,shell})=>{
           const line=document.createElementNS("http://www.w3.org/2000/svg","line");
           line.setAttribute("x1",center.x);line.setAttribute("y1",center.y);line.setAttribute("x2",p.x);line.setAttribute("y2",p.y);
           line.setAttribute("class",`topicSphereRay ${index===topics.length-1?"recent":""}`);topicSphereRoutes.appendChild(line);
           const q=topicQuestion(topic),count=topicStationCount(topic),button=document.createElement("button");
-          button.type="button";button.className=`topicSphereNode ${p.labelVisible?"":"noLabel"}`;button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;button.style.opacity=String(p.opacity);button.style.setProperty("--topic-scale",String(p.scale));button.style.zIndex=String(20+Math.round((p.z+1)*20));
-          button.title=q;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}`);
-          button.innerHTML=`<span class="topicSphereNodeHalo"></span><span class="topicSphereNodeCore"><span class="topicSphereNodeLabel">${q.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</span></span>`;
+          button.type="button";button.className=`topicSphereNode ${p.labelVisible?"":"noLabel"}`;button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;button.style.opacity=String(p.opacity);button.style.setProperty("--topic-scale",String(p.scale));button.style.zIndex=String(20+Math.round((p.front||0)*40));
+          button.title=`${q} · ${shell.label}`;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}, ${shell.label}`);
+          button.innerHTML=`<span class="topicSphereNodeHalo"></span><span class="topicSphereNodeOrbit"></span><span class="topicSphereNodeCore"><span class="topicSphereNodeLabel">${q.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</span></span>`;
           button.addEventListener("click",event=>{event.stopPropagation();if(performance.now()-topicSphereLastDragAt<180)return;location.href=topicResumeUrl(topic)});
           topicSphereNodes.appendChild(button);
         });
@@ -821,12 +946,12 @@
       });
       topicSphere?.addEventListener("pointermove",event=>{
         if(!topicSpherePointers.has(event.pointerId))return;topicSpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-        if(topicSpherePointers.size===2&&topicSpherePinchStart){const d=topicSpherePointerDistance();if(d){const ratio=d/topicSpherePinchStart;topicSphereZoom=Math.max(.90,Math.min(2.35,topicSpherePinchZoomStart*ratio));topicSphereFov=Math.max(1.18,Math.min(1.55,topicSpherePinchFovStart/Math.max(.90,Math.min(1.16,ratio))));topicSphereDidDrag=true;renderTopicSphere()}return}
+        if(topicSpherePointers.size===2&&topicSpherePinchStart){const d=topicSpherePointerDistance();if(d){const ratio=d/topicSpherePinchStart;topicSphereZoom=Math.max(.90,Math.min(2.65,topicSpherePinchZoomStart*ratio));topicSphereFov=Math.max(1.18,Math.min(1.55,topicSpherePinchFovStart/Math.max(.90,Math.min(1.16,ratio))));topicSphereDidDrag=true;renderTopicSphere()}return}
         if(!topicSphereDrag)return;const dx=event.clientX-topicSphereDrag.x,dy=event.clientY-topicSphereDrag.y;if(Math.hypot(dx,dy)>5)topicSphereDidDrag=true;topicSphereYaw=topicSphereNormalizeAngle(topicSphereDrag.yaw+dx*.0065);topicSpherePitch=topicSphereNormalizeAngle(topicSphereDrag.pitch-dy*.0058);renderTopicSphere();
       });
       function clearTopicSpherePointer(event){topicSpherePointers.delete(event.pointerId);if(topicSpherePointers.size<2){topicSpherePinchStart=0;topicSpherePinchFovStart=topicSphereFov;topicSpherePinchZoomStart=topicSphereZoom}if(!topicSpherePointers.size){if(topicSphereDidDrag)topicSphereLastDragAt=performance.now();topicSphereDrag=null;topicSphere.classList.remove("dragging");setTimeout(()=>{topicSphereDidDrag=false},190)}}
       topicSphere?.addEventListener("pointerup",clearTopicSpherePointer);topicSphere?.addEventListener("pointercancel",clearTopicSpherePointer);
-      topicSphere?.addEventListener("wheel",event=>{event.preventDefault();const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;const step=Math.exp(-delta*.00135);topicSphereZoom=Math.max(.90,Math.min(2.35,topicSphereZoom*step));renderTopicSphere()},{passive:false});
+      topicSphere?.addEventListener("wheel",event=>{event.preventDefault();const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;const step=Math.exp(-delta*.00135);topicSphereZoom=Math.max(.90,Math.min(2.65,topicSphereZoom*step));renderTopicSphere()},{passive:false});
       topicSphereOrigin?.addEventListener("click",event=>{event.stopPropagation();if(performance.now()-topicSphereLastDragAt<220)return;setHistoryExpanded(false)});
       topicSphere?.addEventListener("click",event=>{
         if(!topicMemory?.classList.contains("historyExpanded"))return;
