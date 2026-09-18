@@ -6,7 +6,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v5.5-inside-out-journey-sphere" />
+  <meta name="cosmos-build" content="v5.6-inside-sphere-radial-journey" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1260,9 +1260,10 @@
   }
 
 
-  /* v5.5 — Journey Sphere.
-     The viewer stands at the center. Visited stations live on the inside surface
-     of a rotatable sphere; actual Journey parent→child edges are preserved. */
+  /* v5.6 — INSIDE Journey Sphere.
+     The viewer is the origin, not an observer standing outside a globe.
+     The circular portal is the viewer's field of view into the Journey; visited
+     stations live around that viewpoint and can be revealed by rotating 360°. */
   .spatialJourney{
     min-height:58px!important;
     width:min(980px,calc(100% - 28px))!important;
@@ -1295,53 +1296,75 @@
   .journeySphereOverlay{
     position:fixed;z-index:140;inset:0;display:grid;grid-template-rows:auto 1fr auto;
     background:
-      radial-gradient(circle at 50% 48%,rgba(91,132,231,.095),transparent 31%),
-      radial-gradient(circle at 68% 24%,rgba(151,119,255,.055),transparent 24%),
+      radial-gradient(circle at 50% 48%,rgba(91,132,231,.055),transparent 34%),
+      radial-gradient(circle at 70% 23%,rgba(151,119,255,.035),transparent 24%),
       #fff;
-    color:#1b2941;overflow:hidden;touch-action:none
+    color:#1b2941;overflow:hidden;touch-action:none;cursor:pointer
   }
   .journeySphereOverlay[hidden]{display:none!important}
   .journeySphereHeader{
     position:relative;z-index:6;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;
     padding:calc(12px + env(safe-area-inset-top)) 14px 8px;
-    background:linear-gradient(180deg,rgba(255,255,255,.98),rgba(255,255,255,.80),rgba(255,255,255,0))
+    background:linear-gradient(180deg,rgba(255,255,255,.99),rgba(255,255,255,.78),rgba(255,255,255,0));
+    cursor:default
   }
   .journeySphereHeader button{
-    appearance:none;border:1px solid rgba(39,67,108,.12);background:rgba(255,255,255,.92);color:#3e506b;
+    appearance:none;border:1px solid rgba(39,67,108,.12);background:rgba(255,255,255,.94);color:#3e506b;
     min-width:42px;height:42px;border-radius:999px;cursor:pointer;box-shadow:0 5px 20px rgba(31,56,91,.06)
   }
   .journeySphereHeading{text-align:center;min-width:0}
   .journeySphereHeading span{display:block;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#8995a6}
   .journeySphereHeading strong{display:block;margin-top:2px;font-size:14px;color:#26354d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .journeySphereViewport{position:relative;min-height:0;overflow:hidden;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+
+  /* This circle is a portal / field of view. The edge is peripheral vision,
+     not the outside surface of a ball. */
+  .journeySphereViewport{
+    position:relative;justify-self:center;align-self:center;
+    width:min(88vmin,1040px,calc(100vw - 58px),calc(100dvh - 150px));height:auto;
+    aspect-ratio:1;border-radius:50%;overflow:hidden;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
+    border:1px solid rgba(91,127,210,.12);
+    background:
+      radial-gradient(circle at 50% 50%,rgba(255,255,255,.99) 0 16%,rgba(244,248,255,.97) 49%,rgba(230,238,255,.72) 78%,rgba(207,220,250,.42) 100%);
+    box-shadow:
+      inset 0 0 110px rgba(80,116,211,.10),
+      inset 0 0 220px rgba(117,84,220,.045),
+      0 22px 90px rgba(48,76,132,.08);
+    cursor:grab
+  }
   .journeySphereViewport.dragging{cursor:grabbing}
   .journeySphereLens{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:min(88vw,920px);height:min(72dvh,720px);border-radius:50%;pointer-events:none;
+    position:absolute;inset:0;border-radius:50%;pointer-events:none;
     background:
-      radial-gradient(circle at 50% 50%,rgba(98,136,228,.035) 0 48%,rgba(98,136,228,.07) 67%,rgba(98,136,228,.02) 79%,transparent 82%);
-    border:1px solid rgba(93,129,211,.08)
+      radial-gradient(circle at 50% 50%,rgba(102,139,232,.028) 0 38%,transparent 39%),
+      radial-gradient(circle at 50% 50%,transparent 0 66%,rgba(104,135,215,.055) 82%,rgba(80,112,193,.10) 100%)
   }
   .journeySphereLens::before,.journeySphereLens::after{
-    content:"";position:absolute;left:50%;top:50%;border-radius:50%;border:1px solid rgba(92,126,207,.10);transform:translate(-50%,-50%);width:78%;height:28%
+    content:"";position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;
+    border:1px solid rgba(104,137,219,.065)
   }
-  .journeySphereLens::after{width:28%;height:78%}
+  .journeySphereLens::before{width:72%;height:72%}
+  .journeySphereLens::after{width:43%;height:43%;border-color:rgba(117,101,221,.055)}
+
   .journeySphereRoutes{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-  .journeySphereRoute{fill:none;stroke:#a8b7cd;stroke-width:1.25;opacity:.42;stroke-linecap:round}
-  .journeySphereRoute.active{stroke:#7898dc;stroke-width:1.8;opacity:.86}
+  /* Perspective rays originate from the viewer. They are guides, not causal claims. */
+  .journeySphereSightline{fill:none;stroke:#bdcbe0;stroke-width:1;opacity:.34;stroke-linecap:round}
+  .journeySphereSightline.active{stroke:#8ea9df;stroke-width:1.25;opacity:.55}
+  /* Actual parent → child Journey edges remain distinct and stronger. */
+  .journeySphereRoute{fill:none;stroke:#9eafc8;stroke-width:1.35;opacity:.48;stroke-linecap:round}
+  .journeySphereRoute.active{stroke:#688bd6;stroke-width:1.95;opacity:.92}
   .journeySphereStations{position:absolute;inset:0;pointer-events:none}
   .journeySphereStation{
     --sphere-scale:1;position:absolute;left:0;top:0;transform:translate(-50%,-50%) scale(var(--sphere-scale));
-    transform-origin:center;width:88px;height:88px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;
+    transform-origin:center;width:92px;height:92px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;
     -webkit-tap-highlight-color:transparent;transition:opacity .12s linear,filter .12s linear
   }
   .journeySphereStationHalo,.journeySphereStationCore{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
   .journeySphereStationHalo{
-    width:88px;height:88px;
+    width:92px;height:92px;
     background:radial-gradient(circle,rgba(44,105,231,.18) 0 28%,rgba(92,86,230,.10) 41%,rgba(82,36,153,.04) 60%,transparent 73%)
   }
   .journeySphereStationCore{
-    isolation:isolate;overflow:hidden;width:58px;height:58px;display:grid;place-items:center;
+    isolation:isolate;overflow:hidden;width:60px;height:60px;display:grid;place-items:center;
     background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.48) 0 7%,rgba(61,85,197,.42) 13%,rgba(34,53,125,.52) 27%,rgba(15,34,75,.96) 55%,#091a38 78%,#07142b 100%);
     border:1px solid rgba(110,154,255,.56);
     box-shadow:0 0 24px rgba(70,116,240,.20),0 0 48px rgba(103,78,220,.10),inset 0 0 22px rgba(86,124,237,.18)
@@ -1355,28 +1378,39 @@
     background:#edf4ff;box-shadow:0 0 12px rgba(151,180,255,.54);opacity:.62
   }
   .journeySphereStationLabel{
-    position:relative;z-index:4;width:82%;max-height:70%;overflow:hidden;text-align:center;color:#fff;
-    font-size:8px;line-height:1.06;font-weight:760;text-shadow:0 1px 4px rgba(0,0,0,.78);
+    position:relative;z-index:4;width:84%;max-height:70%;overflow:hidden;text-align:center;color:#fff;
+    font-size:8.4px;line-height:1.08;font-weight:760;text-shadow:0 1px 4px rgba(0,0,0,.78);
     overflow-wrap:normal;word-break:normal;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4
   }
-  .journeySphereStation.near .journeySphereStationCore{border-color:#88a9f1;box-shadow:0 0 28px rgba(74,117,224,.30),0 0 54px rgba(112,82,226,.14),inset 0 0 24px rgba(86,124,237,.22)}
+  .journeySphereStation.near .journeySphereStationCore{border-color:#88a9f1;box-shadow:0 0 30px rgba(74,117,224,.32),0 0 58px rgba(112,82,226,.14),inset 0 0 24px rgba(86,124,237,.22)}
+
+  /* The viewer's eye/origin. Every perspective ray begins here. */
   .journeySphereCenter{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;pointer-events:none;
     display:grid;place-items:center;text-align:center;color:#6d7c92
   }
-  .journeySphereCenter::before{content:"";width:9px;height:9px;border-radius:50%;background:#6f8fe1;box-shadow:0 0 0 7px rgba(111,143,225,.11),0 0 28px rgba(91,124,216,.20)}
-  .journeySphereCenter span{margin-top:12px;font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7a89a0}
+  .journeySphereCenter::before{
+    content:"";width:38px;height:16px;border-radius:50%;
+    background:radial-gradient(ellipse at center,#f7f9ff 0 8%,#b4caff 17%,rgba(111,137,238,.72) 31%,rgba(84,71,198,.24) 58%,rgba(70,99,169,.04) 78%,transparent 82%);
+    box-shadow:0 0 18px rgba(111,143,225,.24);opacity:.86
+  }
+  .journeySphereCenter::after{
+    content:"";position:absolute;top:8px;width:6px;height:6px;border-radius:50%;background:#6f8fe1;
+    box-shadow:0 0 0 5px rgba(111,143,225,.09),0 0 16px rgba(91,124,216,.25)
+  }
+  .journeySphereCenter span{margin-top:10px;font-size:8px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;color:#7a89a0}
   .journeySphereHint{
-    position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;pointer-events:none;
-    color:#8793a5;font-size:10px;letter-spacing:.02em;white-space:nowrap
+    position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;pointer-events:none;
+    color:#7e8ca0;font-size:10px;letter-spacing:.02em;white-space:nowrap
   }
   .journeySphereFooter{
     position:relative;z-index:6;padding:8px 14px calc(12px + env(safe-area-inset-bottom));
-    display:flex;justify-content:center;background:linear-gradient(0deg,rgba(255,255,255,.98),rgba(255,255,255,.76),rgba(255,255,255,0))
+    display:flex;justify-content:center;background:linear-gradient(0deg,rgba(255,255,255,.99),rgba(255,255,255,.74),rgba(255,255,255,0));
+    cursor:default
   }
   .journeySphereBreadcrumb{
     max-width:min(900px,calc(100vw - 28px));padding:9px 14px;border:1px solid rgba(39,67,108,.10);border-radius:999px;
-    background:rgba(255,255,255,.92);box-shadow:0 8px 32px rgba(31,56,91,.07);color:#607089;font-size:10px;
+    background:rgba(255,255,255,.94);box-shadow:0 8px 32px rgba(31,56,91,.07);color:#607089;font-size:10px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center
   }
   body.journeySphereOpen .topbar,body.journeySphereOpen .spatialZoomButton,body.journeySphereOpen .spatialJourney{opacity:0!important;pointer-events:none!important}
@@ -1387,12 +1421,12 @@
     .journeySphereLaunchMeta{display:none}
     .journeySphereLaunchMark{width:30px;height:30px}
     .journeySphereLaunchRoute{font-size:10px}
-    .journeySphereLens{width:118vw;height:74dvh}
-    .journeySphereStation{width:76px;height:76px}
-    .journeySphereStationHalo{width:76px;height:76px}
-    .journeySphereStationCore{width:51px;height:51px}
-    .journeySphereStationLabel{font-size:7.2px}
-    .journeySphereHint{font-size:9px;bottom:8px}
+    .journeySphereViewport{width:min(94vw,84dvh,calc(100dvh - 158px));height:auto}
+    .journeySphereStation{width:80px;height:80px}
+    .journeySphereStationHalo{width:80px;height:80px}
+    .journeySphereStationCore{width:53px;height:53px}
+    .journeySphereStationLabel{font-size:7.5px}
+    .journeySphereHint{font-size:8.7px;bottom:11px}
     .journeySphereBreadcrumb{font-size:9px;padding:8px 11px}
   }
 
@@ -1527,7 +1561,7 @@
   <section class="journeySphereOverlay" id="journeySphereOverlay" aria-label="Journey Sphere" hidden>
     <header class="journeySphereHeader">
       <button type="button" id="journeySphereClose" aria-label="Return to Cosmos" title="Return to Cosmos">←</button>
-      <div class="journeySphereHeading"><span>Journey sphere · you are at the center</span><strong id="journeySphereCurrent">Cosmos</strong></div>
+      <div class="journeySphereHeading"><span>Inside your Journey · look outward</span><strong id="journeySphereCurrent">Cosmos</strong></div>
       <button type="button" id="journeySphereReset" aria-label="Reset Journey Sphere view" title="Reset view">◎</button>
     </header>
     <div class="journeySphereViewport" id="journeySphereViewport">
@@ -1535,7 +1569,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>you are here</span></div>
-      <div class="journeySphereHint">drag to look around · pinch / wheel for depth · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° to look around · pinch / wheel for depth · tap a station to travel</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -1653,7 +1687,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.5-inside-out-journey-sphere";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.6-inside-sphere-radial-journey";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -6691,7 +6725,6 @@
   }
 
   function journeySphereBaseVector(index){
-    // Low-discrepancy sphere placement: adding a new station does not move old ones.
     const u=halton(index+1,2);
     const v=halton(index+1,3);
     const z=1-2*u;
@@ -6700,13 +6733,74 @@
     return {x:radius*Math.cos(phi),y:radius*Math.sin(phi),z};
   }
 
+  function sphereNormalize(v){
+    const m=Math.hypot(v?.x||0,v?.y||0,v?.z||0)||1;
+    return {x:(v?.x||0)/m,y:(v?.y||0)/m,z:(v?.z||0)/m};
+  }
+  function sphereCross(a,b){return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
+  function sphereAdd(a,b,weight=1){return {x:a.x+b.x*weight,y:a.y+b.y*weight,z:a.z+b.z*weight};}
+
+  /* Stable tree-aware directions. Related stations remain spatially near one another,
+     so a route reads like a constellation instead of random points on a globe. */
+  function journeySphereVectorMap(nodes){
+    const ordered=[...nodes].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+    const byParent=new Map();
+    for(const node of ordered){
+      const parent=String(node.parent_node_id||"");
+      if(!byParent.has(parent)) byParent.set(parent,[]);
+      byParent.get(parent).push(node);
+    }
+    const vectors=new Map();
+    const depth=new Map();
+    const roots=ordered.filter(node=>!node.parent_node_id || !journeyNodeById(node.parent_node_id));
+    roots.forEach((root,index)=>{
+      vectors.set(root.node_id,index===0?{x:0,y:0,z:1}:journeySphereBaseVector(index+2));
+      depth.set(root.node_id,0);
+    });
+
+    let guard=0;
+    while(vectors.size<ordered.length && guard++<ordered.length+4){
+      let progressed=false;
+      for(const node of ordered){
+        if(vectors.has(node.node_id)) continue;
+        const parent=vectors.get(node.parent_node_id);
+        if(!parent) continue;
+        const siblings=byParent.get(String(node.parent_node_id||""))||[node];
+        const siblingIndex=Math.max(0,siblings.findIndex(s=>s.node_id===node.node_id));
+        const siblingCount=Math.max(1,siblings.length);
+        const d=(depth.get(node.parent_node_id)||0)+1;
+        const reference=Math.abs(parent.y)<.82?{x:0,y:1,z:0}:{x:1,y:0,z:0};
+        const u=sphereNormalize(sphereCross(reference,parent));
+        const v=sphereNormalize(sphereCross(parent,u));
+        const phase=(Math.PI*2*(siblingIndex+.5))/siblingCount + d*.71;
+        const spread=Math.min(.76,.40+d*.065);
+        const tangent={
+          x:u.x*Math.cos(phase)+v.x*Math.sin(phase),
+          y:u.y*Math.cos(phase)+v.y*Math.sin(phase),
+          z:u.z*Math.cos(phase)+v.z*Math.sin(phase)
+        };
+        const child=sphereNormalize({
+          x:parent.x*Math.cos(spread)+tangent.x*Math.sin(spread),
+          y:parent.y*Math.cos(spread)+tangent.y*Math.sin(spread),
+          z:parent.z*Math.cos(spread)+tangent.z*Math.sin(spread)
+        });
+        vectors.set(node.node_id,child);
+        depth.set(node.node_id,d);
+        progressed=true;
+      }
+      if(!progressed) break;
+    }
+    ordered.forEach((node,index)=>{if(!vectors.has(node.node_id)) vectors.set(node.node_id,journeySphereBaseVector(index+3));});
+    return vectors;
+  }
+
   let journeySphereYaw=0;
   let journeySpherePitch=0;
-  let journeySphereFov=1.43;
+  let journeySphereFov=1.72;
   let journeySphereDrag=null;
   const journeySpherePointers=new Map();
   let journeySpherePinchStart=0;
-  let journeySpherePinchFovStart=1.43;
+  let journeySpherePinchFovStart=1.72;
   let journeySphereDidDrag=false;
 
   function rotateSphereVector(vector){
@@ -6723,23 +6817,72 @@
     const r=rotateSphereVector(vector);
     const z=Math.max(-1,Math.min(1,r.z));
     const theta=Math.acos(z);
-    const margin=Math.min(width,height)*.09;
-    const maxRadius=Math.max(90,Math.min(width,height)*.5-margin);
+    const margin=Math.min(width,height)*.095;
+    const maxRadius=Math.max(94,Math.min(width,height)*.5-margin);
     if(theta>journeySphereFov) return {...r,visible:false};
-    const radial=(theta/journeySphereFov)*maxRadius;
+    const normalized=theta/journeySphereFov;
+    // Fisheye-like inside projection: distant directions approach peripheral vision.
+    const radial=Math.sin(normalized*Math.PI*.5)*maxRadius;
     const azimuth=Math.atan2(r.y,r.x);
     return {
       ...r,visible:true,
       x:width/2 + Math.cos(azimuth)*radial,
       y:height/2 + Math.sin(azimuth)*radial,
-      scale:.70 + Math.max(0,z)*.38,
-      opacity:.34 + Math.max(0,z)*.66
+      scale:.66 + Math.max(0,z)*.46,
+      opacity:.28 + Math.max(0,z)*.72
     };
   }
 
-  function sphereNodeIndexMap(nodes){
-    const ordered=[...nodes].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
-    return new Map(ordered.map((node,index)=>[node.node_id,index+1]));
+  function journeySphereGraphDistances(nodes,currentId){
+    const adjacency=new Map(nodes.map(n=>[n.node_id,new Set()]));
+    for(const node of nodes){
+      if(node.parent_node_id && adjacency.has(node.parent_node_id)){
+        adjacency.get(node.node_id)?.add(node.parent_node_id);
+        adjacency.get(node.parent_node_id)?.add(node.node_id);
+      }
+    }
+    const distances=new Map([[currentId,0]]),queue=[currentId];
+    while(queue.length){
+      const id=queue.shift(),next=(distances.get(id)||0)+1;
+      for(const other of adjacency.get(id)||[]){
+        if(distances.has(other)) continue;
+        distances.set(other,next);queue.push(other);
+      }
+    }
+    return distances;
+  }
+
+  function setSphereOrientationToward(vector){
+    const n=sphereNormalize(vector);
+    const yaw=Math.atan2(-n.x,n.z);
+    const cy=Math.cos(yaw),sy=Math.sin(yaw);
+    const z1=-sy*n.x+cy*n.z;
+    const pitch=Math.atan2(n.y,Math.max(.0001,z1));
+    journeySphereYaw=normalizeSphereAngle(yaw);
+    journeySpherePitch=normalizeSphereAngle(pitch);
+  }
+
+  function orientJourneySphereForCurrent(){
+    const nodes=[...(Array.isArray(state.journey?.nodes)?state.journey.nodes:[])];
+    if(nodes.length<2){journeySphereYaw=0;journeySpherePitch=0;journeySphereFov=1.72;return;}
+    const currentId=state.journey.current_node_id;
+    const vectors=journeySphereVectorMap(nodes);
+    const distances=journeySphereGraphDistances(nodes,currentId);
+    let focus={x:0,y:0,z:0},weightTotal=0;
+    for(const node of nodes){
+      if(node.node_id===currentId) continue;
+      const vector=vectors.get(node.node_id);if(!vector) continue;
+      const d=Math.max(1,distances.get(node.node_id)||4);
+      const weight=1/Math.pow(d,1.18);
+      focus=sphereAdd(focus,vector,weight);weightTotal+=weight;
+    }
+    if(weightTotal<.001 || Math.hypot(focus.x,focus.y,focus.z)<.08){
+      const current=journeyNodeById(currentId);
+      const parent=current?.parent_node_id?vectors.get(current.parent_node_id):null;
+      focus=parent||vectors.get(nodes.find(n=>n.node_id!==currentId)?.node_id)||{x:0,y:0,z:1};
+    }
+    setSphereOrientationToward(focus);
+    journeySphereFov=1.72;
   }
 
   function renderJourneySphere(){
@@ -6752,26 +6895,24 @@
     if(journeySphereBreadcrumb) journeySphereBreadcrumb.textContent=(currentJourneyBreadcrumb().join("  ›  ")||currentLabel)+"  ·  YOU ARE HERE";
 
     const rect=journeySphereViewport.getBoundingClientRect();
-    const width=Math.max(320,rect.width||innerWidth);
-    const height=Math.max(320,rect.height||innerHeight);
-    const indexMap=sphereNodeIndexMap(nodes);
+    const width=Math.max(280,rect.width||innerWidth);
+    const height=Math.max(280,rect.height||innerHeight);
+    const vectorMap=journeySphereVectorMap(nodes);
     const projected=new Map();
 
     for(const node of nodes){
       if(node.node_id===currentId) continue;
-      const base=journeySphereBaseVector(indexMap.get(node.node_id)||1);
+      const base=vectorMap.get(node.node_id)||{x:0,y:0,z:1};
       projected.set(node.node_id,projectSphereVector(base,width,height));
     }
 
-    // Front-most stations own the label space. If two projected stations would
-    // collide on the screen, keep the nearer one visible; rotate the sphere to
-    // reveal the other. This preserves the inside-out 3D model without overlap.
+    // Nearer stations own label space. Rotation reveals any temporarily hidden stop.
     const visibleCandidates=[...projected.entries()]
       .filter(([,p])=>p?.visible)
       .sort((a,b)=>(b[1].z||0)-(a[1].z||0));
     const accepted=[];
     for(const [nodeId,p] of visibleCandidates){
-      const minGap=58*Math.max(.82,p.scale||1);
+      const minGap=52*Math.max(.82,p.scale||1);
       const collision=accepted.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<minGap);
       p.display=!collision;
       if(!collision) accepted.push(p);
@@ -6783,12 +6924,24 @@
     const activeIds=new Set(activePath.map(n=>n.node_id));
     const center={x:width/2,y:height/2};
 
+    // Timeless perspective rays: from the viewer's eye to each visible visited station.
+    for(const node of nodes){
+      if(node.node_id===currentId) continue;
+      const p=projected.get(node.node_id);
+      if(!p?.visible || p.display===false) continue;
+      const ray=document.createElementNS("http://www.w3.org/2000/svg","line");
+      ray.setAttribute("x1",center.x);ray.setAttribute("y1",center.y);ray.setAttribute("x2",p.x);ray.setAttribute("y2",p.y);
+      ray.setAttribute("class",`journeySphereSightline ${activeIds.has(node.node_id)?"active":""}`);
+      journeySphereRoutes.appendChild(ray);
+    }
+
+    // Canonical Journey edges stay separate from the rays so branches remain truthful.
     for(const node of nodes){
       if(!node.parent_node_id) continue;
       const parent=journeyNodeById(node.parent_node_id);
       if(!parent) continue;
-      const a=node.node_id===currentId ? {...center,visible:true,z:1} : projected.get(node.node_id);
-      const b=parent.node_id===currentId ? {...center,visible:true,z:1} : projected.get(parent.node_id);
+      const a=node.node_id===currentId ? {...center,visible:true,z:1,display:true} : projected.get(node.node_id);
+      const b=parent.node_id===currentId ? {...center,visible:true,z:1,display:true} : projected.get(parent.node_id);
       if(!a?.visible || !b?.visible || a.display===false || b.display===false) continue;
       const line=document.createElementNS("http://www.w3.org/2000/svg","line");
       line.setAttribute("x1",a.x);line.setAttribute("y1",a.y);line.setAttribute("x2",b.x);line.setAttribute("y2",b.y);
@@ -6804,24 +6957,26 @@
       const label=observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos";
       const button=document.createElement("button");
       button.type="button";
-      button.className=`journeySphereStation ${p.z>.64?"near":""}`;
+      button.className=`journeySphereStation ${p.z>.56?"near":""}`;
       button.dataset.journeySphereNode=node.node_id;
       button.style.left=`${p.x}px`;
       button.style.top=`${p.y}px`;
       button.style.opacity=String(p.opacity);
       button.style.setProperty("--sphere-scale",String(p.scale));
-      button.style.filter=p.z<.28?"blur(.45px)":"none";
+      button.style.filter=p.z<.12?"blur(.55px)":"none";
       button.setAttribute("aria-label",`Travel to ${label}`);
       button.title=label;
-      const showLabel=p.z>.30;
+      const showLabel=p.z>.08;
       button.innerHTML=`<span class="journeySphereStationHalo"></span><span class="journeySphereStationCore"><span class="journeySphereStationLabel">${showLabel?esc(label):""}</span></span>`;
       button.addEventListener("click",event=>{
         event.stopPropagation();
         if(journeySphereDidDrag){journeySphereDidDrag=false;return;}
         const target=journeyNodeById(node.node_id);
         if(!target) return;
+        // Travel through the station, then return to the normal big/small-circle Cosmos view
+        // with the selected station as the new center observer.
         restoreObserverFromJourneyNode(target);
-        requestAnimationFrame(renderJourneySphere);
+        setJourneySphereOpen(false);
       });
       journeySphereStations.appendChild(button);
     }
@@ -6833,25 +6988,30 @@
     if(journeySphereOverlay) journeySphereOverlay.hidden=!journeySphereOpen;
     if(journeySphereOpen){
       if(spatialEssenceOpen) setSpatialEssence(false);
+      orientJourneySphereForCurrent();
       requestAnimationFrame(renderJourneySphere);
     }
   }
 
   function resetJourneySphereView(){
-    journeySphereYaw=0;
-    journeySpherePitch=0;
-    journeySphereFov=1.43;
+    orientJourneySphereForCurrent();
     renderJourneySphere();
   }
 
   journeySphereClose?.addEventListener("click",()=>setJourneySphereOpen(false));
   journeySphereReset?.addEventListener("click",resetJourneySphereView);
+  journeySphereOverlay?.addEventListener("click",event=>{
+    if(!journeySphereOpen) return;
+    // White space outside the circular portal returns to the exact prior Cosmos view.
+    if(event.target===journeySphereOverlay){setJourneySphereOpen(false);}
+  });
   document.addEventListener("keydown",event=>{
     if(event.key==="Escape" && journeySphereOpen){event.preventDefault();setJourneySphereOpen(false);}
   });
 
   journeySphereViewport?.addEventListener("pointerdown",event=>{
     if(!journeySphereOpen) return;
+    event.stopPropagation();
     journeySpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     try{journeySphereViewport.setPointerCapture(event.pointerId)}catch{}
     if(journeySpherePointers.size===1){
@@ -6873,7 +7033,7 @@
       const distance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
       if(distance){
         const ratio=distance/journeySpherePinchStart;
-        journeySphereFov=Math.max(.92,Math.min(1.55,journeySpherePinchFovStart/Math.max(.72,Math.min(1.4,ratio))));
+        journeySphereFov=Math.max(1.12,Math.min(1.90,journeySpherePinchFovStart/Math.max(.70,Math.min(1.48,ratio))));
         journeySphereDidDrag=true;
         renderJourneySphere();
       }
@@ -6883,8 +7043,8 @@
     const dx=event.clientX-journeySphereDrag.x;
     const dy=event.clientY-journeySphereDrag.y;
     if(Math.hypot(dx,dy)>5) journeySphereDidDrag=true;
-    journeySphereYaw=normalizeSphereAngle(journeySphereDrag.yaw + dx*.0063);
-    journeySpherePitch=normalizeSphereAngle(journeySphereDrag.pitch - dy*.0057);
+    journeySphereYaw=normalizeSphereAngle(journeySphereDrag.yaw + dx*.0064);
+    journeySpherePitch=normalizeSphereAngle(journeySphereDrag.pitch - dy*.0059);
     renderJourneySphere();
   });
 
@@ -6898,9 +7058,9 @@
 
   journeySphereViewport?.addEventListener("wheel",event=>{
     if(!journeySphereOpen) return;
-    event.preventDefault();
+    event.preventDefault();event.stopPropagation();
     const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;
-    journeySphereFov=Math.max(.92,Math.min(1.55,journeySphereFov + Math.sign(delta)*.055));
+    journeySphereFov=Math.max(1.12,Math.min(1.90,journeySphereFov + Math.sign(delta)*.055));
     renderJourneySphere();
   },{passive:false});
 
