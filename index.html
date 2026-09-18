@@ -660,6 +660,103 @@
       .topicSphereTimeLabel{font-size:8.5px!important}
       .topicSphereTimeLabelCount{font-size:7.5px!important}
     }
+
+
+    /* v6.2 — History becomes a calm TIME NAVIGATOR, not a discovery sphere.
+       Horizontal = move through time. Vertical = Day / Week / Month / Year.
+       Topics are large, non-overlapping mini-Cosmoses on a scrollable chronological rail. */
+    body.historyExpanded .topicSphere{
+      display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;
+      padding:0!important;touch-action:none!important;cursor:default!important;
+      background:radial-gradient(circle at 50% 42%,rgba(94,128,236,.075) 0 8%,rgba(92,86,230,.025) 24%,rgba(255,255,255,.985) 58%),#fff!important
+    }
+    .topicSphere::before{display:none!important}
+    .topicTimeControls{position:relative;z-index:20;padding:18px 18px 8px;display:grid;gap:10px;pointer-events:auto}
+    .topicTimeScaleTabs{display:flex;justify-content:center;gap:7px;flex-wrap:nowrap}
+    .topicTimeScale{
+      appearance:none;border:1px solid rgba(48,73,111,.11);border-radius:999px;background:#f7f9fd;color:#7a879a;
+      min-width:76px;padding:8px 12px;font:inherit;font-size:10px;font-weight:760;letter-spacing:.08em;text-transform:uppercase;cursor:pointer
+    }
+    .topicTimeScale.active{background:#edf3ff;border-color:rgba(79,116,207,.24);color:#31599e;box-shadow:0 5px 18px rgba(66,101,177,.08)}
+    .topicPeriodNav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:9px;width:min(620px,100%);margin:auto}
+    .topicPeriodStep{
+      appearance:none;width:42px;height:42px;border-radius:50%;border:1px solid rgba(48,73,111,.11);background:rgba(255,255,255,.92);
+      color:#49617f;font-size:24px;line-height:1;cursor:pointer;box-shadow:0 5px 18px rgba(31,56,91,.06)
+    }
+    .topicPeriodStep:disabled{opacity:.22;cursor:default}
+    .topicPeriodCopy{text-align:center;min-width:0;display:grid;gap:2px}
+    .topicPeriodCopy>span{font-size:8px;letter-spacing:.17em;text-transform:uppercase;color:#97a2b1;font-weight:760}
+    .topicPeriodCopy>strong{font-size:17px;line-height:1.1;color:#2b3b54;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .topicPeriodCopy>small{font-size:9px;color:#8b98aa}
+    .topicTimeStage{position:relative;min-height:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+    .topicTimeVerticalLine{position:absolute;left:50%;top:10%;height:39%;width:1px;background:linear-gradient(180deg,rgba(108,140,215,0),rgba(108,140,215,.22));pointer-events:none}
+    .topicTimeOrigin{
+      position:absolute;z-index:14;left:50%;top:34%;transform:translate(-50%,-50%);width:132px;height:132px;border-radius:50%;
+      display:grid;place-items:center;appearance:none;cursor:pointer;isolation:isolate;overflow:visible;padding:0;
+      border:1px solid rgba(110,154,255,.60);
+      background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.50) 0 7%,rgba(61,85,197,.44) 13%,rgba(34,53,125,.54) 27%,rgba(15,34,75,.98) 55%,#091a38 78%,#07142b 100%);
+      box-shadow:0 0 0 12px rgba(68,111,221,.04),0 0 42px rgba(70,116,240,.26),0 0 92px rgba(103,78,220,.14),inset 0 0 32px rgba(86,124,237,.22);
+      animation:cosmosBreath 7.8s ease-in-out infinite
+    }
+    .topicTimeOrigin::before{
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:126%;height:126%;border-radius:50%;
+      border:1px solid rgba(110,168,255,.28);box-shadow:0 0 28px rgba(75,119,255,.16),inset 0 0 24px rgba(154,121,255,.08),0 0 0 13px rgba(154,121,255,.025)
+    }
+    .topicTimeOrigin::after{
+      content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:13%;aspect-ratio:1;border-radius:50%;
+      background:#eef4ff;box-shadow:0 0 16px rgba(151,180,255,.58),0 0 34px rgba(119,91,226,.22);opacity:.62;animation:cosmosCalmHeart 6.6s ease-in-out infinite
+    }
+    .topicTimeOrigin span{position:relative;z-index:3;color:#f7f9fc;font-size:15px;font-weight:700;text-shadow:0 1px 5px rgba(0,0,0,.52)}
+    .topicTimeRail{
+      position:absolute;z-index:8;left:0;right:0;bottom:8%;height:238px;overflow-x:auto;overflow-y:hidden;
+      overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x;scroll-snap-type:x proximity
+    }
+    .topicTimeRail::-webkit-scrollbar{display:none}
+    .topicTimeRailLine{position:sticky;left:0;top:109px;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(95,126,195,.22) 12%,rgba(95,126,195,.22) 88%,transparent);pointer-events:none;z-index:1}
+    .topicTimeRailInner{
+      position:relative;z-index:3;min-width:max-content;height:220px;display:flex;align-items:flex-start;gap:34px;
+      padding:22px max(38px,calc(50vw - 105px)) 26px;
+    }
+    .topicTimeNode{
+      position:relative;flex:0 0 132px;width:132px;height:188px;padding:0;border:0;background:transparent;appearance:none;cursor:pointer;
+      display:grid;grid-template-rows:126px auto auto;justify-items:center;align-items:center;scroll-snap-align:center;-webkit-tap-highlight-color:transparent
+    }
+    .topicTimeNodeHalo,.topicTimeNodeOrbit,.topicTimeNodeCore{position:absolute;top:63px;left:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
+    .topicTimeNodeHalo{width:120px;height:120px;background:radial-gradient(circle,rgba(44,105,231,.17) 0 27%,rgba(92,86,230,.09) 42%,rgba(82,36,153,.035) 60%,transparent 74%)}
+    .topicTimeNodeOrbit{width:98px;height:98px;border:1px solid rgba(110,168,255,.32);box-shadow:0 0 18px rgba(75,119,255,.15),inset 0 0 16px rgba(154,121,255,.07);animation:topicMiniOrbitSpin 38s linear infinite}
+    .topicTimeNodeOrbit::before,.topicTimeNodeOrbit::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+    .topicTimeNodeOrbit::before{inset:8%;border:1px solid rgba(154,121,255,.25);transform:rotate(23deg)}
+    .topicTimeNodeOrbit::after{inset:17%;border:1px solid rgba(135,164,232,.18);transform:rotate(-31deg)}
+    .topicTimeNodeCore{
+      isolation:isolate;overflow:hidden;width:80px;height:80px;display:grid;place-items:center;padding:7px;
+      background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.48) 0 7%,rgba(61,85,197,.42) 13%,rgba(34,53,125,.52) 27%,rgba(15,34,75,.96) 55%,#091a38 78%,#07142b 100%);
+      border:1px solid rgba(110,154,255,.56);box-shadow:0 0 21px rgba(70,116,240,.20),0 0 42px rgba(103,78,220,.10),inset 0 0 22px rgba(86,124,237,.18)
+    }
+    .topicTimeNodeCore::before{content:"";position:absolute;left:50%;top:50%;width:56%;height:25%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(ellipse at center,rgba(232,240,255,.94) 0 5%,rgba(154,183,255,.72) 8%,rgba(98,114,236,.42) 22%,rgba(112,80,208,.20) 43%,transparent 72%)}
+    .topicTimeNodeCore::after{content:"";position:absolute;left:50%;top:50%;width:11%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:#edf4ff;box-shadow:0 0 12px rgba(151,180,255,.54);opacity:.62}
+    .topicTimeNodeLabel{position:relative;z-index:4;width:100%;max-height:62px;overflow:hidden;text-align:center;color:#fff;font-size:10.5px;line-height:1.04;font-weight:780;text-shadow:0 1px 4px rgba(0,0,0,.78);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5}
+    .topicTimeNodeDate{align-self:start;color:#6f7d91;font-size:10px;font-weight:650;white-space:nowrap;margin-top:3px}
+    .topicTimeLatest{align-self:start;margin-top:2px;padding:2px 6px;border-radius:999px;background:#eef3ff;color:#5571aa;font-size:7.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+    .topicTimeEmpty{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);color:#8996a7;font-size:12px;white-space:nowrap}
+    .topicTimeDepthCue{position:absolute;right:18px;top:35%;display:grid;gap:6px;color:#a0aab8;font-size:8px;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;text-align:right}
+    .topicSphereHint{bottom:10px!important;font-size:9px!important;max-width:92%!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    @media(max-width:640px){
+      .topicTimeControls{padding:12px 10px 4px;gap:7px}
+      .topicTimeScaleTabs{gap:4px}
+      .topicTimeScale{min-width:0;flex:1;padding:7px 6px;font-size:8.5px}
+      .topicPeriodNav{grid-template-columns:38px minmax(0,1fr) 38px}
+      .topicPeriodStep{width:36px;height:36px;font-size:21px}
+      .topicPeriodCopy>strong{font-size:14px}.topicPeriodCopy>small{font-size:8px}
+      .topicTimeOrigin{width:112px;height:112px;top:32%}.topicTimeOrigin span{font-size:13px}
+      .topicTimeRail{height:218px;bottom:6%}
+      .topicTimeRailInner{height:204px;gap:22px;padding:18px max(26px,calc(50vw - 93px)) 22px}
+      .topicTimeRailLine{top:99px}
+      .topicTimeNode{flex-basis:116px;width:116px;height:174px;grid-template-rows:116px auto auto}
+      .topicTimeNodeHalo{top:58px;width:108px;height:108px}.topicTimeNodeOrbit{top:58px;width:88px;height:88px}.topicTimeNodeCore{top:58px;width:72px;height:72px}
+      .topicTimeNodeLabel{font-size:9.7px;line-height:1.03}.topicTimeNodeDate{font-size:9px}
+      .topicTimeEmpty{bottom:22%;font-size:11px}.topicTimeDepthCue{right:10px;top:35%;font-size:7px}
+      .topicSphereHint{font-size:8px!important;bottom:5px!important}
+    }
 </style>
   <script>
     (() => {
@@ -689,11 +786,35 @@
             <p>Everything is connected.<br>Ask anything. Explore everything.</p>
           </div>
         </div>
-        <div class="topicSphere" id="topicSphere" aria-label="Your Cosmos topic sphere" hidden>
-          <svg class="topicSphereRoutes" id="topicSphereRoutes" aria-hidden="true"></svg>
-          <div class="topicSphereNodes" id="topicSphereNodes"></div>
-          <button class="topicSphereOrigin" id="topicSphereOrigin" type="button" aria-label="Return to the main Cosmos"><span>Cosmos</span></button>
-          <div class="topicSphereHint">drag 360° · pinch / wheel to zoom · time flows outward · tap a topic to enter · tap empty space to close</div>
+        <div class="topicSphere" id="topicSphere" aria-label="Your Cosmos history by time" hidden>
+          <div class="topicTimeControls" aria-label="History time controls">
+            <div class="topicTimeScaleTabs" role="tablist" aria-label="History scale">
+              <button type="button" class="topicTimeScale" data-topic-time-scale="day" role="tab">Day</button>
+              <button type="button" class="topicTimeScale" data-topic-time-scale="week" role="tab">Week</button>
+              <button type="button" class="topicTimeScale" data-topic-time-scale="month" role="tab">Month</button>
+              <button type="button" class="topicTimeScale" data-topic-time-scale="year" role="tab">Year</button>
+            </div>
+            <div class="topicPeriodNav">
+              <button type="button" class="topicPeriodStep" id="topicPeriodPrev" aria-label="Previous period">‹</button>
+              <div class="topicPeriodCopy">
+                <span id="topicPeriodScale">WEEK</span>
+                <strong id="topicPeriodLabel">This week</strong>
+                <small id="topicPeriodMeta"></small>
+              </div>
+              <button type="button" class="topicPeriodStep" id="topicPeriodNext" aria-label="Next period">›</button>
+            </div>
+          </div>
+          <div class="topicTimeStage" id="topicTimeStage">
+            <div class="topicTimeVerticalLine" aria-hidden="true"></div>
+            <button class="topicTimeOrigin" id="topicSphereOrigin" type="button" aria-label="Return to the main Cosmos"><span>Cosmos</span></button>
+            <div class="topicTimeRail" id="topicTimeRail" aria-label="Topics in selected period">
+              <div class="topicTimeRailLine" aria-hidden="true"></div>
+              <div class="topicTimeRailInner" id="topicTimeRailInner"></div>
+            </div>
+            <div class="topicTimeEmpty" id="topicTimeEmpty" hidden>No Cosmos topics in this period.</div>
+            <div class="topicTimeDepthCue" aria-hidden="true"><span>↑ finer</span><span>↓ broader</span></div>
+          </div>
+          <div class="topicSphereHint">swipe left / right for time · swipe up / down for Day, Week, Month, Year · tap a topic to enter · tap empty space to close</div>
         </div>
       </section>
 
@@ -737,9 +858,17 @@
       const form = document.getElementById("askForm");
       const orbWrap = document.getElementById("orbWrap");
       const topicSphere=document.getElementById("topicSphere");
-      const topicSphereRoutes=document.getElementById("topicSphereRoutes");
-      const topicSphereNodes=document.getElementById("topicSphereNodes");
       const topicSphereOrigin=document.getElementById("topicSphereOrigin");
+      const topicTimeStage=document.getElementById("topicTimeStage");
+      const topicTimeRail=document.getElementById("topicTimeRail");
+      const topicTimeRailInner=document.getElementById("topicTimeRailInner");
+      const topicTimeEmpty=document.getElementById("topicTimeEmpty");
+      const topicPeriodPrev=document.getElementById("topicPeriodPrev");
+      const topicPeriodNext=document.getElementById("topicPeriodNext");
+      const topicPeriodScale=document.getElementById("topicPeriodScale");
+      const topicPeriodLabel=document.getElementById("topicPeriodLabel");
+      const topicPeriodMeta=document.getElementById("topicPeriodMeta");
+      const topicTimeScaleButtons=[...document.querySelectorAll("[data-topic-time-scale]")];
       const input = document.getElementById("askInput");
       const voiceButton = document.getElementById("voiceButton");
       const emergence = document.getElementById("emergence");
@@ -752,7 +881,7 @@
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v6.1-history-time-shells-mini-cosmos";
+      const INDEX_BUILD="v6.2-time-navigator-history";
 
       function recoverLastTopicFromSession(){
         try{
@@ -786,87 +915,15 @@
       function topicStationCount(x){return Number.isFinite(Number(x?.station_count))?Number(x.station_count):(Array.isArray(x?.journey)?x.journey.length:0)}
       function topicCurrentLabel(x){return String(x?.current_label||x?.current_observer?.label||x?.current_observer?.question||topicQuestion(x)).trim()}
       function topicResumeUrl(x){const e=String(x?.resume_url||x?.url||"").trim();if(e)return e;const p=new URLSearchParams({focus:"question",view:"cosmos_projection",question:topicQuestion(x),resume:"1"}),id=topicId(x);if(id)p.set("topic",id);return `/cosmos.html?${p}`}
-      let topicSphereYaw=0;
-      let topicSpherePitch=0;
-      let topicSphereFov=1.48;
-      let topicSphereZoom=1.18;
-      let topicSphereDrag=null;
-      let topicSphereDidDrag=false;
-      let topicSphereLastDragAt=0;
-      let topicSphereLastCount=0;
-      const topicSpherePointers=new Map();
-      let topicSpherePinchStart=0;
-      let topicSpherePinchFovStart=1.48;
-      let topicSpherePinchZoomStart=1.18;
+      const TOPIC_TIME_SCALES=["day","week","month","year"];
+      let topicTimeScale="week";
+      let topicTimeAnchor=new Date();
+      let topicTimeGesture=null;
+      let topicTimeDidDrag=false;
+      let topicTimeLastDragAt=0;
+      let topicTimeLastPeriodKey="";
+      let topicTimeWheelLock=0;
 
-      function topicStringHash(value){
-        let h=2166136261>>>0;
-        const s=String(value||"");
-        for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}
-        return h>>>0;
-      }
-      function topicSphereVector(topic,index){
-        const key=topicId(topic)||topicQuestion(topic)||String(index);
-        const a=topicStringHash(key),b=topicStringHash(`${key}|cosmos-time-sphere`);
-        const u=((a%100003)+.5)/100003;
-        const v=((b%100019)+.5)/100019;
-        const z=.78*(1-2*u);
-        const r=Math.sqrt(Math.max(0,1-z*z));
-        const phase=Math.PI*2*v+.37;
-        return {x:r*Math.cos(phase),y:r*Math.sin(phase),z};
-      }
-      function topicSphereNormalize(v){const m=Math.hypot(v?.x||0,v?.y||0,v?.z||0)||1;return{x:(v?.x||0)/m,y:(v?.y||0)/m,z:(v?.z||0)/m}}
-      function topicSphereNormalizeAngle(v){const t=Math.PI*2;v%=t;if(v>Math.PI)v-=t;if(v<-Math.PI)v+=t;return v}
-      function topicSphereRotate(v){
-        const cy=Math.cos(topicSphereYaw),sy=Math.sin(topicSphereYaw),cp=Math.cos(topicSpherePitch),sp=Math.sin(topicSpherePitch);
-        const x1=cy*v.x+sy*v.z,z1=-sy*v.x+cy*v.z;
-        return {x:x1,y:cp*v.y-sp*z1,z:sp*v.y+cp*z1};
-      }
-      function topicSphereProject(v,width,height,shellRadius=.58){
-        const r=topicSphereRotate(topicSphereNormalize(v));
-        const az=Math.atan2(r.y,r.x),dx=Math.cos(az),dy=Math.sin(az);
-        const front=(Math.max(-1,Math.min(1,r.z))+1)/2;
-        const maxR=Math.max(90,Math.min(width*.455,height*.425));
-        const zoomFactor=.84+Math.min(2.65,Math.max(.90,topicSphereZoom))*.16;
-        const normalizedRadius=Math.max(.18,Math.min(.98,shellRadius));
-        const radial=maxR*normalizedRadius*zoomFactor;
-        const ySquash=.86;
-        const scale=(.76+.34*front)*Math.min(2.25,Math.max(.88,topicSphereZoom));
-        return {...r,visible:true,x:width/2+dx*radial,y:height/2+dy*radial*ySquash,scale,opacity:.34+.66*front,front,az,radial,maxR,ySquash};
-      }
-      function orientTopicSphereToward(v){
-        const n=topicSphereNormalize(v),yaw=Math.atan2(-n.x,n.z),cy=Math.cos(yaw),sy=Math.sin(yaw),z1=-sy*n.x+cy*n.z;
-        topicSphereYaw=topicSphereNormalizeAngle(yaw+.34);
-        topicSpherePitch=topicSphereNormalizeAngle(Math.atan2(n.y,Math.max(.0001,z1))-.12);
-      }
-      function topicTimeBand(topic,now=new Date()){
-        const stamp=topicTimestamp(topic)||Date.now();
-        const d=new Date(stamp),today=startOfDay(now),day=startOfDay(d),week=startOfWeek(now);
-        const currentYear=now.getFullYear();
-        if(day>=today) return {key:"today",label:"TODAY",kind:"today"};
-        if(day>=week) return {key:"week",label:"THIS WEEK",kind:"week"};
-        if(sameMonth(d,now)) return {key:"month",label:monthName(now.getMonth()).toUpperCase(),kind:"month"};
-        if(d.getFullYear()===currentYear) return {key:`year-${currentYear}`,label:String(currentYear),kind:"year",year:currentYear};
-        return {key:`year-${d.getFullYear()}`,label:String(d.getFullYear()),kind:"year",year:d.getFullYear()};
-      }
-      function topicTimeShells(topics){
-        const now=new Date(),currentYear=now.getFullYear();
-        const baseline=[
-          {key:"today",label:"TODAY",radius:.24},
-          {key:"week",label:"THIS WEEK",radius:.40},
-          {key:"month",label:monthName(now.getMonth()).toUpperCase(),radius:.57},
-          {key:`year-${currentYear}`,label:String(currentYear),radius:.73}
-        ];
-        const oldYears=[...new Set(topics.map(x=>topicTimeBand(x,now)).filter(b=>b.year&&b.year<currentYear).map(b=>b.year))].sort((a,b)=>b-a);
-        const visibleYears=oldYears.slice(0,4);
-        visibleYears.forEach((year,index)=>{
-          const span=Math.max(1,visibleYears.length-1);
-          baseline.push({key:`year-${year}`,label:String(year),radius:.82+(index/span)*.12});
-        });
-        if(oldYears.length>4) baseline.push({key:"older",label:"OLDER",radius:.96});
-        const byKey=new Map(baseline.map(b=>[b.key,b]));
-        return {now,shells:baseline,byKey,oldYears};
-      }
       function uniqueTopicSphereTopics(list){
         const seen=new Set();
         return [...list].sort((a,b)=>topicTimestamp(a)-topicTimestamp(b)).filter(x=>{
@@ -874,91 +931,141 @@
           if(!key||seen.has(key))return false;seen.add(key);return true;
         });
       }
+      function topicTimeBounds(scale,anchor){
+        const a=new Date(anchor||Date.now());
+        let start,end;
+        if(scale==="day"){
+          start=startOfDay(a);end=new Date(start);end.setDate(end.getDate()+1);
+        }else if(scale==="week"){
+          start=startOfWeek(a);end=new Date(start);end.setDate(end.getDate()+7);
+        }else if(scale==="month"){
+          start=new Date(a.getFullYear(),a.getMonth(),1);end=new Date(a.getFullYear(),a.getMonth()+1,1);
+        }else{
+          start=new Date(a.getFullYear(),0,1);end=new Date(a.getFullYear()+1,0,1);
+        }
+        return {start,end};
+      }
+      function topicTimeFormatDate(d,opts){return new Intl.DateTimeFormat(undefined,opts).format(d)}
+      function topicTimePeriodLabel(scale,bounds){
+        const {start,end}=bounds,now=new Date(),current=now>=start&&now<end;
+        if(scale==="day") return current?"Today":topicTimeFormatDate(start,{month:"short",day:"numeric",year:start.getFullYear()===now.getFullYear()?undefined:"numeric"});
+        if(scale==="week"){
+          const last=new Date(end);last.setDate(last.getDate()-1);
+          if(current)return `This week · ${topicTimeFormatDate(start,{month:"short",day:"numeric"})}–${topicTimeFormatDate(last,{month:start.getMonth()===last.getMonth()?undefined:"short",day:"numeric"})}`;
+          return `Week of ${topicTimeFormatDate(start,{month:"short",day:"numeric"})}`;
+        }
+        if(scale==="month") return topicTimeFormatDate(start,{month:"long",year:"numeric"});
+        return String(start.getFullYear());
+      }
+      function topicTimeNodeStamp(topic,scale){
+        const d=new Date(topicTimestamp(topic)||Date.now());
+        if(scale==="day")return topicTimeFormatDate(d,{hour:"numeric",minute:"2-digit"});
+        if(scale==="week")return topicTimeFormatDate(d,{weekday:"short",month:"short",day:"numeric"});
+        if(scale==="month")return topicTimeFormatDate(d,{month:"short",day:"numeric"});
+        return topicTimeFormatDate(d,{month:"short",day:"numeric"});
+      }
+      function topicTimePeriodKey(scale,bounds){return `${scale}:${bounds.start.getTime()}`}
+      function topicTimeIsCurrent(bounds){const now=Date.now();return now>=bounds.start.getTime()&&now<bounds.end.getTime()}
+      function topicTimeShift(delta){
+        const next=new Date(topicTimeAnchor);
+        if(topicTimeScale==="day")next.setDate(next.getDate()+delta);
+        else if(topicTimeScale==="week")next.setDate(next.getDate()+7*delta);
+        else if(topicTimeScale==="month")next.setMonth(next.getMonth()+delta);
+        else next.setFullYear(next.getFullYear()+delta);
+        const nextBounds=topicTimeBounds(topicTimeScale,next);
+        const currentBounds=topicTimeBounds(topicTimeScale,new Date());
+        if(nextBounds.start>currentBounds.start&&delta>0)return;
+        topicTimeAnchor=next;renderTopicSphere();
+      }
+      function topicTimeSetScale(scale){
+        if(!TOPIC_TIME_SCALES.includes(scale)||scale===topicTimeScale)return;
+        topicTimeScale=scale;renderTopicSphere();
+      }
+      function topicTimeChangeScale(direction){
+        const i=TOPIC_TIME_SCALES.indexOf(topicTimeScale);
+        const next=Math.max(0,Math.min(TOPIC_TIME_SCALES.length-1,i+direction));
+        if(next!==i)topicTimeSetScale(TOPIC_TIME_SCALES[next]);
+      }
+      function topicTimeSafe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
       function renderTopicSphere(list=readTopicMemory()){
-        if(!topicSphere||!topicSphereRoutes||!topicSphereNodes||!orbWrap)return;
+        if(!topicSphere||!topicTimeRailInner||!orbWrap)return;
         const topics=uniqueTopicSphereTopics(list.filter(x=>topicQuestion(x)));
         const historyOpen=Boolean(topicMemory?.classList.contains("historyExpanded"));
         if(!topics.length||!historyOpen){
           topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");
-          if(!topics.length){topicSphereNodes.innerHTML="";topicSphereRoutes.innerHTML="";topicSphereLastCount=0;}
+          if(!topics.length)topicTimeRailInner.innerHTML="";
           return;
         }
         topicSphere.hidden=false;orbWrap.classList.remove("topicSphereActive");
-        if(topics.length!==topicSphereLastCount){
-          orientTopicSphereToward(topicSphereVector(topics[Math.max(0,topics.length-1)],Math.max(0,topics.length-1)));
-          topicSphereLastCount=topics.length;
-        }
-        const rect=topicSphere.getBoundingClientRect(),width=Math.max(280,rect.width||innerWidth),height=Math.max(240,rect.height||420);
-        const center={x:width/2,y:height/2};
-        const time=topicTimeShells(topics),currentYear=time.now.getFullYear();
-        const olderFallback=time.shells.find(s=>s.key==="older");
-        const counts=new Map();
-        const rows=topics.map((topic,index)=>{
-          const band=topicTimeBand(topic,time.now);
-          let shell=time.byKey.get(band.key);
-          if(!shell&&band.year<currentYear) shell=olderFallback||time.shells[time.shells.length-1];
-          shell=shell||time.shells[0];
-          counts.set(shell.key,(counts.get(shell.key)||0)+1);
-          return {topic,index,band,shell,p:topicSphereProject(topicSphereVector(topic,index),width,height,shell.radius)};
+        const bounds=topicTimeBounds(topicTimeScale,topicTimeAnchor);
+        const periodKey=topicTimePeriodKey(topicTimeScale,bounds);
+        const periodTopics=topics.filter(topic=>{const t=topicTimestamp(topic);return t>=bounds.start.getTime()&&t<bounds.end.getTime();});
+        topicTimeScaleButtons.forEach(button=>{
+          const active=button.dataset.topicTimeScale===topicTimeScale;
+          button.classList.toggle("active",active);button.setAttribute("aria-selected",active?"true":"false");
         });
-
-        topicSphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);
-        topicSphereRoutes.innerHTML="";topicSphereNodes.innerHTML="";
-        const maxR=Math.max(90,Math.min(width*.455,height*.425));
-        const zoomFactor=.84+Math.min(2.65,Math.max(.90,topicSphereZoom))*.16;
-        time.shells.forEach((shell,shellIndex)=>{
-          const count=counts.get(shell.key)||0,rx=maxR*shell.radius*zoomFactor,ry=rx*.86;
-          const ellipse=document.createElementNS("http://www.w3.org/2000/svg","ellipse");
-          ellipse.setAttribute("cx",center.x);ellipse.setAttribute("cy",center.y);ellipse.setAttribute("rx",rx);ellipse.setAttribute("ry",ry);
-          ellipse.setAttribute("class",`topicSphereTimeShell ${shellIndex===0?"current":""}`);topicSphereRoutes.appendChild(ellipse);
-          const label=document.createElementNS("http://www.w3.org/2000/svg","text");
-          const lx=Math.min(width-14,center.x+rx*.73),ly=Math.max(18,center.y-ry*.66);
-          label.setAttribute("x",lx);label.setAttribute("y",ly);label.setAttribute("text-anchor","start");label.setAttribute("class","topicSphereTimeLabel");label.textContent=shell.label;topicSphereRoutes.appendChild(label);
-          if(count){
-            const c=document.createElementNS("http://www.w3.org/2000/svg","text");
-            c.setAttribute("x",lx);c.setAttribute("y",ly+11);c.setAttribute("text-anchor","start");c.setAttribute("class","topicSphereTimeLabelCount");c.textContent=`${count} ${count===1?"COSMOS":"COSMOSES"}`;topicSphereRoutes.appendChild(c);
-          }
-        });
-
-        const accepted=[];
-        rows.sort((a,b)=>(a.p.front||0)-(b.p.front||0)).forEach(row=>{
-          const p=row.p,minGap=88*Math.max(.78,Math.min(1.8,p.scale||1));
-          const collision=accepted.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<minGap);
-          p.labelVisible=!collision;if(!collision)accepted.push(p);
-        });
-        rows.forEach(({topic,index,p,shell})=>{
-          const line=document.createElementNS("http://www.w3.org/2000/svg","line");
-          line.setAttribute("x1",center.x);line.setAttribute("y1",center.y);line.setAttribute("x2",p.x);line.setAttribute("y2",p.y);
-          line.setAttribute("class",`topicSphereRay ${index===topics.length-1?"recent":""}`);topicSphereRoutes.appendChild(line);
+        if(topicPeriodScale)topicPeriodScale.textContent=topicTimeScale.toUpperCase();
+        if(topicPeriodLabel)topicPeriodLabel.textContent=topicTimePeriodLabel(topicTimeScale,bounds);
+        if(topicPeriodMeta)topicPeriodMeta.textContent=`${periodTopics.length} ${periodTopics.length===1?"Cosmos":"Cosmoses"}`;
+        if(topicPeriodNext)topicPeriodNext.disabled=topicTimeIsCurrent(bounds);
+        topicTimeRailInner.innerHTML="";
+        if(topicTimeEmpty)topicTimeEmpty.hidden=periodTopics.length>0;
+        periodTopics.forEach((topic,index)=>{
           const q=topicQuestion(topic),count=topicStationCount(topic),button=document.createElement("button");
-          button.type="button";button.className=`topicSphereNode ${p.labelVisible?"":"noLabel"}`;button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;button.style.opacity=String(p.opacity);button.style.setProperty("--topic-scale",String(p.scale));button.style.zIndex=String(20+Math.round((p.front||0)*40));
-          button.title=`${q} · ${shell.label}`;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}, ${shell.label}`);
-          button.innerHTML=`<span class="topicSphereNodeHalo"></span><span class="topicSphereNodeOrbit"></span><span class="topicSphereNodeCore"><span class="topicSphereNodeLabel">${q.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</span></span>`;
-          button.addEventListener("click",event=>{event.stopPropagation();if(performance.now()-topicSphereLastDragAt<180)return;location.href=topicResumeUrl(topic)});
-          topicSphereNodes.appendChild(button);
+          button.type="button";button.className="topicTimeNode";button.title=q;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}`);
+          button.innerHTML=`<span class="topicTimeNodeHalo"></span><span class="topicTimeNodeOrbit"></span><span class="topicTimeNodeCore"><span class="topicTimeNodeLabel">${topicTimeSafe(q)}</span></span><span class="topicTimeNodeDate">${topicTimeSafe(topicTimeNodeStamp(topic,topicTimeScale))}</span>${index===periodTopics.length-1?'<span class="topicTimeLatest">latest</span>':''}`;
+          button.addEventListener("click",event=>{event.stopPropagation();location.href=topicResumeUrl(topic)});
+          topicTimeRailInner.appendChild(button);
         });
+        if(periodKey!==topicTimeLastPeriodKey){
+          topicTimeLastPeriodKey=periodKey;
+          requestAnimationFrame(()=>{
+            if(!topicTimeRail)return;
+            const last=topicTimeRailInner.lastElementChild;
+            if(last)last.scrollIntoView({behavior:"auto",block:"nearest",inline:"center"});
+            else topicTimeRail.scrollLeft=0;
+          });
+        }
       }
-      function topicSpherePointerDistance(){const pts=[...topicSpherePointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)}
-      topicSphere?.addEventListener("pointerdown",event=>{
-        topicSpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});try{topicSphere.setPointerCapture(event.pointerId)}catch{}
-        if(topicSpherePointers.size===1){topicSphereDrag={x:event.clientX,y:event.clientY,yaw:topicSphereYaw,pitch:topicSpherePitch};topicSphereDidDrag=false;topicSphere.classList.add("dragging")}
-        else if(topicSpherePointers.size===2){topicSpherePinchStart=topicSpherePointerDistance();topicSpherePinchFovStart=topicSphereFov;topicSpherePinchZoomStart=topicSphereZoom}
+      topicTimeScaleButtons.forEach(button=>button.addEventListener("click",event=>{event.stopPropagation();topicTimeSetScale(button.dataset.topicTimeScale)}));
+      topicPeriodPrev?.addEventListener("click",event=>{event.stopPropagation();topicTimeShift(-1)});
+      topicPeriodNext?.addEventListener("click",event=>{event.stopPropagation();if(!topicPeriodNext.disabled)topicTimeShift(1)});
+      topicSphereOrigin?.addEventListener("click",event=>{event.stopPropagation();setHistoryExpanded(false)});
+
+      topicTimeStage?.addEventListener("pointerdown",event=>{
+        if(event.target.closest?.("button")||event.target.closest?.(".topicTimeRail"))return;
+        topicTimeGesture={id:event.pointerId,x:event.clientX,y:event.clientY};topicTimeDidDrag=false;
+        try{topicTimeStage.setPointerCapture(event.pointerId)}catch{}
       });
-      topicSphere?.addEventListener("pointermove",event=>{
-        if(!topicSpherePointers.has(event.pointerId))return;topicSpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-        if(topicSpherePointers.size===2&&topicSpherePinchStart){const d=topicSpherePointerDistance();if(d){const ratio=d/topicSpherePinchStart;topicSphereZoom=Math.max(.90,Math.min(2.65,topicSpherePinchZoomStart*ratio));topicSphereFov=Math.max(1.18,Math.min(1.55,topicSpherePinchFovStart/Math.max(.90,Math.min(1.16,ratio))));topicSphereDidDrag=true;renderTopicSphere()}return}
-        if(!topicSphereDrag)return;const dx=event.clientX-topicSphereDrag.x,dy=event.clientY-topicSphereDrag.y;if(Math.hypot(dx,dy)>5)topicSphereDidDrag=true;topicSphereYaw=topicSphereNormalizeAngle(topicSphereDrag.yaw+dx*.0065);topicSpherePitch=topicSphereNormalizeAngle(topicSphereDrag.pitch-dy*.0058);renderTopicSphere();
+      topicTimeStage?.addEventListener("pointermove",event=>{
+        if(!topicTimeGesture||topicTimeGesture.id!==event.pointerId)return;
+        if(Math.hypot(event.clientX-topicTimeGesture.x,event.clientY-topicTimeGesture.y)>8)topicTimeDidDrag=true;
       });
-      function clearTopicSpherePointer(event){topicSpherePointers.delete(event.pointerId);if(topicSpherePointers.size<2){topicSpherePinchStart=0;topicSpherePinchFovStart=topicSphereFov;topicSpherePinchZoomStart=topicSphereZoom}if(!topicSpherePointers.size){if(topicSphereDidDrag)topicSphereLastDragAt=performance.now();topicSphereDrag=null;topicSphere.classList.remove("dragging");setTimeout(()=>{topicSphereDidDrag=false},190)}}
-      topicSphere?.addEventListener("pointerup",clearTopicSpherePointer);topicSphere?.addEventListener("pointercancel",clearTopicSpherePointer);
-      topicSphere?.addEventListener("wheel",event=>{event.preventDefault();const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;const step=Math.exp(-delta*.00135);topicSphereZoom=Math.max(.90,Math.min(2.65,topicSphereZoom*step));renderTopicSphere()},{passive:false});
-      topicSphereOrigin?.addEventListener("click",event=>{event.stopPropagation();if(performance.now()-topicSphereLastDragAt<220)return;setHistoryExpanded(false)});
+      topicTimeStage?.addEventListener("pointerup",event=>{
+        if(!topicTimeGesture||topicTimeGesture.id!==event.pointerId)return;
+        const dx=event.clientX-topicTimeGesture.x,dy=event.clientY-topicTimeGesture.y;
+        topicTimeGesture=null;
+        if(Math.hypot(dx,dy)>38){
+          topicTimeDidDrag=true;topicTimeLastDragAt=performance.now();
+          if(Math.abs(dx)>Math.abs(dy))topicTimeShift(dx<0?1:-1);
+          else topicTimeChangeScale(dy>0?1:-1);
+          setTimeout(()=>{topicTimeDidDrag=false},180);
+        }
+      });
+      topicTimeStage?.addEventListener("pointercancel",()=>{topicTimeGesture=null;topicTimeDidDrag=false});
       topicSphere?.addEventListener("click",event=>{
         if(!topicMemory?.classList.contains("historyExpanded"))return;
-        if(event.target.closest?.(".topicSphereNode")||event.target.closest?.(".topicSphereOrigin"))return;
-        if(topicSphereDidDrag||performance.now()-topicSphereLastDragAt<240)return;
+        if(event.target.closest?.("button")||event.target.closest?.(".topicTimeRail"))return;
+        if(topicTimeDidDrag||performance.now()-topicTimeLastDragAt<220)return;
         setHistoryExpanded(false);
       });
+      topicSphere?.addEventListener("wheel",event=>{
+        if(event.target.closest?.(".topicTimeRail"))return;
+        event.preventDefault();
+        const now=performance.now();if(now-topicTimeWheelLock<380)return;topicTimeWheelLock=now;
+        if(Math.abs(event.deltaX)>Math.abs(event.deltaY)*.75)topicTimeShift(event.deltaX>0?1:-1);
+        else if(Math.abs(event.deltaY)>8)topicTimeChangeScale(event.deltaY>0?1:-1);
+      },{passive:false});
       window.addEventListener("resize",()=>{if(topicSphere&&!topicSphere.hidden)requestAnimationFrame(()=>renderTopicSphere())});
       function monthName(i){return new Intl.DateTimeFormat(undefined,{month:"long"}).format(new Date(2026,i,1))}
       function startOfDay(d){const x=new Date(d);x.setHours(0,0,0,0);return x}
