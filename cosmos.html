@@ -7,7 +7,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.5-branching-journey-camera-zoom" />
+  <meta name="cosmos-build" content="v6.6-individual-station-focus-zoom" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1527,6 +1527,15 @@
     .cosmosGlyphButton.center .cosmosGlyphLabel{letter-spacing:-.012em!important}
   }
 
+
+  /* v6.6 — individual station focus zoom. Pinching over a station makes that station
+     the camera target and magnifies it without inflating every circle. */
+  .journeySphereStation.focused .journeySphereStationCore{
+    border-color:#a8beff!important;
+    box-shadow:0 0 0 7px rgba(111,143,225,.08),0 0 38px rgba(74,117,224,.36),0 0 74px rgba(112,82,226,.18),inset 0 0 28px rgba(86,124,237,.25)!important
+  }
+  .journeySphereStation.focused .journeySphereStationLabel{font-weight:860!important}
+
 </style>
 </head>
 <body>
@@ -1666,7 +1675,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>Cosmos</span></div>
-      <div class="journeySphereHint">drag 360° · pinch / wheel to move closer · earlier choices stay as branches · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° · pinch over a circle to zoom into it · wheel over a circle on laptop · tap to travel</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -6859,12 +6868,14 @@
   let journeySphereYaw=0;
   let journeySpherePitch=0;
   let journeySphereZoom=1;
+  let journeySphereFocusId="";
   let journeySphereDrag=null;
   const journeySpherePointers=new Map();
   let journeySpherePinchStart=0;
   let journeySpherePinchZoomStart=1;
   let journeySphereDidDrag=false;
   let journeySphereLastDragAt=0;
+  let journeySphereScreenStations=[];
 
   function rotateSphereVector(vector){
     const cy=Math.cos(journeySphereYaw),sy=Math.sin(journeySphereYaw);
@@ -6945,7 +6956,8 @@
     const padX=Math.max(64,width*.11),padY=Math.max(84,height*.13);
     const autoFit=Math.min((width/2-padX)/maxX,(height/2-padY)/maxY);
     const fit=autoFit*journeySphereZoom;
-    const visualZoom=Math.max(.78,Math.min(1.82,Math.pow(journeySphereZoom,.38)));
+    // Camera zoom now magnifies the chosen station, not every station equally.
+    const visualZoom=Math.max(.82,Math.min(1.20,Math.pow(journeySphereZoom,.12)));
     const center={x:width/2,y:height/2};
 
     // Zoom is a camera move toward the CURRENT station, not a simple scale from Cosmos.
@@ -6980,6 +6992,18 @@
     journeySphereYaw=0;
     journeySpherePitch=0;
     journeySphereZoom=1;
+    journeySphereFocusId=state.journey.current_node_id||"";
+  }
+
+  function journeySphereFocusFromClientPoint(clientX,clientY,maxDistance=145){
+    if(!journeySphereScreenStations.length) return "";
+    let best=null;
+    let bestDistance=Infinity;
+    for(const station of journeySphereScreenStations){
+      const distance=Math.hypot(clientX-station.clientX,clientY-station.clientY);
+      if(distance<bestDistance){best=station;bestDistance=distance;}
+    }
+    return best && bestDistance<=maxDistance ? best.node_id : "";
   }
 
   function renderJourneySphere(){
@@ -6997,7 +7021,9 @@
     const rect=journeySphereViewport.getBoundingClientRect();
     const width=Math.max(280,rect.width||innerWidth),height=Math.max(260,rect.height||innerHeight);
     const geometry=journeyTreeGeometry(nodes);
-    const {center,origin,projected}=projectJourneyTree(geometry,width,height,currentId);
+    if(!journeySphereFocusId || !journeyNodeById(journeySphereFocusId)) journeySphereFocusId=currentId;
+    const focusId=journeySphereFocusId||currentId;
+    const {center,origin,projected}=projectJourneyTree(geometry,width,height,focusId);
 
     // The Cosmos origin participates in the same camera transform. This prevents
     // zoom from merely stretching the line while the target station disappears.
@@ -7023,6 +7049,8 @@
     }
 
     journeySphereStations.innerHTML="";
+    journeySphereScreenStations=[];
+    const viewportRect=journeySphereViewport.getBoundingClientRect();
     const projectedNodes=nodes.map(node=>({node,p:projected.get(node.node_id)})).filter(row=>row.p);
     projectedNodes.sort((a,b)=>(a.p.depth||0)-(b.p.depth||0));
 
@@ -7034,15 +7062,23 @@
       occupied.push({x:p.x,y:p.y});
       const button=document.createElement("button");
       button.type="button";
-      button.className=`journeySphereStation ${currentNode?"current":""} ${activeIds.has(node.node_id)?"near":""}`;
+      const focusedNode=node.node_id===focusId;
+      button.className=`journeySphereStation ${currentNode?"current":""} ${focusedNode?"focused":""} ${activeIds.has(node.node_id)?"near":""}`;
       button.dataset.journeySphereNode=node.node_id;
       button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;
       button.style.opacity=String(p.opacity);
-      const focusBoost=currentNode ? (1.10*Math.max(1,Math.min(1.28,Math.pow(journeySphereZoom,.16)))) : 1;
-      button.style.setProperty("--sphere-scale",String(focusBoost*p.scale));
+      const zoomAmount=Math.max(0,journeySphereZoom-1);
+      const focusedBoost=focusedNode ? Math.min(2.45,1.08+zoomAmount*.78) : 1;
+      const currentBoost=currentNode ? 1.07 : 1;
+      button.style.setProperty("--sphere-scale",String(focusedBoost*currentBoost*p.scale));
       button.style.zIndex=String(30+Math.round((p.depth||0)*40)+(currentNode?60:0));
       button.setAttribute("aria-label",`${currentNode?"Current station":"Travel to"} ${label}`);button.title=label;
       button.innerHTML=`<span class="journeySphereStationHalo"></span><span class="journeySphereStationCore"><span class="journeySphereStationLabel">${esc(label)}</span></span>`;
+      journeySphereScreenStations.push({
+        node_id:node.node_id,
+        clientX:viewportRect.left+p.x,
+        clientY:viewportRect.top+p.y
+      });
       if(nearCollision&&!currentNode) button.style.filter="saturate(.92)";
       button.addEventListener("click",event=>{
         event.stopPropagation();if(performance.now()-journeySphereLastDragAt<180)return;
@@ -7100,6 +7136,11 @@
       const pts=[...journeySpherePointers.values()];
       journeySpherePinchStart=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
       journeySpherePinchZoomStart=journeySphereZoom;
+      const midX=(pts[0].x+pts[1].x)/2;
+      const midY=(pts[0].y+pts[1].y)/2;
+      const targeted=journeySphereFocusFromClientPoint(midX,midY,170);
+      if(targeted) journeySphereFocusId=targeted;
+      else if(!journeySphereFocusId) journeySphereFocusId=state.journey.current_node_id||"";
     }
   });
 
@@ -7111,7 +7152,7 @@
       const distance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
       if(distance){
         const ratio=distance/journeySpherePinchStart;
-        journeySphereZoom=Math.max(.55,Math.min(2.80,journeySpherePinchZoomStart*ratio));
+        journeySphereZoom=Math.max(.55,Math.min(3.60,journeySpherePinchZoomStart*ratio));
         journeySphereDidDrag=true;
         renderJourneySphere();
       }
@@ -7144,9 +7185,14 @@
     event.preventDefault();event.stopPropagation();
     const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;
     if(Math.abs(delta)<.25) return;
+    if(delta<0){
+      const targeted=journeySphereFocusFromClientPoint(event.clientX,event.clientY,165);
+      if(targeted) journeySphereFocusId=targeted;
+    }
     const limited=Math.max(-140,Math.min(140,delta));
     const factor=Math.exp(-limited*.0019);
-    journeySphereZoom=Math.max(.55,Math.min(2.80,journeySphereZoom*factor));
+    journeySphereZoom=Math.max(.55,Math.min(3.60,journeySphereZoom*factor));
+    if(journeySphereZoom<=1.01) journeySphereFocusId=state.journey.current_node_id||"";
     renderJourneySphere();
   },{passive:false});
 
@@ -7247,13 +7293,21 @@
 
   // Safari gesture events provide an additional native pinch path on iPhone/iPad/Mac trackpads.
   let safariGestureScale=1;
-  document.addEventListener("gesturestart",event=>{safariGestureScale=1;event.preventDefault();},{passive:false});
+  document.addEventListener("gesturestart",event=>{
+    safariGestureScale=1;
+    if(journeySphereOpen){
+      const targeted=journeySphereFocusFromClientPoint(event.clientX||innerWidth/2,event.clientY||innerHeight/2,175);
+      if(targeted) journeySphereFocusId=targeted;
+    }
+    event.preventDefault();
+  },{passive:false});
   document.addEventListener("gesturechange",event=>{
     event.preventDefault();
     const scale=Number(event.scale)||1;
     if(journeySphereOpen){
       const ratio=scale/safariGestureScale;
-      journeySphereZoom=Math.max(.55,Math.min(2.80,journeySphereZoom*Math.max(.72,Math.min(1.38,ratio))));
+      journeySphereZoom=Math.max(.55,Math.min(3.60,journeySphereZoom*Math.max(.72,Math.min(1.38,ratio))));
+      if(journeySphereZoom<=1.01) journeySphereFocusId=state.journey.current_node_id||"";
       safariGestureScale=scale;
       renderJourneySphere();
       return;
