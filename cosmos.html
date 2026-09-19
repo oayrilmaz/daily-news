@@ -6869,6 +6869,10 @@
   let journeySpherePitch=0;
   let journeySphereZoom=1;
   let journeySphereFocusId="";
+  // v6.7 — when zoomed in, one finger pans across the Journey at a fixed scale.
+  // Wide view keeps the original one-finger 360° rotation behavior.
+  let journeySpherePanX=0;
+  let journeySpherePanY=0;
   let journeySphereDrag=null;
   const journeySpherePointers=new Map();
   let journeySpherePinchStart=0;
@@ -6968,8 +6972,8 @@
     const cameraFollow=journeySphereZoom>1 ? 1-Math.pow(zoomIn,-2.45) : 0;
     const camera={x:focus.x*cameraFollow,y:focus.y*cameraFollow,z:focus.z*cameraFollow};
     const origin={
-      x:center.x-camera.x*fit,
-      y:center.y-camera.y*fit
+      x:center.x-camera.x*fit+journeySpherePanX,
+      y:center.y-camera.y*fit+journeySpherePanY
     };
 
     const depthSpan=Math.max(.001,maxZ-minZ);
@@ -6978,8 +6982,8 @@
       const depth=(g.r.z-minZ)/depthSpan;
       projected.set(id,{
         ...g,
-        x:center.x+(g.r.x-camera.x)*fit,
-        y:center.y+(g.r.y-camera.y)*fit,
+        x:center.x+(g.r.x-camera.x)*fit+journeySpherePanX,
+        y:center.y+(g.r.y-camera.y)*fit+journeySpherePanY,
         depth,
         scale:(.88+depth*.22)*visualZoom,
         opacity:.68+depth*.30
@@ -6992,6 +6996,8 @@
     journeySphereYaw=0;
     journeySpherePitch=0;
     journeySphereZoom=1;
+    journeySpherePanX=0;
+    journeySpherePanY=0;
     journeySphereFocusId=state.journey.current_node_id||"";
   }
 
@@ -7129,7 +7135,12 @@
     journeySpherePointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     try{journeySphereViewport.setPointerCapture(event.pointerId)}catch{}
     if(journeySpherePointers.size===1){
-      journeySphereDrag={x:event.clientX,y:event.clientY,yaw:journeySphereYaw,pitch:journeySpherePitch};
+      journeySphereDrag={
+        x:event.clientX,y:event.clientY,
+        yaw:journeySphereYaw,pitch:journeySpherePitch,
+        panX:journeySpherePanX,panY:journeySpherePanY,
+        mode:journeySphereZoom>1.08?"pan":"rotate"
+      };
       journeySphereDidDrag=false;
       journeySphereViewport.classList.add("dragging");
     }else if(journeySpherePointers.size===2){
@@ -7139,8 +7150,13 @@
       const midX=(pts[0].x+pts[1].x)/2;
       const midY=(pts[0].y+pts[1].y)/2;
       const targeted=journeySphereFocusFromClientPoint(midX,midY,170);
-      if(targeted) journeySphereFocusId=targeted;
-      else if(!journeySphereFocusId) journeySphereFocusId=state.journey.current_node_id||"";
+      if(targeted && targeted!==journeySphereFocusId){
+        journeySphereFocusId=targeted;
+        journeySpherePanX=0;
+        journeySpherePanY=0;
+      }else if(!journeySphereFocusId){
+        journeySphereFocusId=state.journey.current_node_id||"";
+      }
     }
   });
 
@@ -7153,6 +7169,11 @@
       if(distance){
         const ratio=distance/journeySpherePinchStart;
         journeySphereZoom=Math.max(.55,Math.min(3.60,journeySpherePinchZoomStart*ratio));
+        if(journeySphereZoom<=1.01){
+          journeySphereFocusId=state.journey.current_node_id||"";
+          journeySpherePanX=0;
+          journeySpherePanY=0;
+        }
         journeySphereDidDrag=true;
         renderJourneySphere();
       }
@@ -7162,8 +7183,17 @@
     const dx=event.clientX-journeySphereDrag.x;
     const dy=event.clientY-journeySphereDrag.y;
     if(Math.hypot(dx,dy)>5) journeySphereDidDrag=true;
-    journeySphereYaw=normalizeSphereAngle(journeySphereDrag.yaw + dx*.0064);
-    journeySpherePitch=normalizeSphereAngle(journeySphereDrag.pitch - dy*.0059);
+
+    if(journeySphereDrag.mode==="pan" || journeySphereZoom>1.08){
+      // Zoomed Journey behaves like a map: one finger slides the camera across
+      // neighboring stations while zoom level and station size remain unchanged.
+      journeySpherePanX=journeySphereDrag.panX+dx;
+      journeySpherePanY=journeySphereDrag.panY+dy;
+    }else{
+      // At the wide overview, one finger keeps the original 360° rotation.
+      journeySphereYaw=normalizeSphereAngle(journeySphereDrag.yaw + dx*.0064);
+      journeySpherePitch=normalizeSphereAngle(journeySphereDrag.pitch - dy*.0059);
+    }
     renderJourneySphere();
   });
 
@@ -7187,12 +7217,20 @@
     if(Math.abs(delta)<.25) return;
     if(delta<0){
       const targeted=journeySphereFocusFromClientPoint(event.clientX,event.clientY,165);
-      if(targeted) journeySphereFocusId=targeted;
+      if(targeted && targeted!==journeySphereFocusId){
+        journeySphereFocusId=targeted;
+        journeySpherePanX=0;
+        journeySpherePanY=0;
+      }
     }
     const limited=Math.max(-140,Math.min(140,delta));
     const factor=Math.exp(-limited*.0019);
     journeySphereZoom=Math.max(.55,Math.min(3.60,journeySphereZoom*factor));
-    if(journeySphereZoom<=1.01) journeySphereFocusId=state.journey.current_node_id||"";
+    if(journeySphereZoom<=1.01){
+      journeySphereFocusId=state.journey.current_node_id||"";
+      journeySpherePanX=0;
+      journeySpherePanY=0;
+    }
     renderJourneySphere();
   },{passive:false});
 
@@ -7297,7 +7335,11 @@
     safariGestureScale=1;
     if(journeySphereOpen){
       const targeted=journeySphereFocusFromClientPoint(event.clientX||innerWidth/2,event.clientY||innerHeight/2,175);
-      if(targeted) journeySphereFocusId=targeted;
+      if(targeted && targeted!==journeySphereFocusId){
+        journeySphereFocusId=targeted;
+        journeySpherePanX=0;
+        journeySpherePanY=0;
+      }
     }
     event.preventDefault();
   },{passive:false});
@@ -7307,7 +7349,11 @@
     if(journeySphereOpen){
       const ratio=scale/safariGestureScale;
       journeySphereZoom=Math.max(.55,Math.min(3.60,journeySphereZoom*Math.max(.72,Math.min(1.38,ratio))));
-      if(journeySphereZoom<=1.01) journeySphereFocusId=state.journey.current_node_id||"";
+      if(journeySphereZoom<=1.01){
+        journeySphereFocusId=state.journey.current_node_id||"";
+        journeySpherePanX=0;
+        journeySpherePanY=0;
+      }
       safariGestureScale=scale;
       renderJourneySphere();
       return;
