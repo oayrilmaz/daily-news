@@ -1115,9 +1115,11 @@
     opacity:.56;animation:glyphCalmHeart 6.6s ease-in-out infinite
   }
   .cosmosGlyphLabel{
-    position:relative;z-index:4;width:82%;max-height:64%;overflow:hidden;
-    color:#f7f9fc;text-align:center;font-size:var(--label);font-weight:760;line-height:1.08;
-    text-shadow:0 1px 5px rgba(1,8,23,.72);overflow-wrap:anywhere
+    position:relative;z-index:4;width:78%;max-height:72%;overflow:hidden;
+    color:#f7f9fc;text-align:center;font-size:var(--label);font-weight:760;line-height:1.11;
+    text-shadow:0 1px 5px rgba(1,8,23,.72);
+    overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4
   }
   .cosmosGlyphButton.center{z-index:3}
   .cosmosGlyphButton.node{z-index:2}
@@ -1350,16 +1352,16 @@
   .journeySphereStations{position:absolute;inset:0;z-index:4;pointer-events:none}
   .journeySphereStation{
     --sphere-scale:1;position:absolute;left:0;top:0;transform:translate(-50%,-50%) scale(var(--sphere-scale));
-    transform-origin:center;width:86px;height:86px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;
-    -webkit-tap-highlight-color:transparent;transition:opacity .12s linear,filter .12s linear
+    transform-origin:center;width:106px;height:106px;border:0;background:transparent;padding:0;pointer-events:auto;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;transition:opacity .12s linear,filter .12s linear,transform .12s ease-out
   }
   .journeySphereStationHalo,.journeySphereStationCore{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
   .journeySphereStationHalo{
-    width:86px;height:86px;
-    background:radial-gradient(circle,rgba(44,105,231,.17) 0 27%,rgba(92,86,230,.09) 42%,rgba(82,36,153,.035) 60%,transparent 74%)
+    width:106px;height:106px;
+    background:radial-gradient(circle,rgba(44,105,231,.18) 0 27%,rgba(92,86,230,.10) 42%,rgba(82,36,153,.04) 60%,transparent 74%)
   }
   .journeySphereStationCore{
-    isolation:isolate;overflow:hidden;width:56px;height:56px;display:grid;place-items:center;
+    isolation:isolate;overflow:hidden;width:72px;height:72px;display:grid;place-items:center;
     background:radial-gradient(circle at 50% 48%,rgba(94,128,236,.48) 0 7%,rgba(61,85,197,.42) 13%,rgba(34,53,125,.52) 27%,rgba(15,34,75,.96) 55%,#091a38 78%,#07142b 100%);
     border:1px solid rgba(110,154,255,.56);
     box-shadow:0 0 22px rgba(70,116,240,.20),0 0 44px rgba(103,78,220,.10),inset 0 0 21px rgba(86,124,237,.18)
@@ -1373,9 +1375,10 @@
     background:#edf4ff;box-shadow:0 0 12px rgba(151,180,255,.54);opacity:.62
   }
   .journeySphereStationLabel{
-    position:relative;z-index:4;width:84%;max-height:70%;overflow:hidden;text-align:center;color:#fff;
-    font-size:8px;line-height:1.08;font-weight:760;text-shadow:0 1px 4px rgba(0,0,0,.78);
-    overflow-wrap:normal;word-break:normal;hyphens:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4
+    position:relative;z-index:4;width:80%;max-height:74%;overflow:hidden;text-align:center;color:#fff;
+    font-size:9.3px;line-height:1.08;font-weight:780;text-shadow:0 1px 4px rgba(0,0,0,.78);
+    overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4
   }
   .journeySphereStation.near .journeySphereStationCore{border-color:#91aff3;box-shadow:0 0 30px rgba(74,117,224,.34),0 0 60px rgba(112,82,226,.15),inset 0 0 24px rgba(86,124,237,.22)}
 
@@ -1419,10 +1422,10 @@
     .journeySphereLaunchMeta{display:none}
     .journeySphereLaunchMark{width:30px;height:30px}
     .journeySphereLaunchRoute{font-size:10px}
-    .journeySphereStation{width:70px;height:70px}
-    .journeySphereStationHalo{width:70px;height:70px}
-    .journeySphereStationCore{width:47px;height:47px}
-    .journeySphereStationLabel{font-size:7px}
+    .journeySphereStation{width:92px;height:92px}
+    .journeySphereStationHalo{width:92px;height:92px}
+    .journeySphereStationCore{width:64px;height:64px}
+    .journeySphereStationLabel{font-size:8.7px;line-height:1.08}
     .journeySphereCenter{width:62px;height:42px}
     .journeySphereCenter::before{width:52px;height:22px}
     .journeySphereCenter::after{width:8px;height:8px}
@@ -1432,11 +1435,12 @@
   }
 
 
-  /* v5.8 — ONE TOP-LEVEL COSMOS = ONE 3D JOURNEY RAY.
-     Every unique station visited inside this Cosmos is a bead on the same ray.
-     Going back only changes the current bead; it never creates another visual ray. */
+  /* v6.3 — BRANCHING 3D JOURNEY.
+     Going back is navigation only. A genuinely new choice from an earlier station
+     becomes a child branch from that exact station instead of being appended to the end. */
   .journeySphereFieldRay{display:none!important}
-  .journeySphereSightline.branch{display:none!important}
+  .journeySphereSightline{stroke:#a4b2cb!important;stroke-width:1.55!important;opacity:.58!important}
+  .journeySphereSightline.branch{display:block!important;stroke:#a49acb!important;stroke-width:1.45!important;opacity:.50!important}
   .journeySphereSightline.active{
     stroke:#6f91df!important;stroke-width:2.7!important;opacity:.98!important;
     filter:drop-shadow(0 0 5px rgba(92,128,220,.28))
@@ -1507,6 +1511,22 @@
     box-shadow:0 0 24px rgba(75,119,255,.18),inset 0 0 20px rgba(154,121,255,.08),
                0 0 0 8px rgba(154,121,255,.035),0 0 0 16px rgba(110,168,255,.025)!important
   }
+
+
+  /* v6.3 — readable Cosmos labels on phones + branch-preserving Journey map. */
+  .cosmosGlyphButton.node .cosmosGlyphLabel{
+    width:78%!important;max-height:74%!important;overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important;
+    white-space:normal!important;display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:4!important
+  }
+  .cosmosGlyphButton.center .cosmosGlyphLabel{
+    width:72%!important;max-height:66%!important;font-weight:780!important;line-height:1.10!important;
+    overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important
+  }
+  @media(max-width:640px){
+    .cosmosGlyphButton.node .cosmosGlyphLabel{letter-spacing:-.01em!important}
+    .cosmosGlyphButton.center .cosmosGlyphLabel{letter-spacing:-.012em!important}
+  }
+
 </style>
 </head>
 <body>
@@ -1638,7 +1658,7 @@
   <section class="journeySphereOverlay" id="journeySphereOverlay" aria-label="Journey Ray" hidden>
     <header class="journeySphereHeader">
       <button type="button" id="journeySphereClose" aria-label="Return to Cosmos" title="Return to Cosmos">←</button>
-      <div class="journeySphereHeading"><span>Journey Ray · one Cosmos, one line</span><strong id="journeySphereCurrent">Cosmos</strong></div>
+      <div class="journeySphereHeading"><span>Journey Map · branches preserved</span><strong id="journeySphereCurrent">Cosmos</strong></div>
       <button type="button" id="journeySphereReset" aria-label="Reset Journey Ray view" title="Reset view">◎</button>
     </header>
     <div class="journeySphereViewport" id="journeySphereViewport">
@@ -1646,7 +1666,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>Cosmos</span></div>
-      <div class="journeySphereHint">drag 360° · every visited station stays on this one 3D ray · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° · follow the active route · earlier choices stay as branches · tap a station to travel</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -4100,7 +4120,7 @@
     for(const [distance,list] of [...grouped.entries()].sort((a,b)=>a[0]-b[0])){
       const sorted=[...list].sort((a,b)=>a.label.localeCompare(b.label));
       const ringIndex=distance+1;
-      const minNodeGap=76;
+      const minNodeGap=width<=640?94:88;
       const circumferenceNeed=Math.max(minNodeGap*sorted.length,180);
       const capacityRadius=circumferenceNeed/(Math.PI*2);
       const semanticRadius=78+ringIndex*72;
@@ -4118,7 +4138,7 @@
 
     // Deterministic collision relaxation.
     const ids=nodes.map(n=>n.id);
-    const minGap=68;
+    const minGap=width<=640?86:78;
     for(let pass=0;pass<18;pass++){
       let moved=false;
       for(let i=0;i<ids.length;i++){
@@ -5402,12 +5422,17 @@
       cosmosGlyphLayer.appendChild(button);
     }
 
+    const compactViewport=width<=640;
     let nodeRevealIndex=0;
     for(const node of projection.nodes){
       const p=positions.get(node.id); if(!p) continue;
       const secondary=node.projection_depth===2 || node.projection_role==="secondary";
-      const coreSize=node.isSeed?74:(secondary?48:62);
-      const labelSize=node.isSeed?9.4:(secondary?7.3:8.3);
+      const coreSize=node.isSeed
+        ? (compactViewport?82:80)
+        : (secondary ? (compactViewport?62:58) : (compactViewport?72:68));
+      const labelSize=node.isSeed
+        ? (compactViewport?10.1:10.2)
+        : (secondary ? (compactViewport?8.3:8.2) : (compactViewport?9.2:9.1));
       addDomCosmosGlyph({
         x:p.x,y:p.y,label:node.label,coreSize,labelSize,secondary,nodeId:node.id,
         delay:Math.min(nodeRevealIndex++,12)*330
@@ -5419,7 +5444,10 @@
       observer?.response?.response_type==="universal_loading"
     );
     const centerLabel=projection.station?.focus_label || observerDisplayLabel(observer);
-    addDomCosmosGlyph({x:center.x,y:center.y,label:centerLabel,coreSize:118,labelSize:12.2,center:true});
+    addDomCosmosGlyph({
+      x:center.x,y:center.y,label:centerLabel,
+      coreSize:compactViewport?132:128,labelSize:compactViewport?14.2:14.0,center:true
+    });
 
     if(observerLoading){
       // Calm living Cosmos is the only viewer-facing activity cue.
@@ -6772,15 +6800,16 @@
     const nodes=[...(Array.isArray(state.journey?.nodes)?state.journey.nodes:[])].sort((a,b)=>(a.created_at||0)-(b.created_at||0));
     if(!nodes.length){spatialJourney.hidden=true;spatialJourney.innerHTML="";return;}
     spatialJourney.hidden=false;
-    const labels=nodes.map(node=>observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos");
+    const labels=currentJourneyBreadcrumb();
+    const routes=Math.max(1,journeyLeafCount());
     spatialJourney.innerHTML=`
-      <button type="button" class="journeySphereLaunch" data-open-journey-sphere aria-label="Open Journey Ray">
+      <button type="button" class="journeySphereLaunch" data-open-journey-sphere aria-label="Open Journey Map">
         <span class="journeySphereLaunchMark" aria-hidden="true"></span>
         <span class="journeySphereLaunchCopy">
-          <span class="journeySphereLaunchTitle">Journey Ray</span>
+          <span class="journeySphereLaunchTitle">Journey Map</span>
           <span class="journeySphereLaunchRoute">${esc(labels.join("  ›  ")||"Cosmos")}</span>
         </span>
-        <span class="journeySphereLaunchMeta">${nodes.length} ${nodes.length===1?"station":"stations"} · one Cosmos · one 3D ray</span>
+        <span class="journeySphereLaunchMeta">${nodes.length} ${nodes.length===1?"station":"stations"} · ${routes} ${routes===1?"route":"routes"}</span>
       </button>`;
     spatialJourney.querySelector("[data-open-journey-sphere]")?.addEventListener("click",()=>setJourneySphereOpen(true));
     if(journeySphereOpen) renderJourneySphere();
@@ -6816,10 +6845,10 @@
   function sphereCross(a,b){return {x:a.y*b.z-a.z*b.y,y:a.z*b.x-a.x*b.z,z:a.x*b.y-a.y*b.x};}
   function sphereAdd(a,b,weight=1){return {x:a.x+b.x*weight,y:a.y+b.y*weight,z:a.z+b.z*weight};}
 
-  /* One top-level topic = one persistent 3D Journey Ray.
-     Canonical parent relationships stay in data, but the human history surface is linear:
-     stations are ordered by first creation and never duplicated merely by going back. */
-  const JOURNEY_RAY_BASE={x:.26,y:-.73,z:.63};
+  /* One top-level Cosmos keeps one Journey tree. Going back never creates a station.
+     If a new station is selected from an earlier station, parent_node_id already points
+     to that earlier station; this view now preserves that relationship as a visible branch. */
+  const JOURNEY_RAY_BASE={x:.34,y:-.62,z:.71};
 
   let journeySphereYaw=0;
   let journeySpherePitch=0;
@@ -6841,21 +6870,89 @@
     return {x:x1,y:y2,z:z2};
   }
 
-  function projectJourneyRay(width,height){
-    const r=rotateSphereVector(JOURNEY_RAY_BASE);
-    const mag=Math.hypot(r.x,r.y);
-    const fallbackAngle=-Math.PI*.42 + journeySphereYaw*.45;
-    const dx=mag>.055?r.x/mag:Math.cos(fallbackAngle);
-    const dy=mag>.055?r.y/mag:Math.sin(fallbackAngle);
-    const padX=Math.max(46,width*.045),padY=Math.max(54,height*.075);
-    const halfW=Math.max(90,width/2-padX),halfH=Math.max(100,height/2-padY);
-    const edgeX=Math.abs(dx)>.0001?halfW/Math.abs(dx):Infinity;
-    const edgeY=Math.abs(dy)>.0001?halfH/Math.abs(dy):Infinity;
-    const edgeRadius=Math.min(edgeX,edgeY);
-    const sideOn=Math.sqrt(Math.max(.03,1-Math.min(1,r.z*r.z)));
-    const zoom=(1.55-journeySphereFov)/(1.55-1.18);
-    const length=edgeRadius*Math.max(.58,Math.min(.96,.64+.24*sideOn+.08*zoom));
-    return {r,dx,dy,length,x:width/2+dx*length,y:height/2+dy*length,depth:(r.z+1)/2};
+  function journeyBranchBasis(direction){
+    const d=sphereNormalize(direction);
+    const reference=Math.abs(d.y)<.82?{x:0,y:1,z:0}:{x:1,y:0,z:0};
+    const side=sphereNormalize(sphereCross(d,reference));
+    const lift=sphereNormalize(sphereCross(side,d));
+    return {d,side,lift};
+  }
+
+  function journeyBranchDirection(parentDirection,index,count,depth){
+    const {d,side,lift}=journeyBranchBasis(parentDirection);
+    if(count<=1) return d;
+    const cone=Math.min(.76,.34+.09*Math.min(4,count-2));
+    const centered=index-(count-1)/2;
+    const azimuth=count===2 ? (index===0?Math.PI:0) : ((Math.PI*2*index)/count + depth*.61);
+    const magnitude=count===2 ? cone*.72 : cone*(.78+Math.min(.18,Math.abs(centered)*.05));
+    return sphereNormalize({
+      x:d.x + side.x*Math.cos(azimuth)*magnitude + lift.x*Math.sin(azimuth)*magnitude,
+      y:d.y + side.y*Math.cos(azimuth)*magnitude + lift.y*Math.sin(azimuth)*magnitude,
+      z:d.z + side.z*Math.cos(azimuth)*magnitude + lift.z*Math.sin(azimuth)*magnitude
+    });
+  }
+
+  function journeyTreeGeometry(nodes){
+    const byId=new Map(nodes.map(node=>[node.node_id,node]));
+    const children=new Map();
+    for(const node of nodes){
+      const parent=byId.has(node.parent_node_id)?node.parent_node_id:"";
+      if(!children.has(parent)) children.set(parent,[]);
+      children.get(parent).push(node);
+    }
+    for(const list of children.values()) list.sort((a,b)=>(a.created_at||0)-(b.created_at||0));
+
+    const geometry=new Map();
+    const roots=children.get("")||[];
+    const assign=(node,parentPos,direction,depth)=>{
+      const step=1.0 + Math.min(.14,depth*.018);
+      const pos={
+        x:parentPos.x+direction.x*step,
+        y:parentPos.y+direction.y*step,
+        z:parentPos.z+direction.z*step
+      };
+      geometry.set(node.node_id,{pos,direction,depth});
+      const kids=children.get(node.node_id)||[];
+      kids.forEach((child,index)=>assign(child,pos,journeyBranchDirection(direction,index,kids.length,depth+1),depth+1));
+    };
+
+    roots.forEach((root,index)=>{
+      const dir=roots.length<=1
+        ? sphereNormalize(JOURNEY_RAY_BASE)
+        : journeyBranchDirection(JOURNEY_RAY_BASE,index,roots.length,0);
+      assign(root,{x:0,y:0,z:0},dir,1);
+    });
+    return geometry;
+  }
+
+  function projectJourneyTree(geometry,width,height){
+    const rotated=new Map();
+    let maxX=.001,maxY=.001,minZ=Infinity,maxZ=-Infinity;
+    for(const [id,g] of geometry){
+      const r=rotateSphereVector(g.pos);
+      rotated.set(id,{...g,r});
+      maxX=Math.max(maxX,Math.abs(r.x));
+      maxY=Math.max(maxY,Math.abs(r.y));
+      minZ=Math.min(minZ,r.z);maxZ=Math.max(maxZ,r.z);
+    }
+    const padX=Math.max(64,width*.11),padY=Math.max(84,height*.13);
+    const zoom=1+((1.42-journeySphereFov)/.34)*.30;
+    const fit=Math.min((width/2-padX)/maxX,(height/2-padY)/maxY)*Math.max(.76,Math.min(1.28,zoom));
+    const center={x:width/2,y:height/2};
+    const depthSpan=Math.max(.001,maxZ-minZ);
+    const projected=new Map();
+    for(const [id,g] of rotated){
+      const depth=(g.r.z-minZ)/depthSpan;
+      projected.set(id,{
+        ...g,
+        x:center.x+g.r.x*fit,
+        y:center.y+g.r.y*fit,
+        depth,
+        scale:.88+depth*.22,
+        opacity:.68+depth*.30
+      });
+    }
+    return {center,projected};
   }
 
   function orientJourneySphereForCurrent(){
@@ -6870,53 +6967,59 @@
     const currentId=state.journey.current_node_id;
     const current=journeyNodeById(currentId);
     const currentLabel=observerDisplayLabel(journeyNodeDisplayObserver(current))||"Cosmos";
+    const activePath=journeyPathTo(currentId);
+    const activeIds=new Set(activePath.map(node=>node.node_id));
     if(journeySphereCurrent) journeySphereCurrent.textContent=currentLabel;
-    const allLabels=nodes.map(node=>observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos");
-    if(journeySphereBreadcrumb) journeySphereBreadcrumb.textContent=(allLabels.join("  ›  ")||currentLabel)+`  ·  YOU ARE HERE: ${currentLabel}`;
+    const currentLabels=activePath.map(node=>observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos");
+    if(journeySphereBreadcrumb) journeySphereBreadcrumb.textContent=(currentLabels.join("  ›  ")||currentLabel)+`  ·  YOU ARE HERE: ${currentLabel}`;
 
     const rect=journeySphereViewport.getBoundingClientRect();
     const width=Math.max(280,rect.width||innerWidth),height=Math.max(260,rect.height||innerHeight);
-    const center={x:width/2,y:height/2};
-    const ray=projectJourneyRay(width,height);
+    const geometry=journeyTreeGeometry(nodes);
+    const {center,projected}=projectJourneyTree(geometry,width,height);
 
     journeySphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);
     journeySphereRoutes.innerHTML="";
-    const line=document.createElementNS("http://www.w3.org/2000/svg","line");
-    line.setAttribute("x1",center.x);line.setAttribute("y1",center.y);line.setAttribute("x2",ray.x);line.setAttribute("y2",ray.y);
-    line.setAttribute("class","journeySphereSightline active");
-    journeySphereRoutes.appendChild(line);
+
+    for(const node of nodes){
+      const p=projected.get(node.node_id);if(!p)continue;
+      const parent=node.parent_node_id?projected.get(node.parent_node_id):null;
+      const line=document.createElementNS("http://www.w3.org/2000/svg","line");
+      line.setAttribute("x1",parent?.x??center.x);line.setAttribute("y1",parent?.y??center.y);
+      line.setAttribute("x2",p.x);line.setAttribute("y2",p.y);
+      const active=activeIds.has(node.node_id) && (!node.parent_node_id || activeIds.has(node.parent_node_id));
+      line.setAttribute("class",`journeySphereSightline ${active?"active":"branch"}`);
+      journeySphereRoutes.appendChild(line);
+    }
 
     journeySphereStations.innerHTML="";
-    const total=Math.max(1,nodes.length);
-    const start=.16,end=.90;
-    const sizeCompression=total>9?Math.max(.66,1-(total-9)*.035):1;
-    const acceptedLabels=[];
-    nodes.forEach((node,index)=>{
-      const fraction=total===1?.58:start+(end-start)*((index+1)/(total+1));
-      const x=center.x+(ray.x-center.x)*fraction;
-      const y=center.y+(ray.y-center.y)*fraction;
+    const projectedNodes=nodes.map(node=>({node,p:projected.get(node.node_id)})).filter(row=>row.p);
+    projectedNodes.sort((a,b)=>(a.p.depth||0)-(b.p.depth||0));
+
+    const occupied=[];
+    for(const {node,p} of projectedNodes){
       const currentNode=node.node_id===currentId;
-      const depthScale=(.98-.16*fraction)*(0.92+.13*ray.depth)*sizeCompression*(currentNode?1.10:1);
       const label=observerDisplayLabel(journeyNodeDisplayObserver(node))||"Cosmos";
-      const collision=acceptedLabels.some(p=>Math.hypot(x-p.x,y-p.y)<50*Math.max(.7,depthScale));
-      if(!collision||currentNode)acceptedLabels.push({x,y});
+      const nearCollision=occupied.some(q=>Math.hypot(p.x-q.x,p.y-q.y)<74*Math.max(.80,p.scale));
+      occupied.push({x:p.x,y:p.y});
       const button=document.createElement("button");
       button.type="button";
-      button.className=`journeySphereStation ${currentNode?"current":""}`;
+      button.className=`journeySphereStation ${currentNode?"current":""} ${activeIds.has(node.node_id)?"near":""}`;
       button.dataset.journeySphereNode=node.node_id;
-      button.style.left=`${x}px`;button.style.top=`${y}px`;
-      button.style.opacity=String(.72+.26*(1-fraction));
-      button.style.setProperty("--sphere-scale",String(depthScale));
-      button.style.zIndex=String(30+index+(currentNode?50:0));
+      button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;
+      button.style.opacity=String(p.opacity);
+      button.style.setProperty("--sphere-scale",String((currentNode?1.10:1)*p.scale));
+      button.style.zIndex=String(30+Math.round((p.depth||0)*40)+(currentNode?60:0));
       button.setAttribute("aria-label",`${currentNode?"Current station":"Travel to"} ${label}`);button.title=label;
-      button.innerHTML=`<span class="journeySphereStationHalo"></span><span class="journeySphereStationCore"><span class="journeySphereStationLabel">${(!collision||currentNode)?esc(label):""}</span></span>`;
+      button.innerHTML=`<span class="journeySphereStationHalo"></span><span class="journeySphereStationCore"><span class="journeySphereStationLabel">${esc(label)}</span></span>`;
+      if(nearCollision&&!currentNode) button.style.filter="saturate(.92)";
       button.addEventListener("click",event=>{
         event.stopPropagation();if(performance.now()-journeySphereLastDragAt<180)return;
         const target=journeyNodeById(node.node_id);if(!target)return;
         restoreObserverFromJourneyNode(target);setJourneySphereOpen(false);
       });
       journeySphereStations.appendChild(button);
-    });
+    }
   }
 
   function setJourneySphereOpen(open){
@@ -7170,4 +7273,3 @@
 
 </body>
 </html>
-
