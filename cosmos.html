@@ -7,7 +7,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.1-one-topic-one-3d-ray-mini-cosmos" />
+  <meta name="cosmos-build" content="v6.4-branching-journey-zoom" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1666,7 +1666,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>Cosmos</span></div>
-      <div class="journeySphereHint">drag 360° · follow the active route · earlier choices stay as branches · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° · pinch / wheel to zoom · earlier choices stay as branches · tap a station to travel</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -1784,7 +1784,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "5.8-one-topic-one-3d-ray";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.4-branching-journey-zoom";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -6852,11 +6852,11 @@
 
   let journeySphereYaw=0;
   let journeySpherePitch=0;
-  let journeySphereFov=1.42;
+  let journeySphereZoom=1;
   let journeySphereDrag=null;
   const journeySpherePointers=new Map();
   let journeySpherePinchStart=0;
-  let journeySpherePinchFovStart=1.42;
+  let journeySpherePinchZoomStart=1;
   let journeySphereDidDrag=false;
   let journeySphereLastDragAt=0;
 
@@ -6936,8 +6936,9 @@
       minZ=Math.min(minZ,r.z);maxZ=Math.max(maxZ,r.z);
     }
     const padX=Math.max(64,width*.11),padY=Math.max(84,height*.13);
-    const zoom=1+((1.42-journeySphereFov)/.34)*.30;
-    const fit=Math.min((width/2-padX)/maxX,(height/2-padY)/maxY)*Math.max(.76,Math.min(1.28,zoom));
+    const autoFit=Math.min((width/2-padX)/maxX,(height/2-padY)/maxY);
+    const fit=autoFit*journeySphereZoom;
+    const visualZoom=Math.max(.78,Math.min(1.68,Math.sqrt(journeySphereZoom)));
     const center={x:width/2,y:height/2};
     const depthSpan=Math.max(.001,maxZ-minZ);
     const projected=new Map();
@@ -6948,7 +6949,7 @@
         x:center.x+g.r.x*fit,
         y:center.y+g.r.y*fit,
         depth,
-        scale:.88+depth*.22,
+        scale:(.88+depth*.22)*visualZoom,
         opacity:.68+depth*.30
       });
     }
@@ -6958,7 +6959,7 @@
   function orientJourneySphereForCurrent(){
     journeySphereYaw=0;
     journeySpherePitch=0;
-    journeySphereFov=1.42;
+    journeySphereZoom=1;
   }
 
   function renderJourneySphere(){
@@ -7068,7 +7069,7 @@
     }else if(journeySpherePointers.size===2){
       const pts=[...journeySpherePointers.values()];
       journeySpherePinchStart=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
-      journeySpherePinchFovStart=journeySphereFov;
+      journeySpherePinchZoomStart=journeySphereZoom;
     }
   });
 
@@ -7080,7 +7081,7 @@
       const distance=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
       if(distance){
         const ratio=distance/journeySpherePinchStart;
-        journeySphereFov=Math.max(1.18,Math.min(1.55,journeySpherePinchFovStart/Math.max(.78,Math.min(1.28,ratio))));
+        journeySphereZoom=Math.max(.55,Math.min(2.80,journeySpherePinchZoomStart*ratio));
         journeySphereDidDrag=true;
         renderJourneySphere();
       }
@@ -7097,7 +7098,7 @@
 
   function clearJourneySpherePointer(event){
     journeySpherePointers.delete(event.pointerId);
-    if(journeySpherePointers.size<2){journeySpherePinchStart=0;journeySpherePinchFovStart=journeySphereFov;}
+    if(journeySpherePointers.size<2){journeySpherePinchStart=0;journeySpherePinchZoomStart=journeySphereZoom;}
     if(!journeySpherePointers.size){
       if(journeySphereDidDrag) journeySphereLastDragAt=performance.now();
       journeySphereDrag=null;
@@ -7112,7 +7113,10 @@
     if(!journeySphereOpen) return;
     event.preventDefault();event.stopPropagation();
     const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;
-    journeySphereFov=Math.max(1.18,Math.min(1.55,journeySphereFov + Math.sign(delta)*.035));
+    if(Math.abs(delta)<.25) return;
+    const limited=Math.max(-140,Math.min(140,delta));
+    const factor=Math.exp(-limited*.0019);
+    journeySphereZoom=Math.max(.55,Math.min(2.80,journeySphereZoom*factor));
     renderJourneySphere();
   },{passive:false});
 
@@ -7218,7 +7222,8 @@
     event.preventDefault();
     const scale=Number(event.scale)||1;
     if(journeySphereOpen){
-      journeySphereFov=Math.max(.92,Math.min(1.55,journeySphereFov/Math.max(.78,Math.min(1.28,scale/safariGestureScale))));
+      const ratio=scale/safariGestureScale;
+      journeySphereZoom=Math.max(.55,Math.min(2.80,journeySphereZoom*Math.max(.72,Math.min(1.38,ratio))));
       safariGestureScale=scale;
       renderJourneySphere();
       return;
