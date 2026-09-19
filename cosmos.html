@@ -7,7 +7,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.4-branching-journey-zoom" />
+  <meta name="cosmos-build" content="v6.5-branching-journey-camera-zoom" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1666,7 +1666,7 @@
       <svg class="journeySphereRoutes" id="journeySphereRoutes" aria-hidden="true"></svg>
       <div class="journeySphereStations" id="journeySphereStations"></div>
       <div class="journeySphereCenter" aria-hidden="true"><span>Cosmos</span></div>
-      <div class="journeySphereHint">drag 360° · pinch / wheel to zoom · earlier choices stay as branches · tap a station to travel</div>
+      <div class="journeySphereHint">drag 360° · pinch / wheel to move closer · earlier choices stay as branches · tap a station to travel</div>
     </div>
     <footer class="journeySphereFooter"><div class="journeySphereBreadcrumb" id="journeySphereBreadcrumb"></div></footer>
   </section>
@@ -1760,6 +1760,7 @@
   const journeySphereStations=document.getElementById("journeySphereStations");
   const journeySphereCurrent=document.getElementById("journeySphereCurrent");
   const journeySphereBreadcrumb=document.getElementById("journeySphereBreadcrumb");
+  const journeySphereCenter=journeySphereViewport?.querySelector(".journeySphereCenter");
   const journeySphereClose=document.getElementById("journeySphereClose");
   const journeySphereReset=document.getElementById("journeySphereReset");
 
@@ -1784,7 +1785,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.4-branching-journey-zoom";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.5-branching-journey-camera-zoom";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -6761,6 +6762,11 @@
   window.addEventListener("resize",()=>requestAnimationFrame(render));
 
 
+
+  /* v6.5 — CAMERA/DOLLY ZOOM.
+     Pinch/wheel moves the viewer toward the current station instead of stretching
+     the Journey geometry away from a fixed Cosmos origin. */
+
   // Spatial depth v5.0 — semantic zoom, not browser magnification.
   let spatialEssenceOpen=false;
   let journeySphereOpen=false;
@@ -6925,7 +6931,7 @@
     return geometry;
   }
 
-  function projectJourneyTree(geometry,width,height){
+  function projectJourneyTree(geometry,width,height,focusId=""){
     const rotated=new Map();
     let maxX=.001,maxY=.001,minZ=Infinity,maxZ=-Infinity;
     for(const [id,g] of geometry){
@@ -6935,25 +6941,39 @@
       maxY=Math.max(maxY,Math.abs(r.y));
       minZ=Math.min(minZ,r.z);maxZ=Math.max(maxZ,r.z);
     }
+
     const padX=Math.max(64,width*.11),padY=Math.max(84,height*.13);
     const autoFit=Math.min((width/2-padX)/maxX,(height/2-padY)/maxY);
     const fit=autoFit*journeySphereZoom;
-    const visualZoom=Math.max(.78,Math.min(1.68,Math.sqrt(journeySphereZoom)));
+    const visualZoom=Math.max(.78,Math.min(1.82,Math.pow(journeySphereZoom,.38)));
     const center={x:width/2,y:height/2};
+
+    // Zoom is a camera move toward the CURRENT station, not a simple scale from Cosmos.
+    // At 1× Cosmos stays at screen center. As the viewer pinches in, the current
+    // station approaches the center while the Cosmos origin naturally moves away.
+    const focus=rotated.get(focusId)?.r || {x:0,y:0,z:0};
+    const zoomIn=Math.max(1,journeySphereZoom);
+    const cameraFollow=journeySphereZoom>1 ? 1-Math.pow(zoomIn,-2.45) : 0;
+    const camera={x:focus.x*cameraFollow,y:focus.y*cameraFollow,z:focus.z*cameraFollow};
+    const origin={
+      x:center.x-camera.x*fit,
+      y:center.y-camera.y*fit
+    };
+
     const depthSpan=Math.max(.001,maxZ-minZ);
     const projected=new Map();
     for(const [id,g] of rotated){
       const depth=(g.r.z-minZ)/depthSpan;
       projected.set(id,{
         ...g,
-        x:center.x+g.r.x*fit,
-        y:center.y+g.r.y*fit,
+        x:center.x+(g.r.x-camera.x)*fit,
+        y:center.y+(g.r.y-camera.y)*fit,
         depth,
         scale:(.88+depth*.22)*visualZoom,
         opacity:.68+depth*.30
       });
     }
-    return {center,projected};
+    return {center,origin,projected};
   }
 
   function orientJourneySphereForCurrent(){
@@ -6977,7 +6997,16 @@
     const rect=journeySphereViewport.getBoundingClientRect();
     const width=Math.max(280,rect.width||innerWidth),height=Math.max(260,rect.height||innerHeight);
     const geometry=journeyTreeGeometry(nodes);
-    const {center,projected}=projectJourneyTree(geometry,width,height);
+    const {center,origin,projected}=projectJourneyTree(geometry,width,height,currentId);
+
+    // The Cosmos origin participates in the same camera transform. This prevents
+    // zoom from merely stretching the line while the target station disappears.
+    if(journeySphereCenter){
+      journeySphereCenter.style.left=`${origin.x}px`;
+      journeySphereCenter.style.top=`${origin.y}px`;
+      const originScale=Math.max(.72,Math.min(1.22,1/Math.pow(Math.max(1,journeySphereZoom),.16)));
+      journeySphereCenter.style.transform=`translate(-50%,-50%) scale(${originScale})`;
+    }
 
     journeySphereRoutes.setAttribute("viewBox",`0 0 ${width} ${height}`);
     journeySphereRoutes.innerHTML="";
@@ -6986,7 +7015,7 @@
       const p=projected.get(node.node_id);if(!p)continue;
       const parent=node.parent_node_id?projected.get(node.parent_node_id):null;
       const line=document.createElementNS("http://www.w3.org/2000/svg","line");
-      line.setAttribute("x1",parent?.x??center.x);line.setAttribute("y1",parent?.y??center.y);
+      line.setAttribute("x1",parent?.x??origin.x);line.setAttribute("y1",parent?.y??origin.y);
       line.setAttribute("x2",p.x);line.setAttribute("y2",p.y);
       const active=activeIds.has(node.node_id) && (!node.parent_node_id || activeIds.has(node.parent_node_id));
       line.setAttribute("class",`journeySphereSightline ${active?"active":"branch"}`);
@@ -7009,7 +7038,8 @@
       button.dataset.journeySphereNode=node.node_id;
       button.style.left=`${p.x}px`;button.style.top=`${p.y}px`;
       button.style.opacity=String(p.opacity);
-      button.style.setProperty("--sphere-scale",String((currentNode?1.10:1)*p.scale));
+      const focusBoost=currentNode ? (1.10*Math.max(1,Math.min(1.28,Math.pow(journeySphereZoom,.16)))) : 1;
+      button.style.setProperty("--sphere-scale",String(focusBoost*p.scale));
       button.style.zIndex=String(30+Math.round((p.depth||0)*40)+(currentNode?60:0));
       button.setAttribute("aria-label",`${currentNode?"Current station":"Travel to"} ${label}`);button.title=label;
       button.innerHTML=`<span class="journeySphereStationHalo"></span><span class="journeySphereStationCore"><span class="journeySphereStationLabel">${esc(label)}</span></span>`;
