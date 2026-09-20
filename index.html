@@ -15,6 +15,7 @@
   </script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="cosmos-build" content="index-v6.3-history-restored" />
   <title>Cosmos — PTD Today</title>
   <meta name="description" content="Ask. Explore. Discover. Everything is connected through Cosmos." />
   <link rel="canonical" href="https://ptdtoday.com/" />
@@ -197,7 +198,7 @@
     /* Your Cosmos remains quiet until History is requested. */
     .topicMemory{
       position:fixed;z-index:24;left:18px;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));transform:none;
-      width:auto;max-width:800px;margin:0 auto!important;display:none
+      width:auto;max-width:800px;margin:0 auto!important;display:block
     }
     .topicMemory.active{display:block}
     .topicMemoryHeader{
@@ -881,7 +882,7 @@
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v6.2-time-navigator-history";
+      const INDEX_BUILD="v6.3-history-restored-time-navigator";
 
       function recoverLastTopicFromSession(){
         try{
@@ -907,7 +908,25 @@
       }
       function readTopicMemory(){
         recoverLastTopicFromSession();
-        try{const p=JSON.parse(localStorage.getItem(TOPIC_MEMORY_KEY)||"[]");return Array.isArray(p)?p:(Array.isArray(p?.topics)?p.topics:[])}catch(_){return[]}
+        const parseRows=(raw)=>{
+          try{
+            const p=JSON.parse(raw||"[]");
+            if(Array.isArray(p)) return p;
+            if(Array.isArray(p?.topics)) return p.topics;
+            if(Array.isArray(p?.journeys)) return p.journeys;
+            return [];
+          }catch(_){ return []; }
+        };
+        let rows=parseRows(localStorage.getItem(TOPIC_MEMORY_KEY));
+        // One-time compatibility with the earliest Topic Memory build. Never discard a newer archive.
+        if(!rows.length){
+          const legacy=parseRows(localStorage.getItem("ptdtoday_cosmos_topic_memory_v1"));
+          if(legacy.length){
+            rows=legacy;
+            try{ localStorage.setItem(TOPIC_MEMORY_KEY,JSON.stringify(legacy)); }catch(_){}
+          }
+        }
+        return rows;
       }
       function topicTimestamp(x){const r=x?.created_at||x?.timestamp||x?.saved_at||x?.updated_at||x?.last_opened_at,n=Number(r);if(Number.isFinite(n)&&n>0)return n;const d=Date.parse(String(r||""));return Number.isFinite(d)?d:0}
       function topicQuestion(x){return String(x?.question||x?.title||x?.label||x?.observer?.question||"").trim()}
@@ -991,9 +1010,8 @@
         if(!topicSphere||!topicTimeRailInner||!orbWrap)return;
         const topics=uniqueTopicSphereTopics(list.filter(x=>topicQuestion(x)));
         const historyOpen=Boolean(topicMemory?.classList.contains("historyExpanded"));
-        if(!topics.length||!historyOpen){
+        if(!historyOpen){
           topicSphere.hidden=true;orbWrap.classList.remove("topicSphereActive");
-          if(!topics.length)topicTimeRailInner.innerHTML="";
           return;
         }
         topicSphere.hidden=false;orbWrap.classList.remove("topicSphereActive");
@@ -1009,7 +1027,10 @@
         if(topicPeriodMeta)topicPeriodMeta.textContent=`${periodTopics.length} ${periodTopics.length===1?"Cosmos":"Cosmoses"}`;
         if(topicPeriodNext)topicPeriodNext.disabled=topicTimeIsCurrent(bounds);
         topicTimeRailInner.innerHTML="";
-        if(topicTimeEmpty)topicTimeEmpty.hidden=periodTopics.length>0;
+        if(topicTimeEmpty){
+          topicTimeEmpty.hidden=periodTopics.length>0;
+          topicTimeEmpty.textContent=topics.length ? "No Cosmos topics in this period." : "No saved Cosmos journeys yet. Ask something to begin building Your Cosmos.";
+        }
         periodTopics.forEach((topic,index)=>{
           const q=topicQuestion(topic),count=topicStationCount(topic),button=document.createElement("button");
           button.type="button";button.className="topicTimeNode";button.title=q;button.setAttribute("aria-label",`Enter ${q}${count?`, ${count} stations`:""}`);
@@ -1097,8 +1118,10 @@
         const topics=readTopicMemory().filter(x=>topicQuestion(x)).sort((a,b)=>topicTimestamp(b)-topicTimestamp(a));
         renderTopicSphere(topics);
         topicYears.textContent="";
-        if(!topics.length){topicMemory.classList.remove("active");return}
-        topicMemoryCount.textContent=`${topics.length} saved ${topics.length===1?"journey":"journeys"}`;topicMemory.classList.add("active");
+        topicMemory.classList.add("active");
+        topicMemoryCount.textContent=topics.length
+          ? `${topics.length} saved ${topics.length===1?"journey":"journeys"}`
+          : "No saved journeys yet";
         if(!topicMemory.classList.contains("historyExpanded"))return;
 
         const now=new Date(),today=startOfDay(now),weekStart=startOfWeek(now);
@@ -1146,9 +1169,13 @@
           setHistoryExpanded(false);
         }
       });
-      window.addEventListener("pageshow",renderTopicMemory);
-      window.addEventListener("storage",e=>{if(e.key===TOPIC_MEMORY_KEY)renderTopicMemory()});
+      window.addEventListener("pageshow",()=>{renderTopicMemory();setTimeout(renderTopicMemory,60)});
+      window.addEventListener("storage",e=>{
+        if(e.key===TOPIC_MEMORY_KEY || e.key==="ptdtoday_cosmos_topic_memory_v1") renderTopicMemory();
+      });
+      document.addEventListener("visibilitychange",()=>{if(!document.hidden)renderTopicMemory()});
       renderTopicMemory();
+      setTimeout(renderTopicMemory,60);
 
       function resolveView(question) {
         const q = String(question || "").trim();
