@@ -2,12 +2,13 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.6-individual-station-focus-zoom" />
+  <meta name="cosmos-build" content="v6.8-platform-aware-social-sharing" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1536,6 +1537,32 @@
   }
   .journeySphereStation.focused .journeySphereStationLabel{font-weight:860!important}
 
+
+  /* v6.8 — platform-aware social sharing. LinkedIn gets a richer insight post; X stays concise. */
+  .cosmos-share-menu{
+    position:fixed!important;inset:0!important;z-index:190!important;display:grid!important;place-items:end center!important;
+    padding:18px!important;background:rgba(33,47,70,.16)!important;backdrop-filter:blur(8px)!important;-webkit-backdrop-filter:blur(8px)!important
+  }
+  .cosmos-share-menu[hidden]{display:none!important}
+  .cosmos-share-sheet{
+    width:min(460px,100%)!important;border:1px solid rgba(39,67,108,.12)!important;border-radius:22px!important;
+    background:rgba(255,255,255,.985)!important;padding:14px!important;box-shadow:0 24px 80px rgba(31,56,91,.18)!important;color:#26354d!important
+  }
+  .cosmos-share-essence{padding:6px 7px 13px!important;color:#65758d!important;font-size:12.5px!important;line-height:1.48!important;text-align:center!important}
+  .cosmos-share-actions{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+  .cosmos-share-action{
+    min-height:54px!important;border:1px solid rgba(39,67,108,.12)!important;border-radius:15px!important;background:#f8faff!important;
+    color:#2d405e!important;padding:9px 7px!important;font-size:12px!important;font-weight:760!important;cursor:pointer!important
+  }
+  .cosmos-share-action small{display:block;margin-top:3px;color:#8793a5;font-size:9px;font-weight:650;line-height:1.2}
+  .cosmos-share-action:active{transform:scale(.98)}
+  .cosmos-share-close{margin-top:9px!important;width:100%!important;min-height:42px!important;color:#6e7d92!important;background:transparent!important}
+  @media(max-width:420px){
+    .cosmos-share-menu{padding:10px!important}
+    .cosmos-share-sheet{border-radius:20px!important;padding:11px!important}
+    .cosmos-share-action{min-height:58px!important;font-size:11.5px!important}
+  }
+
 </style>
 </head>
 <body>
@@ -1662,6 +1689,18 @@
 
   <div id="shareStationStatus" class="station-share-status" hidden role="status" aria-live="polite"></div>
 
+  <div class="cosmos-share-menu" id="cosmosShareMenu" hidden>
+    <section class="cosmos-share-sheet" role="dialog" aria-modal="true" aria-labelledby="cosmosShareMenuTitle">
+      <div class="cosmos-share-essence" id="cosmosShareMenuTitle">Choose a platform. LinkedIn gets a richer Cosmos insight; X stays short.</div>
+      <div class="cosmos-share-actions">
+        <button class="cosmos-share-action" id="shareLinkedInBtn" type="button">LinkedIn<small>Detailed post + more hashtags</small></button>
+        <button class="cosmos-share-action" id="shareXBtn" type="button">X<small>Short post + 1–3 hashtags</small></button>
+        <button class="cosmos-share-action" id="shareMoreBtn" type="button">More<small>Native share sheet</small></button>
+      </div>
+      <button class="cosmos-share-action cosmos-share-close" id="shareMenuCloseBtn" type="button">Cancel</button>
+    </section>
+  </div>
+
   <div class="spatialJourney" id="spatialJourney" aria-label="Current Cosmos journey" hidden></div>
 
   <section class="journeySphereOverlay" id="journeySphereOverlay" aria-label="Journey Ray" hidden>
@@ -1739,6 +1778,11 @@
   const cosmosHomeLink = document.getElementById("cosmosHomeLink");
   const shareStationStatus=document.getElementById("shareStationStatus");
   const currentStopShare=document.getElementById("currentStopShare");
+  const cosmosShareMenu=document.getElementById("cosmosShareMenu");
+  const shareLinkedInBtn=document.getElementById("shareLinkedInBtn");
+  const shareXBtn=document.getElementById("shareXBtn");
+  const shareMoreBtn=document.getElementById("shareMoreBtn");
+  const shareMenuCloseBtn=document.getElementById("shareMenuCloseBtn");
   const backBtn = document.getElementById("backBtn");
   const articleBtn = document.getElementById("articleBtn");
 
@@ -6590,43 +6634,195 @@
     });
   }
 
-  async function shareCurrentStation(){
-    shareNotice("Preparing current stop…");
+  const SHARE_STOPWORDS=new Set([
+    "the","and","for","with","from","that","this","into","about","what","when","where","why","how","are","is","was","were","will","would","could","should","your","today","current","station","cosmos"
+  ]);
+
+  const SHARE_TAG_RULES=[
+    [/\b(ai|artificial intelligence|openai|anthropic|llm|language model|machine learning)\b/i,["AI","ArtificialIntelligence","Technology","Innovation"]],
+    [/\b(power grid|grid|electricity|transmission|substation|transformer|high voltage|hv|energy infrastructure)\b/i,["PowerGrid","Energy","GridModernization","EnergyInfrastructure"]],
+    [/\b(renewable|solar|wind|storage|battery|decarbon|clean energy)\b/i,["CleanEnergy","Renewables","EnergyTransition"]],
+    [/\b(geopolit|diploma|military|conflict|war|security|nato|foreign policy|international relations)\b/i,["Geopolitics","GlobalSecurity","InternationalRelations"]],
+    [/\b(climate|water|drought|flood|environment|sustainab|emission)\b/i,["Climate","Sustainability","WaterSecurity"]],
+    [/\b(market|markets|stock|stocks|investment|investing|finance|financial|economy|economic)\b/i,["Markets","Investing","Economy"]],
+    [/\b(manufactur|factory|industrial|supply chain|logistics|procurement)\b/i,["Manufacturing","SupplyChain","Industry"]],
+    [/\b(semiconductor|chip|chips|data center|datacenter|compute)\b/i,["Semiconductors","DataCenters","DigitalInfrastructure"]],
+    [/\b(resilien|recovery|reliability|durability)\b/i,["Resilience","Reliability"]],
+    [/\b(cyber|cybersecurity|data security|privacy)\b/i,["Cybersecurity","DataSecurity"]],
+    [/\b(policy|regulation|regulatory|legislation|government)\b/i,["Policy","Regulation"]],
+    [/\b(job|jobs|career|careers|workforce|profession|employment|skills)\b/i,["FutureOfWork","Careers","Workforce"]],
+    [/\b(health|medical|medicine|healthcare|biotech|clinical)\b/i,["Healthcare","HealthInnovation"]],
+    [/\b(education|school|university|learning|student)\b/i,["Education","Learning"]],
+    [/\b(space|satellite|rocket|orbit|lunar|mars)\b/i,["Space","SpaceTech"]],
+    [/\b(transport|mobility|vehicle|automotive|aviation|shipping)\b/i,["Mobility","Transportation"]],
+    [/\b(leadership|strategy|management|organization|execution)\b/i,["Leadership","Strategy","Execution"]],
+    [/\b(butterfly effect|ripple|causal|systems thinking|interconnect)\b/i,["ButterflyEffect","SystemsThinking"]]
+  ];
+
+  function sharePlainText(value){
+    return String(value||"").replace(/\s+/g," ").trim();
+  }
+
+  function shareClip(value,max=560){
+    const text=sharePlainText(value);
+    if(text.length<=max) return text;
+    const clipped=text.slice(0,max);
+    const cut=Math.max(clipped.lastIndexOf(". "),clipped.lastIndexOf("; "),clipped.lastIndexOf(", "),clipped.lastIndexOf(" "));
+    return `${(cut>max*.58?clipped.slice(0,cut):clipped).trim()}…`;
+  }
+
+  function shareLabelFromStation(value){
+    if(typeof value==="string") return sharePlainText(value);
+    return sharePlainText(value?.label||value?.title||value?.name||value?.subject||value?.station_label||"");
+  }
+
+  function topicHashtag(title){
+    const words=sharePlainText(title)
+      .replace(/[^\p{L}\p{N}]+/gu," ")
+      .split(/\s+/)
+      .filter(Boolean)
+      .filter(word=>!SHARE_STOPWORDS.has(word.toLowerCase()))
+      .slice(0,3);
+    if(!words.length) return "";
+    const tag=words.map(word=>word.charAt(0).toLocaleUpperCase()+word.slice(1)).join("").replace(/[^\p{L}\p{N}]/gu,"");
+    return tag && tag.length<=34 ? tag : "";
+  }
+
+  function buildShareHashtags(payload,data,{limit=10,x=false}={}){
+    const title=payload.share_title||payload.current_station_label||payload.label||payload.question||"";
+    const suggested=Array.isArray(payload?.response?.suggested_stations)
+      ? payload.response.suggested_stations.map(shareLabelFromStation).filter(Boolean)
+      : [];
+    const corpus=[
+      title,payload.subject,payload.question,payload.short_answer,payload.essence,payload.answer,
+      ...(payload.current_pulse||[]),...suggested,
+      String(data?.share_text||""),String(data?.linkedin_text||""),String(data?.post_text||"")
+    ].join(" ");
+    const tags=[];
+    const add=(tag)=>{
+      const clean=String(tag||"").replace(/^#+/,"").replace(/[^\p{L}\p{N}_]/gu,"");
+      if(clean && !tags.some(existing=>existing.toLocaleLowerCase()===clean.toLocaleLowerCase())) tags.push(clean);
+    };
+    const topic=topicHashtag(title);
+    if(topic) add(topic);
+    for(const [pattern,values] of SHARE_TAG_RULES){
+      if(pattern.test(corpus)) values.forEach(add);
+      if(tags.length>=limit-3) break;
+    }
+    if(x){
+      if(tags.length<1 && topic) add(topic);
+      add("Cosmos");
+      return tags.slice(0,Math.max(1,Math.min(limit,3))).map(tag=>`#${tag}`).join(" ");
+    }
+    add("SystemsThinking");
+    add("ButterflyEffect");
+    add("Cosmos");
+    add("PTDToday");
+    return tags.slice(0,limit).map(tag=>`#${tag}`).join(" ");
+  }
+
+  function currentShareJourneyLabels(){
+    const path=journeyPathTo(state.journey?.current_node_id);
+    return path.map(node=>sharePlainText(observerDisplayLabel(journeyNodeDisplayObserver(node)))).filter(Boolean);
+  }
+
+  function buildLinkedInPost(payload,data){
+    const title=sharePlainText(payload.share_title||payload.current_station_label||payload.label||payload.question||"Cosmos");
+    const essence=shareClip(payload.essence||payload.short_answer||payload.answer||data?.linkedin_text||data?.share_text||"",640);
+    const suggested=Array.isArray(payload?.response?.suggested_stations)
+      ? payload.response.suggested_stations.map(shareLabelFromStation).filter(Boolean).filter(label=>normalizeSubject(label)!==normalizeSubject(title)).slice(0,3)
+      : [];
+    const pulse=(payload.current_pulse||[]).map(item=>shareClip(item,190)).filter(Boolean).slice(0,1);
+    const path=currentShareJourneyLabels();
+    const pieces=[title];
+
+    if(essence) pieces.push("",essence);
+
+    if(suggested.length){
+      pieces.push("",`What stands out is how this station connects with ${suggested.join(", ")}. These are different directions worth following from the same starting point.`);
+    }else if(path.length>1){
+      const route=path.slice(-4).join(" → ");
+      pieces.push("",`This station is part of a wider Cosmos journey: ${route}. Each stop can reveal another connection, consequence or question.`);
+    }
+
+    if(pulse.length){
+      pieces.push("",`One current signal worth watching: ${pulse[0]}`);
+    }
+
+    pieces.push("","Follow the ripple in Cosmos. 🦋","",buildShareHashtags(payload,data,{limit:10,x:false}));
+    return pieces.filter((part,index,arr)=>part!=="" || (index>0 && arr[index-1]!=="")).join("\n").trim();
+  }
+
+  function buildXPost(payload,data){
+    const title=sharePlainText(payload.share_title||payload.current_station_label||payload.label||payload.question||"Cosmos");
+    const essence=shareClip(payload.short_answer||payload.essence||payload.answer||data?.share_text||"",105);
+    const hashtags=buildShareHashtags(payload,data,{limit:3,x:true});
+    const maxTitle=title.length>74?`${title.slice(0,71).trim()}…`:title;
+    let text=[maxTitle,essence,"Follow the ripple in Cosmos. 🦋",hashtags].filter(Boolean).join("\n\n");
+    if(text.length>230){
+      const room=Math.max(40,230-maxTitle.length-hashtags.length-44);
+      text=[maxTitle,shareClip(essence,room),"Follow the ripple in Cosmos. 🦋",hashtags].filter(Boolean).join("\n\n");
+    }
+    return text;
+  }
+
+  function buildDefaultShareText(payload,data){
+    const base=sharePlainText(data?.share_text||data?.post_text||payload.short_answer||payload.essence||payload.answer||"");
+    const title=sharePlainText(payload.share_title||payload.current_station_label||payload.label||payload.question||"Cosmos");
+    const hashtags=buildShareHashtags(payload,data,{limit:5,x:false});
+    return [title,shareClip(base,280),"Follow the ripple in Cosmos. 🦋",hashtags].filter(Boolean).join("\n\n");
+  }
+
+  function openCosmosShareMenu(){
+    if(!currentStationPersistentPayload()){ shareNotice("No current station to share."); return; }
+    cosmosShareMenu.hidden=false;
+    shareLinkedInBtn?.focus({preventScroll:true});
+  }
+
+  function closeCosmosShareMenu(){
+    cosmosShareMenu.hidden=true;
+    currentStopShare?.focus({preventScroll:true});
+  }
+
+  async function copyShareText(text){
+    if(!text || !navigator.clipboard?.writeText) return false;
+    try{ await navigator.clipboard.writeText(text); return true; }catch{ return false; }
+  }
+
+  async function nativeSharePrepared({title,text,url,notice}){
+    const copied=await copyShareText(text);
+    if(navigator.share){
+      await navigator.share({title,text,url});
+      shareNotice(copied ? `${notice} Text copied too.` : notice);
+      return;
+    }
+    const combined=[text,url].filter(Boolean).join("\n\n");
+    if(copied || await copyShareText(combined)){
+      shareNotice("Post copied. Paste it into your social app.");
+      return;
+    }
+    window.open(url,"_blank","noopener,noreferrer");
+  }
+
+  async function shareCurrentStation(platform="more"){
+    closeCosmosShareMenu();
+    shareNotice(platform==="linkedin"?"Preparing LinkedIn post…":platform==="x"?"Preparing X post…":"Preparing current stop…");
     try{
       const data=await createPersistentStation();
       const payload=currentStationPersistentPayload()||{};
       const title=payload.share_title||payload.current_station_label||payload.label||payload.question||"Cosmos · Current stop";
-      const shareText=String(data.linkedin_text||data.share_text||data.post_text||"").trim();
-      const combined=[shareText,data.share_url].filter(Boolean).join("\n\n");
+      const text=platform==="linkedin"
+        ? buildLinkedInPost(payload,data)
+        : platform==="x"
+          ? buildXPost(payload,data)
+          : buildDefaultShareText(payload,data);
 
-      if(navigator.share){
-        // Share as a real webpage URL object. This is the most reliable path for
-        // LinkedIn/iOS to invoke its composer and fetch the Open Graph preview.
-        // Keep the current working native share flow, but also place the
-        // generated exact-station commentary + hashtags on the clipboard.
-        // LinkedIn's iOS share extension may ignore Web Share `text`, so the
-        // clipboard preserves the ready-to-use post without changing the card URL.
-        if(shareText && navigator.clipboard?.writeText){
-          try{
-            await navigator.clipboard.writeText(shareText);
-          }catch(copyError){
-            console.warn("Could not copy Cosmos post text to clipboard.",copyError);
-          }
-        }
-
-        await navigator.share({
-          title,
-          text: shareText,
-          url: data.share_url
-        });
-      }else if(navigator.clipboard?.writeText){
-        await navigator.clipboard.writeText(combined);
-        shareNotice("Share text copied.");
-        return;
-      }else{
-        window.open(data.share_url,"_blank","noopener,noreferrer");
-      }
-      shareNotice("Share sheet opened.");
+      await nativeSharePrepared({
+        title,
+        text,
+        url:data.share_url,
+        notice:platform==="linkedin"?"LinkedIn post ready.":platform==="x"?"X post ready.":"Share sheet opened."
+      });
     }catch(error){
       if(error?.name==="AbortError") return;
       console.warn("Station sharing failed",error);
@@ -6634,7 +6830,13 @@
     }
   }
 
-  currentStopShare?.addEventListener("click",shareCurrentStation);
+  currentStopShare?.addEventListener("click",openCosmosShareMenu);
+  shareLinkedInBtn?.addEventListener("click",()=>shareCurrentStation("linkedin"));
+  shareXBtn?.addEventListener("click",()=>shareCurrentStation("x"));
+  shareMoreBtn?.addEventListener("click",()=>shareCurrentStation("more"));
+  shareMenuCloseBtn?.addEventListener("click",closeCosmosShareMenu);
+  cosmosShareMenu?.addEventListener("click",event=>{ if(event.target===cosmosShareMenu) closeCosmosShareMenu(); });
+  document.addEventListener("keydown",event=>{ if(event.key==="Escape" && cosmosShareMenu && !cosmosShareMenu.hidden) closeCosmosShareMenu(); });
 
   async function restorePersistentSharedStation(){
     const params=new URLSearchParams(window.location.search);
