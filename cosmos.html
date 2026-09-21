@@ -9,7 +9,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.11-breathing-grow-station-cycle" />
+  <meta name="cosmos-build" content="v6.12-manual-cosmos-pinch-wheel-zoom" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1539,105 +1539,19 @@
   .journeySphereStation.focused .journeySphereStationLabel{font-weight:860!important}
 
 
-  /* v6.11 — visible breathing growth for outer Cosmos stations.
-     One resolved station inhales, eases back slightly, then takes a second deeper
-     breath before returning to rest. Transform is animated directly so iPhone/Safari
-     visibly enlarges the entire mini-Cosmos (core + rings + label) as one living object. */
-  .cosmosGlyphButton.node{
-    --read-breath-1:1.22;
-    --read-rest-1:1.10;
-    --read-breath-2:1.48;
-    --read-rest-2:1.30;
-    --read-peak:1.58;
-    filter:none;
-    will-change:transform,filter;
+  /* v6.12 — manual Cosmos overview zoom.
+     Automatic outer-station growth is intentionally removed. The viewer controls depth:
+     pinch on phone/tablet, wheel or trackpad on laptop, then drag to pan while zoomed. */
+  #cosmosCanvas,.cosmosGlyphLayer{
+    transform-origin:0 0!important;
+    will-change:transform;
   }
-  .cosmosGlyphButton.node .cosmosGlyphHalo,
-  .cosmosGlyphButton.node .cosmosGlyphOrbit,
-  .cosmosGlyphButton.node .cosmosGlyphCore{
-    will-change:filter,opacity,box-shadow;
+  .cosmosGlyphButton.node{
+    filter:none!important;
   }
   .cosmosGlyphButton.node.cosmosStationReading{
-    z-index:14!important;
-    animation:cosmosStationBreathingGrow 8.4s ease-in-out both!important;
-  }
-  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphHalo{
-    animation:cosmosStationHaloBreathe 8.4s ease-in-out both!important;
-  }
-  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphOrbit{
-    animation:cosmosStationOrbitBreathe 8.4s ease-in-out both!important;
-  }
-  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphCore{
-    animation:cosmosStationCoreGlow 8.4s ease-in-out both!important;
-  }
-  @keyframes cosmosStationBreathingGrow{
-    0%,5%{
-      transform:translate(-50%,-50%) scale(1);
-      filter:drop-shadow(0 0 0 rgba(70,110,220,0));
-    }
-    25%{
-      transform:translate(-50%,-50%) scale(var(--read-breath-1));
-      filter:drop-shadow(0 7px 18px rgba(66,100,180,.11)) drop-shadow(0 0 14px rgba(108,91,224,.07));
-    }
-    38%{
-      transform:translate(-50%,-50%) scale(var(--read-rest-1));
-      filter:drop-shadow(0 5px 13px rgba(66,100,180,.08));
-    }
-    63%{
-      transform:translate(-50%,-50%) scale(var(--read-breath-2));
-      filter:drop-shadow(0 12px 30px rgba(66,100,180,.18)) drop-shadow(0 0 28px rgba(108,91,224,.13));
-    }
-    76%{
-      transform:translate(-50%,-50%) scale(var(--read-rest-2));
-      filter:drop-shadow(0 9px 23px rgba(66,100,180,.14)) drop-shadow(0 0 20px rgba(108,91,224,.09));
-    }
-    88%{
-      transform:translate(-50%,-50%) scale(var(--read-peak));
-      filter:drop-shadow(0 15px 38px rgba(66,100,180,.22)) drop-shadow(0 0 38px rgba(108,91,224,.17));
-    }
-    100%{
-      transform:translate(-50%,-50%) scale(1);
-      filter:drop-shadow(0 0 0 rgba(70,110,220,0));
-    }
-  }
-  @keyframes cosmosStationHaloBreathe{
-    0%,5%,100%{opacity:.74;filter:blur(calc(var(--core) * .014))}
-    25%{opacity:.92;filter:blur(calc(var(--core) * .010)) drop-shadow(0 0 calc(var(--core) * .11) rgba(96,127,226,.18))}
-    38%{opacity:.82;filter:blur(calc(var(--core) * .012))}
-    63%{opacity:1;filter:blur(calc(var(--core) * .007)) drop-shadow(0 0 calc(var(--core) * .16) rgba(96,127,226,.27))}
-    76%{opacity:.90;filter:blur(calc(var(--core) * .010)) drop-shadow(0 0 calc(var(--core) * .10) rgba(96,127,226,.17))}
-    88%{opacity:1;filter:blur(calc(var(--core) * .006)) drop-shadow(0 0 calc(var(--core) * .21) rgba(108,91,224,.31))}
-  }
-  @keyframes cosmosStationOrbitBreathe{
-    0%,5%,100%{opacity:.76;box-shadow:0 0 calc(var(--core) * .065) rgba(75,119,255,.24),inset 0 0 calc(var(--core) * .065) rgba(154,121,255,.10)}
-    25%{opacity:.90;box-shadow:0 0 calc(var(--core) * .11) rgba(75,119,255,.30),inset 0 0 calc(var(--core) * .08) rgba(154,121,255,.13)}
-    38%{opacity:.82}
-    63%{opacity:1;box-shadow:0 0 calc(var(--core) * .16) rgba(75,119,255,.37),inset 0 0 calc(var(--core) * .11) rgba(154,121,255,.17)}
-    76%{opacity:.90}
-    88%{opacity:1;box-shadow:0 0 calc(var(--core) * .22) rgba(75,119,255,.43),inset 0 0 calc(var(--core) * .14) rgba(154,121,255,.21)}
-  }
-  @keyframes cosmosStationCoreGlow{
-    0%,5%,100%{border-color:rgba(110,154,255,.56);box-shadow:0 0 0 calc(var(--core) * .035) rgba(68,111,221,.035),0 0 calc(var(--core) * .112) rgba(70,116,240,.30),0 0 calc(var(--core) * .279) rgba(103,78,220,.18),inset 0 0 calc(var(--core) * .149) rgba(86,124,237,.20)}
-    25%{border-color:rgba(132,169,255,.72);box-shadow:0 0 0 calc(var(--core) * .040) rgba(68,111,221,.05),0 0 calc(var(--core) * .16) rgba(70,116,240,.35),0 0 calc(var(--core) * .34) rgba(103,78,220,.21),inset 0 0 calc(var(--core) * .17) rgba(96,134,241,.23)}
-    38%{border-color:rgba(120,160,255,.64)}
-    63%{border-color:rgba(151,184,255,.86);box-shadow:0 0 0 calc(var(--core) * .050) rgba(68,111,221,.07),0 0 calc(var(--core) * .22) rgba(70,116,240,.42),0 0 calc(var(--core) * .46) rgba(103,78,220,.27),inset 0 0 calc(var(--core) * .21) rgba(111,145,244,.29)}
-    76%{border-color:rgba(138,174,255,.76)}
-    88%{border-color:rgba(170,198,255,.96);box-shadow:0 0 0 calc(var(--core) * .060) rgba(68,111,221,.08),0 0 calc(var(--core) * .29) rgba(70,116,240,.50),0 0 calc(var(--core) * .58) rgba(103,78,220,.33),inset 0 0 calc(var(--core) * .25) rgba(126,158,247,.34)}
-  }
-  @media(max-width:640px){
-    .cosmosGlyphButton.node{
-      --read-breath-1:1.26;
-      --read-rest-1:1.12;
-      --read-breath-2:1.55;
-      --read-rest-2:1.34;
-      --read-peak:1.68;
-    }
-  }
-  @media(prefers-reduced-motion:reduce){
-    .cosmosGlyphButton.node.cosmosStationReading{animation:none!important;transform:translate(-50%,-50%) scale(1.24)!important;filter:drop-shadow(0 0 22px rgba(85,120,220,.16))}
-    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphHalo,
-    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphOrbit,
-    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphCore{animation:none!important}
+    animation:none!important;
+    filter:none!important;
   }
 
   /* v6.8 — platform-aware social sharing. LinkedIn gets a richer insight post; X stays concise. */
@@ -1940,7 +1854,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.5-branching-journey-camera-zoom";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.12-manual-cosmos-pinch-wheel-zoom";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -5609,9 +5523,6 @@
       // Calm living Cosmos is the only viewer-facing activity cue.
     }
 
-    // Give the progressively materializing station circles time to settle, then
-    // bring them forward one-by-one for comfortable reading.
-    scheduleCosmosStationReadingCycle(4700);
   }
 
   function travelRelation(previous,targetId){
@@ -5641,6 +5552,7 @@
   function recenterEntity(id,operation="ENTER"){
     const entity=state.entities.get(id);
     if(!entity) return;
+    resetCosmosOverviewView();
 
     const previous=state.observer;
     const parentJourneyId=state.journey.current_node_id;
@@ -7069,6 +6981,7 @@
     if(spatialEssenceOpen){setSpatialEssence(false);return;}
     const previous=state.history.pop();
     if(previous){
+      resetCosmosOverviewView();
       state.observer=previous;
       state.expanded=false;
       ensureJourneyCurrent(state.observer);
@@ -7092,110 +7005,79 @@
   let spatialPinchStart=0;
   let spatialPinchConsumed=false;
 
-  // v6.9 — calm reading assistance for the outer station circles.
-  // This is deliberately not a progress indicator: it only changes presentation
-  // of stations that are already present in the resolved Cosmos projection.
-  const COSMOS_STATION_READING_HOLD_MS=8400;
-  const COSMOS_STATION_READING_GAP_MS=800;
-  const COSMOS_STATION_READING_RESUME_MS=6200;
-  let cosmosStationReadingTimer=null;
-  let cosmosStationReadingWakeTimer=null;
-  let cosmosStationReadingIndex=0;
+  // v6.12 — MANUAL COSMOS OVERVIEW CAMERA.
+  // No automatic station growth. Pinch/wheel zooms the actual Cosmos field around
+  // the viewer's focal point; when enlarged, one-finger/mouse drag pans at the same scale.
+  const COSMOS_VIEW_MIN_SCALE=1;
+  const COSMOS_VIEW_MAX_SCALE=3.0;
+  let cosmosViewScale=1;
+  let cosmosViewPanX=0;
+  let cosmosViewPanY=0;
+  const cosmosViewPointers=new Map();
+  let cosmosViewPinchStart=null;
+  let cosmosViewPanStart=null;
+  let cosmosViewSuppressClickUntil=0;
 
-  function cosmosStationReadingNodes(){
-    if(!cosmosGlyphLayer) return [];
-    const nodes=[...cosmosGlyphLayer.querySelectorAll(".cosmosGlyphButton.node")];
-    const center=cosmosGlyphLayer.querySelector(".cosmosGlyphButton.center");
-    if(!center || nodes.length<2) return nodes;
-    const cx=parseFloat(center.style.left)||0;
-    const cy=parseFloat(center.style.top)||0;
-    // Clockwise visual order beginning near twelve o'clock. This makes the
-    // sequence feel intentional rather than jumping randomly around the screen.
-    return nodes.sort((a,b)=>{
-      const angle=(el)=>{
-        const x=(parseFloat(el.style.left)||0)-cx;
-        const y=(parseFloat(el.style.top)||0)-cy;
-        return (Math.atan2(y,x)+(Math.PI*2)+(Math.PI/2))%(Math.PI*2);
-      };
-      return angle(a)-angle(b);
-    });
-  }
-
-  function clearCosmosStationReading(){
-    cosmosGlyphLayer?.querySelectorAll(".cosmosGlyphButton.node.cosmosStationReading")
-      .forEach(node=>node.classList.remove("cosmosStationReading"));
-  }
-
-  function cosmosStationReadingAllowed(){
-    return document.visibilityState!=="hidden" &&
-      !spatialEssenceOpen &&
-      !journeySphereOpen &&
-      Boolean(cosmosGlyphLayer?.querySelector(".cosmosGlyphButton.node"));
-  }
-
-  function runCosmosStationReadingCycle(){
-    clearTimeout(cosmosStationReadingTimer);
-    cosmosStationReadingTimer=null;
-    if(!cosmosStationReadingAllowed()){clearCosmosStationReading();return;}
-    const nodes=cosmosStationReadingNodes();
-    if(!nodes.length){clearCosmosStationReading();return;}
-
-    clearCosmosStationReading();
-    if(cosmosStationReadingIndex>=nodes.length) cosmosStationReadingIndex=0;
-    const node=nodes[cosmosStationReadingIndex++];
-    node.classList.add("cosmosStationReading");
-
-    cosmosStationReadingTimer=setTimeout(()=>{
-      node.classList.remove("cosmosStationReading");
-      cosmosStationReadingTimer=setTimeout(runCosmosStationReadingCycle,COSMOS_STATION_READING_GAP_MS);
-    },COSMOS_STATION_READING_HOLD_MS);
-  }
-
-  function scheduleCosmosStationReadingCycle(delay=1800){
-    clearTimeout(cosmosStationReadingTimer);
-    clearTimeout(cosmosStationReadingWakeTimer);
-    cosmosStationReadingTimer=null;
-    cosmosStationReadingWakeTimer=null;
-    clearCosmosStationReading();
-    if(!cosmosStationReadingAllowed()) return;
-    cosmosStationReadingTimer=setTimeout(runCosmosStationReadingCycle,Math.max(0,delay));
-  }
-
-  function pauseCosmosStationReadingCycle(resumeDelay=COSMOS_STATION_READING_RESUME_MS){
-    clearTimeout(cosmosStationReadingTimer);
-    clearTimeout(cosmosStationReadingWakeTimer);
-    cosmosStationReadingTimer=null;
-    cosmosStationReadingWakeTimer=null;
-    clearCosmosStationReading();
-    if(document.visibilityState==="hidden") return;
-    cosmosStationReadingWakeTimer=setTimeout(()=>{
-      cosmosStationReadingWakeTimer=null;
-      scheduleCosmosStationReadingCycle(0);
-    },Math.max(0,resumeDelay));
-  }
-
-  // Any deliberate user interaction takes priority. The gentle reading sequence
-  // gets out of the way immediately and resumes only after a quiet period.
-  for(const surface of [canvasWrapEl,cosmosGlyphLayer]){
-    surface?.addEventListener("pointerdown",()=>pauseCosmosStationReadingCycle(),{passive:true});
-    surface?.addEventListener("wheel",()=>pauseCosmosStationReadingCycle(),{passive:true});
-  }
-  document.addEventListener("visibilitychange",()=>{
-    if(document.visibilityState==="hidden"){
-      clearTimeout(cosmosStationReadingTimer);
-      clearTimeout(cosmosStationReadingWakeTimer);
-      clearCosmosStationReading();
-    }else{
-      scheduleCosmosStationReadingCycle(2200);
+  function clampCosmosViewPan(){
+    const rect=(canvasWrapEl||svg)?.getBoundingClientRect();
+    if(!rect) return;
+    if(cosmosViewScale<=1.001){
+      cosmosViewScale=1;
+      cosmosViewPanX=0;
+      cosmosViewPanY=0;
+      return;
     }
-  });
+    const minX=rect.width-(rect.width*cosmosViewScale);
+    const minY=rect.height-(rect.height*cosmosViewScale);
+    cosmosViewPanX=Math.min(0,Math.max(minX,cosmosViewPanX));
+    cosmosViewPanY=Math.min(0,Math.max(minY,cosmosViewPanY));
+  }
+
+  function applyCosmosOverviewView(){
+    clampCosmosViewPan();
+    const transform=`translate(${cosmosViewPanX}px,${cosmosViewPanY}px) scale(${cosmosViewScale})`;
+    if(svg) svg.style.transform=transform;
+    if(cosmosGlyphLayer) cosmosGlyphLayer.style.transform=transform;
+  }
+
+  function resetCosmosOverviewView(){
+    cosmosViewScale=1;
+    cosmosViewPanX=0;
+    cosmosViewPanY=0;
+    applyCosmosOverviewView();
+  }
+
+  function setCosmosOverviewScaleAt(clientX,clientY,nextScale){
+    const surface=canvasWrapEl||svg;
+    const rect=surface?.getBoundingClientRect();
+    if(!rect) return;
+    const scale=Math.max(COSMOS_VIEW_MIN_SCALE,Math.min(COSMOS_VIEW_MAX_SCALE,Number(nextScale)||1));
+    const x=(Number(clientX)||rect.left+rect.width/2)-rect.left;
+    const y=(Number(clientY)||rect.top+rect.height/2)-rect.top;
+    const contentX=(x-cosmosViewPanX)/cosmosViewScale;
+    const contentY=(y-cosmosViewPanY)/cosmosViewScale;
+    cosmosViewPanX=x-contentX*scale;
+    cosmosViewPanY=y-contentY*scale;
+    cosmosViewScale=scale;
+    applyCosmosOverviewView();
+  }
+
+  function cosmosViewPointerMidpoint(){
+    const pts=[...cosmosViewPointers.values()];
+    if(pts.length<2) return null;
+    return {x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+  }
+
+  function cosmosViewPointerDistance(){
+    const pts=[...cosmosViewPointers.values()];
+    if(pts.length<2) return 0;
+    return Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+  }
 
   function setSpatialEssence(open){
     if(Boolean(open) && journeySphereOpen) setJourneySphereOpen(false);
     spatialEssenceOpen=Boolean(open);
     document.body.classList.toggle("spatialEssenceOpen",spatialEssenceOpen);
-    if(spatialEssenceOpen) pauseCosmosStationReadingCycle(9000);
-    else scheduleCosmosStationReadingCycle(2200);
     if(spatialZoomButton){
       spatialZoomButton.textContent=spatialEssenceOpen?"−":"+";
       spatialZoomButton.setAttribute("aria-label",spatialEssenceOpen?"Zoom out to Cosmos universe":"Zoom into Cosmos essence");
@@ -7506,8 +7388,6 @@
   function setJourneySphereOpen(open){
     journeySphereOpen=Boolean(open);
     document.body.classList.toggle("journeySphereOpen",journeySphereOpen);
-    if(journeySphereOpen) pauseCosmosStationReadingCycle(9000);
-    else scheduleCosmosStationReadingCycle(2200);
     if(journeySphereOverlay) journeySphereOverlay.hidden=!journeySphereOpen;
     if(journeySphereOpen){
       if(spatialEssenceOpen) setSpatialEssence(false);
@@ -7698,51 +7578,108 @@
   }
   attachEssenceTouchSurface(projectionPanelEl);
 
-  // Mouse wheel and laptop trackpad. Trackpad pinch is normally delivered as ctrl+wheel;
-  // ordinary wheel is also accepted because the Cosmos owns the viewport and never page-scrolls.
+  // Main Cosmos overview: wheel/trackpad zooms around the pointer.
+  // Pinch zooms around the midpoint between the viewer's fingers.
+  // At any enlarged scale, one-finger or mouse drag pans without changing circle size.
   (canvasWrapEl||svg).addEventListener("wheel",event=>{
+    if(spatialEssenceOpen || journeySphereOpen) return;
     event.preventDefault();
-    const now=performance.now();
-    if(now-spatialWheelLock<260) return;
     const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;
-    if(Math.abs(delta)<1) return;
-    spatialWheelLock=now;
-    if(delta<0) setSpatialEssence(true);
-    else setSpatialEssence(false);
+    if(Math.abs(delta)<.2) return;
+    const factor=Math.exp(-delta*.00155);
+    const next=cosmosViewScale*Math.max(.82,Math.min(1.22,factor));
+    setCosmosOverviewScaleAt(event.clientX,event.clientY,next);
   },{passive:false});
 
-  function spatialPointerDistance(){
-    const pts=[...spatialPointers.values()];
-    if(pts.length<2) return 0;
-    return Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
-  }
   (canvasWrapEl||svg).addEventListener("pointerdown",event=>{
-    if(event.pointerType!=="touch") return;
-    spatialPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+    if(spatialEssenceOpen || journeySphereOpen) return;
+    if(event.pointerType==="mouse" && event.button!==0) return;
+    cosmosViewPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     try{(canvasWrapEl||svg).setPointerCapture(event.pointerId)}catch{}
-    if(spatialPointers.size===2){spatialPinchStart=spatialPointerDistance();spatialPinchConsumed=false;}
-  });
-  (canvasWrapEl||svg).addEventListener("pointermove",event=>{
-    if(!spatialPointers.has(event.pointerId)) return;
-    spatialPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
-    if(spatialPointers.size!==2 || !spatialPinchStart || spatialPinchConsumed) return;
-    const current=spatialPointerDistance();
-    if(!current) return;
-    const ratio=current/spatialPinchStart;
-    if(ratio>1.16){spatialPinchConsumed=true;setSpatialEssence(true);}
-    else if(ratio<.84){spatialPinchConsumed=true;setSpatialEssence(false);}
-  });
-  const clearSpatialPointer=event=>{
-    spatialPointers.delete(event.pointerId);
-    if(spatialPointers.size<2){spatialPinchStart=0;spatialPinchConsumed=false;}
-  };
-  (canvasWrapEl||svg).addEventListener("pointerup",clearSpatialPointer);
-  (canvasWrapEl||svg).addEventListener("pointercancel",clearSpatialPointer);
 
-  // Safari gesture events provide an additional native pinch path on iPhone/iPad/Mac trackpads.
+    if(cosmosViewPointers.size===2){
+      const mid=cosmosViewPointerMidpoint();
+      cosmosViewPinchStart={
+        distance:cosmosViewPointerDistance(),
+        midpoint:mid,
+        scale:cosmosViewScale,
+        panX:cosmosViewPanX,
+        panY:cosmosViewPanY
+      };
+      cosmosViewPanStart=null;
+      cosmosViewSuppressClickUntil=performance.now()+420;
+    }else if(cosmosViewPointers.size===1 && cosmosViewScale>1.001){
+      cosmosViewPanStart={
+        pointerId:event.pointerId,x:event.clientX,y:event.clientY,
+        panX:cosmosViewPanX,panY:cosmosViewPanY,moved:false
+      };
+    }
+  });
+
+  (canvasWrapEl||svg).addEventListener("pointermove",event=>{
+    if(!cosmosViewPointers.has(event.pointerId) || spatialEssenceOpen || journeySphereOpen) return;
+    cosmosViewPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
+
+    if(cosmosViewPointers.size===2 && cosmosViewPinchStart?.distance){
+      event.preventDefault();
+      const currentDistance=cosmosViewPointerDistance();
+      const currentMid=cosmosViewPointerMidpoint();
+      if(!currentDistance || !currentMid) return;
+      const nextScale=Math.max(COSMOS_VIEW_MIN_SCALE,Math.min(COSMOS_VIEW_MAX_SCALE,cosmosViewPinchStart.scale*(currentDistance/cosmosViewPinchStart.distance)));
+      const surface=canvasWrapEl||svg;
+      const rect=surface.getBoundingClientRect();
+      const startX=cosmosViewPinchStart.midpoint.x-rect.left;
+      const startY=cosmosViewPinchStart.midpoint.y-rect.top;
+      const contentX=(startX-cosmosViewPinchStart.panX)/cosmosViewPinchStart.scale;
+      const contentY=(startY-cosmosViewPinchStart.panY)/cosmosViewPinchStart.scale;
+      const nowX=currentMid.x-rect.left;
+      const nowY=currentMid.y-rect.top;
+      cosmosViewScale=nextScale;
+      cosmosViewPanX=nowX-contentX*nextScale;
+      cosmosViewPanY=nowY-contentY*nextScale;
+      cosmosViewSuppressClickUntil=performance.now()+420;
+      applyCosmosOverviewView();
+      return;
+    }
+
+    if(cosmosViewPointers.size===1 && cosmosViewPanStart?.pointerId===event.pointerId && cosmosViewScale>1.001){
+      const dx=event.clientX-cosmosViewPanStart.x;
+      const dy=event.clientY-cosmosViewPanStart.y;
+      if(Math.hypot(dx,dy)>4){
+        event.preventDefault();
+        cosmosViewPanStart.moved=true;
+        cosmosViewSuppressClickUntil=performance.now()+420;
+      }
+      cosmosViewPanX=cosmosViewPanStart.panX+dx;
+      cosmosViewPanY=cosmosViewPanStart.panY+dy;
+      applyCosmosOverviewView();
+    }
+  },{passive:false});
+
+  const clearCosmosViewPointer=event=>{
+    cosmosViewPointers.delete(event.pointerId);
+    if(cosmosViewPointers.size<2) cosmosViewPinchStart=null;
+    if(cosmosViewPanStart?.pointerId===event.pointerId) cosmosViewPanStart=null;
+  };
+  (canvasWrapEl||svg).addEventListener("pointerup",clearCosmosViewPointer);
+  (canvasWrapEl||svg).addEventListener("pointercancel",clearCosmosViewPointer);
+
+  // A pan/pinch ending on a station must not accidentally trigger travel.
+  (canvasWrapEl||svg).addEventListener("click",event=>{
+    if(performance.now()>=cosmosViewSuppressClickUntil) return;
+    if(event.target.closest?.(".cosmosGlyphButton")){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },true);
+
+  // Safari gesture events are kept for the Journey Map. The main Cosmos uses
+  // pointer pinch above (and ctrl+wheel on Mac trackpads) so browser zoom is never invoked.
   let safariGestureScale=1;
+  let safariOverviewStartScale=1;
   document.addEventListener("gesturestart",event=>{
     safariGestureScale=1;
+    safariOverviewStartScale=cosmosViewScale;
     if(journeySphereOpen){
       const targeted=journeySphereFocusFromClientPoint(event.clientX||innerWidth/2,event.clientY||innerHeight/2,175);
       if(targeted && targeted!==journeySphereFocusId){
@@ -7768,8 +7705,13 @@
       renderJourneySphere();
       return;
     }
-    if(scale/safariGestureScale>1.14){setSpatialEssence(true);safariGestureScale=scale;}
-    else if(scale/safariGestureScale<.86){setSpatialEssence(false);safariGestureScale=scale;}
+    if(!spatialEssenceOpen){
+      setCosmosOverviewScaleAt(
+        event.clientX||innerWidth/2,
+        event.clientY||innerHeight/2,
+        safariOverviewStartScale*scale
+      );
+    }
   },{passive:false});
   document.addEventListener("gestureend",event=>event.preventDefault(),{passive:false});
 
