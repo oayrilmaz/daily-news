@@ -9,7 +9,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.10-natural-growing-glow-station-cycle" />
+  <meta name="cosmos-build" content="v6.11-breathing-grow-station-cycle" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1539,73 +1539,105 @@
   .journeySphereStation.focused .journeySphereStationLabel{font-weight:860!important}
 
 
-  /* v6.10 — natural growing glow reading cycle.
-     Each resolved outer Cosmos slowly approaches, brightens, grows a little larger,
-     then calmly exhales before the next station takes a turn. This is presentation
-     only — never loading/progress and never a change to the observer or Journey. */
+  /* v6.11 — visible breathing growth for outer Cosmos stations.
+     One resolved station inhales, eases back slightly, then takes a second deeper
+     breath before returning to rest. Transform is animated directly so iPhone/Safari
+     visibly enlarges the entire mini-Cosmos (core + rings + label) as one living object. */
   .cosmosGlyphButton.node{
-    --read-s1:1.07;
-    --read-s2:1.16;
-    --read-s3:1.28;
-    --read-peak:1.48;
-    scale:1;
+    --read-breath-1:1.22;
+    --read-rest-1:1.10;
+    --read-breath-2:1.48;
+    --read-rest-2:1.30;
+    --read-peak:1.58;
     filter:none;
-    will-change:scale,filter;
+    will-change:transform,filter;
   }
-  .cosmosGlyphButton.node .cosmosGlyphHalo{
-    transition:filter 1.7s ease,opacity 1.7s ease;
-  }
+  .cosmosGlyphButton.node .cosmosGlyphHalo,
+  .cosmosGlyphButton.node .cosmosGlyphOrbit,
   .cosmosGlyphButton.node .cosmosGlyphCore{
-    transition:border-color 1.7s ease,box-shadow 1.7s ease;
+    will-change:filter,opacity,box-shadow;
   }
   .cosmosGlyphButton.node.cosmosStationReading{
     z-index:14!important;
-    animation:cosmosStationNaturalGrow 5.8s cubic-bezier(.20,.68,.22,1) both;
+    animation:cosmosStationBreathingGrow 8.4s ease-in-out both!important;
   }
   .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphHalo{
-    opacity:1;
-    filter:blur(calc(var(--core) * .008)) drop-shadow(0 0 calc(var(--core) * .10) rgba(96,127,226,.24));
+    animation:cosmosStationHaloBreathe 8.4s ease-in-out both!important;
+  }
+  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphOrbit{
+    animation:cosmosStationOrbitBreathe 8.4s ease-in-out both!important;
   }
   .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphCore{
-    border-color:rgba(148,181,255,.82);
-    box-shadow:0 0 0 calc(var(--core) * .045) rgba(68,111,221,.06),0 0 calc(var(--core) * .20) rgba(70,116,240,.39),0 0 calc(var(--core) * .42) rgba(103,78,220,.24),inset 0 0 calc(var(--core) * .19) rgba(111,145,244,.27);
+    animation:cosmosStationCoreGlow 8.4s ease-in-out both!important;
   }
-  @keyframes cosmosStationNaturalGrow{
-    0%,7%{
-      scale:1;
+  @keyframes cosmosStationBreathingGrow{
+    0%,5%{
+      transform:translate(-50%,-50%) scale(1);
       filter:drop-shadow(0 0 0 rgba(70,110,220,0));
     }
-    24%{
-      scale:var(--read-s1);
-      filter:drop-shadow(0 5px 12px rgba(66,100,180,.08));
+    25%{
+      transform:translate(-50%,-50%) scale(var(--read-breath-1));
+      filter:drop-shadow(0 7px 18px rgba(66,100,180,.11)) drop-shadow(0 0 14px rgba(108,91,224,.07));
     }
-    43%{
-      scale:var(--read-s2);
-      filter:drop-shadow(0 8px 18px rgba(66,100,180,.12));
+    38%{
+      transform:translate(-50%,-50%) scale(var(--read-rest-1));
+      filter:drop-shadow(0 5px 13px rgba(66,100,180,.08));
     }
-    62%{
-      scale:var(--read-s3);
-      filter:drop-shadow(0 11px 25px rgba(66,100,180,.16)) drop-shadow(0 0 20px rgba(108,91,224,.08));
+    63%{
+      transform:translate(-50%,-50%) scale(var(--read-breath-2));
+      filter:drop-shadow(0 12px 30px rgba(66,100,180,.18)) drop-shadow(0 0 28px rgba(108,91,224,.13));
     }
-    80%,90%{
-      scale:var(--read-peak);
-      filter:drop-shadow(0 14px 31px rgba(66,100,180,.20)) drop-shadow(0 0 30px rgba(108,91,224,.13));
+    76%{
+      transform:translate(-50%,-50%) scale(var(--read-rest-2));
+      filter:drop-shadow(0 9px 23px rgba(66,100,180,.14)) drop-shadow(0 0 20px rgba(108,91,224,.09));
+    }
+    88%{
+      transform:translate(-50%,-50%) scale(var(--read-peak));
+      filter:drop-shadow(0 15px 38px rgba(66,100,180,.22)) drop-shadow(0 0 38px rgba(108,91,224,.17));
     }
     100%{
-      scale:1;
+      transform:translate(-50%,-50%) scale(1);
       filter:drop-shadow(0 0 0 rgba(70,110,220,0));
     }
+  }
+  @keyframes cosmosStationHaloBreathe{
+    0%,5%,100%{opacity:.74;filter:blur(calc(var(--core) * .014))}
+    25%{opacity:.92;filter:blur(calc(var(--core) * .010)) drop-shadow(0 0 calc(var(--core) * .11) rgba(96,127,226,.18))}
+    38%{opacity:.82;filter:blur(calc(var(--core) * .012))}
+    63%{opacity:1;filter:blur(calc(var(--core) * .007)) drop-shadow(0 0 calc(var(--core) * .16) rgba(96,127,226,.27))}
+    76%{opacity:.90;filter:blur(calc(var(--core) * .010)) drop-shadow(0 0 calc(var(--core) * .10) rgba(96,127,226,.17))}
+    88%{opacity:1;filter:blur(calc(var(--core) * .006)) drop-shadow(0 0 calc(var(--core) * .21) rgba(108,91,224,.31))}
+  }
+  @keyframes cosmosStationOrbitBreathe{
+    0%,5%,100%{opacity:.76;box-shadow:0 0 calc(var(--core) * .065) rgba(75,119,255,.24),inset 0 0 calc(var(--core) * .065) rgba(154,121,255,.10)}
+    25%{opacity:.90;box-shadow:0 0 calc(var(--core) * .11) rgba(75,119,255,.30),inset 0 0 calc(var(--core) * .08) rgba(154,121,255,.13)}
+    38%{opacity:.82}
+    63%{opacity:1;box-shadow:0 0 calc(var(--core) * .16) rgba(75,119,255,.37),inset 0 0 calc(var(--core) * .11) rgba(154,121,255,.17)}
+    76%{opacity:.90}
+    88%{opacity:1;box-shadow:0 0 calc(var(--core) * .22) rgba(75,119,255,.43),inset 0 0 calc(var(--core) * .14) rgba(154,121,255,.21)}
+  }
+  @keyframes cosmosStationCoreGlow{
+    0%,5%,100%{border-color:rgba(110,154,255,.56);box-shadow:0 0 0 calc(var(--core) * .035) rgba(68,111,221,.035),0 0 calc(var(--core) * .112) rgba(70,116,240,.30),0 0 calc(var(--core) * .279) rgba(103,78,220,.18),inset 0 0 calc(var(--core) * .149) rgba(86,124,237,.20)}
+    25%{border-color:rgba(132,169,255,.72);box-shadow:0 0 0 calc(var(--core) * .040) rgba(68,111,221,.05),0 0 calc(var(--core) * .16) rgba(70,116,240,.35),0 0 calc(var(--core) * .34) rgba(103,78,220,.21),inset 0 0 calc(var(--core) * .17) rgba(96,134,241,.23)}
+    38%{border-color:rgba(120,160,255,.64)}
+    63%{border-color:rgba(151,184,255,.86);box-shadow:0 0 0 calc(var(--core) * .050) rgba(68,111,221,.07),0 0 calc(var(--core) * .22) rgba(70,116,240,.42),0 0 calc(var(--core) * .46) rgba(103,78,220,.27),inset 0 0 calc(var(--core) * .21) rgba(111,145,244,.29)}
+    76%{border-color:rgba(138,174,255,.76)}
+    88%{border-color:rgba(170,198,255,.96);box-shadow:0 0 0 calc(var(--core) * .060) rgba(68,111,221,.08),0 0 calc(var(--core) * .29) rgba(70,116,240,.50),0 0 calc(var(--core) * .58) rgba(103,78,220,.33),inset 0 0 calc(var(--core) * .25) rgba(126,158,247,.34)}
   }
   @media(max-width:640px){
     .cosmosGlyphButton.node{
-      --read-s1:1.09;
-      --read-s2:1.20;
-      --read-s3:1.34;
-      --read-peak:1.57;
+      --read-breath-1:1.26;
+      --read-rest-1:1.12;
+      --read-breath-2:1.55;
+      --read-rest-2:1.34;
+      --read-peak:1.68;
     }
   }
   @media(prefers-reduced-motion:reduce){
-    .cosmosGlyphButton.node.cosmosStationReading{animation:none!important;scale:1.20;filter:drop-shadow(0 0 20px rgba(85,120,220,.16))}
+    .cosmosGlyphButton.node.cosmosStationReading{animation:none!important;transform:translate(-50%,-50%) scale(1.24)!important;filter:drop-shadow(0 0 22px rgba(85,120,220,.16))}
+    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphHalo,
+    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphOrbit,
+    .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphCore{animation:none!important}
   }
 
   /* v6.8 — platform-aware social sharing. LinkedIn gets a richer insight post; X stays concise. */
@@ -7063,8 +7095,8 @@
   // v6.9 — calm reading assistance for the outer station circles.
   // This is deliberately not a progress indicator: it only changes presentation
   // of stations that are already present in the resolved Cosmos projection.
-  const COSMOS_STATION_READING_HOLD_MS=5800;
-  const COSMOS_STATION_READING_GAP_MS=650;
+  const COSMOS_STATION_READING_HOLD_MS=8400;
+  const COSMOS_STATION_READING_GAP_MS=800;
   const COSMOS_STATION_READING_RESUME_MS=6200;
   let cosmosStationReadingTimer=null;
   let cosmosStationReadingWakeTimer=null;
