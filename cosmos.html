@@ -3,12 +3,13 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.8-platform-aware-social-sharing" />
+  <meta name="cosmos-build" content="v6.9-calm-station-reading-cycle" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1537,6 +1538,35 @@
   }
   .journeySphereStation.focused .journeySphereStationLabel{font-weight:860!important}
 
+
+  /* v6.9 — calm station reading cycle.
+     Outer Cosmos stations gently come forward one at a time so labels can be read
+     without changing the observer, Journey, or knowledge state. */
+  .cosmosGlyphButton.node{
+    scale:1;
+    transition:scale 1.25s cubic-bezier(.22,.68,.24,1),filter .9s ease;
+    will-change:scale;
+  }
+  .cosmosGlyphButton.node.cosmosStationReading{
+    scale:1.32;
+    z-index:14!important;
+    filter:drop-shadow(0 14px 28px rgba(65,98,176,.18));
+  }
+  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphHalo{
+    opacity:1;
+    filter:blur(calc(var(--core) * .010));
+  }
+  .cosmosGlyphButton.node.cosmosStationReading .cosmosGlyphCore{
+    border-color:rgba(129,169,255,.72);
+    box-shadow:0 0 0 calc(var(--core) * .04) rgba(68,111,221,.05),0 0 calc(var(--core) * .16) rgba(70,116,240,.34),0 0 calc(var(--core) * .34) rgba(103,78,220,.20),inset 0 0 calc(var(--core) * .17) rgba(86,124,237,.24);
+  }
+  @media(max-width:640px){
+    .cosmosGlyphButton.node.cosmosStationReading{scale:1.42}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .cosmosGlyphButton.node{transition:none!important}
+    .cosmosGlyphButton.node.cosmosStationReading{scale:1.18}
+  }
 
   /* v6.8 — platform-aware social sharing. LinkedIn gets a richer insight post; X stays concise. */
   .cosmos-share-menu{
@@ -5506,6 +5536,10 @@
     if(observerLoading){
       // Calm living Cosmos is the only viewer-facing activity cue.
     }
+
+    // Give the progressively materializing station circles time to settle, then
+    // bring them forward one-by-one for comfortable reading.
+    scheduleCosmosStationReadingCycle(4700);
   }
 
   function travelRelation(previous,targetId){
@@ -6986,10 +7020,110 @@
   let spatialPinchStart=0;
   let spatialPinchConsumed=false;
 
+  // v6.9 — calm reading assistance for the outer station circles.
+  // This is deliberately not a progress indicator: it only changes presentation
+  // of stations that are already present in the resolved Cosmos projection.
+  const COSMOS_STATION_READING_HOLD_MS=3200;
+  const COSMOS_STATION_READING_GAP_MS=1050;
+  const COSMOS_STATION_READING_RESUME_MS=6200;
+  let cosmosStationReadingTimer=null;
+  let cosmosStationReadingWakeTimer=null;
+  let cosmosStationReadingIndex=0;
+
+  function cosmosStationReadingNodes(){
+    if(!cosmosGlyphLayer) return [];
+    const nodes=[...cosmosGlyphLayer.querySelectorAll(".cosmosGlyphButton.node")];
+    const center=cosmosGlyphLayer.querySelector(".cosmosGlyphButton.center");
+    if(!center || nodes.length<2) return nodes;
+    const cx=parseFloat(center.style.left)||0;
+    const cy=parseFloat(center.style.top)||0;
+    // Clockwise visual order beginning near twelve o'clock. This makes the
+    // sequence feel intentional rather than jumping randomly around the screen.
+    return nodes.sort((a,b)=>{
+      const angle=(el)=>{
+        const x=(parseFloat(el.style.left)||0)-cx;
+        const y=(parseFloat(el.style.top)||0)-cy;
+        return (Math.atan2(y,x)+(Math.PI*2)+(Math.PI/2))%(Math.PI*2);
+      };
+      return angle(a)-angle(b);
+    });
+  }
+
+  function clearCosmosStationReading(){
+    cosmosGlyphLayer?.querySelectorAll(".cosmosGlyphButton.node.cosmosStationReading")
+      .forEach(node=>node.classList.remove("cosmosStationReading"));
+  }
+
+  function cosmosStationReadingAllowed(){
+    return document.visibilityState!=="hidden" &&
+      !spatialEssenceOpen &&
+      !journeySphereOpen &&
+      Boolean(cosmosGlyphLayer?.querySelector(".cosmosGlyphButton.node"));
+  }
+
+  function runCosmosStationReadingCycle(){
+    clearTimeout(cosmosStationReadingTimer);
+    cosmosStationReadingTimer=null;
+    if(!cosmosStationReadingAllowed()){clearCosmosStationReading();return;}
+    const nodes=cosmosStationReadingNodes();
+    if(!nodes.length){clearCosmosStationReading();return;}
+
+    clearCosmosStationReading();
+    if(cosmosStationReadingIndex>=nodes.length) cosmosStationReadingIndex=0;
+    const node=nodes[cosmosStationReadingIndex++];
+    node.classList.add("cosmosStationReading");
+
+    cosmosStationReadingTimer=setTimeout(()=>{
+      node.classList.remove("cosmosStationReading");
+      cosmosStationReadingTimer=setTimeout(runCosmosStationReadingCycle,COSMOS_STATION_READING_GAP_MS);
+    },COSMOS_STATION_READING_HOLD_MS);
+  }
+
+  function scheduleCosmosStationReadingCycle(delay=1800){
+    clearTimeout(cosmosStationReadingTimer);
+    clearTimeout(cosmosStationReadingWakeTimer);
+    cosmosStationReadingTimer=null;
+    cosmosStationReadingWakeTimer=null;
+    clearCosmosStationReading();
+    if(!cosmosStationReadingAllowed()) return;
+    cosmosStationReadingTimer=setTimeout(runCosmosStationReadingCycle,Math.max(0,delay));
+  }
+
+  function pauseCosmosStationReadingCycle(resumeDelay=COSMOS_STATION_READING_RESUME_MS){
+    clearTimeout(cosmosStationReadingTimer);
+    clearTimeout(cosmosStationReadingWakeTimer);
+    cosmosStationReadingTimer=null;
+    cosmosStationReadingWakeTimer=null;
+    clearCosmosStationReading();
+    if(document.visibilityState==="hidden") return;
+    cosmosStationReadingWakeTimer=setTimeout(()=>{
+      cosmosStationReadingWakeTimer=null;
+      scheduleCosmosStationReadingCycle(0);
+    },Math.max(0,resumeDelay));
+  }
+
+  // Any deliberate user interaction takes priority. The gentle reading sequence
+  // gets out of the way immediately and resumes only after a quiet period.
+  for(const surface of [canvasWrapEl,cosmosGlyphLayer]){
+    surface?.addEventListener("pointerdown",()=>pauseCosmosStationReadingCycle(),{passive:true});
+    surface?.addEventListener("wheel",()=>pauseCosmosStationReadingCycle(),{passive:true});
+  }
+  document.addEventListener("visibilitychange",()=>{
+    if(document.visibilityState==="hidden"){
+      clearTimeout(cosmosStationReadingTimer);
+      clearTimeout(cosmosStationReadingWakeTimer);
+      clearCosmosStationReading();
+    }else{
+      scheduleCosmosStationReadingCycle(2200);
+    }
+  });
+
   function setSpatialEssence(open){
     if(Boolean(open) && journeySphereOpen) setJourneySphereOpen(false);
     spatialEssenceOpen=Boolean(open);
     document.body.classList.toggle("spatialEssenceOpen",spatialEssenceOpen);
+    if(spatialEssenceOpen) pauseCosmosStationReadingCycle(9000);
+    else scheduleCosmosStationReadingCycle(2200);
     if(spatialZoomButton){
       spatialZoomButton.textContent=spatialEssenceOpen?"−":"+";
       spatialZoomButton.setAttribute("aria-label",spatialEssenceOpen?"Zoom out to Cosmos universe":"Zoom into Cosmos essence");
@@ -7300,6 +7434,8 @@
   function setJourneySphereOpen(open){
     journeySphereOpen=Boolean(open);
     document.body.classList.toggle("journeySphereOpen",journeySphereOpen);
+    if(journeySphereOpen) pauseCosmosStationReadingCycle(9000);
+    else scheduleCosmosStationReadingCycle(2200);
     if(journeySphereOverlay) journeySphereOverlay.hidden=!journeySphereOpen;
     if(journeySphereOpen){
       if(spatialEssenceOpen) setSpatialEssence(false);
