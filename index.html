@@ -12,13 +12,31 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-TVKD1RLFE5');
+
+    // OpenAI referral measurement. OpenAI search referrals may include utm_source=chatgpt.com.
+    // This creates one easy-to-find GA4 event without changing navigation or the visible Cosmos UI.
+    try {
+      const referralParams = new URLSearchParams(location.search);
+      const referralSource = String(referralParams.get('utm_source') || '').toLowerCase();
+      const referralHost = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : '';
+      if (referralSource === 'chatgpt.com' || referralHost === 'chatgpt.com' || referralHost.endsWith('.chatgpt.com')) {
+        gtag('event', 'cosmos_chatgpt_referral', {
+          source: 'chatgpt.com',
+          landing_path: location.pathname
+        });
+      }
+    } catch (_) {}
   </script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="index-v6.3-history-restored" />
+  <meta name="cosmos-build" content="index-v6.4-openai-search-ready" />
   <title>Cosmos — PTD Today</title>
   <meta name="description" content="Ask. Explore. Discover. Everything is connected through Cosmos." />
   <link rel="canonical" href="https://ptdtoday.com/" />
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+  <meta name="application-name" content="Cosmos" />
+  <meta name="author" content="PTD Today" />
+  <meta name="theme-color" content="#ffffff" />
 
   <!-- Cosmos master social preview -->
   <meta property="og:type" content="website" />
@@ -38,6 +56,34 @@
   <meta name="twitter:description" content="Ask anything. Explore everything. Follow the connections and ripple effects through Cosmos." />
   <meta name="twitter:image" content="https://ptdtoday.com/cosmos-social-card.png" />
   <meta name="twitter:image:alt" content="Cosmos by PTD Today — Everything is connected." />
+
+  <!-- Machine-readable public identity. No visible UI change. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://ptdtoday.com/#website",
+        "url": "https://ptdtoday.com/",
+        "name": "PTD Today",
+        "alternateName": "PTD Today Cosmos",
+        "description": "PTD Today is the home of Cosmos, an interactive experience for asking questions and exploring connected topics, evidence, journeys and ripple effects."
+      },
+      {
+        "@type": "WebApplication",
+        "@id": "https://ptdtoday.com/#cosmos",
+        "url": "https://ptdtoday.com/",
+        "name": "Cosmos",
+        "isPartOf": { "@id": "https://ptdtoday.com/#website" },
+        "applicationCategory": "ReferenceApplication",
+        "operatingSystem": "Web",
+        "isAccessibleForFree": true,
+        "description": "Ask anything, explore connected stations, inspect evidence, follow journeys and examine supported ripple effects through Cosmos."
+      }
+    ]
+  }
+  </script>
   <style>
     :root{
       --bg:#020711;
