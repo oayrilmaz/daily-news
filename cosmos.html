@@ -10,7 +10,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.12-manual-cosmos-pinch-wheel-zoom" />
+  <meta name="cosmos-build" content="v6.13-desktop-station-click-fix" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1855,7 +1855,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.12-manual-cosmos-pinch-wheel-zoom";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.13-desktop-station-click-fix";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -7595,6 +7595,13 @@
   (canvasWrapEl||svg).addEventListener("pointerdown",event=>{
     if(spatialEssenceOpen || journeySphereOpen) return;
     if(event.pointerType==="mouse" && event.button!==0) return;
+
+    // Desktop station circles are real buttons. Let the browser deliver their native
+    // click instead of moving the mouse pointer into the overview pan/pinch capture.
+    // This preserves wheel/trackpad zoom (wheel still bubbles) while preventing
+    // pointer capture from swallowing station clicks in desktop browsers.
+    if(event.pointerType==="mouse" && event.target.closest?.(".cosmosGlyphButton")) return;
+
     cosmosViewPointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
     try{(canvasWrapEl||svg).setPointerCapture(event.pointerId)}catch{}
 
