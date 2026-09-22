@@ -10,7 +10,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.13-desktop-station-click-fix" />
+  <meta name="cosmos-build" content="v6.14-desktop-circle-activation" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1855,7 +1855,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.13-desktop-station-click-fix";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v6.14-desktop-circle-activation";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -7018,6 +7018,7 @@
   let cosmosViewPinchStart=null;
   let cosmosViewPanStart=null;
   let cosmosViewSuppressClickUntil=0;
+  let cosmosDesktopMousePress=null;
 
   function clampCosmosViewPan(){
     const rect=(canvasWrapEl||svg)?.getBoundingClientRect();
@@ -7596,6 +7597,10 @@
     if(spatialEssenceOpen || journeySphereOpen) return;
     if(event.pointerType==="mouse" && event.button!==0) return;
 
+    if(event.pointerType==="mouse"){
+      cosmosDesktopMousePress={x:event.clientX,y:event.clientY,pointerId:event.pointerId};
+    }
+
     // Desktop station circles are real buttons. Let the browser deliver their native
     // click instead of moving the mouse pointer into the overview pan/pinch capture.
     // This preserves wheel/trackpad zoom (wheel still bubbles) while preventing
@@ -7669,8 +7674,61 @@
     if(cosmosViewPointers.size<2) cosmosViewPinchStart=null;
     if(cosmosViewPanStart?.pointerId===event.pointerId) cosmosViewPanStart=null;
   };
-  (canvasWrapEl||svg).addEventListener("pointerup",clearCosmosViewPointer);
-  (canvasWrapEl||svg).addEventListener("pointercancel",clearCosmosViewPointer);
+  (canvasWrapEl||svg).addEventListener("pointerup",event=>{
+    // Edge/Chrome desktop safeguard: activate the visible rendered circle by hit-testing
+    // its actual bounding box. This avoids relying only on a browser-generated click,
+    // which can be lost around transformed layers / pointer capture.
+    if(
+      event.pointerType==="mouse" &&
+      event.button===0 &&
+      cosmosDesktopMousePress?.pointerId===event.pointerId &&
+      !spatialEssenceOpen &&
+      !journeySphereOpen
+    ){
+      const moved=Math.hypot(
+        event.clientX-cosmosDesktopMousePress.x,
+        event.clientY-cosmosDesktopMousePress.y
+      );
+      if(moved<=7){
+        const buttons=[...document.querySelectorAll(".cosmosGlyphButton")];
+        const hit=buttons
+          .map(button=>({button,rect:button.getBoundingClientRect()}))
+          .filter(({rect})=>
+            event.clientX>=rect.left && event.clientX<=rect.right &&
+            event.clientY>=rect.top && event.clientY<=rect.bottom
+          )
+          .sort((a,b)=>{
+            const acx=(a.rect.left+a.rect.right)/2, acy=(a.rect.top+a.rect.bottom)/2;
+            const bcx=(b.rect.left+b.rect.right)/2, bcy=(b.rect.top+b.rect.bottom)/2;
+            return Math.hypot(event.clientX-acx,event.clientY-acy)-
+                   Math.hypot(event.clientX-bcx,event.clientY-bcy);
+          })[0]?.button || null;
+
+        if(hit){
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          cosmosViewSuppressClickUntil=performance.now()+520;
+          cosmosDesktopMousePress=null;
+          clearCosmosViewPointer(event);
+
+          if(hit.classList.contains("center")){
+            setSpatialEssence(true);
+          }else{
+            const nodeId=hit.dataset.nodeId||"";
+            if(nodeId) recenterEntity(nodeId);
+          }
+          return;
+        }
+      }
+    }
+
+    cosmosDesktopMousePress=null;
+    clearCosmosViewPointer(event);
+  });
+  (canvasWrapEl||svg).addEventListener("pointercancel",event=>{
+    cosmosDesktopMousePress=null;
+    clearCosmosViewPointer(event);
+  });
 
   // A pan/pinch ending on a station must not accidentally trigger travel.
   (canvasWrapEl||svg).addEventListener("click",event=>{
