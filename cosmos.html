@@ -1852,9 +1852,12 @@
     new_topic: params.get("new_topic") === "1"
   };
 
-  const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
-  const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.12-manual-cosmos-pinch-wheel-zoom";
+  // Protection v1: keep browser traffic on the PTD Today origin. Cloudflare routes
+  // /api/cosmos/* to the production Cosmos Worker, so visitors no longer need the
+  // public workers.dev hostname for normal Cosmos use.
+  const COSMOS_ASK_ENDPOINT = "/api/cosmos/ask";
+  const COSMOS_PRESENCE_ENDPOINT = "/api/cosmos/presence";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "6.13-protected-same-origin-route";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -6861,8 +6864,11 @@
     const stationId=params.get(SHARED_STATION_PARAM);
     if(!stationId) return false;
 
-    const gateway=params.get(SHARED_GATEWAY_PARAM) ||
-      COSMOS_ASK_ENDPOINT.replace(/\/api\/cosmos\/ask$/,"");
+    // Always restore shared stations through PTD Today's same-origin protected
+    // route. Older shared links may still contain a workers.dev gateway query
+    // parameter; deliberately ignore it so those links keep working after the
+    // public workers.dev hostname is disabled.
+    const gateway="";
 
     try{
       const response=await fetch(`${gateway}/api/cosmos/station/${encodeURIComponent(stationId)}`);
