@@ -1582,35 +1582,33 @@
 
 
 
-  /* Cosmos v7.0 — Future First.
-     Future is shown as a living scenario layer: state first, butterfly path second,
-     stations remain available underneath. No probability percentages are exposed. */
+  /* Cosmos v7.1 — Future First usability repair.
+     One selected horizon is readable at a time. Playback is opt-in and slow.
+     The time rail is a true interactive control and remains present while travelling. */
   .futureLayer{
-    position:absolute;inset:0;z-index:18;pointer-events:none;opacity:0;visibility:hidden;
-    transition:opacity .42s ease,visibility .42s ease
+    position:absolute;inset:0;z-index:88;pointer-events:none;opacity:0;visibility:hidden;
+    transition:opacity .30s ease,visibility .30s ease
   }
   .futureLayer.active{opacity:1;visibility:visible}
   .futureNarrative{
-    position:absolute;z-index:3;left:50%;top:clamp(82px,14dvh,126px);transform:translateX(-50%);
-    width:min(760px,calc(100% - 34px));text-align:center;pointer-events:none
+    position:absolute;z-index:3;left:50%;top:clamp(72px,10.5dvh,94px);transform:translateX(-50%);
+    width:min(720px,calc(100% - 40px));text-align:center;pointer-events:none
   }
   .futureMoment{
     min-height:16px;color:#7b899d;font-size:9.5px;font-weight:780;letter-spacing:.14em;text-transform:uppercase
   }
   .futureState{
-    margin:7px auto 0;max-width:720px;color:#24354f;font-size:clamp(18px,2.35vw,28px);
-    line-height:1.30;font-weight:610;letter-spacing:-.025em;text-wrap:balance
+    margin:6px auto 0;max-width:680px;color:#24354f;font-size:clamp(17px,2vw,24px);
+    line-height:1.30;font-weight:610;letter-spacing:-.022em;text-wrap:balance
   }
-  .futureSummary{
-    margin:8px auto 0;max-width:640px;color:#718097;font-size:11.5px;line-height:1.45;text-wrap:pretty
-  }
+  .futureSummary{display:none!important}
   .futureButterfly{
-    position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:min(880px,calc(100% - 36px));display:flex;align-items:center;justify-content:center;
-    gap:8px;pointer-events:none;min-height:108px
+    position:absolute;z-index:3;left:50%;top:36%;transform:translate(-50%,-50%);
+    width:min(860px,calc(100% - 42px));display:flex;align-items:center;justify-content:center;
+    gap:8px;pointer-events:none;min-height:104px
   }
   .futureStep{
-    --future-delay:0ms;position:relative;flex:0 1 138px;min-width:0;display:grid;place-items:center;gap:7px;
+    --future-delay:0ms;position:relative;flex:0 1 132px;min-width:0;display:grid;place-items:center;gap:7px;
     opacity:0;transform:translateY(8px) scale(.96);animation:futureStepIn .58s cubic-bezier(.2,.72,.24,1) forwards;
     animation-delay:var(--future-delay)
   }
@@ -1619,11 +1617,11 @@
     box-shadow:0 0 0 5px rgba(91,128,208,.07),0 0 20px rgba(75,116,210,.16)
   }
   .futureStepText{
-    width:100%;max-width:138px;color:#53647e;font-size:10.5px;line-height:1.22;font-weight:670;
-    text-align:center;text-wrap:balance
+    width:100%;max-width:132px;padding:3px 5px;border-radius:7px;background:rgba(255,255,255,.84);
+    color:#53647e;font-size:10.2px;line-height:1.22;font-weight:670;text-align:center;text-wrap:balance
   }
   .futureArrow{
-    --future-delay:0ms;flex:0 0 34px;height:1px;position:relative;opacity:0;
+    --future-delay:0ms;flex:0 0 30px;height:1px;position:relative;opacity:0;
     background:linear-gradient(90deg,rgba(103,132,190,.18),rgba(88,123,199,.68),rgba(103,132,190,.18));
     animation:futureArrowIn .55s ease forwards;animation-delay:var(--future-delay)
   }
@@ -1635,73 +1633,80 @@
   @keyframes futureArrowIn{to{opacity:1}}
 
   .futureBranches{
-    position:absolute;z-index:3;left:50%;top:calc(50% + 78px);transform:translateX(-50%);
-    width:min(760px,calc(100% - 44px));display:flex;justify-content:center;gap:28px;pointer-events:none
+    position:absolute;z-index:3;left:50%;top:calc(36% + 74px);transform:translateX(-50%);
+    width:min(740px,calc(100% - 52px));display:flex;justify-content:center;gap:28px;pointer-events:none
   }
   .futureBranch{
-    max-width:310px;color:#8995a6;font-size:9.5px;line-height:1.35;text-align:center;opacity:.76
+    max-width:300px;padding:3px 6px;border-radius:7px;background:rgba(255,255,255,.78);
+    color:#7f8c9f;font-size:9.3px;line-height:1.35;text-align:center;opacity:.90
   }
-  .futureBranch::before{content:"↳ ";color:#91a5ca}
+  .futureBranch::before{content:"Alternative: ";color:#6f86ad;font-weight:760}
 
   .futureTimelineWrap{
-    position:absolute;z-index:6;left:50%;bottom:calc(91px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    position:absolute;z-index:12;left:50%;bottom:calc(91px + env(safe-area-inset-bottom));transform:translateX(-50%);
     width:min(780px,calc(100% - 28px));pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;
-    gap:8px;align-items:center
+    gap:8px;align-items:center;touch-action:manipulation
   }
   .futureTimeline{
     display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:center;gap:0;
-    min-height:46px;padding:5px 8px;border:1px solid rgba(39,67,108,.11);border-radius:999px;
-    background:rgba(255,255,255,.93);box-shadow:0 10px 36px rgba(31,56,91,.10);backdrop-filter:blur(16px)
+    min-height:50px;padding:5px 8px;border:1px solid rgba(39,67,108,.13);border-radius:999px;
+    background:rgba(255,255,255,.97);box-shadow:0 10px 36px rgba(31,56,91,.10);backdrop-filter:blur(16px);
+    pointer-events:auto;touch-action:manipulation
   }
   .futureTime{
-    appearance:none;position:relative;min-width:0;height:34px;padding:0 4px;border:0;background:transparent;
-    color:#8b97a8;font:inherit;font-size:9.5px;font-weight:760;letter-spacing:.03em;cursor:pointer
+    appearance:none;position:relative;z-index:2;min-width:0;height:40px;padding:0 4px;border:0;background:transparent;
+    color:#7f8c9f;font:inherit;font-size:9.8px;font-weight:780;letter-spacing:.03em;cursor:pointer;
+    pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent
   }
   .futureTime::before{
-    content:"";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;
+    content:"";position:absolute;left:50%;bottom:3px;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;
     background:#bec7d4;box-shadow:0 0 0 0 rgba(89,125,210,0);transition:.18s ease
   }
   .futureTime:not(:last-child)::after{
-    content:"";position:absolute;left:62%;right:-38%;bottom:4px;height:1px;background:#dfe4eb;z-index:-1
+    content:"";position:absolute;left:62%;right:-38%;bottom:5px;height:1px;background:#dfe4eb;z-index:-1
   }
   .futureTime.active{color:#315caa}
   .futureTime.active::before{background:#668be0;box-shadow:0 0 0 5px rgba(102,139,224,.10),0 0 14px rgba(92,128,217,.22)}
   .futureTime.past::before{background:#8ca4d2}
+  .futureTime:disabled{cursor:default;opacity:.34}
   .futurePlay{
-    width:44px;height:44px;border-radius:50%;border:1px solid rgba(39,67,108,.12);background:rgba(255,255,255,.94);
-    color:#526783;box-shadow:0 8px 28px rgba(31,56,91,.09);cursor:pointer;font:inherit;font-size:13px
+    position:relative;z-index:3;width:46px;height:46px;border-radius:50%;border:1px solid rgba(39,67,108,.14);
+    background:rgba(255,255,255,.98);color:#526783;box-shadow:0 8px 28px rgba(31,56,91,.09);
+    cursor:pointer;font:inherit;font-size:13px;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent
   }
+  .futurePlay:focus-visible,.futureTime:focus-visible{outline:2px solid rgba(67,105,190,.45);outline-offset:2px}
   .futureConfidence{
-    position:absolute;z-index:4;left:50%;bottom:calc(148px + env(safe-area-inset-bottom));transform:translateX(-50%);
-    color:#96a2b2;font-size:8.5px;font-weight:720;letter-spacing:.10em;text-transform:uppercase;pointer-events:none
+    position:absolute;z-index:4;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    width:min(680px,calc(100% - 32px));text-align:center;color:#7e8998;font-size:8.8px;font-weight:720;
+    letter-spacing:.055em;text-transform:none;pointer-events:none
   }
-  .futureConfidence[data-level="high"]{color:#5f78a5}
-  .futureConfidence[data-level="medium"]{color:#8190a5}
-  .futureConfidence[data-level="low"]{color:#9ca5b2}
+  .futureConfidence[data-level="high"]{color:#536f9f}
+  .futureConfidence[data-level="medium"]{color:#6f7f95}
+  .futureConfidence[data-level="low"]{color:#818b99}
 
-  body.futureMode .cosmosGlyphButton.node{opacity:.14;transition:opacity .35s ease}
-  body.futureMode .cosmosGlyphButton.center{opacity:.92}
-  body.futureMode .spatialJourney{opacity:.76;transition:opacity .25s ease}
+  body.futureMode .cosmosGlyphButton.node{opacity:.12;transition:opacity .35s ease}
+  body.futureMode .cosmosGlyphButton.center{opacity:.88}
+  body.futureMode .spatialJourney{opacity:.72;transition:opacity .25s ease}
   body.futureMode .spatialJourney:hover{opacity:1}
+  body.futureMode .spatialZoomButton{display:none!important}
   body.spatialEssenceOpen .futureLayer,body.journeySphereOpen .futureLayer{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
 
   @media(max-width:640px){
-    .futureNarrative{top:calc(66px + env(safe-area-inset-top));width:calc(100% - 24px)}
-    .futureState{font-size:clamp(16px,5vw,21px);line-height:1.28}
-    .futureSummary{display:none}
-    .futureButterfly{top:48%;width:calc(100% - 18px);gap:4px;overflow:hidden}
-    .futureStep{flex-basis:94px;gap:5px}
-    .futureStepText{max-width:94px;font-size:8.7px;line-height:1.16}
+    .futureNarrative{top:calc(62px + env(safe-area-inset-top));width:calc(100% - 24px)}
+    .futureState{font-size:clamp(15px,4.6vw,20px);line-height:1.28}
+    .futureButterfly{top:38%;width:calc(100% - 18px);gap:4px;overflow:hidden}
+    .futureStep{flex-basis:90px;gap:5px}
+    .futureStepText{max-width:90px;font-size:8.4px;line-height:1.16;padding:2px 3px}
     .futureStepDot{width:11px;height:11px}
-    .futureArrow{flex-basis:16px}
-    .futureBranches{top:calc(48% + 68px);width:calc(100% - 24px);gap:12px}
-    .futureBranch{font-size:8.5px;max-width:46%}
-    .futureTimelineWrap{bottom:calc(74px + env(safe-area-inset-bottom));width:calc(100% - 18px);grid-template-columns:minmax(0,1fr) 38px;gap:5px}
-    .futureTimeline{min-height:42px;padding:4px 5px}
-    .futureTime{font-size:8.2px;height:32px;padding:0 1px}
-    .futurePlay{width:38px;height:38px}
-    .futureConfidence{bottom:calc(122px + env(safe-area-inset-bottom));font-size:7.7px}
-    body.futureMode .spatialJourney{opacity:.54}
+    .futureArrow{flex-basis:14px}
+    .futureBranches{top:calc(38% + 66px);width:calc(100% - 24px);gap:10px}
+    .futureBranch{font-size:8.2px;max-width:47%;padding:2px 4px}
+    .futureTimelineWrap{bottom:calc(74px + env(safe-area-inset-bottom));width:calc(100% - 18px);grid-template-columns:minmax(0,1fr) 40px;gap:5px}
+    .futureTimeline{min-height:46px;padding:3px 4px}
+    .futureTime{font-size:8.3px;height:38px;padding:0 1px}
+    .futurePlay{width:40px;height:40px}
+    .futureConfidence{bottom:calc(125px + env(safe-area-inset-bottom));font-size:7.8px;width:calc(100% - 26px)}
+    body.futureMode .spatialJourney{opacity:.50}
   }
 
 </style>
@@ -2067,7 +2072,9 @@
     selected_id:"now",
     playing:false,
     timer:null,
-    serial:0
+    serial:0,
+    persist_mode:false,
+    transition_pending:false
   };
 
   const FUTURE_IDS=["now","1m","1h","1d","10d","30d","1y"];
@@ -5528,18 +5535,76 @@
     }
   }
 
-  function futureConfidenceCopy(level){
+  function futureConfidenceCopy(level,epistemic=""){
     const key=String(level||"").toLowerCase();
-    if(key==="high") return "stronger signal";
-    if(key==="medium") return "forming";
-    if(key==="low") return "more uncertain";
-    return "scenario";
+    const mode=String(epistemic||"").toLowerCase();
+    if(key==="high") return mode==="inference"
+      ? "Near-term continuation · current evidence supports this direction"
+      : "Scenario with stronger current support";
+    if(key==="medium") return "Developing scenario · depends on current signals continuing";
+    if(key==="low") return "Long-range scenario · many outcomes remain possible";
+    return "Scenario · direction is conditional, not a prediction";
   }
 
   function compactFutureStep(value,max=46){
     const text=String(value||"").replace(/\s+/g," ").trim();
     if(text.length<=max) return text;
     return text.slice(0,max-1).trimEnd()+"…";
+  }
+
+  function compactFutureState(value,max=250){
+    const text=String(value||"").replace(/\s+/g," ").trim();
+    if(text.length<=max) return text;
+    const cut=text.slice(0,max);
+    const sentence=Math.max(cut.lastIndexOf(". "),cut.lastIndexOf("; "),cut.lastIndexOf(", "));
+    if(sentence>Math.floor(max*.62)) return cut.slice(0,sentence+1).trim();
+    return cut.trimEnd()+"…";
+  }
+
+  function renderFuturePending(observer){
+    if(!futureLayer) return;
+    futureLayer.hidden=false;
+    futureLayer.classList.add("active");
+    document.body.classList.add("futureMode");
+    futureMoment.textContent="UPDATING FUTURE";
+    futureStateEl.textContent=`Reading "${observerDisplayLabel(observer)}" across the same time horizons…`;
+    futureSummary.textContent="";
+    futureButterfly.innerHTML="";
+    futureBranches.innerHTML="";
+    if(futureConfidence){
+      futureConfidence.dataset.level="";
+      futureConfidence.textContent="The timeline stays in place while Cosmos recalculates this station.";
+    }
+    futureTimeline?.querySelectorAll("[data-future-id]").forEach(button=>{
+      const id=button.dataset.futureId||"";
+      button.classList.toggle("active",id===futureExperience.selected_id);
+      button.classList.remove("past");
+      button.disabled=true;
+    });
+    if(futurePlay) futurePlay.disabled=true;
+  }
+
+  function renderPersistentFutureUnavailable(observer){
+    if(!futureLayer) return;
+    futureLayer.hidden=false;
+    futureLayer.classList.add("active");
+    document.body.classList.add("futureMode");
+    futureMoment.textContent="NOW";
+    futureStateEl.textContent=`Cosmos does not yet have a defensible time-path for "${observerDisplayLabel(observer)}".`;
+    futureSummary.textContent="";
+    futureButterfly.innerHTML="";
+    futureBranches.innerHTML="";
+    if(futureConfidence){
+      futureConfidence.dataset.level="";
+      futureConfidence.textContent="No future is being invented. Choose another station or return to the prior path.";
+    }
+    futureTimeline?.querySelectorAll("[data-future-id]").forEach(button=>{
+      const id=button.dataset.futureId||"";
+      button.classList.toggle("active",id==="now");
+      button.classList.remove("past");
+      button.disabled=id!=="now";
+    });
+    if(futurePlay) futurePlay.disabled=true;
   }
 
   function renderFutureSelection(observer,requestedId){
@@ -5561,7 +5626,7 @@
 
     const horizon=selectedId==="now" ? null : fp.horizons.find(item=>String(item?.id||"")===selectedId);
     const label=horizon?.label || (selectedId==="now"?"NOW":selectedId.toUpperCase());
-    const statement=String(horizon?.state || fp.now_state || fp.summary || "").trim();
+    const statement=compactFutureState(horizon?.state || fp.now_state || fp.summary || "");
 
     futureMoment.textContent=label;
     futureStateEl.textContent=statement;
@@ -5572,7 +5637,7 @@
     if(futureConfidence){
       const level=horizon?.confidence || "";
       futureConfidence.dataset.level=level;
-      futureConfidence.textContent=selectedId==="now" ? "current state" : futureConfidenceCopy(level);
+      futureConfidence.textContent=selectedId==="now" ? "Current observed state" : futureConfidenceCopy(level,horizon?.epistemic_state);
     }
 
     const path=selectedId==="now"
@@ -5610,6 +5675,8 @@
       button.classList.toggle("past",FUTURE_IDS.indexOf(id)<FUTURE_IDS.indexOf(selectedId));
       button.disabled=id!=="now" && !fp.horizons.some(item=>String(item?.id||"")===id);
     });
+    if(futurePlay) futurePlay.disabled=false;
+    futureExperience.persist_mode=true;
   }
 
   function scheduleFutureAutoplay(observer,startIndex=0){
@@ -5635,7 +5702,7 @@
         stopFutureAutoplay();
         return;
       }
-      futureExperience.timer=setTimeout(advance,index===1?1500:2100);
+      futureExperience.timer=setTimeout(advance,7000);
     };
     advance();
   }
@@ -5643,7 +5710,16 @@
   function syncFutureExperience(observer){
     const fp=futureProjectionForObserver(observer);
     const responseId=String(observer?.response?.id||"");
+
     if(!fp){
+      if(futureExperience.transition_pending){
+        renderFuturePending(observer);
+        return;
+      }
+      if(futureExperience.persist_mode){
+        renderPersistentFutureUnavailable(observer);
+        return;
+      }
       renderFutureSelection(observer,"now");
       futureExperience.response_id="";
       return;
@@ -5652,9 +5728,9 @@
     if(responseId && responseId!==futureExperience.response_id){
       stopFutureAutoplay();
       futureExperience.response_id=responseId;
-      futureExperience.selected_id="now";
-      renderFutureSelection(observer,"now");
-      futureExperience.timer=setTimeout(()=>scheduleFutureAutoplay(observer,1),900);
+      const requested=FUTURE_IDS.includes(futureExperience.selected_id)?futureExperience.selected_id:"now";
+      const available=requested==="now" || fp.horizons.some(item=>String(item?.id||"")===requested);
+      renderFutureSelection(observer,available?requested:"now");
     }else{
       renderFutureSelection(observer,futureExperience.selected_id||"now");
     }
@@ -5676,9 +5752,17 @@
     }
     const sequence=["now",...fp.horizons.map(item=>String(item.id||"")).filter(Boolean)];
     const currentIndex=Math.max(0,sequence.indexOf(futureExperience.selected_id));
-    const nextIndex=currentIndex>=sequence.length-1?0:currentIndex;
+    const nextIndex=currentIndex>=sequence.length-1?0:currentIndex+1;
     scheduleFutureAutoplay(state.observer,nextIndex);
   });
+
+  // Keep Cosmos pan/pinch pointer capture away from the Future controls.
+  // Without this guard Edge/Chrome can swallow timeline/play clicks.
+  const futureControls=futureLayer?.querySelector(".futureTimelineWrap");
+  ["pointerdown","pointerup","pointercancel"].forEach(type=>{
+    futureControls?.addEventListener(type,event=>event.stopPropagation());
+  });
+  futureControls?.addEventListener("wheel",event=>event.stopPropagation(),{passive:true});
 
   function render(){
     const observer=state.observer;
@@ -5903,7 +5987,9 @@
     // They must never inherit unrelated local PTD summaries. Clicking one
     // turns it into a new universal station and asks Cosmos to explain the
     // node in the context from which the viewer reached it.
-    if(entity.ephemeral_projection){
+    const continueFuture=Boolean(futureProjectionForObserver(previous)) || futureExperience.persist_mode;
+
+    if(entity.ephemeral_projection || continueFuture){
       state.history.push(previous);
 
       const previousLabel=observerDisplayLabel(previous);
@@ -5917,11 +6003,19 @@
         ? `The supported connection used to reach it is "${arrivalRelation.label}".`
         : `Do not invent a causal relationship if the evidence does not support one.`;
 
-      const researchQuestion=
-        `Explain "${label}" as the next Cosmos station reached from "${previousStationLabel}"` +
-        `${originLabel && normalizeSubject(originLabel)!==normalizeSubject(previousStationLabel) ? ` while exploring the origin scenario "${originLabel}"` : ""}. ` +
-        `${relationInstruction} First explain how this station relates to the previous station and the origin scenario, then explain its major dimensions and what matters about it. ` +
-        `Return only the viewer-facing answer. Do not repeat, quote, summarize, or expose this instruction.`;
+      const researchQuestion=continueFuture
+        ? (
+          `Explore "${label}" as the next Cosmos station reached from "${previousStationLabel}"` +
+          `${originLabel && normalizeSubject(originLabel)!==normalizeSubject(previousStationLabel) ? ` while exploring the origin scenario "${originLabel}"` : ""}. ` +
+          `${relationInstruction} Keep the future time horizon active. Using current evidence for "${label}", show how this station could evolve across 1 minute, 1 hour, 1 day, 10 days, 30 days, and 1 year, and preserve the causal Butterfly path showing how each later state could form. ` +
+          `Then explain its major dimensions and what matters about it. Return only the viewer-facing answer. Do not repeat, quote, summarize, or expose this instruction.`
+        )
+        : (
+          `Explain "${label}" as the next Cosmos station reached from "${previousStationLabel}"` +
+          `${originLabel && normalizeSubject(originLabel)!==normalizeSubject(previousStationLabel) ? ` while exploring the origin scenario "${originLabel}"` : ""}. ` +
+          `${relationInstruction} First explain how this station relates to the previous station and the origin scenario, then explain its major dimensions and what matters about it. ` +
+          `Return only the viewer-facing answer. Do not repeat, quote, summarize, or expose this instruction.`
+        );
 
       const provisional={
         id:`response:projection:${normalizeSubject(label).replace(/\s+/g,"-")}`,
@@ -5979,6 +6073,7 @@
 
       saveJourney();
       saveTrail();
+      if(continueFuture) futureExperience.transition_pending=true;
       edgeDetail.innerHTML="<p>Select an edge to inspect confidence, evidence, time, geography and epistemic state.</p>";
 
       const url=new URL(location.href);
@@ -6688,6 +6783,7 @@
       state.response=state.observer.response;
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
+      futureExperience.transition_pending=false;
       stopLoadingProgress(true);
 
       reconcileJourneyWithResolvedObserver(state.observer);
@@ -6698,6 +6794,7 @@
     }catch(error){
       console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
       state.universalAnswerPending=false;
+      futureExperience.transition_pending=false;
       stopLoadingProgress(true);
 
       // Restore deterministic/local response as graceful fallback.
@@ -7927,6 +8024,7 @@
   // Pinch zooms around the midpoint between the viewer's fingers.
   // At any enlarged scale, one-finger or mouse drag pans without changing circle size.
   (canvasWrapEl||svg).addEventListener("wheel",event=>{
+    if(event.target.closest?.(".futureTimelineWrap")) return;
     if(spatialEssenceOpen || journeySphereOpen) return;
     event.preventDefault();
     const delta=Math.abs(event.deltaY)>=Math.abs(event.deltaX)?event.deltaY:event.deltaX;
@@ -7938,6 +8036,7 @@
 
   (canvasWrapEl||svg).addEventListener("pointerdown",event=>{
     if(spatialEssenceOpen || journeySphereOpen) return;
+    if(event.target.closest?.(".futureTimelineWrap,.futureTime,.futurePlay")) return;
     if(event.pointerType==="mouse" && event.button!==0) return;
 
     if(event.pointerType==="mouse"){
