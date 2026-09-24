@@ -10,7 +10,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v6.14-desktop-circle-activation" />
+  <meta name="cosmos-build" content="v7.0-future-first" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -1580,6 +1580,130 @@
     .cosmos-share-action{min-height:58px!important;font-size:11.5px!important}
   }
 
+
+
+  /* Cosmos v7.0 — Future First.
+     Future is shown as a living scenario layer: state first, butterfly path second,
+     stations remain available underneath. No probability percentages are exposed. */
+  .futureLayer{
+    position:absolute;inset:0;z-index:18;pointer-events:none;opacity:0;visibility:hidden;
+    transition:opacity .42s ease,visibility .42s ease
+  }
+  .futureLayer.active{opacity:1;visibility:visible}
+  .futureNarrative{
+    position:absolute;z-index:3;left:50%;top:clamp(82px,14dvh,126px);transform:translateX(-50%);
+    width:min(760px,calc(100% - 34px));text-align:center;pointer-events:none
+  }
+  .futureMoment{
+    min-height:16px;color:#7b899d;font-size:9.5px;font-weight:780;letter-spacing:.14em;text-transform:uppercase
+  }
+  .futureState{
+    margin:7px auto 0;max-width:720px;color:#24354f;font-size:clamp(18px,2.35vw,28px);
+    line-height:1.30;font-weight:610;letter-spacing:-.025em;text-wrap:balance
+  }
+  .futureSummary{
+    margin:8px auto 0;max-width:640px;color:#718097;font-size:11.5px;line-height:1.45;text-wrap:pretty
+  }
+  .futureButterfly{
+    position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(880px,calc(100% - 36px));display:flex;align-items:center;justify-content:center;
+    gap:8px;pointer-events:none;min-height:108px
+  }
+  .futureStep{
+    --future-delay:0ms;position:relative;flex:0 1 138px;min-width:0;display:grid;place-items:center;gap:7px;
+    opacity:0;transform:translateY(8px) scale(.96);animation:futureStepIn .58s cubic-bezier(.2,.72,.24,1) forwards;
+    animation-delay:var(--future-delay)
+  }
+  .futureStepDot{
+    width:13px;height:13px;border-radius:50%;background:#fff;border:2px solid #7f9bd3;
+    box-shadow:0 0 0 5px rgba(91,128,208,.07),0 0 20px rgba(75,116,210,.16)
+  }
+  .futureStepText{
+    width:100%;max-width:138px;color:#53647e;font-size:10.5px;line-height:1.22;font-weight:670;
+    text-align:center;text-wrap:balance
+  }
+  .futureArrow{
+    --future-delay:0ms;flex:0 0 34px;height:1px;position:relative;opacity:0;
+    background:linear-gradient(90deg,rgba(103,132,190,.18),rgba(88,123,199,.68),rgba(103,132,190,.18));
+    animation:futureArrowIn .55s ease forwards;animation-delay:var(--future-delay)
+  }
+  .futureArrow::after{
+    content:"";position:absolute;right:-1px;top:50%;width:6px;height:6px;border-top:1px solid #7791c3;border-right:1px solid #7791c3;
+    transform:translateY(-50%) rotate(45deg)
+  }
+  @keyframes futureStepIn{to{opacity:1;transform:translateY(0) scale(1)}}
+  @keyframes futureArrowIn{to{opacity:1}}
+
+  .futureBranches{
+    position:absolute;z-index:3;left:50%;top:calc(50% + 78px);transform:translateX(-50%);
+    width:min(760px,calc(100% - 44px));display:flex;justify-content:center;gap:28px;pointer-events:none
+  }
+  .futureBranch{
+    max-width:310px;color:#8995a6;font-size:9.5px;line-height:1.35;text-align:center;opacity:.76
+  }
+  .futureBranch::before{content:"↳ ";color:#91a5ca}
+
+  .futureTimelineWrap{
+    position:absolute;z-index:6;left:50%;bottom:calc(91px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    width:min(780px,calc(100% - 28px));pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;
+    gap:8px;align-items:center
+  }
+  .futureTimeline{
+    display:grid;grid-template-columns:repeat(7,minmax(0,1fr));align-items:center;gap:0;
+    min-height:46px;padding:5px 8px;border:1px solid rgba(39,67,108,.11);border-radius:999px;
+    background:rgba(255,255,255,.93);box-shadow:0 10px 36px rgba(31,56,91,.10);backdrop-filter:blur(16px)
+  }
+  .futureTime{
+    appearance:none;position:relative;min-width:0;height:34px;padding:0 4px;border:0;background:transparent;
+    color:#8b97a8;font:inherit;font-size:9.5px;font-weight:760;letter-spacing:.03em;cursor:pointer
+  }
+  .futureTime::before{
+    content:"";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;
+    background:#bec7d4;box-shadow:0 0 0 0 rgba(89,125,210,0);transition:.18s ease
+  }
+  .futureTime:not(:last-child)::after{
+    content:"";position:absolute;left:62%;right:-38%;bottom:4px;height:1px;background:#dfe4eb;z-index:-1
+  }
+  .futureTime.active{color:#315caa}
+  .futureTime.active::before{background:#668be0;box-shadow:0 0 0 5px rgba(102,139,224,.10),0 0 14px rgba(92,128,217,.22)}
+  .futureTime.past::before{background:#8ca4d2}
+  .futurePlay{
+    width:44px;height:44px;border-radius:50%;border:1px solid rgba(39,67,108,.12);background:rgba(255,255,255,.94);
+    color:#526783;box-shadow:0 8px 28px rgba(31,56,91,.09);cursor:pointer;font:inherit;font-size:13px
+  }
+  .futureConfidence{
+    position:absolute;z-index:4;left:50%;bottom:calc(148px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    color:#96a2b2;font-size:8.5px;font-weight:720;letter-spacing:.10em;text-transform:uppercase;pointer-events:none
+  }
+  .futureConfidence[data-level="high"]{color:#5f78a5}
+  .futureConfidence[data-level="medium"]{color:#8190a5}
+  .futureConfidence[data-level="low"]{color:#9ca5b2}
+
+  body.futureMode .cosmosGlyphButton.node{opacity:.14;transition:opacity .35s ease}
+  body.futureMode .cosmosGlyphButton.center{opacity:.92}
+  body.futureMode .spatialJourney{opacity:.76;transition:opacity .25s ease}
+  body.futureMode .spatialJourney:hover{opacity:1}
+  body.spatialEssenceOpen .futureLayer,body.journeySphereOpen .futureLayer{opacity:0!important;visibility:hidden!important;pointer-events:none!important}
+
+  @media(max-width:640px){
+    .futureNarrative{top:calc(66px + env(safe-area-inset-top));width:calc(100% - 24px)}
+    .futureState{font-size:clamp(16px,5vw,21px);line-height:1.28}
+    .futureSummary{display:none}
+    .futureButterfly{top:48%;width:calc(100% - 18px);gap:4px;overflow:hidden}
+    .futureStep{flex-basis:94px;gap:5px}
+    .futureStepText{max-width:94px;font-size:8.7px;line-height:1.16}
+    .futureStepDot{width:11px;height:11px}
+    .futureArrow{flex-basis:16px}
+    .futureBranches{top:calc(48% + 68px);width:calc(100% - 24px);gap:12px}
+    .futureBranch{font-size:8.5px;max-width:46%}
+    .futureTimelineWrap{bottom:calc(74px + env(safe-area-inset-bottom));width:calc(100% - 18px);grid-template-columns:minmax(0,1fr) 38px;gap:5px}
+    .futureTimeline{min-height:42px;padding:4px 5px}
+    .futureTime{font-size:8.2px;height:32px;padding:0 1px}
+    .futurePlay{width:38px;height:38px}
+    .futureConfidence{bottom:calc(122px + env(safe-area-inset-bottom));font-size:7.7px}
+    body.futureMode .spatialJourney{opacity:.54}
+  }
+
 </style>
 </head>
 <body>
@@ -1614,6 +1738,29 @@
       </div>
       <div class="status" id="status">loading</div>
       <div class="empty" id="emptyState"></div>
+
+      <div class="futureLayer" id="futureLayer" aria-live="polite" hidden>
+        <div class="futureNarrative">
+          <div class="futureMoment" id="futureMoment"></div>
+          <div class="futureState" id="futureState"></div>
+          <div class="futureSummary" id="futureSummary"></div>
+        </div>
+        <div class="futureButterfly" id="futureButterfly" aria-label="Butterfly path"></div>
+        <div class="futureBranches" id="futureBranches"></div>
+        <div class="futureConfidence" id="futureConfidence"></div>
+        <div class="futureTimelineWrap">
+          <div class="futureTimeline" id="futureTimeline" aria-label="Future time horizon">
+            <button class="futureTime active" type="button" data-future-id="now">NOW</button>
+            <button class="futureTime" type="button" data-future-id="1m">1m</button>
+            <button class="futureTime" type="button" data-future-id="1h">1h</button>
+            <button class="futureTime" type="button" data-future-id="1d">1d</button>
+            <button class="futureTime" type="button" data-future-id="10d">10d</button>
+            <button class="futureTime" type="button" data-future-id="30d">30d</button>
+            <button class="futureTime" type="button" data-future-id="1y">1y</button>
+          </div>
+          <button class="futurePlay" id="futurePlay" type="button" aria-label="Play future">▶</button>
+        </div>
+      </div>
     </section>
 
     <div class="toolbar">
@@ -1785,6 +1932,15 @@
   const cosmosGlyphLayer=document.getElementById("cosmosGlyphLayer");
   const statusEl = document.getElementById("status");
   const emptyEl = document.getElementById("emptyState");
+  const futureLayer=document.getElementById("futureLayer");
+  const futureMoment=document.getElementById("futureMoment");
+  const futureStateEl=document.getElementById("futureState");
+  const futureSummary=document.getElementById("futureSummary");
+  const futureButterfly=document.getElementById("futureButterfly");
+  const futureBranches=document.getElementById("futureBranches");
+  const futureConfidence=document.getElementById("futureConfidence");
+  const futureTimeline=document.getElementById("futureTimeline");
+  const futurePlay=document.getElementById("futurePlay");
   const observerLabel = document.getElementById("observerLabel");
   const presenceIndicator = document.getElementById("presenceIndicator");
   const presenceText = document.getElementById("presenceText");
@@ -1855,7 +2011,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v6.14-desktop-circle-activation";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.0-future-first";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -1905,6 +2061,16 @@
     semanticProjectionPending: new Map(),
     semanticProjectionSerial: 0
   };
+
+  const futureExperience={
+    response_id:"",
+    selected_id:"now",
+    playing:false,
+    timer:null,
+    serial:0
+  };
+
+  const FUTURE_IDS=["now","1m","1h","1d","10d","30d","1y"];
 
   const esc = (value) => String(value ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
@@ -5343,6 +5509,177 @@
     }
   });
 
+  function futureProjectionForObserver(observer){
+    const fp=observer?.response?.future_projection;
+    if(!fp || fp.available!==true || !Array.isArray(fp.horizons) || !fp.horizons.length) return null;
+    const byId=new Map(fp.horizons.map(item=>[String(item?.id||""),item]));
+    const ordered=["1m","1h","1d","10d","30d","1y"].map(id=>byId.get(id)).filter(Boolean);
+    if(!ordered.length) return null;
+    return {...fp,horizons:ordered};
+  }
+
+  function stopFutureAutoplay(){
+    clearTimeout(futureExperience.timer);
+    futureExperience.timer=null;
+    futureExperience.playing=false;
+    if(futurePlay){
+      futurePlay.textContent="▶";
+      futurePlay.setAttribute("aria-label","Play future");
+    }
+  }
+
+  function futureConfidenceCopy(level){
+    const key=String(level||"").toLowerCase();
+    if(key==="high") return "stronger signal";
+    if(key==="medium") return "forming";
+    if(key==="low") return "more uncertain";
+    return "scenario";
+  }
+
+  function compactFutureStep(value,max=46){
+    const text=String(value||"").replace(/\s+/g," ").trim();
+    if(text.length<=max) return text;
+    return text.slice(0,max-1).trimEnd()+"…";
+  }
+
+  function renderFutureSelection(observer,requestedId){
+    if(!futureLayer) return;
+    const fp=futureProjectionForObserver(observer);
+    if(!fp){
+      futureLayer.hidden=true;
+      futureLayer.classList.remove("active");
+      document.body.classList.remove("futureMode");
+      stopFutureAutoplay();
+      return;
+    }
+
+    const selectedId=FUTURE_IDS.includes(requestedId)?requestedId:"now";
+    futureExperience.selected_id=selectedId;
+    futureLayer.hidden=false;
+    requestAnimationFrame(()=>futureLayer.classList.add("active"));
+    document.body.classList.add("futureMode");
+
+    const horizon=selectedId==="now" ? null : fp.horizons.find(item=>String(item?.id||"")===selectedId);
+    const label=horizon?.label || (selectedId==="now"?"NOW":selectedId.toUpperCase());
+    const statement=String(horizon?.state || fp.now_state || fp.summary || "").trim();
+
+    futureMoment.textContent=label;
+    futureStateEl.textContent=statement;
+    futureSummary.textContent=selectedId==="now"
+      ? String(fp.summary||"").trim()
+      : String((horizon?.what_would_change_it||[])[0] ? `Could shift if ${horizon.what_would_change_it[0]}` : fp.summary||"").trim();
+
+    if(futureConfidence){
+      const level=horizon?.confidence || "";
+      futureConfidence.dataset.level=level;
+      futureConfidence.textContent=selectedId==="now" ? "current state" : futureConfidenceCopy(level);
+    }
+
+    const path=selectedId==="now"
+      ? []
+      : (Array.isArray(horizon?.butterfly_path)?horizon.butterfly_path:[]).filter(Boolean).slice(0,5);
+
+    if(futureButterfly){
+      if(!path.length){
+        futureButterfly.innerHTML="";
+      }else{
+        let html="";
+        path.forEach((step,index)=>{
+          if(index>0){
+            html+=`<span class="futureArrow" style="--future-delay:${index*145-55}ms" aria-hidden="true"></span>`;
+          }
+          html+=`<span class="futureStep" style="--future-delay:${index*145}ms"><span class="futureStepDot" aria-hidden="true"></span><span class="futureStepText">${esc(compactFutureStep(step))}</span></span>`;
+        });
+        futureButterfly.innerHTML=html;
+      }
+    }
+
+    if(futureBranches){
+      const alternatives=selectedId==="now"?[]:(Array.isArray(horizon?.alternatives)?horizon.alternatives:[]).slice(0,2);
+      futureBranches.innerHTML=alternatives.map(item=>{
+        const stateText=compactFutureStep(item?.state||"",82);
+        const trigger=compactFutureStep(item?.trigger||"",74);
+        if(!stateText) return "";
+        return `<div class="futureBranch">${esc(stateText)}${trigger?` · if ${esc(trigger)}`:""}</div>`;
+      }).join("");
+    }
+
+    futureTimeline?.querySelectorAll("[data-future-id]").forEach(button=>{
+      const id=button.dataset.futureId||"";
+      button.classList.toggle("active",id===selectedId);
+      button.classList.toggle("past",FUTURE_IDS.indexOf(id)<FUTURE_IDS.indexOf(selectedId));
+      button.disabled=id!=="now" && !fp.horizons.some(item=>String(item?.id||"")===id);
+    });
+  }
+
+  function scheduleFutureAutoplay(observer,startIndex=0){
+    const fp=futureProjectionForObserver(observer);
+    if(!fp) return;
+    clearTimeout(futureExperience.timer);
+    futureExperience.playing=true;
+    futureExperience.serial++;
+    const serial=futureExperience.serial;
+    if(futurePlay){
+      futurePlay.textContent="Ⅱ";
+      futurePlay.setAttribute("aria-label","Pause future");
+    }
+
+    const sequence=["now",...fp.horizons.map(item=>String(item.id||"")).filter(Boolean)];
+    let index=Math.max(0,Math.min(startIndex,sequence.length-1));
+
+    const advance=()=>{
+      if(!futureExperience.playing || serial!==futureExperience.serial) return;
+      renderFutureSelection(observer,sequence[index]);
+      index++;
+      if(index>=sequence.length){
+        stopFutureAutoplay();
+        return;
+      }
+      futureExperience.timer=setTimeout(advance,index===1?1500:2100);
+    };
+    advance();
+  }
+
+  function syncFutureExperience(observer){
+    const fp=futureProjectionForObserver(observer);
+    const responseId=String(observer?.response?.id||"");
+    if(!fp){
+      renderFutureSelection(observer,"now");
+      futureExperience.response_id="";
+      return;
+    }
+
+    if(responseId && responseId!==futureExperience.response_id){
+      stopFutureAutoplay();
+      futureExperience.response_id=responseId;
+      futureExperience.selected_id="now";
+      renderFutureSelection(observer,"now");
+      futureExperience.timer=setTimeout(()=>scheduleFutureAutoplay(observer,1),900);
+    }else{
+      renderFutureSelection(observer,futureExperience.selected_id||"now");
+    }
+  }
+
+  futureTimeline?.addEventListener("click",event=>{
+    const button=event.target.closest("[data-future-id]");
+    if(!button || button.disabled) return;
+    stopFutureAutoplay();
+    renderFutureSelection(state.observer,button.dataset.futureId||"now");
+  });
+
+  futurePlay?.addEventListener("click",()=>{
+    const fp=futureProjectionForObserver(state.observer);
+    if(!fp) return;
+    if(futureExperience.playing){
+      stopFutureAutoplay();
+      return;
+    }
+    const sequence=["now",...fp.horizons.map(item=>String(item.id||"")).filter(Boolean)];
+    const currentIndex=Math.max(0,sequence.indexOf(futureExperience.selected_id));
+    const nextIndex=currentIndex>=sequence.length-1?0:currentIndex;
+    scheduleFutureAutoplay(state.observer,nextIndex);
+  });
+
   function render(){
     const observer=state.observer;
     const currentStation=stationProjection(observer);
@@ -5374,6 +5711,7 @@
     const projection=project(observer);
     renderObserverDetails(observer,projection);
     renderProjectionLayer(observer,projection);
+    syncFutureExperience(observer);
     renderButterflyEffect();
     setButterflyOpen(true);
     renderButterflyJourney();
@@ -6178,7 +6516,10 @@
       source_label:sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
       knowledge_completion:null,
       suggested_stations:suggested,
-      knowledge_gaps:Array.isArray(data?.knowledge_gaps)?data.knowledge_gaps:[]
+      knowledge_gaps:Array.isArray(data?.knowledge_gaps)?data.knowledge_gaps:[],
+      future_projection:(data?.future_projection && typeof data.future_projection==="object")
+        ? JSON.parse(JSON.stringify(data.future_projection))
+        : {available:false,now_state:"",summary:"",horizons:[]}
     };
 
     const coordinateLabel=String(response?.coordinate?.focus_label||"").trim();
@@ -6313,7 +6654,9 @@
         page:{
           url:location.href,
           entry_question:entry.question||"",
-          article_id:entry.article_id||""
+          article_id:entry.article_id||"",
+          client_time_utc:new Date().toISOString(),
+          client_timezone:(Intl.DateTimeFormat().resolvedOptions().timeZone||"")
         }
       };
 
