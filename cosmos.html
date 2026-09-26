@@ -5,6 +5,7 @@
 
 
 
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -1608,13 +1609,14 @@
   .futureButterfly{
     position:absolute;z-index:5;left:clamp(18px,2.0vw,32px);top:clamp(180px,29%,260px);
     width:min(310px,23vw);display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
-    gap:3px;pointer-events:none;min-height:120px
+    gap:3px;pointer-events:auto;min-height:120px
   }
   .futureStep{
     --future-delay:0ms;position:relative;width:100%;min-width:0;display:grid;
     grid-template-columns:18px minmax(0,1fr);align-items:center;gap:7px;
     opacity:0;transform:translateX(-7px);animation:futureStepIn .58s cubic-bezier(.2,.72,.24,1) forwards;
-    animation-delay:var(--future-delay)
+    animation-delay:var(--future-delay);padding:0;border:0;background:transparent;text-align:left;cursor:pointer;
+    transition:transform .24s ease,filter .24s ease,opacity .24s ease
   }
   .futureStepDot{
     width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #7f9bd3;
@@ -1623,7 +1625,24 @@
   .futureStepText{
     width:auto;max-width:none;padding:4px 7px;border-radius:7px;background:rgba(255,255,255,.94);
     color:#53647e;font-size:10.2px;line-height:1.24;font-weight:670;text-align:left;text-wrap:balance;
-    box-shadow:0 2px 10px rgba(40,66,105,.035)
+    box-shadow:0 2px 10px rgba(40,66,105,.035);transition:transform .24s ease,box-shadow .24s ease,opacity .24s ease
+  }
+  .futureButterfly.focusMode .futureStep{opacity:.18;filter:blur(4px);transform:translateX(-4px) scale(.88)}
+  .futureButterfly.focusMode .futureStep.isFocused{opacity:1;filter:none;transform:translateX(0) scale(1.08);z-index:2}
+  .futureButterfly.focusMode .futureStep.isFocused .futureStepText{box-shadow:0 10px 32px rgba(40,66,105,.14)}
+  .futureButterfly.focusMode .futureArrow{opacity:.14;filter:blur(2px)}
+  .futureFocusReadout{
+    position:absolute;z-index:13;left:50%;bottom:calc(182px + env(safe-area-inset-bottom));transform:translateX(-50%);
+    width:min(540px,calc(100% - 34px));padding:12px 14px;border-radius:18px;
+    background:rgba(255,255,255,.98);border:1px solid rgba(39,67,108,.12);
+    box-shadow:0 18px 46px rgba(31,56,91,.14);color:#2c3d59
+  }
+  .futureFocusReadout[hidden]{display:none!important}
+  .futureFocusLabel{font-size:10px;font-weight:780;letter-spacing:.12em;text-transform:uppercase;color:#7a8ba4}
+  .futureFocusText{margin-top:6px;font-size:13.5px;line-height:1.5;font-weight:670;color:#2d3e59;text-wrap:balance}
+  .futureFocusClose{
+    margin-top:10px;border:1px solid rgba(39,67,108,.12);background:#f5f8fc;color:#5f718c;border-radius:999px;
+    min-height:36px;padding:0 12px;font:inherit;font-size:11px;font-weight:760;cursor:pointer
   }
   .futureArrow{
     --future-delay:0ms;flex:none;width:1px;height:17px;position:relative;opacity:0;
@@ -1644,7 +1663,7 @@
 
   .futureTimelineWrap{
     position:absolute;z-index:12;left:50%;bottom:calc(91px + env(safe-area-inset-bottom));transform:translateX(-50%);
-    width:min(1060px,calc(100% - 28px));pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;
+    width:min(1060px,calc(100% - 28px));pointer-events:auto;display:grid;grid-template-columns:minmax(0,1fr) auto auto;
     gap:8px;align-items:center;touch-action:manipulation
   }
   .futureTimeline{
@@ -1669,12 +1688,13 @@
   .futureTime.active::before{background:#668be0;box-shadow:0 0 0 5px rgba(102,139,224,.10),0 0 14px rgba(92,128,217,.22)}
   .futureTime.past::before{background:#8ca4d2}
   .futureTime:disabled{cursor:default;opacity:.34}
-  .futurePlay{
+  .futurePlay,
+  .futureShareScreen{
     position:relative;z-index:3;width:46px;height:46px;border-radius:50%;border:1px solid rgba(39,67,108,.14);
     background:rgba(255,255,255,.98);color:#526783;box-shadow:0 8px 28px rgba(31,56,91,.09);
     cursor:pointer;font:inherit;font-size:13px;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent
   }
-  .futurePlay:focus-visible,.futureTime:focus-visible{outline:2px solid rgba(67,105,190,.45);outline-offset:2px}
+  .futurePlay:focus-visible,.futureShareScreen:focus-visible,.futureTime:focus-visible{outline:2px solid rgba(67,105,190,.45);outline-offset:2px}
   .futureConfidence{
     position:absolute;z-index:6;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);
     width:min(760px,calc(100% - 32px));text-align:center;color:#7e8998;font-size:8.8px;font-weight:720;
@@ -1729,7 +1749,7 @@
     }
     .futureTimelineWrap{
       bottom:calc(69px + env(safe-area-inset-bottom));width:calc(100% - 16px);
-      grid-template-columns:minmax(0,1fr) 40px;gap:5px
+      grid-template-columns:minmax(0,1fr) 40px 40px;gap:5px
     }
     .futureTimeline{
       display:flex;min-height:46px;padding:3px 4px;overflow-x:auto;overflow-y:hidden;
@@ -1738,7 +1758,11 @@
     .futureTimeline::-webkit-scrollbar{display:none}
     .futureTime{flex:0 0 55px;font-size:8.3px;height:38px;padding:0 1px;scroll-snap-align:center}
     .futureTime:not(:last-child)::after{left:62%;right:-38%}
-    .futurePlay{width:40px;height:40px}
+    .futurePlay,.futureShareScreen{width:40px;height:40px}
+    .futureFocusReadout{
+      bottom:calc(146px + env(safe-area-inset-bottom));width:calc(100% - 18px);padding:10px 12px;border-radius:16px
+    }
+    .futureFocusText{font-size:12.5px;line-height:1.42}
     .futureConfidence{bottom:calc(118px + env(safe-area-inset-bottom));font-size:7.6px;width:calc(100% - 22px)}
     body.futureMode .spatialJourney{opacity:.45}
   }
@@ -1786,6 +1810,11 @@
         </div>
         <div class="futureButterfly" id="futureButterfly" aria-label="Butterfly path"></div>
         <div class="futureBranches" id="futureBranches"></div>
+        <div class="futureFocusReadout" id="futureFocusReadout" hidden>
+          <div class="futureFocusLabel" id="futureFocusLabel">Focused butterfly step</div>
+          <div class="futureFocusText" id="futureFocusText"></div>
+          <button class="futureFocusClose" id="futureFocusClose" type="button">Back to full view</button>
+        </div>
         <div class="futureConfidence" id="futureConfidence"></div>
         <div class="futureTimelineWrap">
           <div class="futureTimeline" id="futureTimeline" aria-label="Future time horizon">
@@ -1801,6 +1830,7 @@
             <button class="futureTime" type="button" data-future-id="50y">50y</button>
           </div>
           <button class="futurePlay" id="futurePlay" type="button" aria-label="Play future">▶</button>
+          <button class="futureShareScreen" id="futureShareScreen" type="button" aria-label="Share this screen">↗</button>
         </div>
       </div>
     </section>
@@ -1980,9 +2010,14 @@
   const futureSummary=document.getElementById("futureSummary");
   const futureButterfly=document.getElementById("futureButterfly");
   const futureBranches=document.getElementById("futureBranches");
+  const futureFocusReadout=document.getElementById("futureFocusReadout");
+  const futureFocusLabel=document.getElementById("futureFocusLabel");
+  const futureFocusText=document.getElementById("futureFocusText");
+  const futureFocusClose=document.getElementById("futureFocusClose");
   const futureConfidence=document.getElementById("futureConfidence");
   const futureTimeline=document.getElementById("futureTimeline");
   const futurePlay=document.getElementById("futurePlay");
+  const futureShareScreen=document.getElementById("futureShareScreen");
   const observerLabel = document.getElementById("observerLabel");
   const presenceIndicator = document.getElementById("presenceIndicator");
   const presenceText = document.getElementById("presenceText");
@@ -2104,17 +2139,19 @@
     semanticProjectionSerial: 0
   };
 
+  const FUTURE_IDS=["now","1m","1h","1d","10d","30d","1y","10y","30y","50y"];
+  const initialFutureId=FUTURE_IDS.includes(params.get("future")||"") ? params.get("future") : "now";
+
   const futureExperience={
     response_id:"",
-    selected_id:"now",
+    selected_id:initialFutureId,
     playing:false,
     timer:null,
     serial:0,
     persist_mode:false,
-    transition_pending:false
+    transition_pending:false,
+    focused_step_index:null
   };
-
-  const FUTURE_IDS=["now","1m","1h","1d","10d","30d","1y","10y","30y","50y"];
 
   const esc = (value) => String(value ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
@@ -5603,6 +5640,64 @@
     return cut.trimEnd()+"…";
   }
 
+  function syncFutureUrlParam(selectedId){
+    const url=new URL(window.location.href);
+    if(selectedId && selectedId!=="now") url.searchParams.set("future",selectedId);
+    else url.searchParams.delete("future");
+    history.replaceState(history.state||{cosmos:true},"",url.pathname+url.search+url.hash);
+  }
+
+  function currentScreenShareUrl(){
+    const url=new URL(window.location.href);
+    if(futureExperience.selected_id && futureExperience.selected_id!=="now") url.searchParams.set("future",futureExperience.selected_id);
+    else url.searchParams.delete("future");
+    return url.toString();
+  }
+
+  function clearFuturePathFocus(){
+    futureExperience.focused_step_index=null;
+    if(futureButterfly){
+      futureButterfly.classList.remove("focusMode");
+      futureButterfly.querySelectorAll(".futureStep").forEach(step=>step.classList.remove("isFocused"));
+    }
+    if(futureFocusReadout){
+      futureFocusReadout.hidden=true;
+    }
+    if(futureFocusText) futureFocusText.textContent="";
+  }
+
+  function focusFuturePathStep(stepIndex){
+    if(!futureButterfly) return;
+    const steps=[...futureButterfly.querySelectorAll(".futureStep")];
+    if(!(stepIndex>=0) || stepIndex>=steps.length){
+      clearFuturePathFocus();
+      return;
+    }
+    futureExperience.focused_step_index=stepIndex;
+    futureButterfly.classList.add("focusMode");
+    steps.forEach((step,index)=>step.classList.toggle("isFocused",index===stepIndex));
+    const fullText=steps[stepIndex].dataset.fullText || steps[stepIndex].textContent || "";
+    if(futureFocusLabel) futureFocusLabel.textContent=`Focused butterfly step ${stepIndex+1} of ${steps.length}`;
+    if(futureFocusText) futureFocusText.textContent=String(fullText).trim();
+    if(futureFocusReadout) futureFocusReadout.hidden=false;
+  }
+
+  async function shareCurrentScreen(){
+    const label=observerDisplayLabel(state.observer);
+    const moment=futureMoment?.textContent?.trim() || "Current view";
+    const summary=shareClip(futureStateEl?.textContent || projectionEssence?.textContent || "Explore this Cosmos screen.",200);
+    const title=`Cosmos · ${label} · ${moment}`;
+    const text=[`${label} · ${moment}`,summary].filter(Boolean).join("\n\n");
+    const url=currentScreenShareUrl();
+    try{
+      await nativeSharePrepared({title,text,url,notice:"Screen share ready."});
+    }catch(error){
+      if(error?.name==="AbortError") return;
+      console.warn("Screen sharing failed",error);
+      shareNotice(error?.message||"Could not share this screen.");
+    }
+  }
+
   function renderFuturePending(observer){
     if(!futureLayer) return;
     futureLayer.hidden=false;
@@ -5613,6 +5708,7 @@
     futureSummary.textContent="";
     futureButterfly.innerHTML="";
     futureBranches.innerHTML="";
+    clearFuturePathFocus();
     if(futureConfidence){
       futureConfidence.dataset.level="";
       futureConfidence.textContent="The timeline stays in place while Cosmos recalculates this station.";
@@ -5624,6 +5720,7 @@
       button.disabled=true;
     });
     if(futurePlay) futurePlay.disabled=true;
+    if(futureShareScreen) futureShareScreen.disabled=false;
   }
 
   function renderPersistentFutureUnavailable(observer){
@@ -5647,6 +5744,8 @@
       button.disabled=id!=="now";
     });
     if(futurePlay) futurePlay.disabled=true;
+    if(futureShareScreen) futureShareScreen.disabled=false;
+    clearFuturePathFocus();
   }
 
   function renderFutureSelection(observer,requestedId){
@@ -5656,6 +5755,8 @@
       futureLayer.hidden=true;
       futureLayer.classList.remove("active");
       document.body.classList.remove("futureMode");
+      clearFuturePathFocus();
+      syncFutureUrlParam("now");
       stopFutureAutoplay();
       return;
     }
@@ -5689,15 +5790,17 @@
     if(futureButterfly){
       if(!path.length){
         futureButterfly.innerHTML="";
+        clearFuturePathFocus();
       }else{
         let html="";
         path.forEach((step,index)=>{
           if(index>0){
             html+=`<span class="futureArrow" style="--future-delay:${index*145-55}ms" aria-hidden="true"></span>`;
           }
-          html+=`<span class="futureStep" style="--future-delay:${index*145}ms"><span class="futureStepDot" aria-hidden="true"></span><span class="futureStepText">${esc(compactFutureStep(step))}</span></span>`;
+          html+=`<button class="futureStep" type="button" data-step-index="${index}" data-full-text="${esc(step)}" aria-label="Focus butterfly step ${index+1}" style="--future-delay:${index*145}ms"><span class="futureStepDot" aria-hidden="true"></span><span class="futureStepText">${esc(compactFutureStep(step))}</span></button>`;
         });
         futureButterfly.innerHTML=html;
+        clearFuturePathFocus();
       }
     }
 
@@ -5724,6 +5827,8 @@
       futureTimeline.scrollTo({left:target,behavior:"smooth"});
     }
     if(futurePlay) futurePlay.disabled=false;
+    if(futureShareScreen) futureShareScreen.disabled=false;
+    syncFutureUrlParam(selectedId);
     futureExperience.persist_mode=true;
   }
 
@@ -5815,6 +5920,27 @@
     futureControls?.addEventListener(type,event=>event.stopPropagation());
   });
   futureControls?.addEventListener("wheel",event=>event.stopPropagation(),{passive:true});
+
+  futureButterfly?.addEventListener("click",event=>{
+    const step=event.target.closest(".futureStep");
+    if(!step) return;
+    event.stopPropagation();
+    const index=Number(step.dataset.stepIndex);
+    if(!Number.isFinite(index)) return;
+    if(futureExperience.focused_step_index===index){
+      clearFuturePathFocus();
+      return;
+    }
+    focusFuturePathStep(index);
+  });
+
+  futureFocusClose?.addEventListener("click",()=>clearFuturePathFocus());
+  futureShareScreen?.addEventListener("click",()=>shareCurrentScreen());
+  futureLayer?.addEventListener("click",event=>{
+    if(futureExperience.focused_step_index==null) return;
+    if(event.target.closest(".futureStep") || event.target.closest(".futureFocusReadout") || event.target.closest(".futureTimelineWrap")) return;
+    clearFuturePathFocus();
+  });
 
   function render(){
     const observer=state.observer;
