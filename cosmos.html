@@ -11,7 +11,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v7.6-subject-scope-time-rail" />
+  <meta name="cosmos-build" content="v7.7-fresh-topic-scope-isolation" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -2218,7 +2218,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.6-subject-scope-time-rail";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.7-fresh-topic-scope-isolation";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -7236,10 +7236,18 @@
 
     try{
       const freshCoordinate=shouldStartFreshCoordinate(question);
-      const topLevelSubject=(entry.new_topic && String(question||"").trim()===String(entry.question||"").trim())
-        ? topLevelTemporalSubject(question)
-        : "";
-      const context=freshCoordinate
+      const freshTopLevel=Boolean(
+        entry.new_topic &&
+        String(question||"").trim()===String(entry.question||"").trim()
+      );
+      const topLevelSubject=freshTopLevel ? topLevelTemporalSubject(question) : "";
+
+      // A question started from the landing page is a NEW Cosmos coordinate.
+      // Never let the previous station, Journey, or PTD's local knowledge density
+      // define its scope. The Worker receives the current question and resolves it
+      // open-world. Narrow context returns only after the user deliberately travels
+      // to a station or asks a follow-up inside that coordinate.
+      const context=(freshTopLevel || freshCoordinate)
         ? null
         : topLevelSubject
           ? {id:"",label:topLevelSubject}
@@ -7247,8 +7255,8 @@
       const payload={
         question,
         context_subject:context,
-        journey:(freshCoordinate || topLevelSubject) ? [] : journeyContextForGateway(),
-        context_policy:freshCoordinate
+        journey:(freshTopLevel || freshCoordinate || topLevelSubject) ? [] : journeyContextForGateway(),
+        context_policy:(freshTopLevel || freshCoordinate)
           ? "fresh_open_world_coordinate"
           : topLevelSubject
             ? "explicit_query_subject"
@@ -7371,6 +7379,7 @@
     url.searchParams.set("focus","question");
     url.searchParams.set("question",question);
     url.searchParams.set("from","cosmos-projection");
+    url.searchParams.delete("new_topic");
 
     const freshCoordinate=shouldStartFreshCoordinate(question);
     const context=freshCoordinate ? null : currentContextSubject();
