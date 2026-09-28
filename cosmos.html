@@ -11,7 +11,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v7.5-journey-history-news-thumbnail" />
+  <meta name="cosmos-build" content="v7.6-subject-scope-time-rail" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -2218,7 +2218,7 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.4-past-present-future-time-arc";
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.6-subject-scope-time-rail";
   const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
@@ -5973,13 +5973,15 @@
     document.body.classList.add("futureMode");
     document.body.classList.remove("pastMode");
     futureMoment.textContent="NOW";
-    futureStateEl.textContent=`Cosmos does not yet have a defensible time-path for "${observerDisplayLabel(observer)}".`;
+    futureStateEl.textContent=compactFutureState(
+      observer?.response?.short_answer || observer?.response?.essence || observer?.response?.answer || observerDisplayLabel(observer)
+    );
     futureSummary.textContent="";
     futureButterfly.innerHTML="";
     futureBranches.innerHTML="";
     if(futureConfidence){
       futureConfidence.dataset.level="";
-      futureConfidence.textContent="No future is being invented. Choose another station or return to the prior path.";
+      futureConfidence.textContent="NOW · time horizons appear as soon as Cosmos has defensible historical or scenario states.";
     }
     futureTimeline?.querySelectorAll("[data-future-id]").forEach(button=>{
       const id=button.dataset.futureId||"";
@@ -5997,10 +5999,11 @@
     const pp=pastProjectionForObserver(observer);
     const fp=futureProjectionForObserver(observer);
     if(!pp && !fp){
-      futureLayer.hidden=true;
-      futureLayer.classList.remove("active");
-      document.body.classList.remove("futureMode","pastMode");
-      clearFuturePathFocus();
+      // The time rail is part of Cosmos orientation and must not disappear.
+      // If the gateway has no defensible Past/Future yet, keep NOW visible and
+      // disable only the unsupported horizons.
+      renderPersistentFutureUnavailable(observer);
+      futureExperience.selected_id="now";
       syncFutureUrlParam("now");
       stopFutureAutoplay();
       return;
@@ -6632,6 +6635,27 @@
     return "";
   }
 
+  function topLevelTemporalSubject(question){
+    let value=String(question||"").trim();
+    if(!value || !entryRequiresFreshCurrentAnswer()) return "";
+
+    // Remove only request/time scaffolding. Preserve the user's named subject.
+    value=value
+      .replace(/^\s*(?:what(?:'s| is)\s+happening\s+(?:with|in|on|around)\s+)/i,"")
+      .replace(/^\s*(?:give me|show me|tell me|provide|find|check)\s+(?:the\s+)?(?:latest|current|today'?s?)?\s*(?:news|developments?|updates?)?\s*(?:about|on|for|regarding)?\s*/i,"")
+      .replace(/^\s*(?:latest|current|today'?s?)\s+(?:news|developments?|updates?)\s+(?:about|on|for|regarding)\s+/i,"")
+      .replace(/^\s*(?:news|developments?|updates?)\s+(?:about|on|for|regarding)\s+/i,"")
+      .replace(/\b(?:today|right now|now|currently|latest|recent|recently|this morning|this afternoon|this evening|tonight|this week|this month)\b\s*$/i,"")
+      .replace(/\b(?:news|developments?|updates?)\b\s*$/i,"")
+      .replace(/[?!.]+$/g,"")
+      .replace(/\s+/g," ")
+      .trim();
+
+    if(!value || /^(?:world|global|globally|worldwide|good|positive|important|major)$/i.test(value)) return "";
+    if(value.length>100) return "";
+    return value;
+  }
+
   function shouldStartFreshCoordinate(question){
     const raw=String(question||"").trim();
     if(!raw) return false;
@@ -7212,12 +7236,23 @@
 
     try{
       const freshCoordinate=shouldStartFreshCoordinate(question);
-      const context=freshCoordinate ? null : currentContextSubject();
+      const topLevelSubject=(entry.new_topic && String(question||"").trim()===String(entry.question||"").trim())
+        ? topLevelTemporalSubject(question)
+        : "";
+      const context=freshCoordinate
+        ? null
+        : topLevelSubject
+          ? {id:"",label:topLevelSubject}
+          : currentContextSubject();
       const payload={
         question,
         context_subject:context,
-        journey:freshCoordinate ? [] : journeyContextForGateway(),
-        context_policy:freshCoordinate ? "fresh_open_world_coordinate" : "current_coordinate_only",
+        journey:(freshCoordinate || topLevelSubject) ? [] : journeyContextForGateway(),
+        context_policy:freshCoordinate
+          ? "fresh_open_world_coordinate"
+          : topLevelSubject
+            ? "explicit_query_subject"
+            : "current_coordinate_only",
         time_arc:true,
         page:{
           url:location.href,
