@@ -11,7 +11,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="v7.7-fresh-topic-scope-isolation" />
+  <meta name="cosmos-build" content="v7.8-fresh-topic-scope-isolation" />
   <title>Cosmos — PTD Today</title>
   <!-- Fresh visit = living entry. Explicit observer = Cosmos explorer. -->
   <meta name="description" content="Explore connected intelligence through Cosmos." />
@@ -2218,8 +2218,8 @@
 
   const COSMOS_ASK_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask";
   const COSMOS_PRESENCE_ENDPOINT = "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/presence";
-  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.7-fresh-topic-scope-isolation";
-  const UNIVERSAL_REQUEST_TIMEOUT_MS = 45000;
+  const COSMOS_DYNAMIC_PROJECTION_VERSION = "v7.8-fresh-topic-scope-isolation";
+  const UNIVERSAL_REQUEST_TIMEOUT_MS = 65000;
   const PRESENCE_HEARTBEAT_MS = 25000;
   const PRESENCE_SESSION_KEY = "ptdtoday_cosmos_presence_session_v0_1";
   const TOPIC_ARCHIVE_STORAGE_KEY = "ptdtoday_cosmos_topic_archive_v0_1";
@@ -7207,14 +7207,55 @@
     }
   }
 
+  function versusComparisonParts(question){
+    const raw=String(question||"").trim().replace(/[?!.]+$/g,"").trim();
+    const match=raw.match(/^(.{1,90}?)\s+(?:vs\.?|versus)\s+(.{1,90}?)$/i);
+    if(!match) return null;
+    const left=String(match[1]||"").trim();
+    const right=String(match[2]||"").trim();
+    return left&&right?{left,right}:null;
+  }
+
+  function responseRespectsStrongQueryAnchor(question,data){
+    const comparison=versusComparisonParts(question);
+    if(!comparison) return true;
+    const corpus=[
+      data?.subject,data?.coordinate?.focus_label,data?.answer,data?.short_answer,data?.essence
+    ].map(value=>String(value||"").toLowerCase()).join(" ");
+    const sideMatches=side=>{
+      const tokens=String(side||"").toLowerCase().match(/[a-z0-9]+/g)||[];
+      const meaningful=tokens.filter(token=>token.length>2);
+      return meaningful.length ? meaningful.some(token=>corpus.includes(token)) : corpus.includes(String(side||"").toLowerCase());
+    };
+    return sideMatches(comparison.left)&&sideMatches(comparison.right);
+  }
+
+  function buildFreshQueryFailureResponse(question,label=""){
+    const safe=buildUniversalLoadingResponse(question,label||question);
+    const message="Cosmos could not complete this live answer yet. Your question has been preserved exactly; no unrelated local topic was substituted. Please try again.";
+    safe.id=`response:universal-unavailable:${normalizeSubject(question).replace(/\s+/g,"-")}`;
+    safe.response_type="universal_unavailable";
+    safe.answer=message;
+    safe.short_answer=message;
+    safe.essence=message;
+    safe.epistemic_state="uncertain";
+    safe.confidence="low";
+    safe.suggested_stations=[];
+    safe.bullets=[];
+    safe.projection_seed_ids=[];
+    safe.dynamic_projection_ids=[];
+    safe.dynamic_projection_relationship_count=0;
+    safe.past_projection={available:false,summary:"",horizons:[]};
+    safe.future_projection={available:false,now_state:"",summary:"",horizons:[]};
+    return safe;
+  }
+
   async function hydrateUniversalAnswer(question,displayLabel=""){
     if(!question || state.universalAnswerPending || state.universalAnswerLoaded) return;
 
     state.universalAnswerPending=true;
     startLoadingProgress();
 
-    // Make the transition explicit instead of briefly presenting a deterministic
-    // fallback as though it were the final answer.
     if(state.observer?.kind==="response"){
       const loading=buildUniversalLoadingResponse(question,displayLabel||state.observer.label||question);
       state.observer={
@@ -7231,89 +7272,129 @@
       setLoadingProgress(6,58);
     }
 
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),UNIVERSAL_REQUEST_TIMEOUT_MS);
-
-    try{
-      const freshCoordinate=shouldStartFreshCoordinate(question);
-      const freshTopLevel=Boolean(
-        entry.new_topic &&
-        String(question||"").trim()===String(entry.question||"").trim()
-      );
-      const topLevelSubject=freshTopLevel ? topLevelTemporalSubject(question) : "";
-
-      // A question started from the landing page is a NEW Cosmos coordinate.
-      // Never let the previous station, Journey, or PTD's local knowledge density
-      // define its scope. The Worker receives the current question and resolves it
-      // open-world. Narrow context returns only after the user deliberately travels
-      // to a station or asks a follow-up inside that coordinate.
-      const context=(freshTopLevel || freshCoordinate)
-        ? null
+    const freshCoordinate=shouldStartFreshCoordinate(question);
+    const freshTopLevel=Boolean(
+      entry.new_topic &&
+      String(question||"").trim()===String(entry.question||"").trim()
+    );
+    const topLevelSubject=freshTopLevel ? topLevelTemporalSubject(question) : "";
+    const context=(freshTopLevel || freshCoordinate)
+      ? null
+      : topLevelSubject
+        ? {id:"",label:topLevelSubject}
+        : currentContextSubject();
+    const basePayload={
+      question,
+      context_subject:context,
+      journey:(freshTopLevel || freshCoordinate || topLevelSubject) ? [] : journeyContextForGateway(),
+      context_policy:(freshTopLevel || freshCoordinate)
+        ? "fresh_open_world_coordinate"
         : topLevelSubject
-          ? {id:"",label:topLevelSubject}
-          : currentContextSubject();
-      const payload={
-        question,
-        context_subject:context,
-        journey:(freshTopLevel || freshCoordinate || topLevelSubject) ? [] : journeyContextForGateway(),
-        context_policy:(freshTopLevel || freshCoordinate)
-          ? "fresh_open_world_coordinate"
-          : topLevelSubject
-            ? "explicit_query_subject"
-            : "current_coordinate_only",
-        time_arc:true,
-        page:{
-          url:location.href,
-          entry_question:entry.question||"",
-          article_id:entry.article_id||"",
-          client_time_utc:new Date().toISOString(),
-          client_timezone:(Intl.DateTimeFormat().resolvedOptions().timeZone||"")
-        }
-      };
-
-      const response=await fetch(COSMOS_ASK_ENDPOINT,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload),
-        signal:controller.signal
-      });
-
-      if(!response.ok){
-        throw new Error(`Cosmos gateway returned ${response.status}`);
+          ? "explicit_query_subject"
+          : "current_coordinate_only",
+      time_arc:true,
+      page:{
+        url:location.href,
+        entry_question:entry.question||"",
+        article_id:entry.article_id||"",
+        client_time_utc:new Date().toISOString(),
+        client_timezone:(Intl.DateTimeFormat().resolvedOptions().timeZone||"")
       }
+    };
 
-      setLoadingProgress(Math.max(state.loadingProgressValue,64),76);
-      const data=await response.json();
-      setLoadingProgress(Math.max(state.loadingProgressValue,78),88);
-      if(!data || !String(data.answer||data.short_answer||"").trim()){
-        throw new Error("Cosmos gateway returned no answer");
+    const applyGatewayData=async data=>{
+      if(!data || !String(data.answer||data.short_answer||"").trim()) throw new Error("Cosmos gateway returned no answer");
+      if((freshTopLevel||freshCoordinate) && !responseRespectsStrongQueryAnchor(question,data)){
+        throw new Error("Cosmos gateway response drifted away from the user's query");
       }
-
       const resolvedObserver=universalResponseToObserver(question,data,displayLabel);
       setLoadingProgress(92,97);
       await new Promise(resolve=>setTimeout(resolve,180));
       setLoadingProgress(100,100);
       await new Promise(resolve=>setTimeout(resolve,420));
-
       state.observer=resolvedObserver;
       state.response=state.observer.response;
       state.universalAnswerLoaded=true;
       state.universalAnswerPending=false;
       futureExperience.transition_pending=false;
       stopLoadingProgress(true);
-
       reconcileJourneyWithResolvedObserver(state.observer);
       saveTrail();
       persistCurrentTopicSnapshot();
       render();
       restoreKnowledgeStatus();
-    }catch(error){
-      console.warn("Universal Cosmos gateway unavailable; using local Cosmos fallback.",error);
+    };
+
+    const requestGateway=async(payload,timeoutMs)=>{
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),timeoutMs);
+      try{
+        const response=await fetch(COSMOS_ASK_ENDPOINT,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(payload),
+          signal:controller.signal
+        });
+        if(!response.ok) throw new Error(`Cosmos gateway returned ${response.status}`);
+        setLoadingProgress(Math.max(state.loadingProgressValue,64),76);
+        const data=await response.json();
+        setLoadingProgress(Math.max(state.loadingProgressValue,78),88);
+        return data;
+      }finally{
+        clearTimeout(timer);
+      }
+    };
+
+    try{
+      const data=await requestGateway(basePayload,UNIVERSAL_REQUEST_TIMEOUT_MS);
+      await applyGatewayData(data);
+      return;
+    }catch(primaryError){
+      console.warn("Universal Cosmos full time-arc request failed or drifted.",primaryError);
+
+      // A fresh top-level query must NEVER fall back into PTD/local graph semantics.
+      // Retry once without the expensive historical time arc so the user's actual
+      // question remains sovereign even when the full Time Arc is slow/unavailable.
+      if(freshTopLevel || freshCoordinate){
+        try{
+          setLoadingProgress(Math.max(state.loadingProgressValue,60),72);
+          const retryPayload={
+            ...basePayload,
+            time_arc:false,
+            page:{...basePayload.page,retry_without_time_arc:true}
+          };
+          const retryData=await requestGateway(retryPayload,35000);
+          await applyGatewayData(retryData);
+          return;
+        }catch(retryError){
+          console.warn("Fresh open-world Cosmos retry also failed.",retryError);
+          state.universalAnswerPending=false;
+          futureExperience.transition_pending=false;
+          stopLoadingProgress(true);
+          const safe=buildFreshQueryFailureResponse(question,displayLabel||question);
+          state.response=safe;
+          state.observer={
+            kind:"response",
+            id:safe.id,
+            label:displayLabel||question,
+            response:safe,
+            question,
+            semantic_subject_id:"",
+            semantic_subject_label:"",
+            article_id:entry.article_id
+          };
+          reconcileJourneyWithResolvedObserver(state.observer);
+          persistCurrentTopicSnapshot();
+          render();
+          restoreKnowledgeStatus();
+          return;
+        }
+      }
+
+      // Only an intentional in-coordinate follow-up may use local Cosmos fallback.
       state.universalAnswerPending=false;
       futureExperience.transition_pending=false;
       stopLoadingProgress(true);
-
-      // Restore deterministic/local response as graceful fallback.
       const local=buildQuestionResponse(question);
       state.response=local;
       state.observer={
@@ -7330,8 +7411,6 @@
       persistCurrentTopicSnapshot();
       render();
       restoreKnowledgeStatus();
-    }finally{
-      clearTimeout(timer);
     }
   }
 
