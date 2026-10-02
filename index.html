@@ -29,7 +29,7 @@
   </script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="cosmos-build" content="index-v6.4-openai-search-ready" />
+  <meta name="cosmos-build" content="index-v6.6-discovery-public-v1" />
   <title>Cosmos — PTD Today</title>
   <meta name="description" content="Ask. Explore. Discover. Everything is connected through Cosmos." />
   <link rel="canonical" href="https://ptdtoday.com/" />
@@ -804,6 +804,98 @@
       .topicTimeEmpty{bottom:22%;font-size:11px}.topicTimeDepthCue{right:10px;top:35%;font-size:7px}
       .topicSphereHint{font-size:8px!important;bottom:5px!important}
     }
+
+    /* Cosmos Discovery v1 — subtle live entrances, never a news-grid takeover. */
+    .discoveryDock{
+      width:min(800px,100%);
+      margin:-8px auto 0;
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:8px;
+      position:relative;
+      z-index:6;
+    }
+    .discoveryDock[hidden]{display:none!important}
+    .discoveryDoor{
+      appearance:none;
+      min-width:0;
+      min-height:56px;
+      display:grid;
+      grid-template-columns:10px minmax(0,1fr);
+      align-items:center;
+      gap:9px;
+      padding:9px 11px;
+      border:1px solid rgba(132,164,226,.13);
+      border-radius:15px;
+      background:linear-gradient(180deg,rgba(14,27,49,.52),rgba(6,14,27,.46));
+      color:#dbe6f7;
+      text-align:left;
+      cursor:pointer;
+      box-shadow:0 10px 30px rgba(0,0,0,.10);
+      transition:transform .16s ease,border-color .16s ease,background .16s ease;
+    }
+    .discoveryDoor:hover,.discoveryDoor:focus-visible{
+      transform:translateY(-1px);
+      border-color:rgba(132,164,226,.30);
+      background:linear-gradient(180deg,rgba(19,37,67,.68),rgba(7,17,32,.58));
+      outline:none;
+    }
+    .discoveryDoor:active{transform:translateY(0) scale(.995)}
+    .discoveryDot{
+      width:7px;height:7px;border-radius:50%;
+      background:#7fa4f4;
+      box-shadow:0 0 0 4px rgba(127,164,244,.06),0 0 13px rgba(127,164,244,.32);
+      animation:discoveryPulse 4.8s ease-in-out infinite;
+    }
+    .discoveryDoor.butterfly .discoveryDot{
+      background:#a890f2;
+      box-shadow:0 0 0 4px rgba(168,144,242,.06),0 0 13px rgba(168,144,242,.30);
+    }
+    .discoveryDoor.surprise .discoveryDot{
+      background:#dfc184;
+      box-shadow:0 0 0 4px rgba(223,193,132,.05),0 0 13px rgba(223,193,132,.25);
+    }
+    .discoveryCopy{min-width:0;display:block}
+    .discoveryCopy strong{
+      display:block;
+      color:#cddaf0;
+      font-size:10px;
+      line-height:1.2;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-weight:750;
+    }
+    .discoveryCopy small{
+      display:block;
+      margin-top:4px;
+      color:#7f8da5;
+      font-size:10.5px;
+      line-height:1.25;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    @keyframes discoveryPulse{
+      0%,100%{transform:scale(.90);opacity:.60}
+      50%{transform:scale(1.08);opacity:1}
+    }
+    @media(max-width:680px){
+      .discoveryDock{
+        width:min(520px,100%);
+        grid-template-columns:1fr;
+        gap:6px;
+        margin-top:-10px;
+      }
+      .discoveryDoor{
+        min-height:44px;
+        grid-template-columns:9px minmax(0,1fr);
+        padding:7px 10px;
+        border-radius:13px;
+      }
+      .discoveryCopy strong{font-size:9.4px}
+      .discoveryCopy small{font-size:10px}
+    }
+
 </style>
   <script>
     (() => {
@@ -874,6 +966,20 @@
       </form>
 
       <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
+      <section class="discoveryDock" id="discoveryDock" aria-label="Discover Cosmos" hidden>
+        <button class="discoveryDoor moving" id="discoveryMoving" type="button">
+          <span class="discoveryDot" aria-hidden="true"></span>
+          <span class="discoveryCopy"><strong>Something is moving</strong><small id="discoveryMovingText">Open a live Cosmos discovery.</small></span>
+        </button>
+        <button class="discoveryDoor butterfly" id="discoveryButterfly" type="button">
+          <span class="discoveryDot" aria-hidden="true"></span>
+          <span class="discoveryCopy"><strong>Today's Butterfly</strong><small id="discoveryButterflyText">Follow a ripple across systems.</small></span>
+        </button>
+        <button class="discoveryDoor surprise" id="discoverySurprise" type="button">
+          <span class="discoveryDot" aria-hidden="true"></span>
+          <span class="discoveryCopy"><strong>Surprise me</strong><small>Take me somewhere I would not think to ask.</small></span>
+        </button>
+      </section>
       <section class="topicMemory" id="topicMemory" aria-label="Your Cosmos journeys">
         <div class="topicMemoryHeader"><span>Your Cosmos</span><span class="topicMemoryActions"><span class="topicMemoryCount" id="topicMemoryCount"></span><button class="topicHistoryToggle" id="topicHistoryToggle" type="button" aria-expanded="false">History ›</button></span></div>
         <div class="topicYears" id="topicYears" hidden></div>
@@ -927,8 +1033,122 @@
       const topicMemoryCount=document.getElementById("topicMemoryCount");
       const topicHistoryToggle=document.getElementById("topicHistoryToggle");
       const historyBackdrop=document.getElementById("historyBackdrop");
+      const discoveryDock=document.getElementById("discoveryDock");
+      const discoveryMoving=document.getElementById("discoveryMoving");
+      const discoveryButterfly=document.getElementById("discoveryButterfly");
+      const discoverySurprise=document.getElementById("discoverySurprise");
+      const discoveryMovingText=document.getElementById("discoveryMovingText");
+      const discoveryButterflyText=document.getElementById("discoveryButterflyText");
+      let discoveryItems=[];
       const TOPIC_MEMORY_KEY="ptdtoday_cosmos_topic_archive_v0_1";
-      const INDEX_BUILD="v6.3-history-restored-time-navigator";
+      const INDEX_BUILD="v6.6-discovery-public-v1";
+
+      function trackDiscovery(eventName,item=null){
+        try{
+          if(typeof gtag!=="function") return;
+          gtag("event",eventName,{
+            discovery_kind:String(item?.kind||""),
+            discovery_slug:String(item?.slug||""),
+            discovery_title:String(item?.title||"").slice(0,120)
+          });
+        }catch(_){}
+      }
+
+      function discoveryExploreUrl(item){
+        const raw=String(item?.explore_url||"").trim();
+        if(raw){
+          try{
+            const url=new URL(raw,location.origin);
+            if(url.origin===location.origin && url.pathname.startsWith("/explore/")){
+              return `${url.pathname}${url.search}${url.hash}`;
+            }
+          }catch(_){}
+        }
+        const slug=String(item?.slug||"").trim();
+        return slug?`/explore/${encodeURIComponent(slug)}`:"";
+      }
+
+      function openDiscoveryItem(item,eventName="cosmos_discovery_click"){
+        const url=discoveryExploreUrl(item);
+        if(!url) return;
+        trackDiscovery(eventName,item);
+        orbWrap.classList.remove("topicSphereActive");
+        if(topicSphere) topicSphere.hidden=true;
+        orbWrap.dataset.state="resolving";
+        emergence.classList.remove("active");
+        hint.textContent="Opening Cosmos discovery…";
+        window.setTimeout(()=>{ location.href=url; },100);
+      }
+
+      async function fetchDiscoveryJson(path,timeoutMs=5000){
+        const controller=new AbortController();
+        const timer=setTimeout(()=>controller.abort(),timeoutMs);
+        try{
+          const response=await fetch(path,{
+            method:"GET",
+            headers:{"Accept":"application/json"},
+            cache:"no-store",
+            signal:controller.signal
+          });
+          if(!response.ok) throw new Error(`Discovery HTTP ${response.status}`);
+          return await response.json();
+        }finally{
+          clearTimeout(timer);
+        }
+      }
+
+      async function loadDiscovery(){
+        if(!discoveryDock) return;
+        try{
+          const data=await fetchDiscoveryJson("/api/discovery/today",5000);
+          const items=Array.isArray(data?.items)?data.items.filter(Boolean):[];
+          if(!items.length) return;
+
+          discoveryItems=items;
+          const moving=items.find(item=>item.kind==="signal") || items[0];
+          const butterfly=items.find(item=>item.kind==="butterfly") || null;
+
+          if(moving && discoveryMoving){
+            discoveryMovingText.textContent=String(moving.title||moving.summary||"A live signal is forming.");
+            discoveryMoving.hidden=false;
+            discoveryMoving.onclick=()=>openDiscoveryItem(moving,"cosmos_discovery_signal_click");
+          }else if(discoveryMoving){
+            discoveryMoving.hidden=true;
+          }
+
+          if(butterfly && discoveryButterfly){
+            discoveryButterflyText.textContent=String(butterfly.title||butterfly.summary||"Follow a ripple across systems.");
+            discoveryButterfly.hidden=false;
+            discoveryButterfly.onclick=()=>openDiscoveryItem(butterfly,"cosmos_discovery_butterfly_click");
+          }else if(discoveryButterfly){
+            discoveryButterfly.hidden=true;
+          }
+
+          if(discoverySurprise){
+            discoverySurprise.hidden=false;
+            discoverySurprise.onclick=async()=>{
+              discoverySurprise.disabled=true;
+              try{
+                const surprise=await fetchDiscoveryJson("/api/discovery/surprise",5000);
+                const item=surprise?.item || discoveryItems[Math.floor(Math.random()*discoveryItems.length)] || moving;
+                if(item) openDiscoveryItem(item,"cosmos_discovery_surprise_click");
+              }catch(_){
+                const item=discoveryItems[Math.floor(Math.random()*discoveryItems.length)] || moving;
+                if(item) openDiscoveryItem(item,"cosmos_discovery_surprise_click");
+              }finally{
+                window.setTimeout(()=>{ discoverySurprise.disabled=false; },800);
+              }
+            };
+          }
+
+          discoveryDock.hidden=false;
+          trackDiscovery("cosmos_discovery_view");
+        }catch(_){
+          // Discovery is deliberately fail-open: the existing Cosmos homepage remains unchanged.
+          discoveryDock.hidden=true;
+        }
+      }
+
 
       function recoverLastTopicFromSession(){
         try{
@@ -1279,6 +1499,7 @@
         orbWrap.classList.remove("topicSphereActive");
         if(topicSphere) topicSphere.hidden=true;
         orbWrap.dataset.state = "resolving";
+        if(discoveryDock) discoveryDock.hidden=true;
         emergence.classList.remove("active");
         hint.textContent = "Entering Cosmos…";
 
@@ -1317,6 +1538,7 @@
         };
         recognition.start();
       });
+      loadDiscovery();
     })();
   </script>
 </body>
