@@ -136,6 +136,34 @@ function oauth1Header(method, url, consumerKey, consumerSecret, accessToken, acc
     .join(", ");
 }
 
+async function verifyXCredentials() {
+  for (const [name, value] of Object.entries({ X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET })) {
+    if (!value) throw new Error(`${name} is required for X credential verification.`);
+  }
+
+  const endpoint = "https://api.x.com/2/users/me";
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: {
+      Authorization: oauth1Header("GET", endpoint, X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET)
+    }
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+
+  if (!response.ok) {
+    throw new Error(`X credential check failed (${response.status}): ${raw.slice(0, 1200)}`);
+  }
+
+  const user = data?.data || {};
+  const accessLevel = String(response.headers.get("x-access-level") || "").trim();
+  console.log(`X credential verification succeeded for @${user.username || "unknown"} (${user.name || "unknown"}) id=${user.id || "unknown"}.`);
+  if (accessLevel) console.log(`X reported access level: ${accessLevel}`);
+  console.log("Verification used GET /2/users/me only. No post was created, edited, or deleted.");
+}
+
 async function publishX(text) {
   for (const [name, value] of Object.entries({ X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET })) {
     if (!value) throw new Error(`${name} is required for live X publishing.`);
@@ -197,10 +225,15 @@ function validateItem(item) {
 }
 
 async function main() {
-  if (!["preview", "live"].includes(MODE)) throw new Error(`SOCIAL_MODE must be preview or live; got ${MODE}`);
+  if (!["preview", "verify-x", "live"].includes(MODE)) throw new Error(`SOCIAL_MODE must be preview, verify-x, or live; got ${MODE}`);
   if (!["all", "linkedin", "x"].includes(PLATFORM)) throw new Error(`SOCIAL_PLATFORM must be all, linkedin, or x; got ${PLATFORM}`);
   if (MODE === "live" && !ENABLED) {
     throw new Error("Live mode is locked. Set repository variable SOCIAL_AUTOPUBLISH_ENABLED=true before publishing.");
+  }
+
+  if (MODE === "verify-x") {
+    await verifyXCredentials();
+    return;
   }
 
   const queue = loadJson(QUEUE_FILE, { schema_version: "1.0", items: [] });
