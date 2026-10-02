@@ -1,0 +1,105 @@
+PTD TODAY / COSMOS — FIRST-PARTY SOCIAL AUTO-PUBLISH SETUP
+Generated: 2026-10-02
+
+PURPOSE
+-------
+This package adds a first-party publisher for LinkedIn and X plus Bing/IndexNow notification.
+No third-party scheduler such as Metricool is required.
+
+SAFETY DEFAULTS
+---------------
+1. SOCIAL_MODE defaults to preview.
+2. Scheduled runs cannot publish unless repository variable SOCIAL_AUTOPUBLISH_ENABLED is exactly true.
+3. LinkedIn defaults to maximum 1 successful post/day and 1/run.
+4. X defaults to maximum 3 successful posts/day and 1/run.
+5. Only https://ptdtoday.com, https://www.ptdtoday.com, and https://share.ptdtoday.com URLs are accepted.
+6. data/social-published.json prevents duplicate posting of the same queue item to the same platform.
+7. API credentials belong only in GitHub Actions secrets.
+
+FILES ADDED
+-----------
+scripts/social_autopublish.mjs
+.github/workflows/social-autopublish.yml
+data/social-queue.json
+data/social-published.json
+scripts/indexnow_submit.mjs
+.github/workflows/indexnow.yml
+indexnow-key.txt
+docs/social-autopublish-setup.txt
+
+GITHUB REPOSITORY VARIABLES
+---------------------------
+SOCIAL_MODE = preview
+SOCIAL_AUTOPUBLISH_ENABLED = false
+LINKEDIN_VERSION = 202609
+
+Keep these values during initial testing. Do not set live/true until both APIs have been tested manually.
+
+GITHUB ACTIONS SECRETS — X
+--------------------------
+X_API_KEY
+X_API_SECRET
+X_ACCESS_TOKEN
+X_ACCESS_TOKEN_SECRET
+
+The X app must have permission to create posts for the PTD Today X account. If app permissions are changed to Read and Write after tokens were created, regenerate the user access token/secret.
+
+GITHUB ACTIONS SECRETS — LINKEDIN
+---------------------------------
+LINKEDIN_ACCESS_TOKEN
+LINKEDIN_AUTHOR_URN
+
+LINKEDIN_AUTHOR_URN may be either:
+urn:li:person:...        for an authenticated member/profile
+urn:li:organization:...  for an organization page when the app has the required organization posting access
+
+The workflow currently uses LinkedIn API version 202609.
+
+QUEUE FORMAT
+------------
+Add enabled items to data/social-queue.json. Each item needs a stable unique id and a permanent PTD Today URL.
+
+Example:
+{
+  "id": "cosmos-2026-10-02-example",
+  "enabled": true,
+  "created_at": "2026-10-02T15:00:00Z",
+  "source_url": "https://ptdtoday.com/explore/example.html",
+  "title": "Example Cosmos discovery",
+  "linkedin_text": "Longer LinkedIn copy... #Cosmos #PTDToday",
+  "x_text": "Short X copy. #Cosmos",
+  "platforms": ["linkedin", "x"],
+  "not_before": null
+}
+
+The current queue contains only a disabled example and therefore cannot accidentally publish anything.
+
+FIRST TEST
+----------
+1. Commit/push these files.
+2. In GitHub -> Settings -> Secrets and variables -> Actions, add credentials.
+3. Keep SOCIAL_MODE=preview and SOCIAL_AUTOPUBLISH_ENABLED=false.
+4. Add one real queue item with enabled=true.
+5. Run Actions -> PTD Today Social Auto Publish -> Run workflow -> preview.
+6. Read the Actions log and verify the exact LinkedIn/X copy and permanent URL.
+7. When satisfied, set SOCIAL_AUTOPUBLISH_ENABLED=true.
+8. Run the workflow manually with mode=live for ONE platform first.
+9. Confirm the resulting post on the actual account before enabling scheduled live mode.
+10. Finally set SOCIAL_MODE=live.
+
+INDEXNOW / BING
+---------------
+The file indexnow-key.txt is the public verification file for IndexNow.
+.github/workflows/indexnow.yml runs after pushes that change public HTML pages and sends those changed URLs to the IndexNow endpoint.
+Because the key file is at the website root, it can validate URLs across ptdtoday.com.
+A manual workflow run submits the principal PTD Today pages for a first test.
+
+IMPORTANT CURRENT-REPOSITORY FINDING
+------------------------------------
+The GitHub package reviewed on 2026-10-02 does not yet contain a production /explore/ directory or an automatic social-candidate queue generator. The existing Cosmos Discovery code is primarily the internal knowledge-gap/acquisition pipeline. Therefore this package intentionally builds the publishing and deduplication layer first without pretending that an Explore-page generator already exists.
+
+NEXT IMPLEMENTATION STEP
+------------------------
+After the X and LinkedIn connections pass preview/live tests, add the production layer that:
+Cosmos discovery -> source/evidence gate -> permanent /explore/... page -> platform-specific copy -> social-queue.json.
+That layer should reject unverified AI-scenario items; the current daily-ai/developments records are marked ai_scenario/unverified and should not be automatically presented as observed facts.
