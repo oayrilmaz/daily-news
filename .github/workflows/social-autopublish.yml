@@ -1,0 +1,89 @@
+name: PTD Today Social Auto Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "preview makes no posts; live publishes if the safety switch is enabled"
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - live
+      platform:
+        description: "Platform to process"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - linkedin
+          - x
+
+  # Three daily opportunities. Daily and per-run caps in the publisher prevent
+  # a burst: LinkedIn defaults to 1/day; X defaults to 3/day and 1/run.
+  schedule:
+    - cron: "15 13 * * *"
+    - cron: "15 17 * * *"
+    - cron: "15 22 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ptdtoday-social-autopublish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate publisher syntax
+        run: node --check scripts/social_autopublish.mjs
+
+      - name: Publish / preview queued Cosmos posts
+        env:
+          SOCIAL_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.SOCIAL_MODE || 'preview' }}
+          SOCIAL_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'all' }}
+          SOCIAL_AUTOPUBLISH_ENABLED: ${{ vars.SOCIAL_AUTOPUBLISH_ENABLED || 'false' }}
+
+          MAX_LINKEDIN_PER_DAY: "1"
+          MAX_X_PER_DAY: "3"
+          MAX_LINKEDIN_PER_RUN: "1"
+          MAX_X_PER_RUN: "1"
+
+          LINKEDIN_VERSION: ${{ vars.LINKEDIN_VERSION || '202609' }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+        run: node scripts/social_autopublish.mjs
+
+      - name: Commit publish state if live publishing changed it
+        run: |
+          if git diff --quiet -- data/social-published.json; then
+            echo "No publish-state changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add data/social-published.json
+          git commit -m "Record PTD Today social publication"
+          git push origin main
