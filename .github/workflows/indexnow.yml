@@ -1,0 +1,61 @@
+name: Notify Bing / IndexNow
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**/*.html"
+      - "indexnow-key.txt"
+      - "scripts/indexnow_submit.mjs"
+      - ".github/workflows/indexnow.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ptdtoday-indexnow
+  cancel-in-progress: true
+
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Validate IndexNow script
+        run: node --check scripts/indexnow_submit.mjs
+
+      - name: Find changed public HTML pages
+        id: changed
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            printf 'files=%s\n' "index.html cosmos.html intelligence.html media.html groups.html support.html" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="${AFTER}^"
+          fi
+
+          FILES="$(git diff --name-only --diff-filter=ACDMRT "$BEFORE" "$AFTER" -- '*.html' | tr '\n' ' ' | xargs)"
+          printf 'files=%s\n' "$FILES" >> "$GITHUB_OUTPUT"
+
+      - name: Submit changed URLs to IndexNow
+        if: ${{ steps.changed.outputs.files != '' }}
+        run: node scripts/indexnow_submit.mjs ${{ steps.changed.outputs.files }}
