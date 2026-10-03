@@ -15,8 +15,9 @@ const SITEMAP_INDEX = process.env.SITEMAP_INDEX_FILE || "sitemap.xml";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
 const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
-const MIN_SIGNIFICANCE = positiveInt(process.env.COSMOS_MIN_SIGNIFICANCE, 68);
-const MIN_BUTTERFLY = positiveInt(process.env.COSMOS_MIN_BUTTERFLY, 60);
+const MIN_SIGNIFICANCE = positiveInt(process.env.COSMOS_MIN_SIGNIFICANCE, 55);
+const MIN_BUTTERFLY = positiveInt(process.env.COSMOS_MIN_BUTTERFLY, 55);
+const MIN_COMPOSITE = positiveInt(process.env.COSMOS_MIN_COMPOSITE, 60);
 const HISTORY_DAYS = positiveInt(process.env.COSMOS_HISTORY_DAYS, 7);
 
 const BLOCKED_AUTOMATED_RE =
@@ -361,6 +362,11 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
     return { ok: false, reason: "low_butterfly_score" };
   }
 
+  const compositeScore = score(candidate);
+  if (compositeScore < MIN_COMPOSITE) {
+    return { ok: false, reason: "low_combined_score" };
+  }
+
   const normalizedSources = [];
   for (const source of candidate.sources || []) {
     const url = canonicalExternalUrl(source.url);
@@ -412,7 +418,7 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       sources: uniqueByUrl.slice(0, 3),
       citation_matched: citationMatched,
       item_id: itemId,
-      rank_score: Math.round(score(candidate) * 10) / 10
+      rank_score: Math.round(compositeScore * 10) / 10
     }
   };
 }
@@ -814,6 +820,7 @@ async function main() {
       target_count: TARGET_COUNT,
       minimum_significance: MIN_SIGNIFICANCE,
       minimum_butterfly_score: MIN_BUTTERFLY,
+      minimum_composite_score: MIN_COMPOSITE,
       automatic_platforms: ["x"],
       note:
         "Fresh evidence-backed Cosmos discoveries only. Public-policy/political and manual-review candidates are excluded from unattended social publishing."
