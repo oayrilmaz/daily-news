@@ -15,9 +15,9 @@ const SITEMAP_INDEX = process.env.SITEMAP_INDEX_FILE || "sitemap.xml";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
 const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
-const MIN_SIGNIFICANCE = positiveInt(process.env.COSMOS_MIN_SIGNIFICANCE, 55);
-const MIN_BUTTERFLY = positiveInt(process.env.COSMOS_MIN_BUTTERFLY, 55);
-const MIN_COMPOSITE = positiveInt(process.env.COSMOS_MIN_COMPOSITE, 60);
+const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 58);
+const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 45);
+const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45);
 const HISTORY_DAYS = positiveInt(process.env.COSMOS_HISTORY_DAYS, 7);
 
 const BLOCKED_AUTOMATED_RE =
@@ -311,9 +311,9 @@ function normalizedHashtags(candidate) {
 
 function score(candidate) {
   return (
-    clamp(candidate.significance_score, 0, 100) * 0.50 +
-    clamp(candidate.butterfly_score, 0, 100) * 0.30 +
-    clamp(candidate.novelty_score, 0, 100) * 0.20
+    clamp(candidate.significance_score, 0, 100) * 0.35 +
+    clamp(candidate.butterfly_score, 0, 100) * 0.40 +
+    clamp(candidate.novelty_score, 0, 100) * 0.25
   );
 }
 
@@ -354,18 +354,28 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
     return { ok: false, reason: "low_confidence" };
   }
 
-  if (Number(candidate.significance_score) < MIN_SIGNIFICANCE) {
-    return { ok: false, reason: "low_significance" };
-  }
-
-  if (Number(candidate.butterfly_score) < MIN_BUTTERFLY) {
-    return { ok: false, reason: "low_butterfly_score" };
-  }
-
   const compositeScore = score(candidate);
-  if (compositeScore < MIN_COMPOSITE) {
-    return { ok: false, reason: "low_combined_score" };
+  const butterflyScore = Number(candidate.butterfly_score) || 0;
+
+  // Hard safety/evidence gates live above. Quality is now calibrated for
+  // "worth exploring in Cosmos", not only for world-historical importance.
+  // Strict candidates are preferred. A bounded fallback prevents the queue
+  // from failing just because a worthwhile niche development was scored
+  // conservatively on "significance".
+  if (compositeScore < FALLBACK_COMPOSITE || butterflyScore < FALLBACK_BUTTERFLY) {
+    return {
+      ok: false,
+      reason: "below_fallback_quality",
+      diagnostic: {
+        significance: Number(candidate.significance_score) || 0,
+        novelty: Number(candidate.novelty_score) || 0,
+        butterfly: butterflyScore,
+        composite: Math.round(compositeScore * 10) / 10
+      }
+    };
   }
+
+  const qualityTier = compositeScore >= STRICT_COMPOSITE ? "strict" : "fallback";
 
   const normalizedSources = [];
   for (const source of candidate.sources || []) {
@@ -417,6 +427,7 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       social_hook: truncate(candidate.social_hook, 90),
       sources: uniqueByUrl.slice(0, 3),
       citation_matched: citationMatched,
+      quality_tier: qualityTier,
       item_id: itemId,
       rank_score: Math.round(compositeScore * 10) / 10
     }
@@ -424,7 +435,15 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
 }
 
 function selectDiverse(candidates) {
-  const ranked = [...candidates].sort((a, b) => b.rank_score - a.rank_score);
+  const strict = candidates
+    .filter(candidate => candidate.quality_tier === "strict")
+    .sort((a, b) => b.rank_score - a.rank_score);
+
+  const fallback = candidates
+    .filter(candidate => candidate.quality_tier !== "strict")
+    .sort((a, b) => b.rank_score - a.rank_score);
+
+  const ranked = [...strict, ...fallback];
   const selected = [];
   const domainCount = new Map();
   const geoCount = new Map();
@@ -443,7 +462,7 @@ function selectDiverse(candidates) {
     geoCount.set(geo, (geoCount.get(geo) || 0) + 1);
   };
 
-  // First pass: maximize domain diversity.
+  // First pass: maximize domain diversity, preferring strict candidates.
   const usedDomains = new Set();
   for (const candidate of ranked) {
     if (selected.length >= TARGET_COUNT) break;
@@ -453,7 +472,7 @@ function selectDiverse(candidates) {
     usedDomains.add(candidate.domain);
   }
 
-  // Second pass: fill the remaining slots, still limiting concentration.
+  // Second pass: fill remaining slots without letting one domain/geography dominate.
   for (const candidate of ranked) {
     if (selected.length >= TARGET_COUNT) break;
     if (selected.includes(candidate)) continue;
@@ -747,19 +766,36 @@ async function main() {
   for (const candidate of parsedCandidates) {
     const checked = validateCandidate(candidate, citationFingerprints, historyKeys, posted);
     if (checked.ok) accepted.push(checked.candidate);
-    else rejected.push({ title: clean(candidate?.title), reason: checked.reason });
+    else rejected.push({ title: clean(candidate?.title), reason: checked.reason, diagnostic: checked.diagnostic || null });
   }
 
   const selected = selectDiverse(accepted);
 
-  console.log(`Discovery gate: raw=${parsedCandidates.length} accepted=${accepted.length} selected=${selected.length}.`);
+  const strictCount = accepted.filter(row => row.quality_tier === "strict").length;
+  const fallbackCount = accepted.filter(row => row.quality_tier === "fallback").length;
+  console.log(
+    `Discovery gate: raw=${parsedCandidates.length} accepted=${accepted.length} ` +
+    `(strict=${strictCount}, fallback=${fallbackCount}) selected=${selected.length}.`
+  );
+
   if (rejected.length) {
     const counts = {};
     for (const row of rejected) counts[row.reason] = (counts[row.reason] || 0) + 1;
     console.log("Rejected candidate reasons:", JSON.stringify(counts));
     for (const row of rejected.slice(0, 12)) {
-      console.log(`- rejected [${row.reason}] ${row.title || "(untitled)"}`);
+      const d = row.diagnostic
+        ? ` sig=${row.diagnostic.significance} nov=${row.diagnostic.novelty} ` +
+          `bf=${row.diagnostic.butterfly} composite=${row.diagnostic.composite}`
+        : "";
+      console.log(`- rejected [${row.reason}]${d} ${row.title || "(untitled)"}`);
     }
+  }
+
+  for (const row of selected) {
+    console.log(
+      `- selected [${row.quality_tier}] score=${row.rank_score} ` +
+      `[${row.domain}] ${row.title}`
+    );
   }
 
   if (selected.length < 3) {
@@ -818,9 +854,9 @@ async function main() {
     policy: {
       mode: "universal_cross_domain_discovery",
       target_count: TARGET_COUNT,
-      minimum_significance: MIN_SIGNIFICANCE,
-      minimum_butterfly_score: MIN_BUTTERFLY,
-      minimum_composite_score: MIN_COMPOSITE,
+      strict_composite_score: STRICT_COMPOSITE,
+      fallback_composite_score: FALLBACK_COMPOSITE,
+      fallback_butterfly_score: FALLBACK_BUTTERFLY,
       automatic_platforms: ["x"],
       note:
         "Fresh evidence-backed Cosmos discoveries only. Public-policy/political and manual-review candidates are excluded from unattended social publishing."
@@ -879,6 +915,8 @@ async function main() {
       novelty_score: candidate.novelty_score,
       butterfly_score: candidate.butterfly_score,
       confidence: candidate.confidence,
+      quality_tier: candidate.quality_tier,
+      rank_score: candidate.rank_score,
       citation_matched: Boolean(candidate.citation_matched),
       sources: candidate.sources
     })),
