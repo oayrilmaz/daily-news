@@ -1,0 +1,96 @@
+name: Build Cosmos Social Queue
+
+on:
+  workflow_dispatch:
+
+  # Build the queue only after the main PTD Today daily generation has
+  # completed successfully. This keeps social selection downstream of the
+  # fresh source feed and gives GitHub Pages time to deploy before X posts.
+  workflow_run:
+    workflows:
+      - "Home AI + Video (PTD Today)"
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ptdtoday-social-queue-builder
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Sync with latest main
+        run: |
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+      - name: Validate queue builder syntax
+        run: node --check scripts/build_social_queue.mjs
+
+      - name: Build permanent Cosmos Explore pages + X queue
+        env:
+          SITE_ORIGIN: https://ptdtoday.com
+          SOCIAL_QUEUE_TARGET: "3"
+          SOCIAL_MAX_AGE_HOURS: "48"
+          SOCIAL_MIN_SCORE: "2.5"
+        run: node scripts/build_social_queue.mjs
+
+      - name: Validate generated queue and Explore pages
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
+          if (!Array.isArray(queue.items)) throw new Error("social-queue.json is missing items[]");
+          if (queue.items.length > 3) throw new Error("Queue exceeded 3 automatic X items");
+
+          for (const item of queue.items) {
+            if (!Array.isArray(item.platforms) || !item.platforms.includes("x")) {
+              throw new Error(`Queue item ${item.id} is not X-enabled`);
+            }
+            const url = new URL(item.source_url);
+            if (url.hostname !== "ptdtoday.com" || !url.pathname.startsWith("/explore/")) {
+              throw new Error(`Queue item ${item.id} does not point to a permanent PTD Today Explore page`);
+            }
+            const filename = decodeURIComponent(url.pathname.split("/").pop());
+            if (!fs.existsSync(`explore/${filename}`)) {
+              throw new Error(`Missing Explore page for ${item.id}`);
+            }
+          }
+
+          console.log(`Validated ${queue.items.length} automatic X queue item(s).`);
+          NODE
+
+      - name: Commit queue + Explore pages if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+
+          git add data/social-queue.json explore/
+
+          if git diff --cached --quiet; then
+            echo "No social queue changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Build PTD Today Cosmos social queue"
+          git push origin main
