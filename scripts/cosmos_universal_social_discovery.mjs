@@ -385,12 +385,13 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
   if (uniqueByUrl.length < 2) return { ok: false, reason: "fewer_than_two_sources" };
   if (distinctHosts(uniqueByUrl).size < 2) return { ok: false, reason: "sources_not_independent" };
 
-  // The Responses web-search tool normally exposes URL citation annotations.
-  // Require at least one returned source to match those citations when annotations exist.
-  if (citationFingerprints.size) {
-    const cited = uniqueByUrl.some(source => citationFingerprints.has(urlFingerprint(source.url)));
-    if (!cited) return { ok: false, reason: "source_not_in_web_search_citations" };
-  }
+  // Web-search citation annotations are useful provenance signals, but exact URL
+  // matching can fail because publishers redirect, canonicalize, or strip tracking.
+  // Keep the signal for diagnostics, but do not reject an otherwise well-sourced
+  // candidate solely because the final source URL differs from the citation URL.
+  const citationMatched = citationFingerprints.size
+    ? uniqueByUrl.some(source => citationFingerprints.has(urlFingerprint(source.url)))
+    : false;
 
   const primary = uniqueByUrl[0];
   const itemId = `universal-${hash12(`${topicKey}|${primary.url}`)}`;
@@ -409,6 +410,7 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       butterfly_question: truncate(candidate.butterfly_question, 180),
       social_hook: truncate(candidate.social_hook, 90),
       sources: uniqueByUrl.slice(0, 3),
+      citation_matched: citationMatched,
       item_id: itemId,
       rank_score: Math.round(score(candidate) * 10) / 10
     }
@@ -744,10 +746,20 @@ async function main() {
 
   const selected = selectDiverse(accepted);
 
+  console.log(`Discovery gate: raw=${parsedCandidates.length} accepted=${accepted.length} selected=${selected.length}.`);
+  if (rejected.length) {
+    const counts = {};
+    for (const row of rejected) counts[row.reason] = (counts[row.reason] || 0) + 1;
+    console.log("Rejected candidate reasons:", JSON.stringify(counts));
+    for (const row of rejected.slice(0, 12)) {
+      console.log(`- rejected [${row.reason}] ${row.title || "(untitled)"}`);
+    }
+  }
+
   if (selected.length < 3) {
     throw new Error(
       `Quality/diversity gate produced only ${selected.length} publishable candidates. ` +
-      `Refusing to overwrite the current queue with weak material.`
+      `Refusing to overwrite the current queue with weak material. See rejection diagnostics above.`
     );
   }
 
@@ -860,6 +872,7 @@ async function main() {
       novelty_score: candidate.novelty_score,
       butterfly_score: candidate.butterfly_score,
       confidence: candidate.confidence,
+      citation_matched: Boolean(candidate.citation_matched),
       sources: candidate.sources
     })),
     rejected
