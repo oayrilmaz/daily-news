@@ -22,12 +22,16 @@ on:
           - linkedin
           - x
 
-  # Three daily opportunities. Daily and per-run caps in the publisher prevent
-  # a burst: LinkedIn defaults to 1/day; X defaults to 3/day and 1/run.
+  # Launch cadence: five spaced X opportunities per day, one post per run.
+  # Current Eastern Daylight Time equivalents are about 8:15 AM, 11:15 AM,
+  # 2:15 PM, 5:15 PM, and 8:15 PM. GitHub cron uses UTC, so local times
+  # shift by one hour when daylight-saving time changes.
   schedule:
-    - cron: "15 13 * * *"
-    - cron: "15 17 * * *"
-    - cron: "15 22 * * *"
+    - cron: "15 12 * * *"
+    - cron: "15 15 * * *"
+    - cron: "15 18 * * *"
+    - cron: "15 21 * * *"
+    - cron: "15 0 * * *"
 
 permissions:
   contents: write
@@ -62,7 +66,7 @@ jobs:
           SOCIAL_AUTOPUBLISH_ENABLED: ${{ vars.SOCIAL_AUTOPUBLISH_ENABLED || 'false' }}
 
           MAX_LINKEDIN_PER_DAY: "1"
-          MAX_X_PER_DAY: "3"
+          MAX_X_PER_DAY: "5"
           MAX_LINKEDIN_PER_RUN: "1"
           MAX_X_PER_RUN: "1"
 
