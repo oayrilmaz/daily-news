@@ -17,6 +17,9 @@ const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").re
 const COSMOS_SHARE_API = String(
   process.env.COSMOS_SHARE_API || "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/share"
 ).trim();
+const COSMOS_ASK_API = String(
+  process.env.COSMOS_ASK_API || "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask"
+).trim();
 const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
 const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 58);
 const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 45);
@@ -548,19 +551,237 @@ async function headOk(url, label, expectImage = false) {
   return response;
 }
 
+
+function sharedEntityId(candidate, localId, label) {
+  const suffix = safeTopicKey(localId || label || "node") || hash12(label || localId || "node");
+  return `shared:${candidate.item_id}:${suffix}`;
+}
+
+function numericConfidence(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value > 1 ? Math.max(0, Math.min(1, value / 100)) : Math.max(0, Math.min(1, value));
+  }
+  const raw = String(value || "").toLowerCase();
+  if (raw === "high") return 0.9;
+  if (raw === "medium") return 0.65;
+  if (raw === "low") return 0.35;
+  return 0.5;
+}
+
+function mapGatewayProjection(candidate, answer) {
+  const nodes = Array.isArray(answer?.projection_nodes) ? answer.projection_nodes.slice(0, 14) : [];
+  const relationships = Array.isArray(answer?.projection_relationships)
+    ? answer.projection_relationships.slice(0, 22)
+    : [];
+
+  const idMap = new Map();
+  const entities = [];
+
+  for (const node of nodes) {
+    const localId = clean(node?.id);
+    const label = clean(node?.label || localId);
+    if (!localId || !label) continue;
+
+    const entityId = sharedEntityId(candidate, localId, label);
+    idMap.set(localId, entityId);
+
+    entities.push({
+      entity_id: entityId,
+      name: label,
+      label,
+      type: clean(node?.type || node?.role || "Projected concept"),
+      role: clean(node?.role || "context"),
+      epistemic_state: clean(node?.epistemic_state || "uncertain"),
+      confidence: numericConfidence(node?.confidence),
+      ephemeral_projection: true,
+      admitted_to_cosmos: false,
+      source_indexes: Array.isArray(node?.source_indexes) ? node.source_indexes.slice(0, 10) : [],
+      projection_mode: clean(node?.projection_mode || answer?.projection_mode || "analytical"),
+      projection_depth: Number.isFinite(Number(node?.projection_depth)) ? Number(node.projection_depth) : null,
+      projection_parent_local_id: clean(node?.parent_id),
+      projection_parent_id: "",
+      projection_role: clean(node?.projection_role || node?.role || ""),
+      projection_version: "social-shared-station-v1"
+    });
+  }
+
+  for (const entity of entities) {
+    const parentLocal = clean(entity.projection_parent_local_id);
+    entity.projection_parent_id = parentLocal ? (idMap.get(parentLocal) || "") : "";
+  }
+
+  const sourceList = Array.isArray(answer?.sources) ? answer.sources : [];
+  const mappedRelationships = [];
+
+  relationships.forEach((rel, index) => {
+    const from = idMap.get(clean(rel?.from_id));
+    const to = idMap.get(clean(rel?.to_id));
+    if (!from || !to || from === to) return;
+
+    const sourceIndexes = Array.isArray(rel?.source_indexes) ? rel.source_indexes : [];
+    const evidenceUrls = sourceIndexes
+      .map(i => sourceList?.[Number(i) - 1]?.url || "")
+      .filter(Boolean);
+
+    mappedRelationships.push({
+      relationship_id: `shared-rel:${candidate.item_id}:${index + 1}`,
+      from_entity_id: from,
+      to_entity_id: to,
+      relationship_type: clean(rel?.label || "related to"),
+      label: clean(rel?.label || "related to"),
+      confidence: numericConfidence(rel?.confidence),
+      epistemic_status: clean(rel?.epistemic_state || "uncertain"),
+      evidence_mode: clean(rel?.epistemic_state || "uncertain"),
+      source_ids: evidenceUrls,
+      ephemeral_projection: true,
+      admitted_to_cosmos: false,
+      projection_version: "social-shared-station-v1"
+    });
+  });
+
+  let subjectLocal = "";
+  for (const node of nodes) {
+    const role = clean(node?.projection_role || node?.role).toLowerCase();
+    if (role === "subject") {
+      subjectLocal = clean(node?.id);
+      break;
+    }
+  }
+  if (!subjectLocal && nodes.length) subjectLocal = clean(nodes[0]?.id);
+
+  const subjectEntityId = idMap.get(subjectLocal) || entities[0]?.entity_id || "";
+  const dynamicIds = entities.map(entity => entity.entity_id);
+
+  return {
+    entities,
+    relationships: mappedRelationships,
+    subject_entity_id: subjectEntityId,
+    dynamic_ids: dynamicIds
+  };
+}
+
+async function buildCosmosProjection(candidate) {
+  const question = [
+    `Explore this exact development: ${candidate.title}.`,
+    clean(candidate.summary),
+    `Question: ${candidate.butterfly_question}`,
+    "Build the most useful evidence-grounded Cosmos topology around this exact development.",
+    "Show the main connected systems, mechanisms, constraints, consequences, or nearby stations.",
+    "Do not invent causal links; use analytical or structural relationships where causality is not established."
+  ].filter(Boolean).join("\n");
+
+  const response = await fetch(COSMOS_ASK_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "PTD-Today-Social-Projection/1.0"
+    },
+    body: JSON.stringify({
+      question,
+      context_policy: "fresh_open_world_coordinate",
+      time_arc: false,
+      journey: []
+    })
+  });
+
+  const raw = await response.text();
+  let answer = {};
+  try { answer = raw ? JSON.parse(raw) : {}; } catch { answer = { raw }; }
+
+  if (!response.ok) {
+    throw new Error(
+      `Cosmos projection request failed (${response.status}): ` +
+      String(answer?.error || answer?.detail || raw).slice(0, 1400)
+    );
+  }
+
+  const mapped = mapGatewayProjection(candidate, answer);
+
+  // A shared social station must actually contain a navigable Cosmos.
+  // We refuse to create/post a station with only the center and no surrounding map.
+  if (mapped.entities.length < 4) {
+    throw new Error(
+      `Cosmos projection for "${candidate.title}" returned only ${mapped.entities.length} node(s). ` +
+      `At least 4 are required for an automatic social station.`
+    );
+  }
+
+  return { answer, mapped, question };
+}
+
 async function createSharedStation(candidate) {
+  const projectionResult = await buildCosmosProjection(candidate);
+  const answer = projectionResult.answer;
+  const mapped = projectionResult.mapped;
+
+  const gatewaySources = Array.isArray(answer?.sources) ? answer.sources : [];
+  const sources = gatewaySources.length
+    ? gatewaySources.slice(0, 10).map(source => ({
+        title: clean(source?.title || source?.url || ""),
+        url: canonicalExternalUrl(source?.url) || clean(source?.url),
+        note: clean(source?.note || "")
+      })).filter(source => source.title || source.url)
+    : candidate.sources;
+
+  const bullets = sources.map((source, index) => ({
+    id: `shared-source-${index + 1}`,
+    title: clean(source?.title || source?.url || `Source ${index + 1}`),
+    summary: clean(source?.note || ""),
+    url: clean(source?.url),
+    article_id: "",
+    seed_ids: []
+  }));
+
+  const stationLabel = clean(
+    answer?.coordinate?.focus_label ||
+    answer?.subject ||
+    candidate.title
+  ) || candidate.title;
+
   const payload = {
     share_title: candidate.title,
     current_station_label: candidate.title,
     label: candidate.title,
-    subject: candidate.title,
-    question: candidate.butterfly_question || candidate.title,
-    intent: "butterfly_exploration",
-    short_answer: candidate.summary,
-    answer: candidate.why_it_matters,
+    subject: clean(answer?.subject || candidate.title),
+    question: projectionResult.question,
+    intent: clean(answer?.intent || "explore"),
+    short_answer: clean(answer?.short_answer || candidate.summary),
+    answer: clean(answer?.answer || candidate.why_it_matters),
     hashtags: normalizedHashtags(candidate),
-    sources: candidate.sources,
-    projection: { entities: [], relationships: [] }
+    sources,
+    observer: {
+      kind: "response",
+      id: `response:shared-social:${candidate.item_id}`,
+      label: stationLabel,
+      question: projectionResult.question,
+      semantic_subject_id: mapped.subject_entity_id,
+      semantic_subject_label: stationLabel
+    },
+    response: {
+      label: stationLabel,
+      question: projectionResult.question,
+      answer: clean(answer?.answer || candidate.why_it_matters),
+      short_answer: clean(answer?.short_answer || candidate.summary),
+      intent: clean(answer?.intent || "explore"),
+      epistemic_state: clean(answer?.epistemic_state || "uncertain"),
+      confidence: clean(answer?.confidence || "medium"),
+      source_label: sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
+      bullets,
+      projection_seed_ids: mapped.subject_entity_id ? [mapped.subject_entity_id] : mapped.dynamic_ids.slice(0, 3),
+      dynamic_projection_ids: mapped.dynamic_ids,
+      dynamic_projection_relationship_count: mapped.relationships.length,
+      suggested_stations: Array.isArray(answer?.suggested_stations)
+        ? answer.suggested_stations.slice(0, 8)
+        : [],
+      knowledge_gaps: Array.isArray(answer?.knowledge_gaps)
+        ? answer.knowledge_gaps.slice(0, 8)
+        : []
+    },
+    projection: {
+      entities: mapped.entities,
+      relationships: mapped.relationships
+    }
   };
 
   const response = await fetch(COSMOS_SHARE_API, {
@@ -592,16 +813,39 @@ async function createSharedStation(candidate) {
   }
 
   const imageUrl = `https://share.ptdtoday.com/social/${encodeURIComponent(stationId)}.png`;
+  const stationApiUrl =
+    `https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/station/${encodeURIComponent(stationId)}`;
 
-  // Never queue a social post until the landing page and its preview image
-  // are both publicly retrievable.
+  // Verify landing page, preview image, AND stored projection before queueing.
   await headOk(shareUrl, "Cosmos share page");
   await headOk(imageUrl, "Cosmos share image", true);
+
+  const stationCheck = await fetch(stationApiUrl, {
+    headers: {
+      "Accept": "application/json",
+      "User-Agent": "PTD-Today-Social-Projection-Preflight/1.0"
+    }
+  });
+  const stationRaw = await stationCheck.text();
+  let storedStation = {};
+  try { storedStation = stationRaw ? JSON.parse(stationRaw) : {}; } catch {}
+
+  const storedEntities = Array.isArray(storedStation?.projection?.entities)
+    ? storedStation.projection.entities.length
+    : 0;
+  if (!stationCheck.ok || storedEntities < 4) {
+    throw new Error(
+      `Shared Cosmos station projection preflight failed: status=${stationCheck.status}, ` +
+      `stored_entities=${storedEntities}, station=${stationId}`
+    );
+  }
 
   return {
     station_id: stationId,
     share_url: shareUrl,
-    image_url: imageUrl
+    image_url: imageUrl,
+    projection_entity_count: mapped.entities.length,
+    projection_relationship_count: mapped.relationships.length
   };
 }
 
@@ -946,7 +1190,9 @@ Explore it in Cosmos.`,
         confidence: candidate.confidence,
         sources: candidate.sources,
         share_station_id: shared.station_id,
-        share_image_url: shared.image_url
+        share_image_url: shared.image_url,
+        share_projection_entity_count: shared.projection_entity_count,
+        share_projection_relationship_count: shared.projection_relationship_count
       }
     });
 
