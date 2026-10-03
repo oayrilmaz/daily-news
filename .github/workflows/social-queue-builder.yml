@@ -48,6 +48,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           COSMOS_DISCOVERY_MODEL: gpt-6-luna
           SITE_ORIGIN: https://ptdtoday.com
+          COSMOS_SHARE_API: https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/share
           SOCIAL_QUEUE_TARGET: "5"
           COSMOS_STRICT_COMPOSITE: "58"
           COSMOS_FALLBACK_COMPOSITE: "45"
@@ -75,13 +76,12 @@ jobs:
             }
 
             const url = new URL(item.source_url);
-            if (url.hostname !== "ptdtoday.com" || !url.pathname.startsWith("/explore/")) {
-              throw new Error(`Queue item ${item.id} does not point to a permanent PTD Today Explore page`);
+            if (url.hostname !== "share.ptdtoday.com" || !url.pathname.startsWith("/s/")) {
+              throw new Error(`Queue item ${item.id} does not point to the persistent Cosmos share surface`);
             }
 
-            const filename = decodeURIComponent(url.pathname.split("/").pop());
-            if (!fs.existsSync(`explore/${filename}`)) {
-              throw new Error(`Missing Explore page for ${item.id}`);
+            if (!item.discovery?.share_station_id || !item.discovery?.share_image_url) {
+              throw new Error(`Queue item ${item.id} is missing shared-station metadata`);
             }
 
             if (!item.discovery || !Array.isArray(item.discovery.sources) || item.discovery.sources.length < 2) {
@@ -97,9 +97,7 @@ jobs:
 
           for (const file of [
             "data/cosmos-universal-discovery.json",
-            "data/cosmos-universal-discovery-history.json",
-            "sitemap-explore.xml",
-            "sitemap.xml"
+            "data/cosmos-universal-discovery-history.json"
           ]) {
             if (!fs.existsSync(file)) throw new Error(`Missing generated file: ${file}`);
           }
@@ -107,7 +105,7 @@ jobs:
           console.log(`Validated ${queue.items.length} universal X queue item(s) across ${domains.size} domains.`);
           NODE
 
-      - name: Commit universal discoveries + Explore pages + Google sitemap
+      - name: Commit universal discoveries + persistent share URLs
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
