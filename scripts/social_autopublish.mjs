@@ -164,6 +164,44 @@ async function verifyXCredentials() {
   console.log("Verification used GET /2/users/me only. No post was created, edited, or deleted.");
 }
 
+
+async function preflightSocialSurface(sourceUrl) {
+  const url = new URL(sourceUrl);
+
+  if (url.hostname.toLowerCase() !== "share.ptdtoday.com") return;
+
+  const match = url.pathname.match(/^\/s\/([^/?#]+)$/);
+  if (!match) {
+    throw new Error(`Unexpected Cosmos share URL path: ${sourceUrl}`);
+  }
+
+  const stationId = decodeURIComponent(match[1]);
+  const imageUrl = `https://share.ptdtoday.com/social/${encodeURIComponent(stationId)}.png`;
+
+  const page = await fetch(sourceUrl, {
+    method: "HEAD",
+    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
+  });
+  if (!page.ok) {
+    throw new Error(`Social landing page is not ready (${page.status}): ${sourceUrl}`);
+  }
+
+  const image = await fetch(imageUrl, {
+    method: "HEAD",
+    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
+  });
+  const imageType = String(image.headers.get("content-type") || "").toLowerCase();
+
+  if (!image.ok || !imageType.startsWith("image/")) {
+    throw new Error(
+      `Social preview image is not ready (${image.status}, ${imageType || "no content-type"}): ${imageUrl}`
+    );
+  }
+
+  console.log(`Social surface preflight passed: ${sourceUrl}`);
+  console.log(`Social image preflight passed: ${imageUrl}`);
+}
+
 async function publishX(text) {
   for (const [name, value] of Object.entries({ X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET })) {
     if (!value) throw new Error(`${name} is required for live X publishing.`);
@@ -267,6 +305,7 @@ async function main() {
       console.log(text);
 
       if (MODE === "live") {
+        await preflightSocialSurface(item.source_url);
         const postId = platform === "linkedin" ? await publishLinkedIn(text) : await publishX(text);
         recordPublished(state, item, platform, postId, item.source_url);
         saveState(state);
