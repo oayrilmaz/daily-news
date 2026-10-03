@@ -7,7 +7,7 @@ const QUEUE_FILE = process.env.SOCIAL_QUEUE_FILE || "data/social-queue.json";
 const EXPLORE_DIR = process.env.SOCIAL_EXPLORE_DIR || "explore";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
-const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 3);
+const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
 const MAX_AGE_HOURS = positiveInt(process.env.SOCIAL_MAX_AGE_HOURS, 48);
 const MIN_SCORE = finiteNumber(process.env.SOCIAL_MIN_SCORE, 2.5);
 
@@ -198,6 +198,36 @@ function exploreHtml(row, exploreUrl, cosmosUrl) {
 `;
 }
 
+
+function xHashtags(row) {
+  const text = `${clean(row?.title)} ${clean(row?.publisher)}`.toLowerCase();
+  const tags = ["#Cosmos"];
+
+  const add = tag => {
+    if (!tags.includes(tag) && tags.length < 4) tags.push(tag);
+  };
+
+  if (/\b(hydrogen|h2)\b/.test(text)) add("#Hydrogen");
+  if (/\b(solar|photovoltaic|pv)\b/.test(text)) add("#SolarEnergy");
+  if (/\b(wind|offshore wind|onshore wind)\b/.test(text)) add("#WindEnergy");
+  if (/\b(battery|bess|energy storage|storage)\b/.test(text)) add("#EnergyStorage");
+  if (/\b(grid|transmission|interconnection|substation|power system)\b/.test(text)) add("#PowerGrid");
+  if (/\b(data center|datacenter|digital infrastructure)\b/.test(text)) add("#DataCenters");
+  if (/\b(ai|artificial intelligence|machine learning)\b/.test(text)) add("#AI");
+  if (/\b(nuclear|reactor|smr)\b/.test(text)) add("#NuclearEnergy");
+  if (/\b(climate|carbon|emission|decarbon)\b/.test(text)) add("#ClimateTech");
+  if (/\b(space|satellite|rocket|lunar|moon|mars)\b/.test(text)) add("#Space");
+  if (/\b(health|medical|medicine|vaccine|clinical)\b/.test(text)) add("#Health");
+  if (/\b(economy|economic|inflation|finance|market)\b/.test(text)) add("#Economy");
+  if (/\b(technology|innovation|startup)\b/.test(text)) add("#Innovation");
+
+  // Fill remaining slots with broad but still relevant discovery tags.
+  if (tags.length < 3 && /\b(energy|power|electric|renewable)\b/.test(text)) add("#Energy");
+  if (tags.length < 3) add("#Innovation");
+
+  return tags.join(" ");
+}
+
 function makeQueueItem(row, createdAt) {
   const sid = safeSid(row.sid);
   const itemId = `news-${sid}`;
@@ -207,8 +237,9 @@ function makeQueueItem(row, createdAt) {
 
   const cosmosUrl = `${SITE_ORIGIN}/cosmos.html?focus=question&question=${encodeURIComponent(question)}&new_topic=1`;
 
-  const xTitle = truncate(title, 168);
-  const xText = `${xTitle}\nWhat could this trigger next? #Cosmos`;
+  const xTitle = truncate(title, 112);
+  const hashtags = xHashtags(row);
+  const xText = `${xTitle}\nWhat could this trigger next?\n${hashtags}`;
 
   const linkedinText =
     `${title}\n\nWhat could this development trigger next — across systems, markets, technology, and people?\n\nExplore it in Cosmos.`;
@@ -281,7 +312,7 @@ function main() {
       max_age_hours: MAX_AGE_HOURS,
       minimum_score: MIN_SCORE,
       auto_platforms: ["x"],
-      note: "Automatic queue uses source-backed PTD Today news feed items only. AI-scenario briefing items are excluded."
+      note: "Automatic queue uses source-backed PTD Today news feed items only. AI-scenario briefing items are excluded. X copy uses up to four relevant hashtags, including #Cosmos."
     },
     items: queueItems
   };
