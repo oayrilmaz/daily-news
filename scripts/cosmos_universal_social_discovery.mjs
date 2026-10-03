@@ -21,7 +21,10 @@ const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45
 const HISTORY_DAYS = positiveInt(process.env.COSMOS_HISTORY_DAYS, 7);
 
 const BLOCKED_AUTOMATED_RE =
-  /\b(election|electoral|ballot|campaign|candidate|partisan|political party|presidential race|parliamentary race|polling|voting intention|war|military strike|terror attack|mass shooting|hostage|death toll|murder|suicide|graphic violence)\b/i;
+  /\b(election|electoral|ballot|candidate|partisan|political party|presidential race|parliamentary race|polling|voting intention|war|military strike|terror attack|mass shooting|hostage|death toll|murder|suicide|graphic violence)\b/i;
+
+const POLITICAL_CAMPAIGN_RE =
+  /\b(?:political|election|electoral|presidential|parliamentary|candidate)\s+campaign\b|\bcampaign\s+(?:trail|rally|finance|ad|advertising|strategy)\b/i;
 
 const DISCOVERY_SCHEMA = {
   type: "object",
@@ -136,6 +139,13 @@ function truncate(value, max) {
 
 function clamp(n, min, max) {
   return Math.min(max, Math.max(min, Number(n) || 0));
+}
+
+function normalizedScore(value) {
+  const n = clamp(value, 0, 100);
+  // Some models naturally return 0-10 ratings despite a 0-100 schema.
+  // Detect that representation per score and normalize it to 0-100.
+  return n > 0 && n <= 10 ? n * 10 : n;
 }
 
 function loadJson(file, fallback) {
@@ -311,9 +321,9 @@ function normalizedHashtags(candidate) {
 
 function score(candidate) {
   return (
-    clamp(candidate.significance_score, 0, 100) * 0.35 +
-    clamp(candidate.butterfly_score, 0, 100) * 0.40 +
-    clamp(candidate.novelty_score, 0, 100) * 0.25
+    normalizedScore(candidate.significance_score) * 0.35 +
+    normalizedScore(candidate.butterfly_score) * 0.40 +
+    normalizedScore(candidate.novelty_score) * 0.25
   );
 }
 
@@ -346,7 +356,8 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
 
   if (candidate.manual_review) return { ok: false, reason: "manual_review" };
   if (candidate.domain === "public_policy") return { ok: false, reason: "public_policy_manual_only" };
-  if (BLOCKED_AUTOMATED_RE.test(`${candidate.title} ${candidate.summary} ${candidate.why_it_matters}`)) {
+  const candidateText = `${candidate.title} ${candidate.summary} ${candidate.why_it_matters}`;
+  if (BLOCKED_AUTOMATED_RE.test(candidateText) || POLITICAL_CAMPAIGN_RE.test(candidateText)) {
     return { ok: false, reason: "blocked_unattended_topic" };
   }
 
@@ -355,7 +366,9 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
   }
 
   const compositeScore = score(candidate);
-  const butterflyScore = Number(candidate.butterfly_score) || 0;
+  const butterflyScore = normalizedScore(candidate.butterfly_score);
+  const normalizedSignificance = normalizedScore(candidate.significance_score);
+  const normalizedNovelty = normalizedScore(candidate.novelty_score);
 
   // Hard safety/evidence gates live above. Quality is now calibrated for
   // "worth exploring in Cosmos", not only for world-historical importance.
@@ -367,8 +380,11 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       ok: false,
       reason: "below_fallback_quality",
       diagnostic: {
-        significance: Number(candidate.significance_score) || 0,
-        novelty: Number(candidate.novelty_score) || 0,
+        significance_raw: Number(candidate.significance_score) || 0,
+        novelty_raw: Number(candidate.novelty_score) || 0,
+        butterfly_raw: Number(candidate.butterfly_score) || 0,
+        significance: normalizedSignificance,
+        novelty: normalizedNovelty,
         butterfly: butterflyScore,
         composite: Math.round(compositeScore * 10) / 10
       }
@@ -428,6 +444,11 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       sources: uniqueByUrl.slice(0, 3),
       citation_matched: citationMatched,
       quality_tier: qualityTier,
+      normalized_scores: {
+        significance: normalizedSignificance,
+        novelty: normalizedNovelty,
+        butterfly: butterflyScore
+      },
       item_id: itemId,
       rank_score: Math.round(compositeScore * 10) / 10
     }
@@ -784,8 +805,9 @@ async function main() {
     console.log("Rejected candidate reasons:", JSON.stringify(counts));
     for (const row of rejected.slice(0, 12)) {
       const d = row.diagnostic
-        ? ` sig=${row.diagnostic.significance} nov=${row.diagnostic.novelty} ` +
-          `bf=${row.diagnostic.butterfly} composite=${row.diagnostic.composite}`
+        ? ` raw(sig=${row.diagnostic.significance_raw},nov=${row.diagnostic.novelty_raw},bf=${row.diagnostic.butterfly_raw})` +
+          ` normalized(sig=${row.diagnostic.significance},nov=${row.diagnostic.novelty},bf=${row.diagnostic.butterfly})` +
+          ` composite=${row.diagnostic.composite}`
         : "";
       console.log(`- rejected [${row.reason}]${d} ${row.title || "(untitled)"}`);
     }
@@ -917,6 +939,7 @@ async function main() {
       confidence: candidate.confidence,
       quality_tier: candidate.quality_tier,
       rank_score: candidate.rank_score,
+      normalized_scores: candidate.normalized_scores,
       citation_matched: Boolean(candidate.citation_matched),
       sources: candidate.sources
     })),
