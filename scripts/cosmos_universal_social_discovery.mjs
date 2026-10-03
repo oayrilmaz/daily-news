@@ -14,6 +14,9 @@ const SITEMAP_EXPLORE = process.env.SITEMAP_EXPLORE_FILE || "sitemap-explore.xml
 const SITEMAP_INDEX = process.env.SITEMAP_INDEX_FILE || "sitemap.xml";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
+const COSMOS_SHARE_API = String(
+  process.env.COSMOS_SHARE_API || "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/share"
+).trim();
 const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
 const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 58);
 const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 45);
@@ -524,6 +527,84 @@ function buildXText(candidate, exploreUrl) {
   return text;
 }
 
+
+async function headOk(url, label, expectImage = false) {
+  const response = await fetch(url, {
+    method: "HEAD",
+    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
+  });
+
+  if (!response.ok) {
+    throw new Error(`${label} HEAD failed (${response.status}) for ${url}`);
+  }
+
+  if (expectImage) {
+    const type = String(response.headers.get("content-type") || "").toLowerCase();
+    if (!type.startsWith("image/")) {
+      throw new Error(`${label} is not an image (${type || "unknown content-type"}): ${url}`);
+    }
+  }
+
+  return response;
+}
+
+async function createSharedStation(candidate) {
+  const payload = {
+    share_title: candidate.title,
+    current_station_label: candidate.title,
+    label: candidate.title,
+    subject: candidate.title,
+    question: candidate.butterfly_question || candidate.title,
+    intent: "butterfly_exploration",
+    short_answer: candidate.summary,
+    answer: candidate.why_it_matters,
+    hashtags: normalizedHashtags(candidate),
+    sources: candidate.sources,
+    projection: { entities: [], relationships: [] }
+  };
+
+  const response = await fetch(COSMOS_SHARE_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "PTD-Today-Universal-Discovery/1.0"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
+
+  if (!response.ok) {
+    throw new Error(
+      `Cosmos share API failed (${response.status}): ` +
+      String(data?.error || data?.detail || raw).slice(0, 1200)
+    );
+  }
+
+  const shareUrl = String(data?.share_url || "").trim();
+  const stationId = String(data?.station_id || "").trim();
+
+  if (!stationId || !/^https:\/\/share\.ptdtoday\.com\/s\/[^/?#]+$/i.test(shareUrl)) {
+    throw new Error(`Cosmos share API returned an invalid share surface: ${raw.slice(0, 1200)}`);
+  }
+
+  const imageUrl = `https://share.ptdtoday.com/social/${encodeURIComponent(stationId)}.png`;
+
+  // Never queue a social post until the landing page and its preview image
+  // are both publicly retrievable.
+  await headOk(shareUrl, "Cosmos share page");
+  await headOk(imageUrl, "Cosmos share image", true);
+
+  return {
+    station_id: stationId,
+    share_url: shareUrl,
+    image_url: imageUrl
+  };
+}
+
 function exploreHtml(candidate, exploreUrl, cosmosUrl) {
   const image = `${SITE_ORIGIN}/cosmos-social-card.png`;
   const description = truncate(candidate.summary, 240);
@@ -828,32 +909,31 @@ async function main() {
   }
 
   const createdAt = new Date().toISOString();
-  fs.mkdirSync(EXPLORE_DIR, { recursive: true });
-
   const queueItems = [];
-  for (const candidate of selected) {
-    const pageId = candidate.item_id.replace(/^universal-/, "u-");
-    const exploreUrl = `${SITE_ORIGIN}/explore/${pageId}.html`;
-    const question = candidate.butterfly_question || `What could this trigger next: ${candidate.title}?`;
-    const cosmosUrl =
-      `${SITE_ORIGIN}/cosmos.html?focus=question&question=${encodeURIComponent(question)}&new_topic=1`;
+  const sharedStations = [];
 
-    fs.writeFileSync(
-      path.join(EXPLORE_DIR, `${pageId}.html`),
-      exploreHtml(candidate, exploreUrl, cosmosUrl),
-      "utf8"
-    );
+  for (const candidate of selected) {
+    const shared = await createSharedStation(candidate);
+    const shareUrl = shared.share_url;
 
     queueItems.push({
       id: candidate.item_id,
       enabled: true,
       created_at: createdAt,
-      source_url: exploreUrl,
+      source_url: shareUrl,
       title: candidate.title,
-      x_text: buildXText(candidate, exploreUrl),
+      x_text: buildXText(candidate, shareUrl),
       linkedin_text:
-        `${candidate.title}\n\n${candidate.summary}\n\n${candidate.why_it_matters}\n\n` +
-        `${candidate.butterfly_question}\n\nExplore it in Cosmos.`,
+        `${candidate.title}
+
+${candidate.summary}
+
+${candidate.why_it_matters}
+
+` +
+        `${candidate.butterfly_question}
+
+Explore it in Cosmos.`,
       platforms: ["x"],
       not_before: null,
       discovery: {
@@ -864,8 +944,17 @@ async function main() {
         novelty_score: candidate.novelty_score,
         butterfly_score: candidate.butterfly_score,
         confidence: candidate.confidence,
-        sources: candidate.sources
+        sources: candidate.sources,
+        share_station_id: shared.station_id,
+        share_image_url: shared.image_url
       }
+    });
+
+    sharedStations.push({
+      item_id: candidate.item_id,
+      station_id: shared.station_id,
+      share_url: shared.share_url,
+      image_url: shared.image_url
     });
   }
 
@@ -881,7 +970,7 @@ async function main() {
       fallback_butterfly_score: FALLBACK_BUTTERFLY,
       automatic_platforms: ["x"],
       note:
-        "Fresh evidence-backed Cosmos discoveries only. Public-policy/political and manual-review candidates are excluded from unattended social publishing."
+        "Fresh evidence-backed Cosmos discoveries only. Each queued item uses the persistent Cloudflare Cosmos share surface with a verified social image. Public-policy/political and manual-review candidates are excluded from unattended social publishing."
     },
     items: queueItems
   };
@@ -923,6 +1012,7 @@ async function main() {
     accepted_candidate_count: accepted.length,
     rejected_candidate_count: rejected.length,
     selected_count: selected.length,
+    shared_stations: sharedStations,
     selected: selected.map(candidate => ({
       item_id: candidate.item_id,
       topic_key: candidate.topic_key,
@@ -946,9 +1036,6 @@ async function main() {
     rejected
   });
 
-  writeExploreSitemap();
-  writeRootSitemapIndex();
-
   console.log(`Cosmos universal discovery selected ${selected.length} item(s) from ${parsedCandidates.length} candidates.`);
   console.log(`Web-search citation fingerprints observed: ${citationFingerprints.size}.`);
   for (const item of queueItems) {
@@ -956,7 +1043,7 @@ async function main() {
     console.log(`  ${item.source_url}`);
     console.log(`  X: ${item.x_text.replace(/\n/g, " | ")}`);
   }
-  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${SITEMAP_EXPLORE}, and ${SITEMAP_INDEX}.`);
+  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, and ${HISTORY_FILE}.`);
 }
 
 main().catch(error => {
