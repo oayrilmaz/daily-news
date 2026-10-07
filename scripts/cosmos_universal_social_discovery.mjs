@@ -12,6 +12,8 @@ const HISTORY_FILE = process.env.COSMOS_DISCOVERY_HISTORY_FILE || "data/cosmos-u
 const EXPLORE_DIR = process.env.SOCIAL_EXPLORE_DIR || "explore";
 const SITEMAP_EXPLORE = process.env.SITEMAP_EXPLORE_FILE || "sitemap-explore.xml";
 const SITEMAP_INDEX = process.env.SITEMAP_INDEX_FILE || "sitemap.xml";
+const COSMOS_DISCOVERIES_FILE = process.env.COSMOS_DISCOVERIES_FILE || "cosmos-discoveries.html";
+const SITEMAP_COSMOS_FILE = process.env.SITEMAP_COSMOS_FILE || "sitemap-cosmos.xml";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
 const COSMOS_SHARE_API = String(
@@ -969,6 +971,121 @@ function writeRootSitemapIndex() {
   fs.writeFileSync(SITEMAP_INDEX, xml, "utf8");
 }
 
+
+function writeCosmosDiscoveryArchive(historyRows, updatedAt) {
+  const rows = [...historyRows]
+    .filter(row => clean(row?.share_url))
+    .sort((a, b) => new Date(b?.queued_at || 0).getTime() - new Date(a?.queued_at || 0).getTime())
+    .slice(0, 120);
+
+  const listItems = rows.map(row => {
+    const title = clean(row.title || "Cosmos discovery");
+    const summary = clean(row.summary || "");
+    const why = clean(row.why_it_matters || "");
+    const domain = clean(row.domain || "other");
+    const geography = clean(row.geography || "global");
+    const queuedAt = clean(row.queued_at || "");
+    const shareUrl = clean(row.share_url);
+    const dateLabel = queuedAt ? new Date(queuedAt).toISOString().slice(0, 10) : "";
+
+    return `
+      <article class="discovery">
+        <p class="meta">${escapeHtml([domain, geography, dateLabel].filter(Boolean).join(" · "))}</p>
+        <h2><a href="${escapeHtml(shareUrl)}">${escapeHtml(title)}</a></h2>
+        ${summary ? `<p>${escapeHtml(summary)}</p>` : ""}
+        ${why ? `<p class="why"><strong>Why it matters:</strong> ${escapeHtml(why)}</p>` : ""}
+        <p><a href="${escapeHtml(shareUrl)}">Open this Cosmos station</a></p>
+      </article>`;
+  }).join("\n");
+
+  const itemList = rows.map((row, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    url: clean(row.share_url),
+    name: clean(row.title || "Cosmos discovery")
+  }));
+
+  const structured = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${SITE_ORIGIN}/cosmos-discoveries.html#collection`,
+    url: `${SITE_ORIGIN}/cosmos-discoveries.html`,
+    name: "Latest Cosmos Discoveries",
+    description:
+      "Fresh evidence-grounded Cosmos discoveries, connected developments and butterfly-effect questions published automatically by PTD Today.",
+    dateModified: updatedAt,
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${SITE_ORIGIN}/#website`,
+      url: `${SITE_ORIGIN}/`,
+      name: "Cosmos by PTD Today"
+    },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: itemList
+    }
+  }).replace(/</g, "\\u003c");
+
+  const page = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Latest Cosmos Discoveries — PTD Today</title>
+  <meta name="description" content="Fresh evidence-grounded Cosmos discoveries, connected developments and butterfly-effect questions published automatically by PTD Today.">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+  <link rel="canonical" href="${SITE_ORIGIN}/cosmos-discoveries.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Cosmos by PTD Today">
+  <meta property="og:title" content="Latest Cosmos Discoveries">
+  <meta property="og:description" content="Fresh evidence-grounded Cosmos discoveries and connected developments published automatically by PTD Today.">
+  <meta property="og:url" content="${SITE_ORIGIN}/cosmos-discoveries.html">
+  <meta property="og:image" content="${SITE_ORIGIN}/cosmos-social-card.png">
+  <script type="application/ld+json">${structured}</script>
+  <style>
+    :root{color-scheme:light}
+    body{max-width:920px;margin:42px auto;padding:0 20px;font-family:Arial,Helvetica,sans-serif;line-height:1.62;color:#17243a;background:#fff}
+    a{color:#2356a8}.kicker,.meta,.updated{color:#6c788b}.kicker{letter-spacing:.12em;text-transform:uppercase;font-size:12px}
+    h1{font-size:clamp(32px,6vw,56px);line-height:1.04;margin:10px 0 16px}h2{font-size:24px;line-height:1.2;margin:6px 0 10px}
+    .intro{font-size:18px;max-width:760px}.discovery{padding:24px 0;border-top:1px solid #e2e7ef}.why{color:#33445f}
+    .cta{display:inline-block;margin:8px 0 28px;padding:10px 15px;border:1px solid #ccd6e6;border-radius:999px;text-decoration:none}
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">PTD Today · Cosmos</p>
+    <h1>Latest Cosmos Discoveries</h1>
+    <p class="intro">Cosmos continuously discovers fresh evidence-backed developments, builds connected stations around them, and publishes persistent public pages that can be explored by people and discovered by search engines.</p>
+    <p><a class="cta" href="${SITE_ORIGIN}/">Open Cosmos</a></p>
+    ${listItems || `<p>No public discovery stations are available yet. The next automatic discovery run will update this page.</p>`}
+    <p class="updated">Last updated: ${escapeHtml(updatedAt)}</p>
+  </main>
+</body>
+</html>
+`;
+  fs.writeFileSync(COSMOS_DISCOVERIES_FILE, page, "utf8");
+}
+
+function writeCosmosSitemap(updatedAt) {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${xmlEscape(`${SITE_ORIGIN}/`)}</loc>
+    <lastmod>${xmlEscape(updatedAt)}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${xmlEscape(`${SITE_ORIGIN}/cosmos-discoveries.html`)}</loc>
+    <lastmod>${xmlEscape(updatedAt)}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+</urlset>
+`;
+  fs.writeFileSync(SITEMAP_COSMOS_FILE, xml, "utf8");
+}
+
 function discoveryPrompt(requestTime) {
   return [
     "You are the universal discovery layer for PTD Today / Cosmos.",
@@ -1229,15 +1346,23 @@ Explore it in Cosmos.`,
     return Number.isFinite(t) && t >= recentCutoff;
   });
 
+  const sharedByItem = new Map(sharedStations.map(row => [row.item_id, row]));
+
   for (const candidate of selected) {
+    const shared = sharedByItem.get(candidate.item_id) || {};
     retainedHistory.push({
       topic_key: candidate.topic_key,
       item_id: candidate.item_id,
       queued_at: createdAt,
       title: candidate.title,
+      summary: candidate.summary,
+      why_it_matters: candidate.why_it_matters,
+      butterfly_question: candidate.butterfly_question,
       domain: candidate.domain,
       geography: candidate.geography,
-      primary_source_url: candidate.sources?.[0]?.url || ""
+      primary_source_url: candidate.sources?.[0]?.url || "",
+      station_id: shared.station_id || "",
+      share_url: shared.share_url || ""
     });
   }
 
@@ -1246,6 +1371,9 @@ Explore it in Cosmos.`,
     updated_at: createdAt,
     items: retainedHistory
   });
+
+  writeCosmosDiscoveryArchive(retainedHistory, createdAt);
+  writeCosmosSitemap(createdAt);
 
   writeJson(DISCOVERY_FILE, {
     schema_version: "1.0",
@@ -1289,7 +1417,7 @@ Explore it in Cosmos.`,
     console.log(`  ${item.source_url}`);
     console.log(`  X: ${item.x_text.replace(/\n/g, " | ")}`);
   }
-  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, and ${HISTORY_FILE}.`);
+  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${COSMOS_DISCOVERIES_FILE}, and ${SITEMAP_COSMOS_FILE}.`);
 }
 
 main().catch(error => {
