@@ -3,11 +3,24 @@ name: Build Cosmos Universal Social Queue
 on:
   workflow_dispatch:
 
-  # Build a fresh Cosmos social queue every morning.
-  # 10:30 UTC = 6:30 AM EDT / 5:30 AM EST.
-  # This gives the queue time to complete before the first X publish slot.
+  # Primary + recovery schedules.
+  # The queue freshness guard below means only the first successful trigger
+  # actually rebuilds the queue. The later triggers are automatic fallbacks
+  # in case GitHub delays or drops an earlier scheduled event.
   schedule:
-    - cron: "30 10 * * *"
+    - cron: "47 9 * * *"
+    - cron: "37 10 * * *"
+    - cron: "27 11 * * *"
+    - cron: "7 13 * * *"
+
+  # Independent backup path: rebuild after the main daily PTD workflow
+  # completes successfully. This no longer replaces the direct schedules;
+  # it is only redundancy.
+  workflow_run:
+    workflows:
+      - "Home AI + Video (PTD Today)"
+    types:
+      - completed
 
 permissions:
   contents: write
@@ -18,6 +31,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -42,7 +56,47 @@ jobs:
       - name: Validate universal discovery syntax
         run: node --check scripts/cosmos_universal_social_discovery.mjs
 
+      - name: Check whether the Cosmos X queue is already fresh
+        id: queue_freshness
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+
+          let shouldBuild = true;
+          let reason = "queue missing or unreadable";
+
+          try {
+            const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
+            const updatedAt = Date.parse(String(queue.updated_at || ""));
+            const items = Array.isArray(queue.items) ? queue.items : [];
+            const ageHours = Number.isFinite(updatedAt)
+              ? (Date.now() - updatedAt) / 3600000
+              : Infinity;
+
+            // A healthy queue created within the last 18 hours does not need
+            // another expensive discovery pass. Backup cron triggers simply exit.
+            if (items.length >= 3 && items.length <= 5 && ageHours >= 0 && ageHours < 18) {
+              shouldBuild = false;
+              reason = `fresh queue: ${items.length} items, ${ageHours.toFixed(1)}h old`;
+            } else {
+              reason = `stale/invalid queue: ${items.length} items, ${Number.isFinite(ageHours) ? ageHours.toFixed(1) : "unknown"}h old`;
+            }
+          } catch (error) {
+            reason = `queue check failed: ${error.message}`;
+          }
+
+          console.log(reason);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${shouldBuild ? "true" : "false"}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason.replace(/\n/g, " ")}\n`);
+          NODE
+
+      - name: Skip message when a fresh queue already exists
+        if: ${{ steps.queue_freshness.outputs.should_build != 'true' }}
+        run: echo "Fresh Cosmos X queue already exists. Recovery trigger exits without rebuilding."
+
       - name: Discover fresh multidimensional Cosmos topics + build X queue
+        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           COSMOS_DISCOVERY_MODEL: gpt-6-luna
@@ -56,6 +110,7 @@ jobs:
         run: node scripts/cosmos_universal_social_discovery.mjs
 
       - name: Validate generated universal queue
+        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         shell: bash
         run: |
           node - <<'NODE'
@@ -107,6 +162,7 @@ jobs:
           NODE
 
       - name: Commit universal discoveries + persistent share URLs
+        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
