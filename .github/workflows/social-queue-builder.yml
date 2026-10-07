@@ -96,7 +96,9 @@ jobs:
 
           for (const file of [
             "data/cosmos-universal-discovery.json",
-            "data/cosmos-universal-discovery-history.json"
+            "data/cosmos-universal-discovery-history.json",
+            "cosmos-discoveries.html",
+            "sitemap-cosmos.xml"
           ]) {
             if (!fs.existsSync(file)) throw new Error(`Missing generated file: ${file}`);
           }
@@ -112,12 +114,14 @@ jobs:
           git add \
             data/social-queue.json \
             data/cosmos-universal-discovery.json \
-            data/cosmos-universal-discovery-history.json
+            data/cosmos-universal-discovery-history.json \
+            cosmos-discoveries.html \
+            sitemap-cosmos.xml
 
           if git diff --cached --quiet; then
             echo "No universal Cosmos discovery changes to commit."
             exit 0
           fi
 
-          git commit -m "Build Cosmos universal social discovery"
+          git commit -m "Build Cosmos universal discovery + search feed"
           git push origin main
