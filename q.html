@@ -84,6 +84,12 @@ a{color:inherit}button,textarea{font:inherit}
 .cq-create-panel{position:relative;z-index:2;display:none;padding:54px 28px 50px;max-width:820px;margin:0 auto}.cq-create-panel.is-open{display:block}.cq-create-panel h2{font-size:clamp(34px,5vw,54px);letter-spacing:-.045em;margin:0 0 10px;text-align:center;color:#22304a}.cq-create-panel p{text-align:center;color:#7c879a;margin:0 auto 28px;max-width:610px;line-height:1.55}.cq-create-box{position:relative;background:#fff;border:1px solid #dfe5ef;border-radius:28px;padding:18px;box-shadow:var(--shadow)}.cq-create-box:before{content:"";position:absolute;left:50%;top:-120px;transform:translateX(-50%);width:210px;height:210px;border-radius:50%;background:radial-gradient(circle,#7c96ee 0 3%,#2d4f91 45%,#102d61 75%);opacity:.10;filter:blur(1px);pointer-events:none}.cq-create-input{position:relative;width:100%;min-height:126px;border:1px solid #d7deea;border-radius:20px;padding:17px;resize:vertical;outline:none;font-size:17px;line-height:1.45;color:#283650;background:#fcfdff}.cq-create-input:focus{border-color:#99a9d7;box-shadow:0 0 0 4px rgba(107,132,222,.11)}.cq-create-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}.cq-status{font-size:13px;color:#7c879a;margin-top:10px;min-height:20px}
 .cq-error{max-width:700px;margin:90px auto;padding:24px;background:#fff;border:1px solid #eccccc;border-radius:22px;color:#8d3d3d;box-shadow:var(--shadow)}
 .cq-hidden{display:none!important}
+.cq-question-shareline{display:flex;justify-content:center;margin:4px 0 0}
+.cq-share-modal{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:18px;background:rgba(17,31,58,.34);backdrop-filter:blur(12px)}
+.cq-share-card{width:min(720px,100%);background:rgba(255,255,255,.98);border:1px solid #dfe5ef;border-radius:28px;box-shadow:0 28px 90px rgba(30,49,90,.22);padding:24px}
+.cq-share-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:14px}.cq-share-title{font-size:24px;font-weight:800;letter-spacing:-.03em;color:#22304a}.cq-share-sub{margin-top:5px;color:#7c879a;font-size:13px;line-height:1.45}.cq-share-close{border:0;background:#f2f5fa;width:36px;height:36px;border-radius:50%;cursor:pointer;color:#536078;font-size:20px;line-height:1}
+.cq-share-text{width:100%;min-height:190px;border:1px solid #d7deea;border-radius:18px;padding:15px;background:#fbfcff;color:#2b3852;font:500 14px/1.55 Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;resize:vertical;outline:none}.cq-share-text:focus{border-color:#9cadde;box-shadow:0 0 0 4px rgba(107,132,222,.10)}
+.cq-share-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.cq-share-status{margin-top:10px;min-height:18px;color:#738099;font-size:12px}.cq-share-platform{min-width:110px}.cq-share-platform-x{background:#111827;color:white;border-color:#111827}.cq-share-platform-li{background:#0a66c2;color:white;border-color:#0a66c2}
 @media(max-width:880px){
   .cq-shell{width:min(100% - 18px,760px);padding-top:12px}.cq-topbar{align-items:flex-start}.cq-top-actions{gap:6px}.cq-btn{padding:9px 12px;font-size:13px}.cq-stage{min-height:640px}.cq-question-wrap{padding:20px 8px 30px}.cq-orbit{height:auto;display:flex;flex-direction:column;gap:10px;align-items:stretch}.cq-orbit:before,.cq-orbit:after{display:none}.cq-center{position:relative;left:auto;top:auto;transform:none;width:290px;height:290px;margin:14px auto 18px;padding:43px}.cq-option{position:relative!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;width:100%;min-height:68px;border-radius:18px}.cq-option:hover{transform:translateY(-1px)!important}.cq-result-grid{grid-template-columns:1fr}.cq-create-panel{padding-left:8px;padding-right:8px}
 }
@@ -98,6 +104,7 @@ a{color:inherit}button,textarea{font:inherit}
         <span>Cosmos<small>by PTD Today</small></span>
       </a>
       <div class="cq-top-actions">
+        <button id="cqShareQuestionTop" class="cq-btn" type="button" hidden>Share question</button>
         <button id="cqCreateTop" class="cq-btn" type="button">Create a question</button>
         <a class="cq-btn cq-btn-primary" href="/">Ask Cosmos</a>
       </div>
@@ -117,6 +124,9 @@ a{color:inherit}button,textarea{font:inherit}
             </div>
           </div>
           <div id="cqPrompt" class="cq-note">Choose before seeing what everyone else and Cosmos think.</div>
+          <div class="cq-question-shareline">
+            <button id="cqShareQuestionInline" class="cq-btn" type="button">Share this question</button>
+          </div>
         </div>
       </section>
 
@@ -168,6 +178,26 @@ a{color:inherit}button,textarea{font:inherit}
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="cqShareModal" class="cq-share-modal cq-hidden" role="dialog" aria-modal="true" aria-labelledby="cqShareTitle">
+    <div class="cq-share-card">
+      <div class="cq-share-head">
+        <div>
+          <div id="cqShareTitle" class="cq-share-title">Share this Cosmos Question</div>
+          <div class="cq-share-sub">The description and hashtags are prepared automatically. X uses a compact version; LinkedIn gets the full A–E question.</div>
+        </div>
+        <button id="cqShareClose" class="cq-share-close" type="button" aria-label="Close sharing">×</button>
+      </div>
+      <textarea id="cqShareText" class="cq-share-text" readonly></textarea>
+      <div class="cq-share-actions">
+        <button id="cqShareX" class="cq-btn cq-share-platform cq-share-platform-x" type="button">Share on X</button>
+        <button id="cqShareLinkedIn" class="cq-btn cq-share-platform cq-share-platform-li" type="button">LinkedIn</button>
+        <button id="cqShareNative" class="cq-btn cq-share-platform" type="button">Share…</button>
+        <button id="cqShareCopy" class="cq-btn cq-share-platform" type="button">Copy post</button>
+      </div>
+      <div id="cqShareStatus" class="cq-share-status"></div>
+    </div>
   </div>
 
   <script>
@@ -456,6 +486,128 @@ a{color:inherit}button,textarea{font:inherit}
     el("cqDeepLink").href = deepUrl;
   }
 
+  function topicHashtag(){
+    const raw = clean(state.challenge?.short_title || state.challenge?.title || "");
+    const words = raw.match(/[A-Za-z0-9]+/g) || [];
+    if(!words.length) return "#Explore";
+    const body = words.slice(0,3).map(word => {
+      if(word.length <= 3) return word.toUpperCase();
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join("").slice(0,26);
+    return body ? `#${body}` : "#Explore";
+  }
+
+  function questionShareUrl(){
+    const url = new URL(location.href);
+    url.hash = "";
+    return url.href;
+  }
+
+  function questionShareHashtags(){
+    const tags = ["#Cosmos", "#ButterflyEffect", topicHashtag()];
+    return [...new Set(tags.map(t => t.toLowerCase()))].map(lower => tags.find(t => t.toLowerCase() === lower)).filter(Boolean).join(" ");
+  }
+
+  function fullQuestionShareText(){
+    const node = state.challenge || state.current;
+    if(!node?.question) return "";
+    const options = (node.options || []).map(o => `${o.key}. ${clean(o.label)}`).join("\n");
+    return [
+      "Cosmos Question",
+      "",
+      clean(node.question),
+      "",
+      options,
+      "",
+      "Choose before seeing what the crowd and Cosmos think. Then follow where your choice leads.",
+      "",
+      questionShareHashtags()
+    ].join("\n");
+  }
+
+  function compactQuestionShareText(){
+    const node = state.challenge || state.current;
+    if(!node?.question) return "";
+    const q = clean(node.question).slice(0,72);
+    const options = (node.options || []).map(o => `${o.key} ${clean(o.label).slice(0,18)}`).join(" · ");
+    const tags = ["#Cosmos", topicHashtag()].join(" ");
+    let text = `Cosmos Question: ${q}\n${options}\nChoose A–E before seeing Crowd vs Cosmos.\n${tags}`;
+    if(text.length > 235){
+      const shortOptions = (node.options || []).map(o => `${o.key} ${clean(o.label).slice(0,13)}`).join(" · ");
+      text = `Cosmos Question: ${clean(node.question).slice(0,58)}\n${shortOptions}\nChoose first.\n${tags}`;
+    }
+    return text.slice(0,245);
+  }
+
+  function openQuestionShare(){
+    if(!state.challenge?.question) return;
+    const modal = el("cqShareModal");
+    const text = el("cqShareText");
+    const status = el("cqShareStatus");
+    if(text) text.value = fullQuestionShareText();
+    if(status) status.textContent = "";
+    modal?.classList.remove("cq-hidden");
+  }
+
+  function closeQuestionShare(){
+    el("cqShareModal")?.classList.add("cq-hidden");
+  }
+
+  async function copyText(value){
+    try{
+      await navigator.clipboard.writeText(value);
+      return true;
+    }catch{
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function shareQuestionX(){
+    const text = compactQuestionShareText();
+    const url = questionShareUrl();
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function shareQuestionLinkedIn(){
+    const status = el("cqShareStatus");
+    const payload = `${fullQuestionShareText()}\n${questionShareUrl()}`;
+    const copied = await copyText(payload);
+    if(status) status.textContent = copied
+      ? "LinkedIn post text + hashtags copied. Paste it into the LinkedIn composer that opens."
+      : "LinkedIn will open. Copy the prepared text above if your browser blocks clipboard access.";
+    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(questionShareUrl())}`, "_blank", "noopener,noreferrer");
+  }
+
+  async function shareQuestionNative(){
+    const text = fullQuestionShareText();
+    const url = questionShareUrl();
+    const status = el("cqShareStatus");
+    try{
+      if(navigator.share){
+        await navigator.share({title:"Cosmos Question", text, url});
+      }else{
+        await copyText(`${text}\n${url}`);
+        if(status) status.textContent = "Post text + link copied.";
+      }
+    }catch(error){
+      if(error?.name !== "AbortError" && status) status.textContent = "Could not open the share sheet. Use X, LinkedIn, or Copy post.";
+    }
+  }
+
+  async function copyQuestionPost(){
+    const ok = await copyText(`${fullQuestionShareText()}\n${questionShareUrl()}`);
+    const status = el("cqShareStatus");
+    if(status) status.textContent = ok ? "Post text, hashtags and link copied." : "Could not copy automatically. Select the text above and copy it manually.";
+  }
+
   async function shareJourney(){
     const path = state.journey.map(j => j.answer_label).join(" → ");
     const text = `I started with “${state.challenge.question}” and my Cosmos Butterfly went: ${path}. Where will yours end?`;
@@ -508,11 +660,13 @@ a{color:inherit}button,textarea{font:inherit}
     state.step = 1;
     state.journey = [];
     document.title = `${root.question} · Cosmos Question`;
+    if(el("cqShareQuestionTop")) el("cqShareQuestionTop").hidden = false;
     renderQuestion();
   }
 
   function openCreate(){
     setView("create");
+    if(!state.challenge && el("cqShareQuestionTop")) el("cqShareQuestionTop").hidden = true;
     el("cqCreateInput")?.focus();
   }
 
@@ -549,6 +703,15 @@ a{color:inherit}button,textarea{font:inherit}
   function wire(){
     el("cqContinue")?.addEventListener("click",continueButterfly);
     el("cqShare")?.addEventListener("click",shareJourney);
+    el("cqShareQuestionTop")?.addEventListener("click",openQuestionShare);
+    el("cqShareQuestionInline")?.addEventListener("click",openQuestionShare);
+    el("cqShareClose")?.addEventListener("click",closeQuestionShare);
+    el("cqShareModal")?.addEventListener("click",event => { if(event.target === el("cqShareModal")) closeQuestionShare(); });
+    el("cqShareX")?.addEventListener("click",shareQuestionX);
+    el("cqShareLinkedIn")?.addEventListener("click",shareQuestionLinkedIn);
+    el("cqShareNative")?.addEventListener("click",shareQuestionNative);
+    el("cqShareCopy")?.addEventListener("click",copyQuestionPost);
+    document.addEventListener("keydown",event => { if(event.key === "Escape") closeQuestionShare(); });
     el("cqCreateTop")?.addEventListener("click",openCreate);
     el("cqCreateFromFinal")?.addEventListener("click",openCreate);
     el("cqCreateSubmit")?.addEventListener("click",createChallenge);
