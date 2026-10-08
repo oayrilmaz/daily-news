@@ -9,30 +9,20 @@ const QUEUE_FILE = process.env.SOCIAL_QUEUE_FILE || "data/social-queue.json";
 const STATE_FILE = process.env.SOCIAL_STATE_FILE || "data/social-published.json";
 const DISCOVERY_FILE = process.env.COSMOS_DISCOVERY_FILE || "data/cosmos-universal-discovery.json";
 const HISTORY_FILE = process.env.COSMOS_DISCOVERY_HISTORY_FILE || "data/cosmos-universal-discovery-history.json";
-const EXPLORE_DIR = process.env.SOCIAL_EXPLORE_DIR || "explore";
-const SITEMAP_EXPLORE = process.env.SITEMAP_EXPLORE_FILE || "sitemap-explore.xml";
-const SITEMAP_INDEX = process.env.SITEMAP_INDEX_FILE || "sitemap.xml";
-const COSMOS_DISCOVERIES_FILE = process.env.COSMOS_DISCOVERIES_FILE || "cosmos-discoveries.html";
-const SITEMAP_COSMOS_FILE = process.env.SITEMAP_COSMOS_FILE || "sitemap-cosmos.xml";
+const Q_DIR = process.env.COSMOS_QUESTION_DIR || "q";
+const QUESTION_TEMPLATE = process.env.COSMOS_QUESTION_TEMPLATE || "q.html";
+const SITEMAP_COSMOS = process.env.SITEMAP_COSMOS_FILE || "sitemap-cosmos.xml";
+const DISCOVERIES_HTML = process.env.COSMOS_DISCOVERIES_HTML || "cosmos-discoveries.html";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
-const COSMOS_SHARE_API = String(
-  process.env.COSMOS_SHARE_API || "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/share"
-).trim();
-const COSMOS_ASK_API = String(
-  process.env.COSMOS_ASK_API || "https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/ask"
-).trim();
 const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
-const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 58);
-const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 45);
+const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 60);
+const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 48);
 const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45);
 const HISTORY_DAYS = positiveInt(process.env.COSMOS_HISTORY_DAYS, 7);
 
-const BLOCKED_AUTOMATED_RE =
-  /\b(election|electoral|ballot|candidate|partisan|political party|presidential race|parliamentary race|polling|voting intention|war|military strike|terror attack|mass shooting|hostage|death toll|murder|suicide|graphic violence)\b/i;
-
-const POLITICAL_CAMPAIGN_RE =
-  /\b(?:political|election|electoral|presidential|parliamentary|candidate)\s+campaign\b|\bcampaign\s+(?:trail|rally|finance|ad|advertising|strategy)\b/i;
+const BLOCKED_AUTOMATED_RE = /\b(election|electoral|ballot|candidate|partisan|political party|presidential race|parliamentary race|polling|voting intention|war|military strike|terror attack|mass shooting|hostage|death toll|murder|suicide|graphic violence)\b/i;
+const POLITICAL_CAMPAIGN_RE = /\b(?:political|election|electoral|presidential|parliamentary|candidate)\s+campaign\b|\bcampaign\s+(?:trail|rally|finance|ad|advertising|strategy)\b/i;
 
 const DISCOVERY_SCHEMA = {
   type: "object",
@@ -48,79 +38,57 @@ const DISCOVERY_SCHEMA = {
         type: "object",
         additionalProperties: false,
         required: [
-          "topic_key",
-          "domain",
-          "geography",
-          "title",
-          "summary",
-          "why_it_matters",
-          "butterfly_question",
-          "social_hook",
-          "hashtags",
-          "significance_score",
-          "novelty_score",
-          "butterfly_score",
-          "confidence",
-          "manual_review",
-          "manual_review_reason",
-          "sources"
+          "topic_key","domain","geography","title","summary","why_it_matters",
+          "butterfly_question","social_hook","hashtags","challenge_question",
+          "challenge_options","answer_mode","cosmos_choice","answer_explanation",
+          "challenge_confidence","attention_score","significance_score","novelty_score",
+          "butterfly_score","confidence","manual_review","manual_review_reason","sources"
         ],
         properties: {
           topic_key: { type: "string" },
-          domain: {
-            type: "string",
-            enum: [
-              "science",
-              "health",
-              "technology",
-              "ai",
-              "space",
-              "environment",
-              "economics",
-              "business",
-              "society",
-              "culture",
-              "education",
-              "infrastructure",
-              "energy",
-              "public_policy",
-              "other"
-            ]
-          },
+          domain: { type: "string", enum: [
+            "science","health","technology","ai","space","environment","economics",
+            "business","society","culture","education","infrastructure","energy",
+            "public_policy","sports","travel","other"
+          ] },
           geography: { type: "string" },
           title: { type: "string" },
           summary: { type: "string" },
           why_it_matters: { type: "string" },
           butterfly_question: { type: "string" },
           social_hook: { type: "string" },
-          hashtags: {
-            type: "array",
-            minItems: 2,
-            maxItems: 4,
-            items: { type: "string" }
+          hashtags: { type: "array", minItems: 2, maxItems: 4, items: { type: "string" } },
+          challenge_question: { type: "string" },
+          challenge_options: {
+            type: "array", minItems: 5, maxItems: 5,
+            items: {
+              type: "object", additionalProperties: false,
+              required: ["key","label"],
+              properties: {
+                key: { type: "string", enum: ["A","B","C","D","E"] },
+                label: { type: "string" }
+              }
+            }
           },
+          answer_mode: { type: "string", enum: ["fact","supported","opinion","prediction"] },
+          cosmos_choice: { type: "string", enum: ["A","B","C","D","E","NONE"] },
+          answer_explanation: { type: "string" },
+          challenge_confidence: { type: "string", enum: ["high","medium","low"] },
+          attention_score: { type: "integer", minimum: 0, maximum: 100 },
           significance_score: { type: "integer", minimum: 0, maximum: 100 },
           novelty_score: { type: "integer", minimum: 0, maximum: 100 },
           butterfly_score: { type: "integer", minimum: 0, maximum: 100 },
-          confidence: {
-            type: "string",
-            enum: ["high", "medium", "low"]
-          },
+          confidence: { type: "string", enum: ["high","medium","low"] },
           manual_review: { type: "boolean" },
           manual_review_reason: { type: "string" },
           sources: {
-            type: "array",
-            minItems: 2,
-            maxItems: 3,
+            type: "array", minItems: 2, maxItems: 3,
             items: {
-              type: "object",
-              additionalProperties: false,
-              required: ["title", "url", "publisher", "published_at"],
+              type: "object", additionalProperties: false,
+              required: ["title","url","publisher","published_at"],
               properties: {
-                title: { type: "string" },
-                url: { type: "string" },
-                publisher: { type: "string" },
-                published_at: { type: "string" }
+                title: { type: "string" }, url: { type: "string" },
+                publisher: { type: "string" }, published_at: { type: "string" }
               }
             }
           }
@@ -318,6 +286,9 @@ function normalizedHashtags(candidate) {
     education: "#Education",
     infrastructure: "#Infrastructure",
     energy: "#Energy",
+    sports: "#Sports",
+    travel: "#Travel",
+    public_policy: "#PublicPolicy",
     other: "#Innovation"
   }[candidate.domain];
 
@@ -329,9 +300,10 @@ function normalizedHashtags(candidate) {
 
 function score(candidate) {
   return (
-    normalizedScore(candidate.significance_score) * 0.35 +
-    normalizedScore(candidate.butterfly_score) * 0.40 +
-    normalizedScore(candidate.novelty_score) * 0.25
+    normalizedScore(candidate.significance_score) * 0.25 +
+    normalizedScore(candidate.butterfly_score) * 0.30 +
+    normalizedScore(candidate.novelty_score) * 0.20 +
+    normalizedScore(candidate.attention_score) * 0.25
   );
 }
 
@@ -433,8 +405,30 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
     ? uniqueByUrl.some(source => citationFingerprints.has(urlFingerprint(source.url)))
     : false;
 
+  const challengeQuestion = truncate(candidate.challenge_question || candidate.butterfly_question, 220);
+  const answerMode = ["fact", "supported", "opinion", "prediction"].includes(candidate.answer_mode)
+    ? candidate.answer_mode
+    : "supported";
+  const cosmosChoice = /^[A-E]$/.test(String(candidate.cosmos_choice || ""))
+    ? String(candidate.cosmos_choice)
+    : "NONE";
+  const challengeOptions = Array.isArray(candidate.challenge_options)
+    ? candidate.challenge_options
+        .filter(option => /^[A-E]$/.test(String(option?.key || "")) && clean(option?.label))
+        .slice(0, 5)
+        .map(option => ({ key: String(option.key), label: truncate(option.label, 120) }))
+    : [];
+
+  if (!challengeQuestion) return { ok: false, reason: "missing_challenge_question" };
+  if (challengeOptions.length !== 5 || challengeOptions.map(o => o.key).join("") !== "ABCDE") {
+    return { ok: false, reason: "invalid_challenge_options" };
+  }
+  if (["fact", "supported"].includes(answerMode) && cosmosChoice === "NONE") {
+    return { ok: false, reason: "missing_cosmos_choice" };
+  }
+
   const primary = uniqueByUrl[0];
-  const itemId = `universal-${hash12(`${topicKey}|${primary.url}`)}`;
+  const itemId = `universal-${hash12(`${topicKey}|${primary.url}|${challengeQuestion}`)}`;
 
   if (historyKeys.has(topicKey)) return { ok: false, reason: "recent_topic_duplicate" };
   if (postedIds.has(itemId)) return { ok: false, reason: "already_published" };
@@ -449,6 +443,15 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
       why_it_matters: truncate(candidate.why_it_matters, 440),
       butterfly_question: truncate(candidate.butterfly_question, 180),
       social_hook: truncate(candidate.social_hook, 90),
+      challenge_question: challengeQuestion,
+      challenge_options: challengeOptions,
+      answer_mode: answerMode,
+      cosmos_choice: cosmosChoice,
+      answer_explanation: truncate(candidate.answer_explanation, 700),
+      challenge_confidence: ["high", "medium", "low"].includes(candidate.challenge_confidence)
+        ? candidate.challenge_confidence
+        : candidate.confidence,
+      attention_score: normalizedScore(candidate.attention_score),
       sources: uniqueByUrl.slice(0, 3),
       citation_matched: citationMatched,
       quality_tier: qualityTier,
@@ -480,15 +483,17 @@ function selectDiverse(candidates) {
   const canAdd = candidate => {
     const domain = candidate.domain || "other";
     const geo = clean(candidate.geography).toLowerCase() || "global";
-    return (domainCount.get(domain) || 0) < 2 && (geoCount.get(geo) || 0) < 2;
+    const globalScope = ["global", "worldwide", "international", "multiple", "cross-border"].includes(geo);
+    return (domainCount.get(domain) || 0) < 2 && (globalScope || (geoCount.get(geo) || 0) < 2);
   };
 
   const add = candidate => {
     selected.push(candidate);
     const domain = candidate.domain || "other";
     const geo = clean(candidate.geography).toLowerCase() || "global";
+    const globalScope = ["global", "worldwide", "international", "multiple", "cross-border"].includes(geo);
     domainCount.set(domain, (domainCount.get(domain) || 0) + 1);
-    geoCount.set(geo, (geoCount.get(geo) || 0) + 1);
+    if (!globalScope) geoCount.set(geo, (geoCount.get(geo) || 0) + 1);
   };
 
   // First pass: maximize domain diversity, preferring strict candidates.
@@ -512,633 +517,189 @@ function selectDiverse(candidates) {
   return selected;
 }
 
-function buildXText(candidate, exploreUrl) {
+
+
+function compactOptions(candidate) {
+  return candidate.challenge_options.map(option => `${option.key}. ${truncate(option.label, 34)}`).join(" · ");
+}
+
+function buildXText(candidate, questionUrl) {
+  const tags = normalizedHashtags(candidate).slice(0, 3).join(" ");
+  const q = truncate(candidate.challenge_question, 118);
+  const options = compactOptions(candidate);
+  const cta = "Choose first. Then see the Crowd + Cosmos.";
+  const reserved = questionUrl.length + 4;
+  const max = Math.max(150, 280 - reserved);
+
+  const versions = [
+    `${q}\n${options}\n${cta}\n${tags}`,
+    `${q}\n${options}\nVote before seeing the result.\n${tags}`,
+    `${q}\nA–E: choose inside Cosmos. See the Crowd + Cosmos.\n${tags}`,
+    `${q}\nChoose before seeing what everyone else thinks.\n${tags}`
+  ];
+  return versions.find(text => text.length <= max) || truncate(versions.at(-1), max);
+}
+
+function buildLinkedInText(candidate) {
+  const options = candidate.challenge_options.map(option => `${option.key}. ${option.label}`).join("\n");
   const tags = normalizedHashtags(candidate).join(" ");
-  const title = truncate(candidate.title, 108);
-  const hook = truncate(candidate.social_hook || "What could this trigger next?", 72);
-
-  let text = `${title}\n${hook}\n${tags}`;
-
-  // The publisher appends two newlines + URL. Leave enough room below X's 280 chars.
-  const reserved = exploreUrl.length + 2;
-  const maxBeforeUrl = Math.max(120, 280 - reserved);
-  if (text.length > maxBeforeUrl) {
-    text = `${truncate(title, 92)}\n${truncate(hook, 50)}\n${tags}`;
-  }
-  if (text.length > maxBeforeUrl) {
-    text = `${truncate(title, 105)}\n${tags}`;
-  }
-
-  return text;
+  return [
+    candidate.social_hook || candidate.title,
+    "",
+    candidate.challenge_question,
+    "",
+    options,
+    "",
+    "Choose before seeing how the crowd answered — then follow your choice through the Cosmos Butterfly.",
+    "",
+    tags
+  ].join("\n");
 }
 
-
-async function headOk(url, label, expectImage = false) {
-  const response = await fetch(url, {
-    method: "HEAD",
-    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
-  });
-
-  if (!response.ok) {
-    throw new Error(`${label} HEAD failed (${response.status}) for ${url}`);
-  }
-
-  if (expectImage) {
-    const type = String(response.headers.get("content-type") || "").toLowerCase();
-    if (!type.startsWith("image/")) {
-      throw new Error(`${label} is not an image (${type || "unknown content-type"}): ${url}`);
-    }
-  }
-
-  return response;
+function challengeSlug(candidate) {
+  const base = safeTopicKey(candidate.topic_key || candidate.title).slice(0, 56) || "cosmos-question";
+  return `${base}-${hash12(`${candidate.item_id}|${candidate.challenge_question}`).slice(0, 8)}`;
 }
 
-
-function sharedEntityId(candidate, localId, label) {
-  const suffix = safeTopicKey(localId || label || "node") || hash12(label || localId || "node");
-  return `shared:${candidate.item_id}:${suffix}`;
-}
-
-function numericConfidence(value) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value > 1 ? Math.max(0, Math.min(1, value / 100)) : Math.max(0, Math.min(1, value));
-  }
-  const raw = String(value || "").toLowerCase();
-  if (raw === "high") return 0.9;
-  if (raw === "medium") return 0.65;
-  if (raw === "low") return 0.35;
-  return 0.5;
-}
-
-function mapGatewayProjection(candidate, answer) {
-  const nodes = Array.isArray(answer?.projection_nodes) ? answer.projection_nodes.slice(0, 14) : [];
-  const relationships = Array.isArray(answer?.projection_relationships)
-    ? answer.projection_relationships.slice(0, 22)
-    : [];
-
-  const idMap = new Map();
-  const entities = [];
-
-  for (const node of nodes) {
-    const localId = clean(node?.id);
-    const label = clean(node?.label || localId);
-    if (!localId || !label) continue;
-
-    const entityId = sharedEntityId(candidate, localId, label);
-    idMap.set(localId, entityId);
-
-    entities.push({
-      entity_id: entityId,
-      name: label,
-      label,
-      type: clean(node?.type || node?.role || "Projected concept"),
-      role: clean(node?.role || "context"),
-      epistemic_state: clean(node?.epistemic_state || "uncertain"),
-      confidence: numericConfidence(node?.confidence),
-      ephemeral_projection: true,
-      admitted_to_cosmos: false,
-      source_indexes: Array.isArray(node?.source_indexes) ? node.source_indexes.slice(0, 10) : [],
-      projection_mode: clean(node?.projection_mode || answer?.projection_mode || "analytical"),
-      projection_depth: Number.isFinite(Number(node?.projection_depth)) ? Number(node.projection_depth) : null,
-      projection_parent_local_id: clean(node?.parent_id),
-      projection_parent_id: "",
-      projection_role: clean(node?.projection_role || node?.role || ""),
-      projection_version: "social-shared-station-v1"
-    });
-  }
-
-  for (const entity of entities) {
-    const parentLocal = clean(entity.projection_parent_local_id);
-    entity.projection_parent_id = parentLocal ? (idMap.get(parentLocal) || "") : "";
-  }
-
-  const sourceList = Array.isArray(answer?.sources) ? answer.sources : [];
-  const mappedRelationships = [];
-
-  relationships.forEach((rel, index) => {
-    const from = idMap.get(clean(rel?.from_id));
-    const to = idMap.get(clean(rel?.to_id));
-    if (!from || !to || from === to) return;
-
-    const sourceIndexes = Array.isArray(rel?.source_indexes) ? rel.source_indexes : [];
-    const evidenceUrls = sourceIndexes
-      .map(i => sourceList?.[Number(i) - 1]?.url || "")
-      .filter(Boolean);
-
-    mappedRelationships.push({
-      relationship_id: `shared-rel:${candidate.item_id}:${index + 1}`,
-      from_entity_id: from,
-      to_entity_id: to,
-      relationship_type: clean(rel?.label || "related to"),
-      label: clean(rel?.label || "related to"),
-      confidence: numericConfidence(rel?.confidence),
-      epistemic_status: clean(rel?.epistemic_state || "uncertain"),
-      evidence_mode: clean(rel?.epistemic_state || "uncertain"),
-      source_ids: evidenceUrls,
-      ephemeral_projection: true,
-      admitted_to_cosmos: false,
-      projection_version: "social-shared-station-v1"
-    });
-  });
-
-  let subjectLocal = "";
-  for (const node of nodes) {
-    const role = clean(node?.projection_role || node?.role).toLowerCase();
-    if (role === "subject") {
-      subjectLocal = clean(node?.id);
-      break;
-    }
-  }
-  if (!subjectLocal && nodes.length) subjectLocal = clean(nodes[0]?.id);
-
-  const subjectEntityId = idMap.get(subjectLocal) || entities[0]?.entity_id || "";
-  const dynamicIds = entities.map(entity => entity.entity_id);
-
+function officialChallenge(candidate, pageUrl) {
   return {
-    entities,
-    relationships: mappedRelationships,
-    subject_entity_id: subjectEntityId,
-    dynamic_ids: dynamicIds
+    schema_version: "1.0",
+    challenge_id: `official-${hash12(`${candidate.item_id}|${candidate.challenge_question}`)}`,
+    official: true,
+    created_at: new Date().toISOString(),
+    title: candidate.title,
+    short_title: truncate(candidate.title, 70),
+    question_id: "root",
+    question: candidate.challenge_question,
+    options: candidate.challenge_options,
+    answer_mode: candidate.answer_mode,
+    cosmos_choice: candidate.cosmos_choice,
+    answer_explanation: candidate.answer_explanation,
+    confidence: candidate.challenge_confidence,
+    butterfly_question: candidate.butterfly_question,
+    domain: candidate.domain,
+    geography: candidate.geography,
+    canonical_url: pageUrl,
+    sources: candidate.sources
   };
 }
 
-async function buildCosmosProjection(candidate) {
-  const question = [
-    `Explore this exact development: ${candidate.title}.`,
-    clean(candidate.summary),
-    `Question: ${candidate.butterfly_question}`,
-    "Build the most useful evidence-grounded Cosmos topology around this exact development.",
-    "Show the main connected systems, mechanisms, constraints, consequences, or nearby stations.",
-    "Do not invent causal links; use analytical or structural relationships where causality is not established."
-  ].filter(Boolean).join("\n");
-
-  const response = await fetch(COSMOS_ASK_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "User-Agent": "PTD-Today-Social-Projection/1.0"
-    },
-    body: JSON.stringify({
-      question,
-      context_policy: "fresh_open_world_coordinate",
-      time_arc: false,
-      journey: []
-    })
-  });
-
-  const raw = await response.text();
-  let answer = {};
-  try { answer = raw ? JSON.parse(raw) : {}; } catch { answer = { raw }; }
-
-  if (!response.ok) {
-    throw new Error(
-      `Cosmos projection request failed (${response.status}): ` +
-      String(answer?.error || answer?.detail || raw).slice(0, 1400)
-    );
-  }
-
-  const mapped = mapGatewayProjection(candidate, answer);
-
-  // A shared social station must actually contain a navigable Cosmos.
-  // We refuse to create/post a station with only the center and no surrounding map.
-  if (mapped.entities.length < 4) {
-    throw new Error(
-      `Cosmos projection for "${candidate.title}" returned only ${mapped.entities.length} node(s). ` +
-      `At least 4 are required for an automatic social station.`
-    );
-  }
-
-  return { answer, mapped, question };
+function renderOfficialQuestionPage(template, challenge, candidate, pageUrl) {
+  const description = truncate(
+    `Choose first, compare with the crowd and Cosmos, then follow the Butterfly. ${candidate.summary}`,
+    260
+  );
+  const bootstrap = JSON.stringify(challenge).replace(/</g, "\\u003c");
+  let html = template;
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(candidate.challenge_question)} · Cosmos Question</title>`);
+  html = html.replace(/<meta name="description"[^>]*>/i, `<meta name="description" content="${escapeHtml(description)}">`);
+  html = html.replace(/<meta name="robots"[^>]*>/i, `<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">`);
+  html = html.replace(/<meta property="og:title"[^>]*>/i, `<meta property="og:title" content="${escapeHtml(candidate.challenge_question)}">`);
+  html = html.replace(/<meta property="og:description"[^>]*>/i, `<meta property="og:description" content="${escapeHtml(description)}">`);
+  html = html.replace("</head>", `  <link rel="canonical" href="${escapeHtml(pageUrl)}">\n  <meta property="og:url" content="${escapeHtml(pageUrl)}">\n</head>`);
+  html = html.replace(
+    '<script src="/assets/cosmos-question.js" defer></script>',
+    `<script>window.COSMOS_CHALLENGE_BOOTSTRAP=${bootstrap};</script>\n  <script src="/assets/cosmos-question.js" defer></script>`
+  );
+  return html;
 }
 
-async function createSharedStation(candidate) {
-  const projectionResult = await buildCosmosProjection(candidate);
-  const answer = projectionResult.answer;
-  const mapped = projectionResult.mapped;
-
-  const gatewaySources = Array.isArray(answer?.sources) ? answer.sources : [];
-  const sources = gatewaySources.length
-    ? gatewaySources.slice(0, 10).map(source => ({
-        title: clean(source?.title || source?.url || ""),
-        url: canonicalExternalUrl(source?.url) || clean(source?.url),
-        note: clean(source?.note || "")
-      })).filter(source => source.title || source.url)
-    : candidate.sources;
-
-  const bullets = sources.map((source, index) => ({
-    id: `shared-source-${index + 1}`,
-    title: clean(source?.title || source?.url || `Source ${index + 1}`),
-    summary: clean(source?.note || ""),
-    url: clean(source?.url),
-    article_id: "",
-    seed_ids: []
-  }));
-
-  const stationLabel = clean(
-    answer?.coordinate?.focus_label ||
-    answer?.subject ||
-    candidate.title
-  ) || candidate.title;
-
-  const payload = {
-    share_title: candidate.title,
-    current_station_label: candidate.title,
-    label: candidate.title,
-    subject: clean(answer?.subject || candidate.title),
-    question: projectionResult.question,
-    intent: clean(answer?.intent || "explore"),
-    short_answer: clean(answer?.short_answer || candidate.summary),
-    answer: clean(answer?.answer || candidate.why_it_matters),
-    hashtags: normalizedHashtags(candidate),
-    sources,
-    observer: {
-      kind: "response",
-      id: `response:shared-social:${candidate.item_id}`,
-      label: stationLabel,
-      question: projectionResult.question,
-      semantic_subject_id: mapped.subject_entity_id,
-      semantic_subject_label: stationLabel
-    },
-    response: {
-      label: stationLabel,
-      question: projectionResult.question,
-      answer: clean(answer?.answer || candidate.why_it_matters),
-      short_answer: clean(answer?.short_answer || candidate.summary),
-      intent: clean(answer?.intent || "explore"),
-      epistemic_state: clean(answer?.epistemic_state || "uncertain"),
-      confidence: clean(answer?.confidence || "medium"),
-      source_label: sources.length ? "Cosmos + web evidence" : "Cosmos reasoning",
-      bullets,
-      projection_seed_ids: mapped.subject_entity_id ? [mapped.subject_entity_id] : mapped.dynamic_ids.slice(0, 3),
-      dynamic_projection_ids: mapped.dynamic_ids,
-      dynamic_projection_relationship_count: mapped.relationships.length,
-      suggested_stations: Array.isArray(answer?.suggested_stations)
-        ? answer.suggested_stations.slice(0, 8)
-        : [],
-      knowledge_gaps: Array.isArray(answer?.knowledge_gaps)
-        ? answer.knowledge_gaps.slice(0, 8)
-        : []
-    },
-    projection: {
-      entities: mapped.entities,
-      relationships: mapped.relationships
-    }
-  };
-
-  const response = await fetch(COSMOS_SHARE_API, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
-      "User-Agent": "PTD-Today-Universal-Discovery/1.0"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const raw = await response.text();
-  let data = {};
-  try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
-
-  if (!response.ok) {
-    throw new Error(
-      `Cosmos share API failed (${response.status}): ` +
-      String(data?.error || data?.detail || raw).slice(0, 1200)
-    );
-  }
-
-  const shareUrl = String(data?.share_url || "").trim();
-  const stationId = String(data?.station_id || "").trim();
-
-  if (!stationId || !/^https:\/\/share\.ptdtoday\.com\/s\/[^/?#]+$/i.test(shareUrl)) {
-    throw new Error(`Cosmos share API returned an invalid share surface: ${raw.slice(0, 1200)}`);
-  }
-
-  const imageUrl = `https://share.ptdtoday.com/social/${encodeURIComponent(stationId)}.png`;
-  const stationApiUrl =
-    `https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/station/${encodeURIComponent(stationId)}`;
-
-  // Verify landing page, preview image, AND stored projection before queueing.
-  await headOk(shareUrl, "Cosmos share page");
-  await headOk(imageUrl, "Cosmos share image", true);
-
-  const stationCheck = await fetch(stationApiUrl, {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "PTD-Today-Social-Projection-Preflight/1.0"
-    }
-  });
-  const stationRaw = await stationCheck.text();
-  let storedStation = {};
-  try { storedStation = stationRaw ? JSON.parse(stationRaw) : {}; } catch {}
-
-  const storedEntities = Array.isArray(storedStation?.projection?.entities)
-    ? storedStation.projection.entities.length
-    : 0;
-  if (!stationCheck.ok || storedEntities < 4) {
-    throw new Error(
-      `Shared Cosmos station projection preflight failed: status=${stationCheck.status}, ` +
-      `stored_entities=${storedEntities}, station=${stationId}`
-    );
-  }
-
-  return {
-    station_id: stationId,
-    share_url: shareUrl,
-    image_url: imageUrl,
-    projection_entity_count: mapped.entities.length,
-    projection_relationship_count: mapped.relationships.length
-  };
-}
-
-function exploreHtml(candidate, exploreUrl, cosmosUrl) {
-  const image = `${SITE_ORIGIN}/cosmos-social-card.png`;
-  const description = truncate(candidate.summary, 240);
-
-  const structured = JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "WebPage",
-    url: exploreUrl,
-    name: candidate.title,
-    description,
-    dateModified: new Date().toISOString(),
-    isPartOf: {
-      "@type": "WebSite",
-      url: `${SITE_ORIGIN}/`,
-      name: "PTD Today"
-    },
-    about: {
-      "@type": "Thing",
-      name: candidate.title,
-      description: candidate.why_it_matters
-    }
-  }).replace(/</g, "\\u003c");
-
-  const sourceList = candidate.sources
-    .map(source =>
-      `<li><a href="${escapeHtml(source.url)}" rel="noopener noreferrer">${escapeHtml(source.title || source.publisher || source.url)}</a>${source.publisher ? ` · ${escapeHtml(source.publisher)}` : ""}</li>`
-    )
-    .join("\n");
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${escapeHtml(candidate.title)} · Explore in Cosmos</title>
-  <meta name="description" content="${escapeHtml(description)}">
-  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
-  <link rel="canonical" href="${escapeHtml(exploreUrl)}">
-
-  <meta property="og:type" content="article">
-  <meta property="og:site_name" content="PTD Today · Cosmos">
-  <meta property="og:title" content="${escapeHtml(candidate.title)}">
-  <meta property="og:description" content="${escapeHtml(description)}">
-  <meta property="og:url" content="${escapeHtml(exploreUrl)}">
-  <meta property="og:image" content="${escapeHtml(image)}">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="627">
-
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${escapeHtml(candidate.title)}">
-  <meta name="twitter:description" content="${escapeHtml(description)}">
-  <meta name="twitter:image" content="${escapeHtml(image)}">
-
-  <script type="application/ld+json">${structured}</script>
-</head>
-<body>
-  <main>
-    <p>PTD Today · Cosmos Explore</p>
-    <h1>${escapeHtml(candidate.title)}</h1>
-    <p>${escapeHtml(candidate.summary)}</p>
-
-    <h2>Why it matters</h2>
-    <p>${escapeHtml(candidate.why_it_matters)}</p>
-
-    <h2>Butterfly question</h2>
-    <p>${escapeHtml(candidate.butterfly_question)}</p>
-
-    <p><a href="${escapeHtml(cosmosUrl)}">Explore this question in Cosmos</a></p>
-
-    <h2>Sources</h2>
-    <ul>
-      ${sourceList}
-    </ul>
-  </main>
-</body>
-</html>
-`;
-}
-
-function writeExploreSitemap() {
-  fs.mkdirSync(EXPLORE_DIR, { recursive: true });
-  const files = fs.readdirSync(EXPLORE_DIR)
+function collectHtmlUrls(dir, prefix) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
     .filter(name => name.toLowerCase().endsWith(".html"))
-    .sort();
-
-  const rows = files.map(name => {
-    const full = path.join(EXPLORE_DIR, name);
-    const stat = fs.statSync(full);
-    return `  <url><loc>${xmlEscape(`${SITE_ORIGIN}/explore/${encodeURIComponent(name)}`)}</loc><lastmod>${xmlEscape(stat.mtime.toISOString())}</lastmod><changefreq>daily</changefreq><priority>0.7</priority></url>`;
-  });
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${rows.join("\n")}
-</urlset>
-`;
-  fs.writeFileSync(SITEMAP_EXPLORE, xml, "utf8");
+    .map(name => {
+      const full = path.join(dir, name);
+      return { url: `${SITE_ORIGIN}/${prefix}/${encodeURIComponent(name)}`, lastmod: fs.statSync(full).mtime.toISOString() };
+    });
 }
 
-function writeRootSitemapIndex() {
-  const now = new Date().toISOString();
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <sitemap>
-    <loc>${xmlEscape(`${SITE_ORIGIN}/sitemap-main.xml`)}</loc>
-    <lastmod>${xmlEscape(now)}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${xmlEscape(`${SITE_ORIGIN}/sitemap-articles.xml`)}</loc>
-    <lastmod>${xmlEscape(now)}</lastmod>
-  </sitemap>
-  <sitemap>
-    <loc>${xmlEscape(`${SITE_ORIGIN}/sitemap-explore.xml`)}</loc>
-    <lastmod>${xmlEscape(now)}</lastmod>
-  </sitemap>
-</sitemapindex>
-`;
-  fs.writeFileSync(SITEMAP_INDEX, xml, "utf8");
+function writeCosmosSitemap() {
+  const urls = [
+    ...collectHtmlUrls("explore", "explore"),
+    ...collectHtmlUrls(Q_DIR, "q")
+  ];
+  const seen = new Set();
+  const rows = [];
+  for (const row of urls.sort((a,b) => b.lastmod.localeCompare(a.lastmod))) {
+    if (seen.has(row.url)) continue;
+    seen.add(row.url);
+    rows.push(`  <url><loc>${xmlEscape(row.url)}</loc><lastmod>${xmlEscape(row.lastmod)}</lastmod><changefreq>weekly</changefreq><priority>0.75</priority></url>`);
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${rows.join("\n")}\n</urlset>\n`;
+  fs.writeFileSync(SITEMAP_COSMOS, xml, "utf8");
 }
 
-
-function writeCosmosDiscoveryArchive(historyRows, updatedAt) {
-  const rows = [...historyRows]
-    .filter(row => clean(row?.share_url))
-    .sort((a, b) => new Date(b?.queued_at || 0).getTime() - new Date(a?.queued_at || 0).getTime())
-    .slice(0, 120);
-
-  const listItems = rows.map(row => {
-    const title = clean(row.title || "Cosmos discovery");
-    const summary = clean(row.summary || "");
-    const why = clean(row.why_it_matters || "");
-    const domain = clean(row.domain || "other");
-    const geography = clean(row.geography || "global");
-    const queuedAt = clean(row.queued_at || "");
-    const shareUrl = clean(row.share_url);
-    const dateLabel = queuedAt ? new Date(queuedAt).toISOString().slice(0, 10) : "";
-
-    return `
-      <article class="discovery">
-        <p class="meta">${escapeHtml([domain, geography, dateLabel].filter(Boolean).join(" · "))}</p>
-        <h2><a href="${escapeHtml(shareUrl)}">${escapeHtml(title)}</a></h2>
-        ${summary ? `<p>${escapeHtml(summary)}</p>` : ""}
-        ${why ? `<p class="why"><strong>Why it matters:</strong> ${escapeHtml(why)}</p>` : ""}
-        <p><a href="${escapeHtml(shareUrl)}">Open this Cosmos station</a></p>
-      </article>`;
+function writeDiscoveriesArchive(queueItems) {
+  const cards = queueItems.map(item => {
+    const c = item.discovery?.challenge || {};
+    const options = (c.options || []).map(o => `<li><strong>${escapeHtml(o.key)}.</strong> ${escapeHtml(o.label)}</li>`).join("");
+    return `<article><h2><a href="${escapeHtml(item.source_url)}">${escapeHtml(c.question || item.title)}</a></h2><p>${escapeHtml(item.discovery?.summary || "")}</p><ol>${options}</ol><p><a href="${escapeHtml(item.source_url)}">Answer before seeing the result →</a></p></article>`;
   }).join("\n");
-
-  const itemList = rows.map((row, index) => ({
-    "@type": "ListItem",
-    position: index + 1,
-    url: clean(row.share_url),
-    name: clean(row.title || "Cosmos discovery")
-  }));
-
-  const structured = JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "@id": `${SITE_ORIGIN}/cosmos-discoveries.html#collection`,
-    url: `${SITE_ORIGIN}/cosmos-discoveries.html`,
-    name: "Latest Cosmos Discoveries",
-    description:
-      "Fresh evidence-grounded Cosmos discoveries, connected developments and butterfly-effect questions published automatically by PTD Today.",
-    dateModified: updatedAt,
-    isPartOf: {
-      "@type": "WebSite",
-      "@id": `${SITE_ORIGIN}/#website`,
-      url: `${SITE_ORIGIN}/`,
-      name: "Cosmos by PTD Today"
-    },
-    mainEntity: {
-      "@type": "ItemList",
-      itemListElement: itemList
-    }
-  }).replace(/</g, "\\u003c");
-
-  const page = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Latest Cosmos Discoveries — PTD Today</title>
-  <meta name="description" content="Fresh evidence-grounded Cosmos discoveries, connected developments and butterfly-effect questions published automatically by PTD Today.">
-  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
-  <link rel="canonical" href="${SITE_ORIGIN}/cosmos-discoveries.html">
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Cosmos by PTD Today">
-  <meta property="og:title" content="Latest Cosmos Discoveries">
-  <meta property="og:description" content="Fresh evidence-grounded Cosmos discoveries and connected developments published automatically by PTD Today.">
-  <meta property="og:url" content="${SITE_ORIGIN}/cosmos-discoveries.html">
-  <meta property="og:image" content="${SITE_ORIGIN}/cosmos-social-card.png">
-  <script type="application/ld+json">${structured}</script>
-  <style>
-    :root{color-scheme:light}
-    body{max-width:920px;margin:42px auto;padding:0 20px;font-family:Arial,Helvetica,sans-serif;line-height:1.62;color:#17243a;background:#fff}
-    a{color:#2356a8}.kicker,.meta,.updated{color:#6c788b}.kicker{letter-spacing:.12em;text-transform:uppercase;font-size:12px}
-    h1{font-size:clamp(32px,6vw,56px);line-height:1.04;margin:10px 0 16px}h2{font-size:24px;line-height:1.2;margin:6px 0 10px}
-    .intro{font-size:18px;max-width:760px}.discovery{padding:24px 0;border-top:1px solid #e2e7ef}.why{color:#33445f}
-    .cta{display:inline-block;margin:8px 0 28px;padding:10px 15px;border:1px solid #ccd6e6;border-radius:999px;text-decoration:none}
-  </style>
-</head>
-<body>
-  <main>
-    <p class="kicker">PTD Today · Cosmos</p>
-    <h1>Latest Cosmos Discoveries</h1>
-    <p class="intro">Cosmos continuously discovers fresh evidence-backed developments, builds connected stations around them, and publishes persistent public pages that can be explored by people and discovered by search engines.</p>
-    <p><a class="cta" href="${SITE_ORIGIN}/">Open Cosmos</a></p>
-    ${listItems || `<p>No public discovery stations are available yet. The next automatic discovery run will update this page.</p>`}
-    <p class="updated">Last updated: ${escapeHtml(updatedAt)}</p>
-  </main>
-</body>
-</html>
-`;
-  fs.writeFileSync(COSMOS_DISCOVERIES_FILE, page, "utf8");
-}
-
-function writeCosmosSitemap(updatedAt) {
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${xmlEscape(`${SITE_ORIGIN}/`)}</loc>
-    <lastmod>${xmlEscape(updatedAt)}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${xmlEscape(`${SITE_ORIGIN}/cosmos-discoveries.html`)}</loc>
-    <lastmod>${xmlEscape(updatedAt)}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-</urlset>
-`;
-  fs.writeFileSync(SITEMAP_COSMOS_FILE, xml, "utf8");
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cosmos Questions · PTD Today</title><meta name="description" content="Fresh evidence-backed questions from Cosmos. Choose first, compare with the crowd and Cosmos, then follow the Butterfly."><meta name="robots" content="index,follow"><link rel="canonical" href="${SITE_ORIGIN}/cosmos-discoveries.html"></head><body><main><h1>Cosmos Questions</h1><p>Choose first. See what the world and Cosmos think. Follow where it leads.</p>${cards}</main></body></html>\n`;
+  fs.writeFileSync(DISCOVERIES_HTML, html, "utf8");
 }
 
 function discoveryPrompt(requestTime) {
   return [
-    "You are the universal discovery layer for PTD Today / Cosmos.",
+    "You are the universal discovery and attention layer for PTD Today / Cosmos.",
     "",
     "MISSION",
-    "Find the strongest fresh developments in the world that are worth exploring through a butterfly-effect lens.",
-    "Cosmos is not an energy feed. Energy, grids, AI, data centers, science, health, space, environment, economics, business, society, culture, education, infrastructure and other domains compete on equal terms.",
+    "Find fresh, evidence-backed developments that can become irresistible but responsible Cosmos Questions — short participatory entrances that lead into a butterfly-effect exploration.",
+    "Cosmos is universal. Science, health, technology, AI, space, environment, economics, business, society, culture, education, infrastructure, energy, sports, travel and other domains compete on equal terms.",
     "",
     "DISCOVERY WINDOW",
     `Current UTC time: ${requestTime}`,
-    "Prioritize developments from roughly the last 24-36 hours. Use older context only when needed to understand a genuinely fresh change.",
+    "Prioritize developments from roughly the last 24-36 hours. Use older context only when necessary to explain a genuinely fresh change.",
     "",
-    "SELECTION PRINCIPLES",
-    "- Search broadly across domains and geographies; do not inherit PTD Today's existing energy-heavy knowledge density.",
-    "- Return 8-12 evidence-backed candidates so a downstream diversity gate can choose five.",
-    "- Prefer developments with real downstream consequences, cross-domain connections, second-order effects, or structural significance.",
-    "- Do not force quotas, but avoid returning a list dominated by one domain or geography.",
-    "- Avoid celebrity gossip, routine product marketing, generic listicles, rumors, opinion-only stories, and low-consequence incremental updates.",
-    "- Do not sensationalize. The social_hook should be intriguing but factual and restrained.",
+    "SELECTION",
+    "- Return 8-12 candidates so downstream quality/diversity gates can select the strongest 3-5.",
+    "- Prefer developments with meaningful second-order consequences and cross-domain paths.",
+    "- attention_score measures whether a normal person would stop, choose and want to see the result — without clickbait.",
+    "- Avoid generic headline summaries. Turn each development into a question that creates curiosity, comparison or surprise.",
+    "- Do not force energy or AI. Topic diversity is a core requirement.",
+    "",
+    "COSMOS QUESTION CONTRACT",
+    "- challenge_question must be self-contained, concise and understandable without reading the source article.",
+    "- Provide exactly five options with keys A, B, C, D, E in that order.",
+    "- Options must all be plausible and distinct. Avoid joke answers or obvious padding.",
+    "- answer_mode=fact only when there is an objectively verifiable correct answer.",
+    "- answer_mode=supported when evidence currently favors one answer but uncertainty remains.",
+    "- answer_mode=opinion when no answer is objectively correct; use cosmos_choice=NONE.",
+    "- answer_mode=prediction for unresolved future outcomes; cosmos_choice may be the evidence-backed Cosmos view today or NONE when evidence is too weak.",
+    "- For fact or supported, cosmos_choice must be A-E and answer_explanation must explain why using the evidence.",
+    "- Never call a forecast 'correct'. Use best-supported/current view logic instead.",
+    "- butterfly_question is the deeper consequence question that becomes the bridge into Cosmos.",
+    "",
+    "SOCIAL",
+    "- social_hook must be factual, short and curiosity-producing, not sensational.",
+    "- The social post will hide the crowd result and answer until the person enters Cosmos.",
+    "- hashtags: 2-4 genuinely relevant topical tags. Do not include #Cosmos; downstream adds it.",
     "",
     "EVIDENCE",
     "- Use web search.",
-    "- Each candidate must have 2-3 direct public source URLs from at least two independent publishers/domains.",
-    "- Prefer primary, official, scientific, regulatory, company-filing, institutional, or high-quality news sources.",
-    "- Do not invent URLs. Do not use search-result pages or AI-generated summaries as sources.",
-    "- title, summary, why_it_matters and social_hook must be supported by those sources.",
+    "- Each candidate requires 2-3 direct public source URLs from at least two independent domains.",
+    "- Prefer primary/official/scientific/regulatory/company-filing/institutional/high-quality reporting.",
+    "- Do not invent URLs.",
+    "- The title, summary, why_it_matters, challenge answer and explanation must be supported by the sources.",
     "",
     "UNATTENDED SOCIAL SAFETY",
-    "- Do not select elections, candidates, campaigns, partisan persuasion, polling, or political advocacy for unattended social publishing.",
-    "- Public-policy/regulatory developments may be returned only with manual_review=true; the downstream system will hold them out of automatic posting.",
-    "- Mark manual_review=true for a development involving acute violence/tragedy, individualized medical/financial/legal advice, contested allegations, or another topic that should not be auto-published without human review.",
-    "- Health/science developments can be eligible when factual, non-personalized, and grounded in strong scientific/official sources.",
+    "- Do not select elections, candidates, campaigns, partisan persuasion, polling, war/acute violence, tragedy or contested allegations for unattended posting.",
+    "- Public-policy/regulatory developments may be returned only with manual_review=true.",
+    "- Mark manual_review=true for individualized medical/financial/legal advice or anything inappropriate for unattended publication.",
     "",
-    "COSMOS FORM",
-    "- topic_key must be a stable compact semantic identifier, not a date or random ID.",
-    "- summary: 1-2 concise factual sentences.",
-    "- why_it_matters: explain the material consequence in 1-2 concise sentences.",
-    "- butterfly_question: one compelling neutral question about what this could trigger next.",
-    "- social_hook: one short factual curiosity hook, not clickbait, ideally under 80 characters.",
-    "- hashtags: 2-4 genuinely relevant topical hashtags. Do not include #Cosmos; the downstream system adds it.",
-    "- significance_score measures real-world importance.",
-    "- novelty_score measures how meaningfully new the development is now.",
-    "- butterfly_score measures downstream/cross-domain consequence potential.",
+    "SCORING",
+    "- significance_score: real-world importance.",
+    "- novelty_score: how meaningfully new it is now.",
+    "- butterfly_score: consequence/cross-domain depth.",
+    "- attention_score: likelihood a broad audience will stop, choose, and want the reveal while remaining factual.",
     "",
     "Return only the required structured JSON."
   ].join("\n");
 }
 
 async function requestUniversalDiscovery() {
-  if (!OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is required for Cosmos universal discovery.");
-  }
-
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required for Cosmos universal discovery.");
   const requestTime = new Date().toISOString();
   const payload = {
     model: MODEL,
@@ -1146,281 +707,158 @@ async function requestUniversalDiscovery() {
     tools: [{ type: "web_search", search_context_size: "medium" }],
     tool_choice: "auto",
     store: false,
-    max_output_tokens: 6000,
+    max_output_tokens: 9000,
     text: {
       verbosity: "low",
       format: {
         type: "json_schema",
-        name: "cosmos_universal_social_discovery",
-        description: "Fresh cross-domain Cosmos discovery candidates for evidence-backed social exploration.",
+        name: "cosmos_universal_question_discovery",
+        description: "Fresh cross-domain, evidence-backed Cosmos Question candidates.",
         strict: true,
         schema: DISCOVERY_SCHEMA
       }
     },
-    input: [{
-      role: "user",
-      content: [{ type: "input_text", text: discoveryPrompt(requestTime) }]
-    }]
+    input: [{ role: "user", content: [{ type: "input_text", text: discoveryPrompt(requestTime) }] }]
   };
-
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
-
   const rawText = await response.text();
   let raw = {};
-  try { raw = rawText ? JSON.parse(rawText) : {}; }
-  catch { raw = { raw_text: rawText.slice(0, 4000) }; }
-
+  try { raw = rawText ? JSON.parse(rawText) : {}; } catch { raw = { raw_text: rawText.slice(0,4000) }; }
   if (!response.ok) {
     const detail = raw?.error?.message || raw?.message || raw?.raw_text || rawText;
-    throw new Error(`OpenAI Responses API ${response.status}: ${String(detail).slice(0, 1800)}`);
+    throw new Error(`OpenAI Responses API ${response.status}: ${String(detail).slice(0,1800)}`);
   }
-
   const outputText = extractOutputText(raw);
   if (!outputText) throw new Error("Universal discovery returned no structured output text.");
-
   let parsed;
-  try {
-    parsed = JSON.parse(outputText);
-  } catch (error) {
-    throw new Error(`Could not parse universal discovery JSON: ${error.message}`);
-  }
-
-  return {
-    raw,
-    parsed,
-    request_time_utc: requestTime
-  };
+  try { parsed = JSON.parse(outputText); } catch (error) { throw new Error(`Could not parse universal discovery JSON: ${error.message}`); }
+  return { raw, parsed, request_time_utc: requestTime };
 }
 
 function loadMockDiscovery(file) {
-  const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-  return {
-    raw: { id: "mock_response", output: [] },
-    parsed,
-    request_time_utc: new Date().toISOString()
-  };
+  const parsed = JSON.parse(fs.readFileSync(file,"utf8"));
+  return { raw: { id: "mock_response", output: [] }, parsed, request_time_utc: new Date().toISOString() };
 }
 
 async function main() {
   const mockFile = String(process.env.COSMOS_DISCOVERY_MOCK_FILE || "").trim();
   const result = mockFile ? loadMockDiscovery(mockFile) : await requestUniversalDiscovery();
-
   const parsedCandidates = Array.isArray(result.parsed?.candidates) ? result.parsed.candidates : [];
-  if (parsedCandidates.length < 8) {
-    throw new Error(`Universal discovery returned only ${parsedCandidates.length} candidates; minimum is 8.`);
-  }
+  if (parsedCandidates.length < 8) throw new Error(`Universal discovery returned only ${parsedCandidates.length} candidates; minimum is 8.`);
 
   const citationFingerprints = extractCitationUrls(result.raw);
-  const history = loadJson(HISTORY_FILE, { schema_version: "1.0", items: [] });
-  if (!Array.isArray(history.items)) history.items = [];
+  const history = loadJson(HISTORY_FILE,{schema_version:"1.0",items:[]});
+  if(!Array.isArray(history.items)) history.items=[];
   const historyKeys = recentHistoryKeys(history);
   const posted = publishedIds();
-
-  const accepted = [];
-  const rejected = [];
-
-  for (const candidate of parsedCandidates) {
-    const checked = validateCandidate(candidate, citationFingerprints, historyKeys, posted);
-    if (checked.ok) accepted.push(checked.candidate);
-    else rejected.push({ title: clean(candidate?.title), reason: checked.reason, diagnostic: checked.diagnostic || null });
+  const accepted=[]; const rejected=[];
+  for(const candidate of parsedCandidates){
+    const checked=validateCandidate(candidate,citationFingerprints,historyKeys,posted);
+    if(checked.ok) accepted.push(checked.candidate);
+    else rejected.push({title:clean(candidate?.title),reason:checked.reason,diagnostic:checked.diagnostic||null});
   }
-
-  const selected = selectDiverse(accepted);
-
-  const strictCount = accepted.filter(row => row.quality_tier === "strict").length;
-  const fallbackCount = accepted.filter(row => row.quality_tier === "fallback").length;
-  console.log(
-    `Discovery gate: raw=${parsedCandidates.length} accepted=${accepted.length} ` +
-    `(strict=${strictCount}, fallback=${fallbackCount}) selected=${selected.length}.`
-  );
-
-  if (rejected.length) {
-    const counts = {};
-    for (const row of rejected) counts[row.reason] = (counts[row.reason] || 0) + 1;
-    console.log("Rejected candidate reasons:", JSON.stringify(counts));
-    for (const row of rejected.slice(0, 12)) {
-      const d = row.diagnostic
-        ? ` raw(sig=${row.diagnostic.significance_raw},nov=${row.diagnostic.novelty_raw},bf=${row.diagnostic.butterfly_raw})` +
-          ` normalized(sig=${row.diagnostic.significance},nov=${row.diagnostic.novelty},bf=${row.diagnostic.butterfly})` +
-          ` composite=${row.diagnostic.composite}`
-        : "";
-      console.log(`- rejected [${row.reason}]${d} ${row.title || "(untitled)"}`);
-    }
+  const selected=selectDiverse(accepted);
+  if(selected.length<3){
+    const counts={}; for(const row of rejected) counts[row.reason]=(counts[row.reason]||0)+1;
+    console.log("Rejected candidate reasons:",JSON.stringify(counts));
+    throw new Error(`Quality/diversity gate produced only ${selected.length} publishable candidates. Refusing to overwrite the current queue.`);
   }
+  if(!fs.existsSync(QUESTION_TEMPLATE)) throw new Error(`Missing ${QUESTION_TEMPLATE}. Add the supplied q.html before running discovery.`);
+  const template=fs.readFileSync(QUESTION_TEMPLATE,"utf8");
+  fs.mkdirSync(Q_DIR,{recursive:true});
 
-  for (const row of selected) {
-    console.log(
-      `- selected [${row.quality_tier}] score=${row.rank_score} ` +
-      `[${row.domain}] ${row.title}`
-    );
-  }
-
-  if (selected.length < 3) {
-    throw new Error(
-      `Quality/diversity gate produced only ${selected.length} publishable candidates. ` +
-      `Refusing to overwrite the current queue with weak material. See rejection diagnostics above.`
-    );
-  }
-
-  const createdAt = new Date().toISOString();
-  const queueItems = [];
-  const sharedStations = [];
-
-  for (const candidate of selected) {
-    const shared = await createSharedStation(candidate);
-    const shareUrl = shared.share_url;
-
+  const createdAt=new Date().toISOString();
+  const queueItems=[];
+  for(const candidate of selected){
+    const slug=challengeSlug(candidate);
+    const pageUrl=`${SITE_ORIGIN}/q/${slug}.html`;
+    const challenge=officialChallenge(candidate,pageUrl);
+    fs.writeFileSync(path.join(Q_DIR,`${slug}.html`),renderOfficialQuestionPage(template,challenge,candidate,pageUrl),"utf8");
     queueItems.push({
-      id: candidate.item_id,
-      enabled: true,
-      created_at: createdAt,
-      source_url: shareUrl,
-      title: candidate.title,
-      x_text: buildXText(candidate, shareUrl),
-      linkedin_text:
-        `${candidate.title}
-
-${candidate.summary}
-
-${candidate.why_it_matters}
-
-` +
-        `${candidate.butterfly_question}
-
-Explore it in Cosmos.`,
-      platforms: ["x"],
-      not_before: null,
-      discovery: {
-        domain: candidate.domain,
-        geography: candidate.geography,
-        topic_key: candidate.topic_key,
-        significance_score: candidate.significance_score,
-        novelty_score: candidate.novelty_score,
-        butterfly_score: candidate.butterfly_score,
-        confidence: candidate.confidence,
-        sources: candidate.sources,
-        share_station_id: shared.station_id,
-        share_image_url: shared.image_url,
-        share_projection_entity_count: shared.projection_entity_count,
-        share_projection_relationship_count: shared.projection_relationship_count
+      id:candidate.item_id,
+      enabled:true,
+      created_at:createdAt,
+      source_url:pageUrl,
+      title:candidate.challenge_question,
+      x_text:buildXText(candidate,pageUrl),
+      linkedin_text:buildLinkedInText(candidate),
+      platforms:["x"],
+      not_before:null,
+      discovery:{
+        domain:candidate.domain,
+        geography:candidate.geography,
+        topic_key:candidate.topic_key,
+        title:candidate.title,
+        summary:candidate.summary,
+        why_it_matters:candidate.why_it_matters,
+        significance_score:candidate.significance_score,
+        novelty_score:candidate.novelty_score,
+        butterfly_score:candidate.butterfly_score,
+        attention_score:candidate.attention_score,
+        confidence:candidate.confidence,
+        sources:candidate.sources,
+        challenge:{
+          challenge_id:challenge.challenge_id,
+          question:candidate.challenge_question,
+          options:candidate.challenge_options,
+          answer_mode:candidate.answer_mode,
+          cosmos_choice:candidate.cosmos_choice,
+          confidence:candidate.challenge_confidence,
+          canonical_url:pageUrl,
+          butterfly_question:candidate.butterfly_question
+        }
       }
     });
-
-    sharedStations.push({
-      item_id: candidate.item_id,
-      station_id: shared.station_id,
-      share_url: shared.share_url,
-      image_url: shared.image_url
-    });
   }
 
-  const queue = {
-    schema_version: "1.0",
-    updated_at: createdAt,
-    generated_by: "scripts/cosmos_universal_social_discovery.mjs",
-    policy: {
-      mode: "universal_cross_domain_discovery",
-      target_count: TARGET_COUNT,
-      strict_composite_score: STRICT_COMPOSITE,
-      fallback_composite_score: FALLBACK_COMPOSITE,
-      fallback_butterfly_score: FALLBACK_BUTTERFLY,
-      automatic_platforms: ["x"],
-      note:
-        "Fresh evidence-backed Cosmos discoveries only. Each queued item uses the persistent Cloudflare Cosmos share surface with a verified social image. Public-policy/political and manual-review candidates are excluded from unattended social publishing."
+  writeJson(QUEUE_FILE,{
+    schema_version:"2.0",
+    updated_at:createdAt,
+    generated_by:"scripts/cosmos_universal_social_discovery.mjs",
+    policy:{
+      mode:"universal_cross_domain_participatory_discovery",
+      target_count:TARGET_COUNT,
+      strict_composite_score:STRICT_COMPOSITE,
+      fallback_composite_score:FALLBACK_COMPOSITE,
+      fallback_butterfly_score:FALLBACK_BUTTERFLY,
+      automatic_platforms:["x"],
+      note:"Question-first social entrances. Vote inside Cosmos; reveal Crowd + Cosmos; continue through a Butterfly."
     },
-    items: queueItems
-  };
-
-  writeJson(QUEUE_FILE, queue);
-
-  const recentCutoff = Date.now() - 30 * 86400_000;
-  const retainedHistory = history.items.filter(row => {
-    const t = new Date(row?.queued_at || "").getTime();
-    return Number.isFinite(t) && t >= recentCutoff;
+    items:queueItems
   });
 
-  const sharedByItem = new Map(sharedStations.map(row => [row.item_id, row]));
-
-  for (const candidate of selected) {
-    const shared = sharedByItem.get(candidate.item_id) || {};
-    retainedHistory.push({
-      topic_key: candidate.topic_key,
-      item_id: candidate.item_id,
-      queued_at: createdAt,
-      title: candidate.title,
-      summary: candidate.summary,
-      why_it_matters: candidate.why_it_matters,
-      butterfly_question: candidate.butterfly_question,
-      domain: candidate.domain,
-      geography: candidate.geography,
-      primary_source_url: candidate.sources?.[0]?.url || "",
-      station_id: shared.station_id || "",
-      share_url: shared.share_url || ""
-    });
+  const recentCutoff=Date.now()-30*86400_000;
+  const retainedHistory=history.items.filter(row=>{const t=new Date(row?.queued_at||"").getTime();return Number.isFinite(t)&&t>=recentCutoff;});
+  for(const candidate of selected){
+    retainedHistory.push({topic_key:candidate.topic_key,item_id:candidate.item_id,queued_at:createdAt,title:candidate.title,domain:candidate.domain,geography:candidate.geography,primary_source_url:candidate.sources?.[0]?.url||""});
   }
-
-  writeJson(HISTORY_FILE, {
-    schema_version: "1.0",
-    updated_at: createdAt,
-    items: retainedHistory
+  writeJson(HISTORY_FILE,{schema_version:"1.0",updated_at:createdAt,items:retainedHistory});
+  writeJson(DISCOVERY_FILE,{
+    schema_version:"2.0",generated_at:createdAt,request_time_utc:result.request_time_utc,model:MODEL,
+    provider_response_id:String(result.raw?.id||""),web_search_citation_count:citationFingerprints.size,
+    raw_candidate_count:parsedCandidates.length,accepted_candidate_count:accepted.length,rejected_candidate_count:rejected.length,
+    selected_count:selected.length,
+    selected:selected.map(candidate=>({
+      item_id:candidate.item_id,topic_key:candidate.topic_key,domain:candidate.domain,geography:candidate.geography,
+      title:candidate.title,summary:candidate.summary,why_it_matters:candidate.why_it_matters,
+      challenge_question:candidate.challenge_question,challenge_options:candidate.challenge_options,
+      answer_mode:candidate.answer_mode,cosmos_choice:candidate.cosmos_choice,answer_explanation:candidate.answer_explanation,
+      butterfly_question:candidate.butterfly_question,hashtags:normalizedHashtags(candidate),
+      significance_score:candidate.significance_score,novelty_score:candidate.novelty_score,
+      butterfly_score:candidate.butterfly_score,attention_score:candidate.attention_score,
+      confidence:candidate.confidence,quality_tier:candidate.quality_tier,rank_score:candidate.rank_score,sources:candidate.sources
+    })),rejected
   });
 
-  writeCosmosDiscoveryArchive(retainedHistory, createdAt);
-  writeCosmosSitemap(createdAt);
-
-  writeJson(DISCOVERY_FILE, {
-    schema_version: "1.0",
-    generated_at: createdAt,
-    request_time_utc: result.request_time_utc,
-    model: MODEL,
-    provider_response_id: String(result.raw?.id || ""),
-    web_search_citation_count: citationFingerprints.size,
-    raw_candidate_count: parsedCandidates.length,
-    accepted_candidate_count: accepted.length,
-    rejected_candidate_count: rejected.length,
-    selected_count: selected.length,
-    shared_stations: sharedStations,
-    selected: selected.map(candidate => ({
-      item_id: candidate.item_id,
-      topic_key: candidate.topic_key,
-      domain: candidate.domain,
-      geography: candidate.geography,
-      title: candidate.title,
-      summary: candidate.summary,
-      why_it_matters: candidate.why_it_matters,
-      butterfly_question: candidate.butterfly_question,
-      hashtags: normalizedHashtags(candidate),
-      significance_score: candidate.significance_score,
-      novelty_score: candidate.novelty_score,
-      butterfly_score: candidate.butterfly_score,
-      confidence: candidate.confidence,
-      quality_tier: candidate.quality_tier,
-      rank_score: candidate.rank_score,
-      normalized_scores: candidate.normalized_scores,
-      citation_matched: Boolean(candidate.citation_matched),
-      sources: candidate.sources
-    })),
-    rejected
-  });
-
-  console.log(`Cosmos universal discovery selected ${selected.length} item(s) from ${parsedCandidates.length} candidates.`);
-  console.log(`Web-search citation fingerprints observed: ${citationFingerprints.size}.`);
-  for (const item of queueItems) {
-    console.log(`- [${item.discovery.domain}] ${item.title}`);
-    console.log(`  ${item.source_url}`);
-    console.log(`  X: ${item.x_text.replace(/\n/g, " | ")}`);
-  }
-  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${COSMOS_DISCOVERIES_FILE}, and ${SITEMAP_COSMOS_FILE}.`);
+  writeDiscoveriesArchive(queueItems);
+  writeCosmosSitemap();
+  console.log(`Cosmos participatory discovery selected ${selected.length} question(s) from ${parsedCandidates.length} candidates.`);
+  for(const item of queueItems){ console.log(`- ${item.title}`); console.log(`  ${item.source_url}`); console.log(`  X: ${item.x_text.replace(/\n/g," | ")}`); }
+  console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${DISCOVERIES_HTML}, ${SITEMAP_COSMOS}, and ${Q_DIR}/.`);
 }
 
-main().catch(error => {
-  console.error("COSMOS_UNIVERSAL_DISCOVERY_ERROR", error?.stack || error);
-  process.exit(1);
-});
+main().catch(error=>{console.error("COSMOS_UNIVERSAL_DISCOVERY_ERROR",error?.stack||error);process.exit(1);});
