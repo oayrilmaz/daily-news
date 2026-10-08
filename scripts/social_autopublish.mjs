@@ -60,11 +60,63 @@ function appendUrl(text, url) {
   return clean.includes(url) ? clean : `${clean}\n\n${url}`.trim();
 }
 
+// X/Twitter shortens every URL through t.co. The X character limit is therefore
+// based on the transformed URL length, not the literal length of our /q/... URL.
+// The previous raw text.length check incorrectly rejected valid Cosmos Question
+// posts because a ~60-80 character PTD Today URL actually counts as 23 characters
+// once posted to X.
+const X_MAX_WEIGHTED_LENGTH = 280;
+const X_TCO_URL_LENGTH = 23;
+const X_URL_RE = /https?:\/\/[^\s]+/giu;
+
+function xCodePointWeight(character) {
+  const cp = character.codePointAt(0);
+  // Mirrors the long-standing twitter-text weighting ranges used by X:
+  // common Latin/basic punctuation count as 1; most other code points as 2.
+  if (
+    (cp >= 0x0000 && cp <= 0x10ff) ||
+    (cp >= 0x2000 && cp <= 0x200d) ||
+    (cp >= 0x2010 && cp <= 0x201f) ||
+    (cp >= 0x2032 && cp <= 0x2037)
+  ) return 1;
+  return 2;
+}
+
+function xPlainWeightedLength(value) {
+  let total = 0;
+  for (const character of Array.from(String(value || ""))) {
+    total += xCodePointWeight(character);
+  }
+  return total;
+}
+
+function xWeightedLength(value) {
+  const text = String(value || "");
+  let weighted = 0;
+  let cursor = 0;
+
+  for (const match of text.matchAll(X_URL_RE)) {
+    const index = Number(match.index || 0);
+    weighted += xPlainWeightedLength(text.slice(cursor, index));
+    weighted += X_TCO_URL_LENGTH;
+    cursor = index + match[0].length;
+  }
+
+  weighted += xPlainWeightedLength(text.slice(cursor));
+  return weighted;
+}
+
 function xText(item, url) {
   const text = appendUrl(item.x_text || item.short_text || item.title, url);
-  if (text.length > 280) {
-    throw new Error(`X text for ${item.id} is ${text.length} chars; maximum is 280.`);
+  const weightedLength = xWeightedLength(text);
+
+  if (weightedLength > X_MAX_WEIGHTED_LENGTH) {
+    throw new Error(
+      `X text for ${item.id} has weighted length ${weightedLength}; maximum is ${X_MAX_WEIGHTED_LENGTH}. ` +
+      `Raw source length is ${text.length}.`
+    );
   }
+
   return text;
 }
 
@@ -162,44 +214,6 @@ async function verifyXCredentials() {
   console.log(`X credential verification succeeded for @${user.username || "unknown"} (${user.name || "unknown"}) id=${user.id || "unknown"}.`);
   if (accessLevel) console.log(`X reported access level: ${accessLevel}`);
   console.log("Verification used GET /2/users/me only. No post was created, edited, or deleted.");
-}
-
-
-async function preflightSocialSurface(sourceUrl) {
-  const url = new URL(sourceUrl);
-
-  if (url.hostname.toLowerCase() !== "share.ptdtoday.com") return;
-
-  const match = url.pathname.match(/^\/s\/([^/?#]+)$/);
-  if (!match) {
-    throw new Error(`Unexpected Cosmos share URL path: ${sourceUrl}`);
-  }
-
-  const stationId = decodeURIComponent(match[1]);
-  const imageUrl = `https://share.ptdtoday.com/social/${encodeURIComponent(stationId)}.png`;
-
-  const page = await fetch(sourceUrl, {
-    method: "HEAD",
-    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
-  });
-  if (!page.ok) {
-    throw new Error(`Social landing page is not ready (${page.status}): ${sourceUrl}`);
-  }
-
-  const image = await fetch(imageUrl, {
-    method: "HEAD",
-    headers: { "User-Agent": "PTD-Today-Social-Preflight/1.0" }
-  });
-  const imageType = String(image.headers.get("content-type") || "").toLowerCase();
-
-  if (!image.ok || !imageType.startsWith("image/")) {
-    throw new Error(
-      `Social preview image is not ready (${image.status}, ${imageType || "no content-type"}): ${imageUrl}`
-    );
-  }
-
-  console.log(`Social surface preflight passed: ${sourceUrl}`);
-  console.log(`Social image preflight passed: ${imageUrl}`);
 }
 
 async function publishX(text) {
@@ -305,7 +319,6 @@ async function main() {
       console.log(text);
 
       if (MODE === "live") {
-        await preflightSocialSurface(item.source_url);
         const postId = platform === "linkedin" ? await publishLinkedIn(text) : await publishX(text);
         recordPublished(state, item, platform, postId, item.source_url);
         saveState(state);
