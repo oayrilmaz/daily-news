@@ -92,6 +92,16 @@ jobs:
           let shouldBuild = true;
           let reason = "queue missing or unreadable";
 
+          // A manual workflow_dispatch is an explicit request to rebuild now,
+          // even when the existing queue is still within the freshness window.
+          if (process.env.GITHUB_EVENT_NAME === "workflow_dispatch") {
+            reason = "manual run: force rebuild requested";
+            console.log(reason);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, "should_build=true\n");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason}\n`);
+            process.exit(0);
+          }
+
           try {
             const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
             const updatedAt = Date.parse(String(queue.updated_at || ""));
