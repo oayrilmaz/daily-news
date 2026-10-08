@@ -597,10 +597,25 @@ function renderOfficialQuestionPage(template, challenge, candidate, pageUrl) {
   html = html.replace(/<meta property="og:title"[^>]*>/i, `<meta property="og:title" content="${escapeHtml(candidate.challenge_question)}">`);
   html = html.replace(/<meta property="og:description"[^>]*>/i, `<meta property="og:description" content="${escapeHtml(description)}">`);
   html = html.replace("</head>", `  <link rel="canonical" href="${escapeHtml(pageUrl)}">\n  <meta property="og:url" content="${escapeHtml(pageUrl)}">\n</head>`);
-  html = html.replace(
-    '<script src="/assets/cosmos-question.js" defer></script>',
-    `<script>window.COSMOS_CHALLENGE_BOOTSTRAP=${bootstrap};</script>\n  <script src="/assets/cosmos-question.js" defer></script>`
-  );
+  // Support both the original split-asset template and the current
+  // self-contained q.html. Official generated /q/<slug>.html pages must load
+  // the challenge before the app initializes.
+  const bootstrapScript = `<script>window.COSMOS_CHALLENGE_BOOTSTRAP=${bootstrap};</script>`;
+  const externalScript = '<script src="/assets/cosmos-question.js" defer></script>';
+
+  if (html.includes(externalScript)) {
+    html = html.replace(
+      externalScript,
+      `${bootstrapScript}\n  ${externalScript}`
+    );
+  } else {
+    const embeddedApp = /<script>\s*\(\(\)\s*=>\s*\{/i;
+    if (!embeddedApp.test(html)) {
+      throw new Error("Question template is missing the Cosmos Question app script.");
+    }
+    html = html.replace(embeddedApp, match => `${bootstrapScript}\n  ${match}`);
+  }
+
   return html;
 }
 
