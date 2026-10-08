@@ -3,19 +3,14 @@ name: Build Cosmos Universal Social Queue
 on:
   workflow_dispatch:
 
-  # Primary + recovery schedules.
-  # The queue freshness guard below means only the first successful trigger
-  # actually rebuilds the queue. The later triggers are automatic fallbacks
-  # in case GitHub delays or drops an earlier scheduled event.
+  # Primary + recovery schedules. The freshness guard means only the first
+  # successful trigger builds; later triggers are automatic fallbacks.
   schedule:
     - cron: "47 9 * * *"
     - cron: "37 10 * * *"
     - cron: "27 11 * * *"
     - cron: "7 13 * * *"
 
-  # Independent backup path: rebuild after the main daily PTD workflow
-  # completes successfully. This no longer replaces the direct schedules;
-  # it is only redundancy.
   workflow_run:
     workflows:
       - "Home AI + Video (PTD Today)"
@@ -33,7 +28,7 @@ jobs:
   build:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout latest main
@@ -53,8 +48,15 @@ jobs:
           git checkout main
           git reset --hard origin/main
 
-      - name: Validate universal discovery syntax
-        run: node --check scripts/cosmos_universal_social_discovery.mjs
+      - name: Validate Cosmos Question source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/cosmos_universal_social_discovery.mjs
+          node --check assets/cosmos-question.js
+          test -f q.html
+          test -f assets/cosmos-question.css
+          echo "Cosmos Question V1 source files are present."
 
       - name: Check whether the Cosmos X queue is already fresh
         id: queue_freshness
@@ -74,13 +76,24 @@ jobs:
               ? (Date.now() - updatedAt) / 3600000
               : Infinity;
 
-            // A healthy queue created within the last 18 hours does not need
-            // another expensive discovery pass. Backup cron triggers simply exit.
-            if (items.length >= 3 && items.length <= 5 && ageHours >= 0 && ageHours < 18) {
+            const participatory =
+              String(queue.schema_version || "") === "2.0" &&
+              items.length >= 3 &&
+              items.length <= 5 &&
+              items.every(item => {
+                try {
+                  const url = new URL(item.source_url);
+                  return url.hostname === "ptdtoday.com" && url.pathname.startsWith("/q/");
+                } catch {
+                  return false;
+                }
+              });
+
+            if (participatory && ageHours >= 0 && ageHours < 18) {
               shouldBuild = false;
-              reason = `fresh queue: ${items.length} items, ${ageHours.toFixed(1)}h old`;
+              reason = `fresh participatory queue: ${items.length} items, ${ageHours.toFixed(1)}h old`;
             } else {
-              reason = `stale/invalid queue: ${items.length} items, ${Number.isFinite(ageHours) ? ageHours.toFixed(1) : "unknown"}h old`;
+              reason = `stale/legacy queue: schema=${queue.schema_version || "unknown"}, items=${items.length}, age=${Number.isFinite(ageHours) ? ageHours.toFixed(1) : "unknown"}h`;
             }
           } catch (error) {
             reason = `queue check failed: ${error.message}`;
@@ -93,55 +106,64 @@ jobs:
 
       - name: Skip message when a fresh queue already exists
         if: ${{ steps.queue_freshness.outputs.should_build != 'true' }}
-        run: echo "Fresh Cosmos X queue already exists. Recovery trigger exits without rebuilding."
+        run: echo "Fresh Cosmos Question queue already exists. Recovery trigger exits without rebuilding."
 
-      - name: Discover fresh multidimensional Cosmos topics + build X queue
+      - name: Discover fresh developments + build participatory Cosmos Questions
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           COSMOS_DISCOVERY_MODEL: gpt-6-luna
           SITE_ORIGIN: https://ptdtoday.com
-          COSMOS_SHARE_API: https://ptdtoday-cosmos.ptdtoday.workers.dev/api/cosmos/share
           SOCIAL_QUEUE_TARGET: "5"
-          COSMOS_STRICT_COMPOSITE: "58"
-          COSMOS_FALLBACK_COMPOSITE: "45"
+          COSMOS_STRICT_COMPOSITE: "60"
+          COSMOS_FALLBACK_COMPOSITE: "48"
           COSMOS_FALLBACK_BUTTERFLY: "45"
           COSMOS_HISTORY_DAYS: "7"
         run: node scripts/cosmos_universal_social_discovery.mjs
 
-      - name: Validate generated universal queue
+      - name: Validate generated Cosmos Question queue
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         shell: bash
         run: |
           node - <<'NODE'
           const fs = require("fs");
+          const path = require("path");
 
           const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
-          if (!Array.isArray(queue.items)) throw new Error("social-queue.json is missing items[]");
-          if (queue.items.length < 3 || queue.items.length > 5) {
-            throw new Error(`Expected 3-5 quality-gated X items, got ${queue.items.length}`);
+          if (String(queue.schema_version) !== "2.0") {
+            throw new Error(`Expected queue schema 2.0, got ${queue.schema_version}`);
+          }
+          if (!Array.isArray(queue.items) || queue.items.length < 3 || queue.items.length > 5) {
+            throw new Error(`Expected 3-5 quality-gated X items, got ${queue.items?.length ?? 0}`);
           }
 
           const domains = new Set();
-
           for (const item of queue.items) {
             if (!Array.isArray(item.platforms) || item.platforms.length !== 1 || item.platforms[0] !== "x") {
               throw new Error(`Queue item ${item.id} is not X-only`);
             }
 
             const url = new URL(item.source_url);
-            if (url.hostname !== "share.ptdtoday.com" || !url.pathname.startsWith("/s/")) {
-              throw new Error(`Queue item ${item.id} does not point to the persistent Cosmos share surface`);
+            if (url.hostname !== "ptdtoday.com" || !url.pathname.startsWith("/q/") || !url.pathname.endsWith(".html")) {
+              throw new Error(`Queue item ${item.id} does not point to a main-domain Cosmos Question page`);
             }
 
-            if (!item.discovery?.share_station_id || !item.discovery?.share_image_url) {
-              throw new Error(`Queue item ${item.id} is missing shared-station metadata`);
-            }
+            const localFile = decodeURIComponent(url.pathname.replace(/^\//, ""));
+            if (!fs.existsSync(localFile)) throw new Error(`Missing generated question page: ${localFile}`);
 
-            if (!item.discovery || !Array.isArray(item.discovery.sources) || item.discovery.sources.length < 2) {
+            const challenge = item.discovery?.challenge;
+            if (!challenge?.challenge_id || !challenge?.question) {
+              throw new Error(`Queue item ${item.id} is missing challenge metadata`);
+            }
+            if (!Array.isArray(challenge.options) || challenge.options.length !== 5 || challenge.options.map(o => o.key).join("") !== "ABCDE") {
+              throw new Error(`Queue item ${item.id} does not have valid A-E options`);
+            }
+            if (!["fact","supported","opinion","prediction"].includes(challenge.answer_mode)) {
+              throw new Error(`Queue item ${item.id} has invalid answer_mode`);
+            }
+            if (!Array.isArray(item.discovery?.sources) || item.discovery.sources.length < 2) {
               throw new Error(`Queue item ${item.id} lacks two-source provenance`);
             }
-
             domains.add(String(item.discovery.domain || "other"));
           }
 
@@ -158,10 +180,10 @@ jobs:
             if (!fs.existsSync(file)) throw new Error(`Missing generated file: ${file}`);
           }
 
-          console.log(`Validated ${queue.items.length} universal X queue item(s) across ${domains.size} domains.`);
+          console.log(`Validated ${queue.items.length} participatory Cosmos Question item(s) across ${domains.size} domains.`);
           NODE
 
-      - name: Commit universal discoveries + persistent share URLs
+      - name: Commit questions + discovery/search surfaces
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         run: |
           git config user.name "github-actions"
@@ -172,12 +194,13 @@ jobs:
             data/cosmos-universal-discovery.json \
             data/cosmos-universal-discovery-history.json \
             cosmos-discoveries.html \
-            sitemap-cosmos.xml
+            sitemap-cosmos.xml \
+            q
 
           if git diff --cached --quiet; then
-            echo "No universal Cosmos discovery changes to commit."
+            echo "No Cosmos Question changes to commit."
             exit 0
           fi
 
-          git commit -m "Build Cosmos universal discovery + search feed"
+          git commit -m "Build participatory Cosmos Questions + search feed"
           git push origin main
