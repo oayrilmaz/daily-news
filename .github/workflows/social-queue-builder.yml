@@ -53,10 +53,34 @@ jobs:
         run: |
           set -euo pipefail
           node --check scripts/cosmos_universal_social_discovery.mjs
-          node --check assets/cosmos-question.js
           test -f q.html
-          test -f assets/cosmos-question.css
-          echo "Cosmos Question V1 source files are present."
+
+          # q.html is intentionally self-contained now. Do not require the old
+          # assets/cosmos-question.js or assets/cosmos-question.css files.
+          node - <<'NODE'
+          const fs = require("fs");
+          const html = fs.readFileSync("q.html", "utf8");
+
+          const required = [
+            [/<style[\s>]/i, "embedded Cosmos Question CSS"],
+            [/id=["']cqPlayer["']/i, "Cosmos Question player"],
+            [/id=["']cqShareQuestionInline["']/i, "question sharing controls"],
+            [/COSMOS_CHALLENGE_BOOTSTRAP/, "official-question bootstrap support"]
+          ];
+
+          for (const [pattern, label] of required) {
+            if (!pattern.test(html)) throw new Error(`q.html is missing ${label}`);
+          }
+
+          const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
+            .map(match => match[1])
+            .filter(code => code.trim());
+
+          if (!scripts.length) throw new Error("q.html has no embedded JavaScript");
+          for (const code of scripts) new Function(code);
+
+          console.log(`q.html self-contained validation passed (${scripts.length} inline script block(s)).`);
+          NODE
 
       - name: Check whether the Cosmos X queue is already fresh
         id: queue_freshness
