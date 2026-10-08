@@ -405,7 +405,7 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
     ? uniqueByUrl.some(source => citationFingerprints.has(urlFingerprint(source.url)))
     : false;
 
-  const challengeQuestion = truncate(candidate.challenge_question || candidate.butterfly_question, 220);
+  const challengeQuestion = truncate(candidate.challenge_question || candidate.butterfly_question, 112);
   const answerMode = ["fact", "supported", "opinion", "prediction"].includes(candidate.answer_mode)
     ? candidate.answer_mode
     : "supported";
@@ -416,7 +416,7 @@ function validateCandidate(candidate, citationFingerprints, historyKeys, postedI
     ? candidate.challenge_options
         .filter(option => /^[A-E]$/.test(String(option?.key || "")) && clean(option?.label))
         .slice(0, 5)
-        .map(option => ({ key: String(option.key), label: truncate(option.label, 120) }))
+        .map(option => ({ key: String(option.key), label: truncate(option.label, 30) }))
     : [];
 
   if (!challengeQuestion) return { ok: false, reason: "missing_challenge_question" };
@@ -519,25 +519,39 @@ function selectDiverse(candidates) {
 
 
 
-function compactOptions(candidate) {
-  return candidate.challenge_options.map(option => `${option.key}. ${truncate(option.label, 34)}`).join(" · ");
+function compactOptions(candidate, labelMax = 22) {
+  return candidate.challenge_options
+    .map(option => `${option.key}. ${truncate(option.label, labelMax)}`)
+    .join("\n");
 }
 
 function buildXText(candidate, questionUrl) {
-  const tags = normalizedHashtags(candidate).slice(0, 3).join(" ");
-  const q = truncate(candidate.challenge_question, 118);
-  const options = compactOptions(candidate);
-  const cta = "Choose first. Then see the Crowd + Cosmos.";
-  const reserved = questionUrl.length + 4;
-  const max = Math.max(150, 280 - reserved);
+  // The public X post must always show all five choices. Never fall back to
+  // a generic “A–E” sentence: the choices themselves are the traffic hook.
+  // X shortens URLs through t.co, so reserve 27 characters for the URL that
+  // social_autopublish appends plus a small safety margin.
+  const max = 248;
+  const topicTags = normalizedHashtags(candidate).filter(tag => tag.toLowerCase() !== "#cosmos");
 
-  const versions = [
-    `${q}\n${options}\n${cta}\n${tags}`,
-    `${q}\n${options}\nVote before seeing the result.\n${tags}`,
-    `${q}\nA–E: choose inside Cosmos. See the Crowd + Cosmos.\n${tags}`,
-    `${q}\nChoose before seeing what everyone else thinks.\n${tags}`
+  const attempts = [
+    { q: 92, option: 22, tags: ["#Cosmos", ...topicTags.slice(0, 2)] },
+    { q: 84, option: 20, tags: ["#Cosmos", ...topicTags.slice(0, 1)] },
+    { q: 74, option: 17, tags: ["#Cosmos", ...topicTags.slice(0, 1)] },
+    { q: 66, option: 14, tags: ["#Cosmos"] }
   ];
-  return versions.find(text => text.length <= max) || truncate(versions.at(-1), max);
+
+  for (const attempt of attempts) {
+    const q = truncate(candidate.challenge_question, attempt.q);
+    const options = compactOptions(candidate, attempt.option);
+    const tags = attempt.tags.filter(Boolean).join(" ");
+    const text = `${q}\n${options}\nChoose first → Crowd + Cosmos\n${tags}`.trim();
+    if (text.length <= max) return text;
+  }
+
+  // Extremely defensive final form. It still preserves A, B, C, D and E.
+  const q = truncate(candidate.challenge_question, 58);
+  const options = compactOptions(candidate, 11);
+  return truncate(`${q}\n${options}\nVote → Crowd + Cosmos\n#Cosmos`, max);
 }
 
 function buildLinkedInText(candidate) {
@@ -675,8 +689,9 @@ function discoveryPrompt(requestTime) {
     "- Do not force energy or AI. Topic diversity is a core requirement.",
     "",
     "COSMOS QUESTION CONTRACT",
-    "- challenge_question must be self-contained, concise and understandable without reading the source article.",
+    "- challenge_question must be self-contained, concise and understandable without reading the source article; target <= 95 characters and never exceed 110.",
     "- Provide exactly five options with keys A, B, C, D, E in that order.",
+    "- Every option label must be compact enough for social sharing: ideally 2-4 words, target <= 22 characters, hard maximum 30 characters.",
     "- Options must all be plausible and distinct. Avoid joke answers or obvious padding.",
     "- answer_mode=fact only when there is an objectively verifiable correct answer.",
     "- answer_mode=supported when evidence currently favors one answer but uncertainty remains.",
