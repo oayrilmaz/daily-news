@@ -207,6 +207,8 @@ a{color:inherit}button,textarea{font:inherit}
   const API_BASE = "https://ptdtoday-cosmos.ptdtoday.workers.dev";
   const MAX_STEPS = 5;
   const SESSION_KEY = "ptdtoday_cosmos_question_session_v1";
+  const VOTE_RECEIPTS_KEY = "ptdtoday_cosmos_question_vote_receipts_v2";
+  const SESSION_COOKIE = "ptdtoday_cq_sid";
 
   const el = id => document.getElementById(id);
   const state = {
@@ -220,19 +222,66 @@ a{color:inherit}button,textarea{font:inherit}
     loading: false
   };
 
+  function cookieValue(name){
+    try{
+      const prefix = `${name}=`;
+      const row = document.cookie.split(";").map(v => v.trim()).find(v => v.startsWith(prefix));
+      return row ? decodeURIComponent(row.slice(prefix.length)) : "";
+    }catch{ return ""; }
+  }
+
+  function rememberSessionCookie(id){
+    try{
+      document.cookie = `${SESSION_COOKIE}=${encodeURIComponent(id)}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`;
+    }catch{}
+  }
+
   function getSessionId(){
     try{
-      let id = localStorage.getItem(SESSION_KEY);
+      let id = localStorage.getItem(SESSION_KEY) || cookieValue(SESSION_COOKIE);
       if(!id){
         const bytes = new Uint8Array(16);
         crypto.getRandomValues(bytes);
         id = "cq_" + [...bytes].map(b => b.toString(16).padStart(2,"0")).join("");
-        localStorage.setItem(SESSION_KEY,id);
       }
+      localStorage.setItem(SESSION_KEY,id);
+      rememberSessionCookie(id);
       return id;
     }catch{
-      return "cq_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      const existing = cookieValue(SESSION_COOKIE);
+      if(existing) return existing;
+      const id = "cq_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+      rememberSessionCookie(id);
+      return id;
     }
+  }
+
+  function loadVoteReceipts(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(VOTE_RECEIPTS_KEY) || "{}");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    }catch{ return {}; }
+  }
+
+  function voteReceiptId(challengeId,questionId){
+    return `${clean(challengeId)}::${clean(questionId)}`;
+  }
+
+  function getVoteReceipt(challengeId,questionId){
+    const row = loadVoteReceipts()[voteReceiptId(challengeId,questionId)];
+    return row && /^[A-E]$/.test(String(row.option || "")) ? row : null;
+  }
+
+  function saveVoteReceipt(challengeId,questionId,option){
+    if(!/^[A-E]$/.test(String(option || ""))) return;
+    try{
+      const all = loadVoteReceipts();
+      all[voteReceiptId(challengeId,questionId)] = {
+        option:String(option),
+        saved_at:new Date().toISOString()
+      };
+      localStorage.setItem(VOTE_RECEIPTS_KEY,JSON.stringify(all));
+    }catch{}
   }
 
   function clean(v){ return String(v ?? "").replace(/\s+/g," ").trim(); }
@@ -338,6 +387,89 @@ a{color:inherit}button,textarea{font:inherit}
     window.scrollTo({top:0,behavior:"smooth"});
   }
 
+  function upsertJourneySelection(node,selected){
+    const entry = {
+      question_id:node.question_id,
+      question:node.question,
+      option:selected.key,
+      answer_label:selected.label,
+      label:clean(selected.label).slice(0,70)
+    };
+    const index = state.journey.findIndex(row => row.question_id === node.question_id);
+    if(index >= 0) state.journey[index] = entry;
+    else state.journey.push(entry);
+  }
+
+  async function fetchVoteStatus(node){
+    const params = new URLSearchParams({
+      challenge_id:state.challenge.challenge_id,
+      question_id:node.question_id,
+      session_id:state.sessionId
+    });
+    return api(`/api/cosmos/challenge/results?${params.toString()}`,{method:"GET"});
+  }
+
+  async function restorePriorVote(node){
+    if(!node || state.loading) return false;
+    state.loading = true;
+    el("cqOptions")?.querySelectorAll("button").forEach(b => b.disabled = true);
+    if(el("cqPrompt")) el("cqPrompt").textContent = "Checking your previous answer…";
+
+    const localReceipt = getVoteReceipt(state.challenge.challenge_id,node.question_id);
+    try{
+      let data = await fetchVoteStatus(node);
+
+      // If this browser already has a receipt but the distributed store has not
+      // exposed it in this location yet, reconcile the same immutable answer.
+      if(!data?.has_voted && localReceipt){
+        data = await api("/api/cosmos/challenge/vote",{
+          method:"POST",
+          body:JSON.stringify({
+            challenge_id:state.challenge.challenge_id,
+            question_id:node.question_id,
+            option:localReceipt.option,
+            session_id:state.sessionId
+          })
+        });
+      }
+
+      const prior = String(data?.selected_option || localReceipt?.option || "");
+      if((data?.has_voted || data?.already_voted || localReceipt) && /^[A-E]$/.test(prior)){
+        const selected = optionByKey(node,prior);
+        if(selected){
+          saveVoteReceipt(state.challenge.challenge_id,node.question_id,prior);
+          state.selected = prior;
+          state.counts = data;
+          showResults(selected,data);
+          return true;
+        }
+      }
+    }catch(error){
+      // The local receipt still prevents this browser from presenting a second
+      // blank ballot if the live totals endpoint is temporarily unavailable.
+      if(localReceipt){
+        const selected = optionByKey(node,localReceipt.option);
+        if(selected){
+          state.selected = localReceipt.option;
+          showResults(selected,{
+            counts:{A:0,B:0,C:0,D:0,E:0},
+            total:0,
+            approximate:true,
+            restored_locally:true
+          });
+          return true;
+        }
+      }
+      console.warn("Could not restore previous Cosmos Question vote",error);
+    }finally{
+      state.loading = false;
+    }
+
+    el("cqOptions")?.querySelectorAll("button").forEach(b => b.disabled = false);
+    if(el("cqPrompt")) el("cqPrompt").textContent = "Choose before seeing what everyone else and Cosmos think.";
+    return false;
+  }
+
   async function vote(key){
     if(state.loading) return;
     const node = state.current;
@@ -346,7 +478,7 @@ a{color:inherit}button,textarea{font:inherit}
     state.loading = true;
     state.selected = key;
     el("cqOptions")?.querySelectorAll("button").forEach(b => b.disabled = true);
-    el("cqPrompt").textContent = "Counting the world…";
+    el("cqPrompt").textContent = "Recording your answer…";
 
     try{
       const data = await api("/api/cosmos/challenge/vote",{
@@ -358,11 +490,21 @@ a{color:inherit}button,textarea{font:inherit}
           session_id:state.sessionId
         })
       });
+
+      // The first recorded answer is immutable for this anonymous browser.
+      const acceptedKey = String(data?.selected_option || key);
+      const accepted = optionByKey(node,acceptedKey) || selected;
+      saveVoteReceipt(state.challenge.challenge_id,node.question_id,accepted.key);
+      state.selected = accepted.key;
       state.counts = data;
-      showResults(selected,data);
+      showResults(accepted,data);
     }catch(error){
-      // Never trap the visitor because analytics/voting is temporarily unavailable.
-      showResults(selected,{counts:{A:0,B:0,C:0,D:0,E:0},total:0,approximate:true,error:error.message});
+      // Do not show a result as if it were counted when the server did not
+      // confirm the response. Keep the ballot open so the answer can be retried.
+      state.selected = "";
+      el("cqOptions")?.querySelectorAll("button").forEach(b => b.disabled = false);
+      el("cqPrompt").textContent = "Your answer was not recorded. Please tap your choice again.";
+      console.warn("Cosmos Question vote was not recorded",error);
     }finally{
       state.loading = false;
     }
@@ -384,7 +526,7 @@ a{color:inherit}button,textarea{font:inherit}
     }
     el("cqCrowd").textContent = total > 0 && leader
       ? `${leader.opt.key} · ${leader.opt.label} (${safePct(leader.count,total)}%)`
-      : "You're among the first answers";
+      : "Your answer is saved · live totals are updating";
 
     el("cqCosmosLabel").textContent = cosmosLabel(node);
     el("cqCosmos").textContent = cosmosOpt ? `${cosmosOpt.key} · ${cosmosOpt.label}` : "No single answer";
@@ -410,20 +552,17 @@ a{color:inherit}button,textarea{font:inherit}
     el("cqExplanation").append(strong,document.createTextNode(explanation));
     const meta = document.createElement("div");
     meta.style.cssText = "margin-top:10px;font-size:12px;color:#7a8495";
-    meta.textContent = `${total.toLocaleString()} answer${total === 1 ? "" : "s"}${data?.approximate ? " · live totals may take a moment to settle" : ""}`;
+    meta.textContent = total > 0
+      ? `${total.toLocaleString()} answer${total === 1 ? "" : "s"}${data?.approximate ? " · live totals may take a moment to settle" : ""}`
+      : "Your answer is saved. Live totals are temporarily unavailable.";
     el("cqExplanation").appendChild(meta);
 
-    const label = clean(selected.label).slice(0,70);
-    state.journey.push({
-      question_id:node.question_id,
-      question:node.question,
-      option:selected.key,
-      answer_label:selected.label,
-      label
-    });
+    upsertJourneySelection(node,selected);
     renderJourney();
     el("cqContinue").textContent = state.step >= MAX_STEPS ? "See your Butterfly →" : "Follow this choice →";
+    window.scrollTo({top:0,behavior:"smooth"});
   }
+
 
   async function continueButterfly(){
     if(state.loading) return;
@@ -454,6 +593,7 @@ a{color:inherit}button,textarea{font:inherit}
       state.selected = "";
       state.counts = null;
       renderQuestion();
+      void restorePriorVote(state.current);
     }catch(error){
       showFinal(`Cosmos could not generate the next fork right now. Your path is saved locally in this session.`);
     }finally{
@@ -662,6 +802,7 @@ a{color:inherit}button,textarea{font:inherit}
     document.title = `${root.question} · Cosmos Question`;
     if(el("cqShareQuestionTop")) el("cqShareQuestionTop").hidden = false;
     renderQuestion();
+    void restorePriorVote(root);
   }
 
   function openCreate(){
