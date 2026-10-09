@@ -633,6 +633,56 @@ function renderOfficialQuestionPage(template, challenge, candidate, pageUrl) {
   return html;
 }
 
+function refreshExistingOfficialQuestionPages(template) {
+  if (!fs.existsSync(Q_DIR)) return 0;
+
+  const files = fs.readdirSync(Q_DIR).filter(name => name.toLowerCase().endsWith(".html"));
+  let refreshed = 0;
+
+  for (const name of files) {
+    const file = path.join(Q_DIR, name);
+    const existing = fs.readFileSync(file, "utf8");
+    const bootstrapMatch = existing.match(/<script>window\.COSMOS_CHALLENGE_BOOTSTRAP=([\s\S]*?);<\/script>/i);
+    if (!bootstrapMatch) continue;
+
+    let challenge;
+    try { challenge = JSON.parse(bootstrapMatch[1]); }
+    catch { continue; }
+    if (!challenge?.challenge_id || !challenge?.question) continue;
+
+    const preserved = {
+      title: existing.match(/<title>[\s\S]*?<\/title>/i)?.[0] || "",
+      description: existing.match(/<meta name="description"[^>]*>/i)?.[0] || "",
+      robots: existing.match(/<meta name="robots"[^>]*>/i)?.[0] || "",
+      ogTitle: existing.match(/<meta property="og:title"[^>]*>/i)?.[0] || "",
+      ogDescription: existing.match(/<meta property="og:description"[^>]*>/i)?.[0] || "",
+      canonical: existing.match(/<link rel="canonical"[^>]*>/i)?.[0] || "",
+      ogUrl: existing.match(/<meta property="og:url"[^>]*>/i)?.[0] || ""
+    };
+
+    let html = template;
+    if (preserved.title) html = html.replace(/<title>[\s\S]*?<\/title>/i, preserved.title);
+    if (preserved.description) html = html.replace(/<meta name="description"[^>]*>/i, preserved.description);
+    if (preserved.robots) html = html.replace(/<meta name="robots"[^>]*>/i, preserved.robots);
+    if (preserved.ogTitle) html = html.replace(/<meta property="og:title"[^>]*>/i, preserved.ogTitle);
+    if (preserved.ogDescription) html = html.replace(/<meta property="og:description"[^>]*>/i, preserved.ogDescription);
+
+    const headExtras = [preserved.canonical, preserved.ogUrl].filter(Boolean).join("\n  ");
+    if (headExtras) html = html.replace("</head>", `  ${headExtras}\n</head>`);
+
+    const bootstrap = JSON.stringify(challenge).replace(/</g, "\\u003c");
+    const bootstrapScript = `<script>window.COSMOS_CHALLENGE_BOOTSTRAP=${bootstrap};</script>`;
+    const embeddedApp = /<script>\s*\(\(\)\s*=>\s*\{/i;
+    if (!embeddedApp.test(html)) continue;
+    html = html.replace(embeddedApp, match => `${bootstrapScript}\n  ${match}`);
+
+    fs.writeFileSync(file, html, "utf8");
+    refreshed += 1;
+  }
+
+  return refreshed;
+}
+
 function collectHtmlUrls(dir, prefix) {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir)
@@ -800,6 +850,10 @@ async function main() {
   if(!fs.existsSync(QUESTION_TEMPLATE)) throw new Error(`Missing ${QUESTION_TEMPLATE}. Add the supplied q.html before running discovery.`);
   const template=fs.readFileSync(QUESTION_TEMPLATE,"utf8");
   fs.mkdirSync(Q_DIR,{recursive:true});
+  const refreshedExistingQuestions = refreshExistingOfficialQuestionPages(template);
+  if(refreshedExistingQuestions){
+    console.log(`Refreshed ${refreshedExistingQuestions} existing Cosmos Question page(s) with the current player.`);
+  }
 
   const createdAt=new Date().toISOString();
   const queueItems=[];
