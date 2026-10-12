@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="cosmos-build" content="cosmos-life-v1-staging" />
+  <title>COSMOS — Look deeper.</title>
+  <style>
+    :root{
+      --bg:#f7f8fb;
+      --ink:#0e1220;
+      --muted:#6d7484;
+      --line:rgba(14,18,32,.10);
+      --panel:rgba(255,255,255,.92);
+      --shadow:0 18px 60px rgba(25,35,60,.14);
+      --safe:#287c5b;
+      --danger:#a53a3a;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+    button,input,textarea{font:inherit}
+    button{cursor:pointer}
+    [hidden]{display:none!important}
+    .app{position:relative;width:100%;height:100%;overflow:hidden;background:#eef0f5}
+    .camera{position:absolute;inset:0;background:radial-gradient(circle at 50% 38%,#ffffff 0,#f2f4f8 45%,#e4e8ef 100%);overflow:hidden}
+    .camera video{width:100%;height:100%;object-fit:cover;filter:saturate(.92) contrast(.98)}
+    .camera::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,rgba(255,255,255,.50),transparent 22%,transparent 72%,rgba(255,255,255,.64))}
+    .camera-fallback{position:absolute;inset:0;display:grid;place-items:center;padding:32px;text-align:center;color:#7a8090;font-size:14px;line-height:1.6}
+    .topbar{position:absolute;z-index:5;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 18px) 18px 12px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+    .brand{font-size:13px;letter-spacing:.20em;font-weight:800;text-transform:uppercase;text-shadow:0 1px 12px rgba(255,255,255,.9)}
+    .tagline{display:block;margin-top:5px;font-size:11px;letter-spacing:.01em;font-weight:500;color:#697183;text-transform:none}
+    .account{pointer-events:auto;border:1px solid var(--line);background:rgba(255,255,255,.78);backdrop-filter:blur(14px);border-radius:999px;padding:8px 12px;font-size:11px;color:#4e5668}
+    .ambient{position:absolute;z-index:4;left:50%;top:44%;transform:translate(-50%,-50%);display:grid;place-items:center;text-align:center;pointer-events:none;width:min(78vw,420px)}
+    .ambient-title{font-size:clamp(22px,5vw,34px);font-weight:600;letter-spacing:-.035em;line-height:1.04;color:rgba(14,18,32,.88);text-shadow:0 2px 20px rgba(255,255,255,.9)}
+    .ambient-sub{margin-top:8px;font-size:12px;color:#737b8c}
+    .found-orb{pointer-events:auto;margin-top:24px;width:86px;height:86px;border-radius:50%;border:1px solid rgba(14,18,32,.22);background:rgba(255,255,255,.30);backdrop-filter:blur(8px);box-shadow:0 0 0 1px rgba(255,255,255,.55) inset,0 14px 42px rgba(25,35,60,.14);display:grid;place-items:center;animation:breathe 3.8s ease-in-out infinite}
+    .found-orb::before{content:"";width:52px;height:52px;border-radius:50%;border:1px solid rgba(14,18,32,.30)}
+    @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+    .found-label{margin-top:12px;font-size:12px;color:#4d5566;background:rgba(255,255,255,.78);border:1px solid rgba(14,18,32,.07);padding:7px 10px;border-radius:999px;backdrop-filter:blur(10px)}
+    .bottom{position:absolute;z-index:6;left:0;right:0;bottom:0;padding:14px 18px calc(env(safe-area-inset-bottom) + 18px);display:grid;justify-items:center;gap:12px}
+    .core{position:relative;width:78px;height:78px;border-radius:50%;border:1.4px solid rgba(14,18,32,.52);background:rgba(255,255,255,.26);backdrop-filter:blur(16px);box-shadow:0 10px 38px rgba(30,42,68,.16),0 0 0 1px rgba(255,255,255,.58) inset;touch-action:none}
+    .core::after{content:"";position:absolute;inset:14px;border-radius:50%;border:1px solid rgba(14,18,32,.18);transition:.22s ease}
+    .core.holding::after{inset:8px;background:rgba(255,255,255,.34)}
+    .hint{font-size:11px;color:#6f7788;background:rgba(255,255,255,.74);padding:6px 10px;border-radius:999px;border:1px solid rgba(14,18,32,.06);backdrop-filter:blur(12px)}
+    .nav{display:flex;gap:9px}
+    .nav button{border:1px solid rgba(14,18,32,.08);background:rgba(255,255,255,.68);backdrop-filter:blur(14px);border-radius:999px;padding:8px 13px;color:#5a6273;font-size:11px}
+    .nav button.active{color:#111827;background:rgba(255,255,255,.92);border-color:rgba(14,18,32,.16)}
+    .toast{position:absolute;z-index:20;left:50%;top:calc(env(safe-area-inset-top) + 80px);transform:translateX(-50%);max-width:min(90vw,520px);background:#111827;color:white;border-radius:999px;padding:10px 14px;font-size:12px;box-shadow:var(--shadow);text-align:center}
+    .sheet-backdrop{position:absolute;z-index:30;inset:0;background:rgba(12,16,27,.24);backdrop-filter:blur(3px)}
+    .sheet{position:absolute;z-index:31;left:0;right:0;bottom:0;max-height:min(86vh,780px);overflow:auto;background:rgba(255,255,255,.97);border-radius:28px 28px 0 0;padding:16px 18px calc(env(safe-area-inset-bottom) + 22px);box-shadow:0 -26px 70px rgba(24,33,55,.18)}
+    .handle{width:38px;height:4px;border-radius:99px;background:#d5d9e1;margin:0 auto 16px}
+    .sheet h2{margin:0;font-size:24px;letter-spacing:-.04em}
+    .sheet p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+    .choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}
+    .choice{min-height:68px;border-radius:18px;border:1px solid var(--line);background:#fff;text-align:left;padding:13px 14px;color:#182030}
+    .choice strong{display:block;font-size:14px}.choice span{display:block;color:#7a8191;font-size:11px;margin-top:4px;line-height:1.35}
+    .choice.wide{grid-column:1/-1}.choice[disabled]{opacity:.44;cursor:not-allowed}
+    .field{margin-top:16px}.field label{display:block;font-size:11px;font-weight:700;color:#5c6473;margin-bottom:7px;text-transform:uppercase;letter-spacing:.06em}
+    .field input,.field textarea{width:100%;border:1px solid var(--line);background:#fff;border-radius:15px;padding:12px 13px;color:#151a26;outline:none}.field textarea{min-height:90px;resize:vertical}
+    .actions{display:flex;gap:9px;margin-top:18px}.actions button{flex:1;min-height:46px;border-radius:15px;border:1px solid var(--line);background:#fff;color:#151a26}.actions .primary{background:#111827;color:#fff;border-color:#111827}.actions .danger{color:var(--danger)}
+    .micro{font-size:11px;color:#808797;line-height:1.5;margin-top:12px}.micro.good{color:var(--safe)}
+    .media-preview{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:12px;background:#fafbfc}.media-preview img,.media-preview video{display:block;width:100%;max-height:300px;object-fit:contain;border-radius:12px}.media-preview audio{width:100%}.media-preview a{word-break:break-all}
+    .panel{position:absolute;z-index:25;inset:0;background:rgba(248,249,252,.98);padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 30px);overflow:auto}
+    .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.panel h1{margin:0;font-size:28px;letter-spacing:-.045em}.panel .close{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px}
+    .list{display:grid;gap:10px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 8px 28px rgba(25,35,60,.05)}.card-title{font-weight:750;font-size:14px}.card-meta{color:#7a8190;font-size:11px;margin-top:5px;line-height:1.45}.card-body{margin-top:10px;font-size:13px;color:#313849;line-height:1.5;white-space:pre-wrap}.empty{color:#7a8190;font-size:13px;line-height:1.6;padding:26px 6px}
+    .auth{position:absolute;z-index:50;inset:0;background:#fff;display:grid;place-items:center;padding:28px}.auth-card{width:min(420px,100%)}.auth-orb{width:94px;height:94px;margin:0 auto 22px;border-radius:50%;border:1.4px solid rgba(14,18,32,.48);position:relative}.auth-orb::after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(14,18,32,.18)}.auth h1{text-align:center;margin:0;font-size:31px;letter-spacing:.15em;font-weight:800}.auth h2{text-align:center;margin:8px 0 28px;font-size:16px;font-weight:500;color:#697183}.auth .field{margin-top:12px}.auth button{width:100%;min-height:48px;border:0;border-radius:15px;background:#111827;color:white;margin-top:16px;font-weight:700}.auth-note{text-align:center;color:#89909d;font-size:11px;line-height:1.5;margin-top:14px}.auth-error{color:var(--danger);font-size:12px;margin-top:12px;text-align:center}.auth-secondary{background:#fff!important;color:#313849!important;border:1px solid var(--line)!important}
+    @media(min-width:760px){.sheet{left:50%;right:auto;width:min(560px,calc(100% - 40px));transform:translateX(-50%);border-radius:28px;margin-bottom:18px}.choices{grid-template-columns:repeat(3,minmax(0,1fr))}.choice.wide{grid-column:auto}.panel{left:50%;right:auto;width:min(650px,100%);transform:translateX(-50%);box-shadow:0 0 70px rgba(25,35,60,.10)}}
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="camera">
+    <video id="cameraVideo" autoplay muted playsinline hidden></video>
+    <div class="camera-fallback" id="cameraFallback">Reality stays visible here. Camera access is requested only when you choose to use it.</div>
+  </div>
+
+  <div class="topbar">
+    <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
+    <button class="account" id="accountButton">You</button>
+  </div>
+
+  <div class="ambient" id="ambient">
+    <div class="ambient-title" id="ambientTitle">The world has more.</div>
+    <div class="ambient-sub" id="ambientSub">Tap ◯ to look here. Hold ◯ to leave something.</div>
+    <button class="found-orb" id="foundOrb" hidden aria-label="Open Cosmos"></button>
+    <div class="found-label" id="foundLabel" hidden></div>
+  </div>
+
+  <div class="bottom">
+    <button class="core" id="coreOrb" aria-label="Cosmos circle"></button>
+    <div class="hint" id="hint">Tap to look · hold to leave</div>
+    <div class="nav">
+      <button class="active" data-space="here">HERE</button>
+      <button data-space="mine">MINE</button>
+      <button data-space="waiting">WAITING</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <div class="sheet" id="sheet" hidden></div>
+  <div class="panel" id="panel" hidden></div>
+
+  <section class="auth" id="auth">
+    <div class="auth-card">
+      <div class="auth-orb"></div>
+      <h1>COSMOS</h1>
+      <h2>Look deeper.</h2>
+      <div id="authStart">
+        <div class="field"><label>Phone</label><input id="phoneInput" autocomplete="tel" inputmode="tel" placeholder="+1 919 555 0123" /></div>
+        <div class="field"><label>Email</label><input id="emailInput" autocomplete="email" inputmode="email" placeholder="you@example.com" /></div>
+        <button id="sendCodesButton">Continue</button>
+        <div class="auth-note">Phone identifies your Cosmos. Email protects it. Neither is public.</div>
+      </div>
+      <div id="authVerify" hidden>
+        <div class="field"><label>Phone code</label><input id="phoneCodeInput" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" /></div>
+        <div class="field"><label>Email code</label><input id="emailCodeInput" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" /></div>
+        <button id="verifyCodesButton">Enter Cosmos</button>
+        <button class="auth-secondary" id="restartAuthButton">Use different phone/email</button>
+        <div class="auth-note" id="devAuthNote" hidden>Staging mode is active. Use the verification code configured in the Worker secret <b>AUTH_DEV_CODE</b>.</div>
+      </div>
+      <div class="auth-error" id="authError" hidden></div>
+    </div>
+  </section>
+</div>
+
+<input id="fileInput" type="file" hidden />
+
+<script>
+(() => {
+  const DEFAULT_API = "https://ptdtoday-cosmos-life.ptdtoday.workers.dev";
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("api")) localStorage.setItem("cosmos_life_api", qs.get("api"));
+  const API = String(localStorage.getItem("cosmos_life_api") || DEFAULT_API).replace(/\/$/,"");
+  const TOKEN_KEY = "cosmos_life_token_v1";
+
+  const $ = id => document.getElementById(id);
+  const auth = $("auth"), authStart = $("authStart"), authVerify = $("authVerify"), authError = $("authError");
+  const phoneInput = $("phoneInput"), emailInput = $("emailInput"), phoneCodeInput = $("phoneCodeInput"), emailCodeInput = $("emailCodeInput");
+  const sendCodesButton = $("sendCodesButton"), verifyCodesButton = $("verifyCodesButton"), restartAuthButton = $("restartAuthButton"), devAuthNote = $("devAuthNote");
+  const cameraVideo = $("cameraVideo"), cameraFallback = $("cameraFallback"), coreOrb = $("coreOrb"), hint = $("hint"), ambientTitle = $("ambientTitle"), ambientSub = $("ambientSub"), foundOrb = $("foundOrb"), foundLabel = $("foundLabel");
+  const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput");
+
+  let token = localStorage.getItem(TOKEN_KEY) || "";
+  let me = null;
+  let challengeId = "";
+  let currentFound = null;
+  let holdTimer = null;
+  let held = false;
+  let mediaRecorder = null;
+  let voiceChunks = [];
+  let compose = null;
+  let lastScanLoc = null;
+
+  function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
+  function toastMsg(message, ms=2600){toast.textContent=message;toast.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>toast.hidden=true,ms);}
+  function showAuthError(msg){authError.textContent=msg;authError.hidden=!msg;}
+  function closeSheet(){sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;}
+  function openSheet(html){sheet.innerHTML=`<div class="handle"></div>${html}`;sheet.hidden=false;sheetBackdrop.hidden=false;}
+  function closePanel(){panel.hidden=true;panel.innerHTML="";document.querySelectorAll('[data-space]').forEach(b=>b.classList.toggle('active',b.dataset.space==='here'));}
+
+  async function api(path, options={}){
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    if (options.body && !(options.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type","application/json");
+    const res = await fetch(API + path,{...options,headers});
+    const ct = res.headers.get("content-type")||"";
+    const data = ct.includes("application/json") ? await res.json() : await res.text();
+    if(!res.ok){
+      const msg = typeof data === "object" ? (data.error || data.message || `HTTP ${res.status}`) : String(data || `HTTP ${res.status}`);
+      const err = new Error(msg); err.status=res.status; throw err;
+    }
+    return data;
+  }
+
+  async function bootstrap(){
+    if(!token){auth.hidden=false;return;}
+    try{
+      me = await api("/api/me");
+      auth.hidden=true;
+      accountButton.textContent = me.display_name || "You";
+      startCamera(false);
+      scanHere(false);
+    }catch(e){
+      localStorage.removeItem(TOKEN_KEY); token=""; auth.hidden=false;
+    }
+  }
+
+  sendCodesButton.addEventListener("click", async()=>{
+    showAuthError("");
+    const phone=phoneInput.value.trim(), email=emailInput.value.trim();
+    if(!phone||!email){showAuthError("Enter both phone and email.");return;}
+    sendCodesButton.disabled=true; sendCodesButton.textContent="Sending…";
+    try{
+      const r=await api("/api/auth/start",{method:"POST",body:JSON.stringify({phone,email})});
+      challengeId=r.challenge_id;
+      authStart.hidden=true;authVerify.hidden=false;devAuthNote.hidden=!r.dev_mode;
+      phoneCodeInput.focus();
+    }catch(e){showAuthError(e.message);}finally{sendCodesButton.disabled=false;sendCodesButton.textContent="Continue";}
+  });
+
+  verifyCodesButton.addEventListener("click", async()=>{
+    showAuthError("");
+    const phone_code=phoneCodeInput.value.trim(), email_code=emailCodeInput.value.trim();
+    if(!challengeId||!phone_code||!email_code){showAuthError("Enter both verification codes.");return;}
+    verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
+    try{
+      const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);
+    }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
+  });
+
+  restartAuthButton.addEventListener("click",()=>{challengeId="";authVerify.hidden=true;authStart.hidden=false;phoneCodeInput.value="";emailCodeInput.value="";showAuthError("");});
+
+  async function startCamera(showError=true){
+    if(!navigator.mediaDevices?.getUserMedia){cameraFallback.textContent="Camera is unavailable in this browser. You can still leave and receive location-based Cosmoses.";return;}
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+      cameraVideo.srcObject=stream;cameraVideo.hidden=false;cameraFallback.hidden=true;
+    }catch(e){
+      cameraVideo.hidden=true;cameraFallback.hidden=false;cameraFallback.textContent="Camera remains private until you allow it. Cosmos can still use place and time without camera access.";
+      if(showError) toastMsg("Camera permission was not granted.");
+    }
+  }
+
+  function getLocation(){
+    return new Promise((resolve,reject)=>{
+      if(!navigator.geolocation) return reject(new Error("Location is unavailable in this browser."));
+      navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy}),e=>reject(new Error("Location permission is needed for a Cosmos that belongs here.")),{enableHighAccuracy:true,timeout:10000,maximumAge:15000});
+    });
+  }
+
+  async function scanHere(showErrors=true){
+    if(!token) return;
+    hint.textContent="Looking here…";ambientTitle.textContent="Looking deeper…";ambientSub.textContent="Only Cosmoses you are allowed to see can appear.";
+    foundOrb.hidden=true;foundLabel.hidden=true;currentFound=null;
+    let loc=null;
+    try{loc=await getLocation();lastScanLoc=loc;}catch(e){lastScanLoc=null;if(showErrors) toastMsg(e.message);}
+    try{
+      const params=new URLSearchParams(); if(loc){params.set("lat",loc.lat);params.set("lng",loc.lng);params.set("accuracy",loc.accuracy||0);}
+      const r=await api(`/api/cosmos/here?${params.toString()}`);
+      const item=(r.items||[])[0]||null;
+      if(item){
+        currentFound=item;ambientTitle.textContent="Something is here for you.";ambientSub.textContent=item.unlock_mode==="here"?"This Cosmos waited for this place.":"This Cosmos has reached its moment.";foundLabel.textContent=item.sender_name?`From ${item.sender_name}`:"A Cosmos is ready";foundLabel.hidden=false;foundOrb.hidden=false;hint.textContent="Tap the circle to open";
+      }else{
+        ambientTitle.textContent="The world has more.";ambientSub.textContent="Nothing meant for you is ready here right now.";hint.textContent="Tap to look · hold to leave";
+      }
+    }catch(e){
+      ambientTitle.textContent="The world has more.";ambientSub.textContent="Cosmos could not look here yet.";hint.textContent="Tap to try again · hold to leave";if(showErrors)toastMsg(e.message);
+    }
+  }
+
+  foundOrb.addEventListener("click",()=>{if(currentFound)openCosmos(currentFound.id);});
+
+  coreOrb.addEventListener("pointerdown",e=>{
+    e.preventDefault();held=false;coreOrb.setPointerCapture?.(e.pointerId);coreOrb.classList.add("holding");
+    holdTimer=setTimeout(()=>{held=true;coreOrb.classList.remove("holding");beginCompose();},520);
+  });
+  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held)scanHere(true);held=false;};
+  coreOrb.addEventListener("pointerup",releaseCore);coreOrb.addEventListener("pointercancel",()=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");held=false;});
+  coreOrb.addEventListener("contextmenu",e=>e.preventDefault());
+
+  sheetBackdrop.addEventListener("click",closeSheet);
+
+  function beginCompose(){
+    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null};
+    showContentStep();
+  }
+
+  function showContentStep(){
+    openSheet(`<h2>Leave something</h2><p>What belongs in this moment?</p><div class="choices">
+      <button class="choice" data-kind="text"><strong>Text</strong><span>A thought, note or memory.</span></button>
+      <button class="choice" data-kind="voice"><strong>Voice</strong><span>Record your own voice.</span></button>
+      <button class="choice" data-kind="photo"><strong>Photo</strong><span>Choose or take a photo.</span></button>
+      <button class="choice" data-kind="video"><strong>Video</strong><span>Choose or record a short video.</span></button>
+      <button class="choice" data-kind="music"><strong>Music</strong><span>Paste a Spotify, Apple Music or other music link.</span></button>
+      <button class="choice" data-kind="link"><strong>Link</strong><span>Attach something from another app.</span></button>
+    </div><div class="micro">Private by default. A Cosmos never makes another person public.</div>`);
+    sheet.querySelectorAll("[data-kind]").forEach(b=>b.addEventListener("click",()=>chooseContent(b.dataset.kind)));
+  }
+
+  async function chooseContent(kind){
+    compose.content_kind=kind;
+    if(kind==="text") return textEntry("What would you leave here?",false);
+    if(kind==="music") return textEntry("Paste the music link",true);
+    if(kind==="link") return textEntry("Paste a link",true);
+    if(kind==="voice") return voiceEntry();
+    if(kind==="photo"||kind==="video"){
+      fileInput.accept=kind==="photo"?"image/*":"video/*";fileInput.setAttribute("capture",kind==="photo"?"environment":"environment");fileInput.value="";fileInput.onchange=async()=>{
+        const file=fileInput.files?.[0]; if(!file) return showContentStep();
+        try{toastMsg("Securing media…");const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();}catch(e){toastMsg(e.message);showContentStep();}
+      };fileInput.click();
+    }
+  }
+
+  function textEntry(title,isUrl){
+    openSheet(`<h2>${escapeHtml(title)}</h2><p>${isUrl?"Cosmos stores the relationship; the original app still hosts the content.":"Keep it human. Cosmos is for good."}</p><div class="field"><label>${isUrl?"Link":"Text"}</label>${isUrl?'<input id="composeValue" inputmode="url" placeholder="https://…">':'<textarea id="composeValue" placeholder="Write something worth leaving…"></textarea>'}</div><div class="actions"><button id="backCompose">Back</button><button class="primary" id="nextCompose">Continue</button></div>`);
+    $("backCompose").onclick=showContentStep;$("nextCompose").onclick=()=>{const v=$("composeValue").value.trim();if(!v)return toastMsg("Add something first.");if(isUrl)compose.content_url=v;else compose.content_text=v;showRecipientStep();};
+  }
+
+  function voiceEntry(){
+    openSheet(`<h2>Leave your voice</h2><p>Cosmos preserves the human Trace. AI should never silently replace it.</p><div class="actions"><button id="recordVoice" class="primary">Start recording</button><button id="cancelVoice">Back</button></div><div class="micro" id="voiceStatus">Microphone access begins only after you tap record.</div>`);
+    $("cancelVoice").onclick=showContentStep;
+    $("recordVoice").onclick=async()=>{
+      if(mediaRecorder?.state==="recording"){mediaRecorder.stop();return;}
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data?.size)voiceChunks.push(e.data)};mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||"audio/webm"});const file=new File([blob],`cosmos-voice-${Date.now()}.webm`,{type:blob.type});$("voiceStatus").textContent="Securing voice…";try{const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();}catch(e){toastMsg(e.message);showContentStep();}};mediaRecorder.start();$("recordVoice").textContent="Stop recording";$("voiceStatus").textContent="Recording…";
+      }catch(e){toastMsg("Microphone permission was not granted.");}
+    };
+  }
+
+  async function uploadFile(file){
+    const fd=new FormData();fd.append("file",file,file.name||"cosmos-media");return await api("/api/media/upload",{method:"POST",body:fd});
+  }
+
+  function showRecipientStep(){
+    openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices">
+      <button class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
+      <button class="choice" data-recipient="person"><strong>Someone</strong><span>A person you choose.</span></button>
+      <button class="choice" disabled><strong>Anyone</strong><span>Release / Message in a Bottle comes next.</span></button>
+    </div><div class="actions"><button id="backRecipient">Back</button></div>`);
+    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{compose.recipient_mode=b.dataset.recipient;if(compose.recipient_mode==="person")showPersonStep();else showWhenStep();});
+  }
+
+  function showPersonStep(){
+    openSheet(`<h2>Someone</h2><p>Use their phone or email. Cosmos stores a protected identity hash, not a public address.</p>
+      <div class="field"><label>Phone or email</label><input id="recipientTarget" placeholder="+1… or name@example.com"></div>
+      <div class="field"><label>Your label for them</label><input id="recipientLabel" placeholder="Ayşe"></div>
+      <div class="actions"><button id="backPerson">Back</button><button class="primary" id="nextPerson">Continue</button></div>`);
+    $("backPerson").onclick=showRecipientStep;$("nextPerson").onclick=async()=>{
+      const target=$("recipientTarget").value.trim(),label=$("recipientLabel").value.trim();if(!target)return toastMsg("Enter their phone or email.");compose.recipient_target=target;compose.recipient_label=label||"Someone";
+      if(!me?.display_name){const name=prompt("How should this person see your name? (You can change it later)","")?.trim();if(name){try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:name})});accountButton.textContent=me.display_name||"You";}catch(e){return toastMsg(e.message);}}}
+      showWhenStep();
+    };
+  }
+
+  function showWhenStep(){
+    openSheet(`<h2>When?</h2><p>A Cosmos can wait until the moment belongs.</p><div class="choices">
+      <button class="choice" data-when="now"><strong>Now</strong><span>Ready as soon as they open Cosmos.</span></button>
+      <button class="choice" data-when="here"><strong>When here</strong><span>Wait for this place.</span></button>
+      <button class="choice" data-when="date"><strong>Future date</strong><span>Wait until a date you choose.</span></button>
+    </div><div class="actions"><button id="backWhen">Back</button></div>`);
+    $("backWhen").onclick=showRecipientStep;sheet.querySelectorAll("[data-when]").forEach(b=>b.onclick=async()=>{
+      compose.unlock_mode=b.dataset.when;
+      if(compose.unlock_mode==="here"){
+        try{const loc=await getLocation();compose.lat=loc.lat;compose.lng=loc.lng;showFinalStep();}catch(e){toastMsg(e.message);}
+      }else if(compose.unlock_mode==="date") showDateStep(); else showFinalStep();
+    });
+  }
+
+  function showDateStep(){
+    const min=new Date(Date.now()+60000).toISOString().slice(0,16);
+    openSheet(`<h2>Future date</h2><p>Cosmos will wait. The recipient remains free to open or ignore it when the moment arrives.</p><div class="field"><label>Open after</label><input id="unlockDate" type="datetime-local" min="${min}"></div><div class="actions"><button id="backDate">Back</button><button class="primary" id="nextDate">Continue</button></div>`);
+    $("backDate").onclick=showWhenStep;$("nextDate").onclick=()=>{const v=$("unlockDate").value;if(!v)return toastMsg("Choose a future date.");compose.unlock_at=new Date(v).toISOString();showFinalStep();};
+  }
+
+  function showFinalStep(){
+    const who=compose.recipient_mode==="self"?"Future you":compose.recipient_label||"Someone";
+    const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString():"Now";
+    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)}</p><div class="micro good">Private by default. The recipient's location is never exposed to you by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
+  }
+
+  async function createCosmos(){
+    $("leaveFinal").disabled=true;$("leaveFinal").textContent="Leaving…";
+    try{
+      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Tap ◯ to look here. Hold ◯ to leave something.";},3200);
+    }catch(e){toastMsg(e.message,4200);$("leaveFinal").disabled=false;$("leaveFinal").textContent="Leave ◯";}
+  }
+
+  async function openCosmos(id){
+    try{
+      const body = lastScanLoc ? JSON.stringify({lat:lastScanLoc.lat,lng:lastScanLoc.lng}) : JSON.stringify({});
+      const r=await api(`/api/cosmos/${encodeURIComponent(id)}/open`,{method:"POST",body});currentFound=null;foundOrb.hidden=true;foundLabel.hidden=true;renderCosmos(r.item,r.thread||[]);
+    }catch(e){toastMsg(e.message);}
+  }
+
+  async function mediaObjectUrl(mediaId){
+    const res=await fetch(`${API}/api/media/${encodeURIComponent(mediaId)}`,{headers:{Authorization:`Bearer ${token}`}});if(!res.ok)throw new Error("Media could not be opened.");const blob=await res.blob();return URL.createObjectURL(blob);
+  }
+
+  async function contentHtml(item){
+    const kind=item.content_kind;
+    if(item.media_id){
+      const url=await mediaObjectUrl(item.media_id);
+      if(kind==="photo")return `<div class="media-preview"><img src="${url}" alt="Cosmos photo"></div>`;
+      if(kind==="video")return `<div class="media-preview"><video controls playsinline src="${url}"></video></div>`;
+      if(kind==="voice")return `<div class="media-preview"><audio controls src="${url}"></audio></div>`;
+    }
+    if(item.content_url){return `<div class="media-preview"><a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.content_url)}</a></div>`;}
+    return `<div class="card-body">${escapeHtml(item.content_text||"")}</div>`;
+  }
+
+  async function renderCosmos(item,thread){
+    const content=await contentHtml(item);
+    const chain=(thread||[]).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button class="danger" id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    $("closeCosmos").onclick=()=>{closeSheet();scanHere(false);};
+    if($("replyCosmos"))$("replyCosmos").onclick=()=>showReplyStep(item);
+    if($("blockSender"))$("blockSender").onclick=async()=>{if(!confirm("Block this sender from contacting you through Cosmos?"))return;try{await api("/api/block",{method:"POST",body:JSON.stringify({user_id:item.creator_user_id})});closeSheet();toastMsg("Blocked.");}catch(e){toastMsg(e.message);}};
+    if($("reportCosmos"))$("reportCosmos").onclick=async()=>{const reason=prompt("What should Cosmos review?","")?.trim();if(!reason)return;try{await api("/api/report",{method:"POST",body:JSON.stringify({item_id:item.id,reason})});toastMsg("Thank you. This was reported for review.");}catch(e){toastMsg(e.message);}};
+  }
+
+  function showReplyStep(item){
+    openSheet(`<h2>Reply</h2><p>Your reply deepens this Cosmos. It does not create a public comment.</p><div class="field"><label>Your reply</label><textarea id="replyText" placeholder="Leave something worth adding…"></textarea></div><div class="actions"><button id="cancelReply">Back</button><button class="primary" id="sendReply">Reply ◯</button></div>`);
+    $("cancelReply").onclick=()=>openCosmos(item.id);$("sendReply").onclick=async()=>{const text=$("replyText").value.trim();if(!text)return toastMsg("Write a reply first.");try{await api(`/api/cosmos/${encodeURIComponent(item.id)}/reply`,{method:"POST",body:JSON.stringify({content_kind:"text",content_text:text})});closeSheet();toastMsg("Reply added to the Cosmos.");scanHere(false);}catch(e){toastMsg(e.message);}};
+  }
+
+  async function showSpace(space){
+    if(space==="here"){closePanel();scanHere(true);return;}
+    document.querySelectorAll('[data-space]').forEach(b=>b.classList.toggle('active',b.dataset.space===space));
+    panel.hidden=false;panel.innerHTML=`<div class="panel-head"><h1>${space==="mine"?"Mine":"Waiting"}</h1><button class="close" id="panelClose">Close</button></div><div class="empty">Loading…</div>`;$("panelClose").onclick=closePanel;
+    try{
+      const r=await api(`/api/cosmos/${space}`);const items=r.items||[];
+      panel.innerHTML=`<div class="panel-head"><h1>${space==="mine"?"Mine":"Waiting"}</h1><button class="close" id="panelClose">Close</button></div>${items.length?`<div class="list">${items.map(item=>`<div class="card" data-item="${escapeHtml(item.id)}"><div class="card-title">${escapeHtml(item.title||item.recipient_label||item.sender_name||"Cosmos")}</div><div class="card-meta">${escapeHtml(item.state_label||item.unlock_label||"")} · ${new Date(item.created_at).toLocaleDateString()}</div><div class="card-body">${escapeHtml(item.preview||"")}</div></div>`).join("")}</div>`:`<div class="empty">${space==="mine"?"Your Cosmos grows as life happens.":"Nothing you are allowed to see is waiting here right now."}</div>`}`;
+      $("panelClose").onclick=closePanel;panel.querySelectorAll("[data-item]").forEach(c=>c.onclick=()=>openCosmos(c.dataset.item));
+    }catch(e){panel.querySelector(".empty").textContent=e.message;}
+  }
+
+  document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
+  accountButton.addEventListener("click",()=>{
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
+    $("logout").onclick=()=>{localStorage.removeItem(TOKEN_KEY);location.reload();};
+  });
+
+  bootstrap();
+})();
+</script>
+</body>
+</html>
