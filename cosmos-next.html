@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v1-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v1.1-vision-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -62,6 +62,7 @@
     .actions{display:flex;gap:9px;margin-top:18px}.actions button{flex:1;min-height:46px;border-radius:15px;border:1px solid var(--line);background:#fff;color:#151a26}.actions .primary{background:#111827;color:#fff;border-color:#111827}.actions .danger{color:var(--danger)}
     .micro{font-size:11px;color:#808797;line-height:1.5;margin-top:12px}.micro.good{color:var(--safe)}
     .media-preview{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:12px;background:#fafbfc}.media-preview img,.media-preview video{display:block;width:100%;max-height:300px;object-fit:contain;border-radius:12px}.media-preview audio{width:100%}.media-preview a{word-break:break-all}
+    .look-card{margin-top:16px;border:1px solid var(--line);border-radius:20px;background:#fafbfc;padding:15px 16px}.look-kicker{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-what{font-size:14px;line-height:1.5;color:#303746;margin-top:8px}.look-depth{font-size:16px;line-height:1.55;color:#141a27;margin-top:14px;letter-spacing:-.01em}.look-next{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}.look-next span{border:1px solid var(--line);background:white;border-radius:999px;padding:7px 9px;font-size:10.5px;color:#5f6778}.look-privacy{margin-top:12px;font-size:10.5px;line-height:1.45;color:#858c99}
     .panel{position:absolute;z-index:25;inset:0;background:rgba(248,249,252,.98);padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 30px);overflow:auto}
     .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.panel h1{margin:0;font-size:28px;letter-spacing:-.045em}.panel .close{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px}
     .list{display:grid;gap:10px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 8px 28px rgba(25,35,60,.05)}.card-title{font-weight:750;font-size:14px}.card-meta{color:#7a8190;font-size:11px;margin-top:5px;line-height:1.45}.card-body{margin-top:10px;font-size:13px;color:#313849;line-height:1.5;white-space:pre-wrap}.empty{color:#7a8190;font-size:13px;line-height:1.6;padding:26px 6px}
@@ -153,6 +154,7 @@
   let voiceChunks = [];
   let compose = null;
   let lastScanLoc = null;
+  let looking = false;
 
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function toastMsg(message, ms=2600){toast.textContent=message;toast.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>toast.hidden=true,ms);}
@@ -245,20 +247,76 @@
       if(item){
         currentFound=item;ambientTitle.textContent="Something is here for you.";ambientSub.textContent=item.unlock_mode==="here"?"This Cosmos waited for this place.":"This Cosmos has reached its moment.";foundLabel.textContent=item.sender_name?`From ${item.sender_name}`:"A Cosmos is ready";foundLabel.hidden=false;foundOrb.hidden=false;hint.textContent="Tap the circle to open";
       }else{
-        ambientTitle.textContent="The world has more.";ambientSub.textContent="Nothing meant for you is ready here right now.";hint.textContent="Tap to look · hold to leave";
+        ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper.";hint.textContent="Tap to look · hold to leave";
       }
     }catch(e){
-      ambientTitle.textContent="The world has more.";ambientSub.textContent="Cosmos could not look here yet.";hint.textContent="Tap to try again · hold to leave";if(showErrors)toastMsg(e.message);
+      ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper.";hint.textContent="Tap to look · hold to leave";if(showErrors)toastMsg(e.message);
     }
   }
 
   foundOrb.addEventListener("click",()=>{if(currentFound)openCosmos(currentFound.id);});
 
+  async function captureLookFrame(){
+    if(!cameraVideo.srcObject || cameraVideo.readyState < 2 || !cameraVideo.videoWidth || !cameraVideo.videoHeight){
+      throw new Error("Camera is not ready yet. Point at something and try again.");
+    }
+    const maxSide=1280;
+    const vw=cameraVideo.videoWidth, vh=cameraVideo.videoHeight;
+    const scale=Math.min(1,maxSide/Math.max(vw,vh));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(vw*scale));
+    canvas.height=Math.max(1,Math.round(vh*scale));
+    const ctx=canvas.getContext("2d",{alpha:false});
+    ctx.drawImage(cameraVideo,0,0,canvas.width,canvas.height);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.78));
+    if(!blob) throw new Error("Cosmos could not capture this view.");
+    return new File([blob],`cosmos-look-${Date.now()}.jpg`,{type:"image/jpeg"});
+  }
+
+  function showLookResult(r){
+    const next=(r.next||[]).map(v=>`<span>${escapeHtml(v)}</span>`).join("");
+    openSheet(`<h2>${escapeHtml(r.title||"Look deeper")}</h2>
+      <p>There is more here.</p>
+      <div class="look-card">
+        <div class="look-kicker">What Cosmos sees</div>
+        <div class="look-what">${escapeHtml(r.what_it_is||"")}</div>
+        <div class="look-depth">${escapeHtml(r.deeper||"")}</div>
+        ${next?`<div class="look-next">${next}</div>`:""}
+        <div class="look-privacy">${escapeHtml(r.provenance||"AI visual interpretation")} · ${escapeHtml(r.confidence||"medium")} confidence. This camera frame was analyzed for this look and was not added to your Cosmos.</div>
+      </div>
+      <div class="actions"><button id="closeLook">Close</button><button class="primary" id="leaveFromLook">Leave something here</button></div>`);
+    $("closeLook").onclick=closeSheet;
+    $("leaveFromLook").onclick=()=>{closeSheet();beginCompose();};
+  }
+
+  async function lookDeeper(){
+    if(looking) return;
+    if(currentFound){openCosmos(currentFound.id);return;}
+    looking=true;coreOrb.disabled=true;
+    ambientTitle.textContent="Looking deeper…";
+    ambientSub.textContent="Cosmos is reading this view. The frame is not added to your Cosmos.";
+    hint.textContent="Looking…";
+    try{
+      const frame=await captureLookFrame();
+      const fd=new FormData();fd.append("image",frame,frame.name);
+      const r=await api("/api/look",{method:"POST",body:fd});
+      ambientTitle.textContent=r.title||"There is more here.";
+      ambientSub.textContent=r.what_it_is||"Cosmos found another layer.";
+      hint.textContent="Tap to look again · hold to leave";
+      showLookResult(r);
+    }catch(e){
+      ambientTitle.textContent="The world has more.";
+      ambientSub.textContent="Cosmos could not read this view yet.";
+      hint.textContent="Tap to try again · hold to leave";
+      toastMsg(e.message,3800);
+    }finally{looking=false;coreOrb.disabled=false;}
+  }
+
   coreOrb.addEventListener("pointerdown",e=>{
     e.preventDefault();held=false;coreOrb.setPointerCapture?.(e.pointerId);coreOrb.classList.add("holding");
     holdTimer=setTimeout(()=>{held=true;coreOrb.classList.remove("holding");beginCompose();},520);
   });
-  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held)scanHere(true);held=false;};
+  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held)lookDeeper();held=false;};
   coreOrb.addEventListener("pointerup",releaseCore);coreOrb.addEventListener("pointercancel",()=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");held=false;});
   coreOrb.addEventListener("contextmenu",e=>e.preventDefault());
 
@@ -366,7 +424,7 @@
   async function createCosmos(){
     $("leaveFinal").disabled=true;$("leaveFinal").textContent="Leaving…";
     try{
-      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Tap ◯ to look here. Hold ◯ to leave something.";},3200);
+      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper. Hold ◯ to leave something.";},3200);
     }catch(e){toastMsg(e.message,4200);$("leaveFinal").disabled=false;$("leaveFinal").textContent="Leave ◯";}
   }
 
