@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v1.1-vision-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v1.2-fast-depth-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -49,7 +49,7 @@
     .nav button.active{color:#111827;background:rgba(255,255,255,.92);border-color:rgba(14,18,32,.16)}
     .toast{position:absolute;z-index:20;left:50%;top:calc(env(safe-area-inset-top) + 80px);transform:translateX(-50%);max-width:min(90vw,520px);background:#111827;color:white;border-radius:999px;padding:10px 14px;font-size:12px;box-shadow:var(--shadow);text-align:center}
     .sheet-backdrop{position:absolute;z-index:30;inset:0;background:rgba(12,16,27,.24);backdrop-filter:blur(3px)}
-    .sheet{position:absolute;z-index:31;left:0;right:0;bottom:0;max-height:min(86vh,780px);overflow:auto;background:rgba(255,255,255,.97);border-radius:28px 28px 0 0;padding:16px 18px calc(env(safe-area-inset-bottom) + 22px);box-shadow:0 -26px 70px rgba(24,33,55,.18)}
+    .sheet{position:absolute;z-index:31;left:0;right:0;bottom:0;height:min(84dvh,820px);max-height:calc(100dvh - 72px);overflow:hidden;background:rgba(255,255,255,.97);border-radius:28px 28px 0 0;padding:0;box-shadow:0 -26px 70px rgba(24,33,55,.18);display:flex;flex-direction:column}.sheet-inner{min-height:0;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:16px 18px calc(env(safe-area-inset-bottom) + 22px);scrollbar-width:thin}.sheet-inner::-webkit-scrollbar{width:4px}.sheet-inner::-webkit-scrollbar-thumb{background:rgba(14,18,32,.16);border-radius:999px}
     .handle{width:38px;height:4px;border-radius:99px;background:#d5d9e1;margin:0 auto 16px}
     .sheet h2{margin:0;font-size:24px;letter-spacing:-.04em}
     .sheet p{margin:8px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
@@ -62,7 +62,7 @@
     .actions{display:flex;gap:9px;margin-top:18px}.actions button{flex:1;min-height:46px;border-radius:15px;border:1px solid var(--line);background:#fff;color:#151a26}.actions .primary{background:#111827;color:#fff;border-color:#111827}.actions .danger{color:var(--danger)}
     .micro{font-size:11px;color:#808797;line-height:1.5;margin-top:12px}.micro.good{color:var(--safe)}
     .media-preview{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:12px;background:#fafbfc}.media-preview img,.media-preview video{display:block;width:100%;max-height:300px;object-fit:contain;border-radius:12px}.media-preview audio{width:100%}.media-preview a{word-break:break-all}
-    .look-card{margin-top:16px;border:1px solid var(--line);border-radius:20px;background:#fafbfc;padding:15px 16px}.look-kicker{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-what{font-size:14px;line-height:1.5;color:#303746;margin-top:8px}.look-depth{font-size:16px;line-height:1.55;color:#141a27;margin-top:14px;letter-spacing:-.01em}.look-next{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px}.look-next span{border:1px solid var(--line);background:white;border-radius:999px;padding:7px 9px;font-size:10.5px;color:#5f6778}.look-privacy{margin-top:12px;font-size:10.5px;line-height:1.45;color:#858c99}
+    .look-card{margin-top:16px;border:1px solid var(--line);border-radius:20px;background:#fafbfc;padding:15px 16px}.look-section{margin-top:16px}.look-section:first-child{margin-top:0}.look-kicker{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-what{font-size:14px;line-height:1.55;color:#303746;margin-top:8px}.look-depth{font-size:15px;line-height:1.62;color:#141a27;margin-top:8px;letter-spacing:-.005em;white-space:pre-wrap}.look-unseen{font-size:14px;line-height:1.6;color:#20293a;margin-top:8px}.look-details{display:grid;gap:8px;margin-top:10px}.look-detail{border-left:2px solid rgba(14,18,32,.14);padding-left:10px;font-size:13px;line-height:1.5;color:#3d4556}.look-next-title{margin-top:18px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-next{display:flex;gap:8px;margin-top:9px;overflow-x:auto;padding:0 0 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}.look-next button{flex:0 0 auto;border:1px solid var(--line);background:white;border-radius:999px;padding:9px 11px;font-size:11px;color:#4c5567;scroll-snap-align:start;white-space:nowrap}.look-next button:active{transform:scale(.98)}.look-privacy{margin-top:14px;font-size:10.5px;line-height:1.45;color:#858c99}.look-loading{padding:18px 2px;color:#697183;font-size:13px;line-height:1.55}
     .panel{position:absolute;z-index:25;inset:0;background:rgba(248,249,252,.98);padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 30px);overflow:auto}
     .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.panel h1{margin:0;font-size:28px;letter-spacing:-.045em}.panel .close{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px}
     .list{display:grid;gap:10px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 8px 28px rgba(25,35,60,.05)}.card-title{font-weight:750;font-size:14px}.card-meta{color:#7a8190;font-size:11px;margin-top:5px;line-height:1.45}.card-body{margin-top:10px;font-size:13px;color:#313849;line-height:1.5;white-space:pre-wrap}.empty{color:#7a8190;font-size:13px;line-height:1.6;padding:26px 6px}
@@ -155,12 +155,14 @@
   let compose = null;
   let lastScanLoc = null;
   let looking = false;
+  let lastLookFrame = null;
+  let lastLookResult = null;
 
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function toastMsg(message, ms=2600){toast.textContent=message;toast.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>toast.hidden=true,ms);}
   function showAuthError(msg){authError.textContent=msg;authError.hidden=!msg;}
   function closeSheet(){sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;}
-  function openSheet(html){sheet.innerHTML=`<div class="handle"></div>${html}`;sheet.hidden=false;sheetBackdrop.hidden=false;}
+  function openSheet(html){sheet.innerHTML=`<div class="sheet-inner"><div class="handle"></div>${html}</div>`;sheet.hidden=false;sheetBackdrop.hidden=false;}
   function closePanel(){panel.hidden=true;panel.innerHTML="";document.querySelectorAll('[data-space]').forEach(b=>b.classList.toggle('active',b.dataset.space==='here'));}
 
   async function api(path, options={}){
@@ -260,7 +262,7 @@
     if(!cameraVideo.srcObject || cameraVideo.readyState < 2 || !cameraVideo.videoWidth || !cameraVideo.videoHeight){
       throw new Error("Camera is not ready yet. Point at something and try again.");
     }
-    const maxSide=1280;
+    const maxSide=896;
     const vw=cameraVideo.videoWidth, vh=cameraVideo.videoHeight;
     const scale=Math.min(1,maxSide/Math.max(vw,vh));
     const canvas=document.createElement("canvas");
@@ -268,37 +270,46 @@
     canvas.height=Math.max(1,Math.round(vh*scale));
     const ctx=canvas.getContext("2d",{alpha:false});
     ctx.drawImage(cameraVideo,0,0,canvas.width,canvas.height);
-    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.78));
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.70));
     if(!blob) throw new Error("Cosmos could not capture this view.");
     return new File([blob],`cosmos-look-${Date.now()}.jpg`,{type:"image/jpeg"});
   }
 
   function showLookResult(r){
-    const next=(r.next||[]).map(v=>`<span>${escapeHtml(v)}</span>`).join("");
+    lastLookResult=r;
+    const details=(r.details||[]).map(v=>`<div class="look-detail">${escapeHtml(v)}</div>`).join("");
+    const paths=(r.next&&r.next.length?r.next:["How it works","What most people miss","Design & materials","Origin & history","Useful connections"])
+      .map(v=>`<button type="button" data-look-path="${escapeHtml(v)}">${escapeHtml(v)}</button>`).join("");
     openSheet(`<h2>${escapeHtml(r.title||"Look deeper")}</h2>
-      <p>There is more here.</p>
+      <p>${r.direction?`Going deeper: ${escapeHtml(r.direction)}`:"There is more here."}</p>
       <div class="look-card">
-        <div class="look-kicker">What Cosmos sees</div>
-        <div class="look-what">${escapeHtml(r.what_it_is||"")}</div>
-        <div class="look-depth">${escapeHtml(r.deeper||"")}</div>
-        ${next?`<div class="look-next">${next}</div>`:""}
+        ${r.what_it_is?`<div class="look-section"><div class="look-kicker">What Cosmos sees</div><div class="look-what">${escapeHtml(r.what_it_is)}</div></div>`:""}
+        <div class="look-section"><div class="look-kicker">Deeper</div><div class="look-depth">${escapeHtml(r.deeper||"")}</div></div>
+        ${r.unseen?`<div class="look-section"><div class="look-kicker">What you may not see</div><div class="look-unseen">${escapeHtml(r.unseen)}</div></div>`:""}
+        ${details?`<div class="look-section"><div class="look-kicker">Worth knowing</div><div class="look-details">${details}</div></div>`:""}
+        <div class="look-next-title">Go somewhere less obvious</div>
+        <div class="look-next">${paths}</div>
         <div class="look-privacy">${escapeHtml(r.provenance||"AI visual interpretation")} · ${escapeHtml(r.confidence||"medium")} confidence. This camera frame was analyzed for this look and was not added to your Cosmos.</div>
       </div>
       <div class="actions"><button id="closeLook">Close</button><button class="primary" id="leaveFromLook">Leave something here</button></div>`);
     $("closeLook").onclick=closeSheet;
     $("leaveFromLook").onclick=()=>{closeSheet();beginCompose();};
+    sheet.querySelectorAll("[data-look-path]").forEach(btn=>btn.addEventListener("click",()=>lookDeeper(btn.dataset.lookPath||"")));
   }
 
-  async function lookDeeper(){
+  async function lookDeeper(direction=""){
     if(looking) return;
-    if(currentFound){openCosmos(currentFound.id);return;}
+    if(currentFound && !direction){openCosmos(currentFound.id);return;}
     looking=true;coreOrb.disabled=true;
-    ambientTitle.textContent="Looking deeper…";
-    ambientSub.textContent="Cosmos is reading this view. The frame is not added to your Cosmos.";
+    ambientTitle.textContent=direction?"Going deeper…":"Looking deeper…";
+    ambientSub.textContent=direction?`Following: ${direction}`:"Cosmos is reading this view. The frame is not added to your Cosmos.";
     hint.textContent="Looking…";
     try{
-      const frame=await captureLookFrame();
-      const fd=new FormData();fd.append("image",frame,frame.name);
+      if(!lastLookFrame || !direction) lastLookFrame=await captureLookFrame();
+      if(direction && !sheet.hidden){
+        openSheet(`<h2>Look deeper</h2><p>Going deeper: ${escapeHtml(direction)}</p><div class="look-loading">Finding the strongest hidden layer without losing the current view…</div>`);
+      }
+      const fd=new FormData();fd.append("image",lastLookFrame,lastLookFrame.name);if(direction)fd.append("direction",direction);
       const r=await api("/api/look",{method:"POST",body:fd});
       ambientTitle.textContent=r.title||"There is more here.";
       ambientSub.textContent=r.what_it_is||"Cosmos found another layer.";
@@ -308,6 +319,7 @@
       ambientTitle.textContent="The world has more.";
       ambientSub.textContent="Cosmos could not read this view yet.";
       hint.textContent="Tap to try again · hold to leave";
+      if(direction && lastLookResult) showLookResult(lastLookResult);
       toastMsg(e.message,3800);
     }finally{looking=false;coreOrb.disabled=false;}
   }
