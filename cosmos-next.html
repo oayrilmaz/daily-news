@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v1.7-video-controls-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v1.8-consent-swipe-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -114,11 +114,34 @@
     .app[data-dimension="connections"] .ambient,.app[data-dimension="public"] .ambient,.app[data-time="past"] .ambient,.app[data-time="future"] .ambient{opacity:0;pointer-events:none}
     .app[data-dimension="connections"] .found-orb,.app[data-dimension="public"] .found-orb,.app[data-time="past"] .found-orb,.app[data-time="future"] .found-orb{pointer-events:none}
     .app[data-dimension="connections"] .camera-fallback,.app[data-dimension="public"] .camera-fallback,.app[data-time="past"] .camera-fallback,.app[data-time="future"] .camera-fallback{opacity:.12;pointer-events:none}
-    .app[data-dimension="connections"] .journey-stage,.app[data-dimension="public"] .journey-stage{top:47%}
+    .app[data-dimension="connections"] .journey-stage,.app[data-dimension="public"] .journey-stage{top:calc(env(safe-area-inset-top) + 151px)}
     .journey-busy{opacity:.65}
     .journey-status{font-size:11px;color:#64728b}
     .journey-status[role="status"]{min-height:16px}
     @media(max-width:370px){.journey-controls{gap:5px;padding:0 5px}.journey-controls button{padding:6px 9px}.journey-label{padding:9px 10px}.journey-stage{max-height:43%}.journey-lane{bottom:calc(env(safe-area-inset-bottom) + 211px)}.dim-nav button{min-width:58px;padding:7px 8px}}
+    /* v1.8: reserve distinct zones: controls, scrollable station line, camera circle. */
+    .journey-stage{top:calc(env(safe-area-inset-top) + 151px);bottom:calc(env(safe-area-inset-bottom) + 225px);left:50%;transform:translateX(-50%);width:min(94vw,430px);max-height:none;gap:9px;align-content:start;padding:8px 8px 18px;touch-action:pan-y}
+    .journey-lane{display:none!important}
+    .journey-era{font-size:clamp(22px,6vw,33px);line-height:1.14;letter-spacing:-.03em}
+    .journey-sub{max-width:100%;color:#35455e;line-height:1.4}
+    .journey-actions{flex-wrap:wrap;position:relative;z-index:1}
+    .journey-actions button{min-height:44px;min-width:105px;font-size:12px}
+    .journey-station{padding:14px 15px}
+    .journey-status{min-height:1em;line-height:1.4;overflow-wrap:anywhere}
+    .journey-controls{top:calc(env(safe-area-inset-top) + 82px)}
+    .journey-label{max-width:58%;letter-spacing:.05em}
+    .dim-nav button{min-height:42px}
+    .friend-row{border:1px solid var(--line);border-radius:15px;padding:12px 13px;background:#fff;margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .friend-row .person{font-size:14px;font-weight:650;color:#17283f;overflow-wrap:anywhere}
+    .friend-row .sub{font-size:11px;color:#6d7484;margin-top:3px}
+    .friend-row .friend-actions{display:flex;flex-wrap:wrap;gap:6px}
+    .friend-actions button{border:1px solid var(--line);border-radius:12px;padding:9px 12px;min-height:42px;background:#fff;font-size:12px}
+    .friend-actions .accept{background:#173a30;color:white}
+    .friend-actions .remove{color:#a53a3a}
+    .friend-group-title{font-size:13px;font-weight:750;margin:19px 0 8px;color:#25354e}
+    .friend-empty{font-size:12px;color:#768096;line-height:1.5}
+    .friend-badge{border-radius:999px;background:#1e7056;color:#fff;font-size:10px;padding:4px 7px}
+    @media(max-width:370px){.journey-stage{top:calc(env(safe-area-inset-top) + 145px);bottom:calc(env(safe-area-inset-bottom) + 214px);max-height:none}.journey-controls{top:calc(env(safe-area-inset-top) + 78px)}.journey-label{max-width:55%}.journey-station b{font-size:14px}}
     @media(prefers-reduced-motion:reduce){.time-world,.camera video,.dimension-wash{transition:none!important}}
   </style>
 </head>
@@ -259,6 +282,7 @@
       startCamera(false);
       scanHere(false);
       renderJourney();
+      refreshFriendsSummary();
     }catch(e){
       localStorage.removeItem(TOKEN_KEY); token=""; auth.hidden=false;
     }
@@ -284,7 +308,7 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);renderJourney();
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -431,7 +455,7 @@
   sheetBackdrop.addEventListener("click",closeSheet);
 
   function beginCompose(){
-    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null};
+    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null};
     showContentStep();
   }
 
@@ -544,25 +568,84 @@
     const fd=new FormData();fd.append("file",file,file.name||"cosmos-media");return await api("/api/media/upload",{method:"POST",body:fd});
   }
 
+  let friendsCache={accepted:[],incoming:[],outgoing:[]};
+  async function refreshFriendsSummary(){
+    if(!token||!me)return;
+    try{const data=await api('/api/friends');friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
+      const connectionsButton=document.querySelector('[data-dimension="connections"]');
+      connectionsButton.textContent=friendsCache.incoming.length?`CONNECTIONS (${friendsCache.incoming.length})`:'CONNECTIONS';
+    }catch(err){console.warn('Could not load Connections',err.message);}
+  }
+  async function openFriends(){
+    openSheet('<h2>Connections</h2><p>People must accept your invitation before you can exchange private Cosmoses.</p><div class="look-loading">Loading your people…</div>');
+    try{
+      const data=await api('/api/friends');friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
+      const entry=(person,type)=>`<div class="friend-row"><div><div class="person">${escapeHtml(person.name)}</div><div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Connected'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button data-friend-send="${escapeHtml(person.user_id)}">Send ◯</button><button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
+      openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
+        <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Close</button></div>
+        <div class="friend-group-title">Requests received ${data.incoming?.length?`<span class="friend-badge">${data.incoming.length}</span>`:''}</div>
+        ${data.incoming?.length?data.incoming.map(x=>entry(x,'incoming')).join(''):'<div class="friend-empty">No pending requests.</div>'}
+        <div class="friend-group-title">Connected people (${data.accepted?.length||0})</div>
+        ${data.accepted?.length?data.accepted.map(x=>entry(x,'accepted')).join(''):'<div class="friend-empty">No accepted connections yet.</div>'}
+        <div class="friend-group-title">Invitations sent</div>
+        ${data.outgoing?.length?data.outgoing.map(x=>entry(x,'outgoing')).join(''):'<div class="friend-empty">No invitations waiting.</div>'}
+        <div class="micro">Messages previously left for someone are only made available to that person after connection acceptance, subject to the original time and place rules.</div>`);
+      $('inviteContact').onclick=openInvite;
+      $('closeFriends').onclick=closeSheet;
+      sheet.querySelectorAll('[data-friend-accept],[data-friend-decline],[data-friend-remove]').forEach(btn=>btn.onclick=async()=>{
+        const action=btn.hasAttribute('data-friend-accept')?'accept':btn.hasAttribute('data-friend-decline')?'decline':'remove';
+        const id=btn.getAttribute('data-friend-'+action);
+        if(action==='remove'&&!confirm('Remove this connection? They will lose access to your private messages.'))return;
+        btn.disabled=true;
+        try{await api('/api/friends/'+encodeURIComponent(id)+'/'+action,{method:'POST'});await refreshFriendsSummary();await openFriends();refreshConnections();}
+        catch(e){toastMsg(e.message,4300);btn.disabled=false;}
+      });
+      sheet.querySelectorAll('[data-friend-send]').forEach(btn=>btn.onclick=()=>{
+        const p=friendsCache.accepted.find(x=>x.user_id===btn.dataset.friendSend);
+        if(!p)return;
+        closeSheet();beginCompose();compose.recipient_mode='person';compose.recipient_user_id=p.user_id;compose.recipient_label=p.name;showContentStep();
+      });
+      refreshFriendsSummary();
+    }catch(error){openSheet(`<h2>Connections unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="tryFriends">Retry</button></div>`);$('tryFriends').onclick=openFriends;}
+  }
+  function openInvite(){
+    openSheet(`<h2>Invite someone</h2><p>Enter a phone number or email they used for Cosmos. We won't reveal whether the person has an account.</p>
+      <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Phone or email"></div>
+      <div class="actions"><button id="inviteBack">Back</button><button class="primary" id="sendInvite">Send invitation</button></div>`);
+    $('inviteBack').onclick=openFriends;
+    $('sendInvite').onclick=async()=>{
+      const contact=$('friendContact').value.trim();if(!contact)return toastMsg('Enter a phone or email.');
+      $('sendInvite').disabled=true;
+      try{const r=await api('/api/friends/invite',{method:'POST',body:JSON.stringify({contact})});await refreshFriendsSummary();toastMsg(r.message||'Invitation submitted.',4200);openFriends();}
+      catch(e){toastMsg(e.message,4400);$('sendInvite').disabled=false;}
+    };
+  }
+
   function showRecipientStep(){
     openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices">
       <button class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
       <button class="choice" data-recipient="person"><strong>Someone</strong><span>A person you choose.</span></button>
       <button class="choice" disabled><strong>Anyone</strong><span>Release / Message in a Bottle comes next.</span></button>
     </div><div class="actions"><button id="backRecipient">Back</button></div>`);
-    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{compose.recipient_mode=b.dataset.recipient;if(compose.recipient_mode==="person")showPersonStep();else showWhenStep();});
+    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{compose.recipient_mode=b.dataset.recipient;if(compose.recipient_mode==="person"){if(compose.recipient_user_id)showWhenStep();else showPersonStep();}else{compose.recipient_user_id=null;showWhenStep();}});
   }
 
-  function showPersonStep(){
-    openSheet(`<h2>Someone</h2><p>Use their phone or email. Cosmos stores a protected identity hash, not a public address.</p>
-      <div class="field"><label>Phone or email</label><input id="recipientTarget" placeholder="+1… or name@example.com"></div>
-      <div class="field"><label>Your label for them</label><input id="recipientLabel" placeholder="Ayşe"></div>
-      <div class="actions"><button id="backPerson">Back</button><button class="primary" id="nextPerson">Continue</button></div>`);
-    $("backPerson").onclick=showRecipientStep;$("nextPerson").onclick=async()=>{
-      const target=$("recipientTarget").value.trim(),label=$("recipientLabel").value.trim();if(!target)return toastMsg("Enter their phone or email.");compose.recipient_target=target;compose.recipient_label=label||"Someone";
-      if(!me?.display_name){const name=prompt("How should this person see your name? (You can change it later)","")?.trim();if(name){try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:name})});accountButton.textContent=me.display_name||"You";}catch(e){return toastMsg(e.message);}}}
-      showWhenStep();
-    };
+  async function showPersonStep(){
+    openSheet(`<h2>Choose a connection</h2><p>Only someone who has accepted your invitation can receive your private Cosmos.</p><div class="look-loading">Loading connections…</div>`);
+    try{
+      const r=await api('/api/friends');friendsCache.accepted=r.accepted||[];
+      openSheet(`<h2>Choose a connection</h2><p>Choose someone who has accepted your invitation.</p>
+        ${friendsCache.accepted.length?friendsCache.accepted.map(p=>`<button type="button" class="friend-row" data-choose-person="${escapeHtml(p.user_id)}" style="width:100%;text-align:left"><span class="person">${escapeHtml(p.name)}</span><span aria-hidden="true">→</span></button>`).join(''):'<div class="friend-empty">You do not have an accepted connection yet.</div>'}
+        <div class="actions"><button id="personBack">Back</button><button class="primary" id="personInvite">Invite someone</button></div>`);
+      $('personBack').onclick=showRecipientStep;
+      $('personInvite').onclick=openInvite;
+      sheet.querySelectorAll('[data-choose-person]').forEach(btn=>btn.onclick=()=>{
+        const p=friendsCache.accepted.find(x=>x.user_id===btn.dataset.choosePerson);
+        if(!p)return;
+        compose.recipient_user_id=p.user_id;compose.recipient_target='';compose.recipient_label=p.name;
+        showWhenStep();
+      });
+    }catch(err){toastMsg(err.message,4300);openFriends();}
   }
 
   function showWhenStep(){
@@ -652,8 +735,9 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. No background iPhone tracking or push messages yet. Public place-stations are not enabled until safety moderation exists.</div><div class="actions"><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. No background iPhone tracking or push messages yet. Public place-stations are not enabled until safety moderation exists.</div><div class="actions"><button id="openConnections" class="primary">Connections</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
+    $("openConnections").onclick=openFriends;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
@@ -738,7 +822,13 @@
         if(generation!==journeyGeneration)break;
         const found=Array.isArray(r.items)?r.items:[];
         if(!found.length){
-          journeyStatus=direction==="older"?"No earlier saved stations on this line.":"No later saved stations on this line.";
+          // Empty stretches are real too; continue the time journey instead of getting stuck.
+          const n=new Date(searchAt);
+          n.setUTCDate(n.getUTCDate()+(direction==='older'?-1:1)*(minimumDays||7));
+          n.setUTCFullYear(Math.max(1900,Math.min(2200,n.getUTCFullYear())));
+          journeyAt=n.toISOString();journeyKey='';journeyFocus=null;
+          timeMode=Date.parse(journeyAt)>Date.now()?'future':'past';
+          journeyStatus='No saved station here. Keep swiping to travel through time.';
         } else {
           const next=found[found.length-1];
           // Preserve the real present as a stop while traveling across the present.
@@ -783,8 +873,7 @@
     app.style.setProperty("--dim-wash",dimension==="mine"?"0":(timeMode==="now"?".64":".4"));
     const labels={mine:"MY",connections:"CONNECTIONS",public:"PUBLIC"};
     journeyLabel.textContent=`${labels[dimension]} · ${timeMode==="now"?"NOW":formatMoment(journeyAt,false)}`;
-    journeyGuide.textContent=dimension==="mine"?"→ Your past  ·  Your future ←  ·  ↑ Public  ·  Friends ↓":
-      dimension==="connections"?"Connections · → Past  ·  Future ←  ·  ↑ MY":"Public · → Past  ·  Future ←  ·  ↓ MY";
+    journeyGuide.textContent=''; // The old floating label overlapped the station controls.
     const openStage=!(dimension==="mine"&&timeMode==="now"&&!journeyStatus);
     journeyStage.hidden=!openStage;
     if(!openStage){
@@ -808,16 +897,18 @@
       const unique=all.filter((x,i)=>x.id && all.findIndex(z=>z.id===x.id)===i).slice(0,5);
       main=unique.length?`<div class="journey-track"><div class="journey-node"></div>${unique.map(x=>`<div class="journey-connector"></div><button type="button" class="journey-station" data-private="${escapeHtml(x.id)}"><b>◯ ${escapeHtml(x.sender_name?"From "+x.sender_name:"A private message")}</b><span>${x.unlock_mode==="here"?"Waiting at this place":"Ready for you"} · ${escapeHtml(x.content_kind||"moment")}</span></button>`).join("")}</div>`:
         `<div class="journey-sub">Your shared messages and location-bound memories will appear here.<br>Swipe through time, or find private moments nearby.</div>`;
-      main+=`<div class="journey-actions"><button type="button" id="findNearby">◯ Find nearby</button></div>`;
+      main+=`<div class="journey-actions"><button type="button" id="viewFriends">👥 People & requests${friendsCache.incoming.length?' ('+friendsCache.incoming.length+')':''}</button><button type="button" id="findNearby">◯ Find nearby</button></div>`;
     }else{
       main=`<div class="journey-sub">${dimension==="mine"?"Your saved moments appear as you travel through time.":"Only your real, permissioned connections appear on this line."}</div>`;
     }
-    const footer=dimension!=="public"?`<div class="journey-actions"><button type="button" id="earlier" aria-label="Travel to an earlier saved station">← Earlier</button><button type="button" id="later" aria-label="Travel to a later saved station">Later →</button></div>`:"";
-    journeyStage.innerHTML=`<div class="journey-era">${escapeHtml(dateText)}</div><div class="journey-sub">${label}</div>${main}${footer}<div class="journey-status" role="status">${escapeHtml(journeyStatus)}</div>`;
+    const footer=dimension!=="public"?`<div class="journey-actions"><button type="button" id="earlier" aria-label="Travel to an earlier saved station">← Earlier</button><button type="button" id="later" aria-label="Travel to a later saved station">Later →</button>${dimension==='connections'?'<button type="button" id="footerPeople">👥 People</button>':''}</div>`:"";
+    journeyStage.innerHTML=`<div class="journey-era">${escapeHtml(dateText)}</div><div class="journey-sub">${label}</div>${main}${footer}<div class="journey-status" role="status">${escapeHtml(journeyStatus)}</div><div class="micro" style="margin-top:4px;text-align:center">Swipe right: earlier · left: later · down: connections · up: public</div>`;
     journeyStage.querySelector('[data-selected]')?.addEventListener('click',()=>{if(performance.now()>suppressStationClickUntil)openJourneyStation(selected);});
     journeyStage.querySelectorAll('[data-private]').forEach(b=>b.addEventListener('click',()=>{if(performance.now()>suppressStationClickUntil)openCosmos(b.dataset.private); }));
+    $("footerPeople")?.addEventListener('click',openFriends);
     $("earlier")?.addEventListener('click',()=>travel(-1,1));
     $("later")?.addEventListener('click',()=>travel(1,1));
+    $("viewFriends")?.addEventListener('click',openFriends);
     $("findNearby")?.addEventListener('click',async()=>{
       try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(e){toastMsg(e.message,3900);}
     });
@@ -873,16 +964,17 @@
     if(!gestureStart||!e.changedTouches.length)return;
     const s=gestureStart;gestureStart=null;
     const dx=e.changedTouches[0].clientX-s.x,dy=e.changedTouches[0].clientY-s.y;
-    if(Math.max(Math.abs(dx),Math.abs(dy))<52)return;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<30)return;
     suppressStationClickUntil=performance.now()+450;
-    if(Math.abs(dx)>Math.abs(dy)*1.17){
+    if(Math.abs(dx)>Math.abs(dy)*1.08){
       const direction=dx>0?-1:1,rate=Math.abs(dx)/Math.max(1,performance.now()-s.t);
       const elapsed=performance.now()-lastTravelAt;
       swipeStreak=elapsed<850&&lastSwipeDir===direction?Math.min(4,swipeStreak+1):0;
       lastSwipeDir=direction;lastTravelAt=performance.now();
-      const steps=rate>2.2?18:rate>1.15?8:rate>.65?3:1;
+      // Predictable speed: a gentle swipe moves one station; a flick skips more.
+      const steps=rate>2.6?12:rate>1.6?6:rate>.95?3:1;
       travel(direction,Math.min(48,steps*(1+swipeStreak)));
-    }else if(Math.abs(dy)>Math.abs(dx)*1.17){
+    }else if(Math.abs(dy)>Math.abs(dx)*1.08){
       const region=e.target.closest?.('.journey-stage');
       if(region && region.scrollHeight>region.clientHeight+8)return;
       if(dy<0)setDimension(dimension==='connections'?'mine':'public');
