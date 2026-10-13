@@ -4,8 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
+  <link rel="manifest" href="/cosmos.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v2.1.2-fire-drag-resize" />
+  <meta name="cosmos-build" content="cosmos-life-v2.2-family-notifications-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -245,6 +248,20 @@
     .moment-tools button.fire-tool{border-color:#ff9452;color:#97320d;background:#fff2de}
     .moment-tools button.fire-tool.selected{background:#9c3411;border-color:#9c3411;color:#fff}
     @media(max-width:360px){.art-word-row{grid-template-columns:1fr}.art-word-row button{width:100%}}
+    /* v2.2 — stable notification inbox and opt-in controls. */
+    .cosmos-head-actions{display:flex;align-items:center;gap:8px;pointer-events:auto}
+    .cosmos-bell{min-height:42px;min-width:42px;border-radius:50%;border:1px solid rgba(14,18,32,.14);background:rgba(255,255,255,.84);font-size:22px;color:#18263b;position:relative}
+    .cosmos-bell span{position:absolute;right:-3px;top:-5px;background:#a53a3a;color:white;border-radius:999px;min-width:19px;height:19px;display:grid;place-items:center;padding:0 4px;font-size:10px;font-weight:800}
+    .cosmos-bell span[hidden]{display:none!important}
+    .notice-list{display:grid;gap:10px;margin-top:15px}
+    .notice-item{width:100%;text-align:left;display:block;min-height:74px;border:1px solid #dce2e9;background:#fff;border-radius:17px;padding:14px;color:#1a283b}
+    .notice-item.unread{border-color:#719e99;background:#f0faf7}
+    .notice-item strong{display:block;font-size:14px}.notice-item span{display:block;font-size:12px;margin-top:5px;color:#607083;line-height:1.4}
+    .notice-settings{margin:12px 0;padding:15px;border-radius:17px;border:1px solid #d7e1ec;background:#f4f8fb}
+    .notice-settings button{min-height:47px;margin-top:10px;border:1px solid #ccd6e2;border-radius:13px;padding:9px 13px;background:#14283f;color:#fff;font-weight:650}
+    .notice-settings p{font-size:12px;line-height:1.6;color:#48566a}
+    .notice-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
+    .notice-actions button{flex:1;min-width:110px}
   </style>
 </head>
 <body>
@@ -266,7 +283,7 @@
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
-    <button class="account" id="accountButton">You</button>
+    <div class="cosmos-head-actions"><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
   </div>
 
   <div class="ambient" id="ambient">
@@ -327,7 +344,8 @@
   const TOKEN_KEY = "cosmos_life_token_v1";
   const SESSION_RENEW_KEY = "cosmos_life_last_renew_v21";
   const FAMILY_INVITE_CODE = (qs.get("invite") || "").slice(0,1200);
-  const INVITE_HOME = `${location.origin}/cosmos-next.html?v=21`;
+  const INVITE_HOME = `${location.origin}/cosmos-next.html?v=22`;
+  const OPEN_INBOX_FROM_LINK=qs.get("inbox")==="1";
 
 
   const $ = id => document.getElementById(id);
@@ -335,7 +353,7 @@
   const phoneInput = $("phoneInput"), emailInput = $("emailInput"), phoneCodeInput = $("phoneCodeInput"), emailCodeInput = $("emailCodeInput");
   const sendCodesButton = $("sendCodesButton"), verifyCodesButton = $("verifyCodesButton"), restartAuthButton = $("restartAuthButton"), devAuthNote = $("devAuthNote");
   const cameraVideo = $("cameraVideo"), cameraFallback = $("cameraFallback"), coreOrb = $("coreOrb"), hint = $("hint"), ambientTitle = $("ambientTitle"), ambientSub = $("ambientSub"), foundOrb = $("foundOrb"), foundLabel = $("foundLabel");
-  const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput");
+  const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput"), noticeBell=$("noticeBell"), noticeCount=$("noticeCount");
 
   // Same browser + same web origin retains a session across ordinary visits.
   // Authenticated sessions still expire for safety if unused for too long.
@@ -436,6 +454,8 @@
     try{
       me = await api("/api/me");
       auth.hidden=true;showAuthError('');
+      refreshNoticeBadge();
+      if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,350);
       accountButton.textContent = me.display_name || "You";
       startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
       renewSessionIfDue();
@@ -471,7 +491,7 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,300);
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -1202,7 +1222,7 @@
     openSheet(`<h2>Share on ${name}'s timeline</h2><p>Who can discover this Cosmos?</p>
       <div class="circle-audience">
         ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Recommended</b><span>Share with their accepted connections. The timeline owner reviews contributions unless they opted into automatic text approval.</span></button>`:'<div class="circle-info">Voice, photos and videos can currently be sent privately between two people. Wider sharing requires additional media moderation.</div>'}
-        <button type="button" id="audiencePair"><b>♡ Only us</b><span>A private moment between you and ${name}; their other connections cannot see it.</span></button>
+        <button type="button" id="audiencePair"><b>♡ Only us · Notify ${name}</b><span>A private moment between you and ${name}; their other connections cannot see it. Cosmos adds a notification when the moment becomes available.</span></button>
       </div><div class="actions"><button id="audienceBack">Back</button></div>`);
     if($('audienceGroup'))$('audienceGroup').onclick=async()=>{compose.circle_audience='connections';
       if(compose.place_station_id){compose.unlock_mode='here';showPlaceStep();return;}
@@ -1233,7 +1253,7 @@
     openSheet(`<h2>Choose a connection</h2><p>Only someone who has accepted your invitation can receive your private Cosmos.</p><div class="look-loading">Loading connections…</div>`);
     try{
       const r=await api('/api/friends');friendsCache.accepted=r.accepted||[];
-      openSheet(`<h2>Choose a connection</h2><p>Choose someone who has accepted your invitation.</p>
+      openSheet(`<h2>Tag a connection</h2><p>Choose who should receive this Cosmos. If they enabled notifications, their phone alerts them when it is available.</p>
         ${friendsCache.accepted.length?friendsCache.accepted.map(p=>`<button type="button" class="friend-row" data-choose-person="${escapeHtml(p.user_id)}" style="width:100%;text-align:left"><span class="person">${escapeHtml(p.name)}</span><span aria-hidden="true">→</span></button>`).join(''):'<div class="friend-empty">You do not have an accepted connection yet.</div>'}
         <div class="actions"><button id="personBack">Back</button><button class="primary" id="personInvite">Invite someone</button></div>`);
       $('personBack').onclick=showRecipientStep;
@@ -1480,15 +1500,104 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. No background iPhone tracking or push messages yet. Public place-stations are not enabled until safety moderation exists.</div><div class="actions"><button id="openConnections" class="primary">Connections</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
+    $("openNotifications").onclick=showCosmosNotifications;
     $("openConnections").onclick=openFriends;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
-    $("logout").onclick=()=>{localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);location.reload();};
+    $("logout").onclick=async()=>{await turnOffCosmosPush().catch(()=>{});localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);location.reload();};
   });
 
+
+
+  // A private inbox is available in every browser. Push needs an explicit tap
+  // and (on iPhone) the Cosmos Home Screen app. No automatic permission prompts.
+  let inboxOpening=false;
+  let noticeListCache=[];
+  const isStandalone=()=>window.matchMedia?.('(display-mode: standalone)').matches || Boolean(navigator.standalone);
+  const isIOS=()=>/iPhone|iPad|iPod/.test(navigator.userAgent);
+  async function refreshNoticeBadge(){
+    if(!token||!me)return;
+    try{
+      const r=await api('/api/notifications');
+      const n=Number(r.unread||0);
+      noticeCount.textContent=n>99?'99+':String(n);
+      noticeCount.hidden=!n;
+      if(navigator.setAppBadge){if(n)navigator.setAppBadge(n).catch(()=>{});else navigator.clearAppBadge?.().catch(()=>{});}
+    }catch(e){console.warn('Notifications unavailable:',e.message);}
+  }
+  async function showCosmosNotifications(){
+    if(!token||!me){toastMsg('Sign in to see your notifications.');return;}
+    if(inboxOpening)return;
+    inboxOpening=true;
+    openSheet('<h2>Notifications</h2><p>Your private Cosmos inbox</p><div class="look-loading">Loading moments…</div>');
+    try{
+      const r=await api('/api/notifications');
+      noticeListCache=r.items||[];
+      const unread=noticeListCache.filter(n=>!n.read_at).length;
+      noticeCount.textContent=String(unread);noticeCount.hidden=!unread;
+      const allowed=typeof Notification!=='undefined'&&Notification.permission==='granted';
+      const support=Boolean(navigator.serviceWorker&&window.PushManager&&window.Notification);
+      const note=isIOS()&&!isStandalone()
+        ? 'To receive alerts when Cosmos is closed on iPhone: open Cosmos in Safari → Share → Add to Home Screen → launch the new COSMOS icon → tap Enable notifications. The usual Safari tab still has this inbox.'
+        : !support?'Push is unavailable in this browser; the private inbox still works.'
+        : !r.push_configured?'Push credentials are not configured in Cloudflare yet; the inbox works now.'
+        : allowed?'Push permission has been granted for this installation.':'Enable notifications to receive alerts even when the app is closed.';
+      openSheet(`<h2>Notifications ${unread?'· '+unread+' new':''}</h2>
+        <p>New messages and replies from accepted connections. Private content is not displayed on your lock screen.</p>
+        <div class="notice-settings"><b>🔔 On your phone</b><p>${escapeHtml(note)}</p>
+          <div class="notice-actions"><button type="button" id="enableCosmosPush">Enable notifications</button><button type="button" id="disableCosmosPush">Turn off</button><button type="button" id="testCosmosPush">Send test</button></div></div>
+        <div class="notice-list">${noticeListCache.length?noticeListCache.map(n=>`<button type="button" class="notice-item ${n.read_at?'':'unread'}" data-notice-id="${escapeHtml(n.id)}"><strong>${n.read_at?'◯':'●'} ${escapeHtml(n.title)}</strong><span>${escapeHtml(n.body)} · ${escapeHtml(new Date(n.created_at).toLocaleString())}</span></button>`).join(''):'<div class="empty">Nothing waiting yet. Ask a connection to send you a Cosmos now.</div>'}</div>
+        <div class="actions"><button id="noticeDone">Camera / NOW</button><button id="noticeRefresh">Refresh</button></div>`);
+      $('noticeDone').onclick=returnToCamera;
+      $('noticeRefresh').onclick=showCosmosNotifications;
+      $('enableCosmosPush').onclick=enableCosmosPush;
+      $('disableCosmosPush').onclick=async()=>{await turnOffCosmosPush();toastMsg('Push turned off for this device.');showCosmosNotifications();};
+      $('testCosmosPush').onclick=async()=>{try{await api('/api/notifications/test',{method:'POST'});toastMsg('Test queued. Check for an alert, or refresh the inbox.',3500);}catch(e){toastMsg(e.message,4500);}};
+      sheet.querySelectorAll('[data-notice-id]').forEach(btn=>btn.onclick=async()=>{
+        const n=noticeListCache.find(x=>x.id===btn.dataset.noticeId);if(!n)return;
+        try{await api(`/api/notifications/${encodeURIComponent(n.id)}/read`,{method:'POST'});}catch{}
+        refreshNoticeBadge();
+        if(n.cosmos_id){closeSheet();openCosmos(n.cosmos_id);}else showCosmosNotifications();
+      });
+    }catch(e){openSheet(`<h2>Notifications</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="noticeAgain">Try again</button><button id="noticeGoBack">Camera</button></div>`);$('noticeAgain').onclick=showCosmosNotifications;$('noticeGoBack').onclick=returnToCamera;}
+    finally{inboxOpening=false;}
+  }
+  function pushPublicToBytes(b64){
+    b64=String(b64).replace(/-/g,'+').replace(/_/g,'/');while(b64.length%4)b64+='=';
+    return Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  }
+  async function enableCosmosPush(){
+    // Apple requires the permission request to follow a direct user gesture.
+    if(isIOS()&&!isStandalone())return toastMsg('First add Cosmos to your iPhone Home Screen and open it from its icon.',5500);
+    if(!navigator.serviceWorker||!window.PushManager||!window.Notification)return toastMsg('Push is unavailable in this browser.',4200);
+    try{
+      const permission=Notification.permission==='granted'?'granted':await Notification.requestPermission();
+      if(permission!=='granted')return toastMsg('Notifications were not enabled in device settings.',4200);
+      const config=await api('/api/push/config');
+      if(!config.enabled)return toastMsg('Set up VAPID keys in the Cloudflare Worker first.',4800);
+      const reg=await navigator.serviceWorker.register('/cosmos-push-sw.js',{scope:'/cosmos-next.html'});
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushPublicToBytes(config.public_key)});
+      await api('/api/push/subscribe',{method:'POST',body:JSON.stringify(sub.toJSON())});
+      toastMsg('Notifications enabled for this device!',3500);
+      refreshNoticeBadge();
+    }catch(e){toastMsg('Could not enable notifications: '+e.message,6500);}
+  }
+  async function turnOffCosmosPush(){
+    if(!navigator.serviceWorker)return;
+    const reg=await navigator.serviceWorker.getRegistration('/cosmos-next.html');
+    const sub=await reg?.pushManager?.getSubscription();
+    if(sub){
+      try{await api('/api/push/unsubscribe',{method:'POST',body:JSON.stringify({endpoint:sub.endpoint})});}catch{}
+      await sub.unsubscribe().catch(()=>{});
+    }
+  }
+  noticeBell.addEventListener('click',showCosmosNotifications);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshNoticeBadge();});
+  setInterval(()=>{if(!document.hidden&&token&&me)refreshNoticeBadge();},45000);
 
   const shortDate = d => {
     const n=new Date(d);
