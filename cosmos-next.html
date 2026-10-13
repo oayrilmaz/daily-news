@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v1.6-swipe-universe-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v1.7-video-controls-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -64,6 +64,12 @@
     .media-preview{margin-top:14px;border:1px solid var(--line);border-radius:18px;padding:12px;background:#fafbfc}.media-preview img,.media-preview video{display:block;width:100%;max-height:300px;object-fit:contain;border-radius:12px}.media-preview audio{width:100%}.media-preview a{word-break:break-all}
     .look-card{margin-top:16px;border:1px solid var(--line);border-radius:20px;background:#fafbfc;padding:15px 16px}.look-section{margin-top:16px}.look-section:first-child{margin-top:0}.look-kicker{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-what{font-size:14px;line-height:1.55;color:#303746;margin-top:8px}.look-depth{font-size:15px;line-height:1.62;color:#141a27;margin-top:8px;letter-spacing:-.005em;white-space:pre-wrap}.look-unseen{font-size:14px;line-height:1.6;color:#20293a;margin-top:8px}.look-details{display:grid;gap:8px;margin-top:10px}.look-detail{border-left:2px solid rgba(14,18,32,.14);padding-left:10px;font-size:13px;line-height:1.5;color:#3d4556}.look-next-title{margin-top:18px;font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#7d8493;font-weight:800}.look-next{display:flex;gap:8px;margin-top:9px;overflow-x:auto;padding:0 0 6px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}.look-next button{flex:0 0 auto;border:1px solid var(--line);background:white;border-radius:999px;padding:9px 11px;font-size:11px;color:#4c5567;scroll-snap-align:start;white-space:nowrap}.look-next button:active{transform:scale(.98)}.look-privacy{margin-top:14px;font-size:10.5px;line-height:1.45;color:#858c99}.look-loading{padding:18px 2px;color:#697183;font-size:13px;line-height:1.55}.look-progress{height:3px;overflow:hidden;border-radius:5px;background:#edf0f4;margin:18px 0}.look-progress::before{content:"";display:block;width:38%;height:100%;background:#737d90;animation:lookProgress 1.4s ease-in-out infinite alternate}@keyframes lookProgress{from{transform:translateX(-90%)}to{transform:translateX(250%)}}.look-card{overflow-wrap:anywhere}.sheet-inner{touch-action:pan-y}.look-next{flex-wrap:wrap;overflow-x:visible;scroll-snap-type:none}.look-next button{white-space:normal;text-align:left;max-width:100%;font-size:12px}
     .panel{position:absolute;z-index:25;inset:0;background:rgba(248,249,252,.98);padding:calc(env(safe-area-inset-top) + 20px) 18px calc(env(safe-area-inset-bottom) + 30px);overflow:auto}
+    .post-card-actions{display:flex;justify-content:flex-end;margin-top:12px;gap:8px}
+    .post-delete{border:1px solid rgba(165,58,58,.22);background:#fff;color:#a53a3a;border-radius:99px;min-height:42px;padding:9px 14px;font-size:12px;font-weight:700}
+    .post-delete:focus-visible{outline:3px solid #a53a3a;outline-offset:2px}
+    .policy-card{border:1px solid var(--line);background:#f7f9fc;border-radius:18px;padding:14px 15px;margin-top:14px;font-size:13px;line-height:1.55;color:#253044}
+    .policy-card strong{display:block;font-size:14px;margin-bottom:6px}
+    .policy-card small{display:block;color:#667184;font-size:11px;margin-top:6px}
     .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}.panel h1{margin:0;font-size:28px;letter-spacing:-.045em}.panel .close{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px}
     .list{display:grid;gap:10px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 8px 28px rgba(25,35,60,.05)}.card-title{font-weight:750;font-size:14px}.card-meta{color:#7a8190;font-size:11px;margin-top:5px;line-height:1.45}.card-body{margin-top:10px;font-size:13px;color:#313849;line-height:1.5;white-space:pre-wrap}.empty{color:#7a8190;font-size:13px;line-height:1.6;padding:26px 6px}
     .auth{position:absolute;z-index:50;inset:0;background:#fff;display:grid;place-items:center;padding:28px}.auth-card{width:min(420px,100%)}.auth-orb{width:94px;height:94px;margin:0 auto 22px;border-radius:50%;border:1.4px solid rgba(14,18,32,.48);position:relative}.auth-orb::after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(14,18,32,.18)}.auth h1{text-align:center;margin:0;font-size:31px;letter-spacing:.15em;font-weight:800}.auth h2{text-align:center;margin:8px 0 28px;font-size:16px;font-weight:500;color:#697183}.auth .field{margin-top:12px}.auth button{width:100%;min-height:48px;border:0;border-radius:15px;background:#111827;color:white;margin-top:16px;font-weight:700}.auth-note{text-align:center;color:#89909d;font-size:11px;line-height:1.5;margin-top:14px}.auth-error{color:var(--danger);font-size:12px;margin-top:12px;text-align:center}.auth-secondary{background:#fff!important;color:#313849!important;border:1px solid var(--line)!important}
@@ -434,7 +440,7 @@
       <button class="choice" data-kind="text"><strong>Text</strong><span>A thought, note or memory.</span></button>
       <button class="choice" data-kind="voice"><strong>Voice</strong><span>Record your own voice.</span></button>
       <button class="choice" data-kind="photo"><strong>Photo</strong><span>Choose or take a photo.</span></button>
-      <button class="choice" data-kind="video"><strong>Video</strong><span>Choose or record a short video.</span></button>
+      <button class="choice" data-kind="video"><strong>Video</strong><span>Short clips · 30s, 5 uploads/month on Free.</span></button>
       <button class="choice" data-kind="music"><strong>Music</strong><span>Paste a Spotify, Apple Music or other music link.</span></button>
       <button class="choice" data-kind="link"><strong>Link</strong><span>Attach something from another app.</span></button>
     </div><div class="micro">Private by default. A Cosmos never makes another person public.</div>`);
@@ -447,12 +453,75 @@
     if(kind==="music") return textEntry("Paste the music link",true);
     if(kind==="link") return textEntry("Paste a link",true);
     if(kind==="voice") return voiceEntry();
+    if(kind==="video")return videoRules();
+    if(kind==="photo")return selectMediaForCompose("photo");
+  }
+
+  function selectMediaForCompose(kind){
     if(kind==="photo"||kind==="video"){
       fileInput.accept=kind==="photo"?"image/*":"video/*";fileInput.setAttribute("capture",kind==="photo"?"environment":"environment");fileInput.value="";fileInput.onchange=async()=>{
         const file=fileInput.files?.[0]; if(!file) return showContentStep();
         try{toastMsg("Securing media…");const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();}catch(e){toastMsg(e.message);showContentStep();}
       };fileInput.click();
     }
+  }
+
+  async function durationFromFile(file){
+    const url=URL.createObjectURL(file);
+    try{
+      const v=document.createElement('video');v.preload='metadata';v.muted=true;v.playsInline=true;
+      const d=await new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>reject(new Error('Video metadata timed out.')),10000);
+        v.onloadedmetadata=()=>{clearTimeout(timer);resolve(v.duration);};
+        v.onerror=()=>{clearTimeout(timer);reject(new Error('Video duration unavailable. Export as MP4 or MOV.'));};
+        v.src=url;
+      });
+      return Number.isFinite(d)?d:NaN;
+    }finally{URL.revokeObjectURL(url);}
+  }
+
+  async function videoRules(){
+    openSheet('<h2>Short video</h2><p>Keep Cosmos meaningful. Clips are short and monthly uploads are limited.</p><div class="look-loading">Checking your video allowance…</div>');
+    try{
+      const policy=await api('/api/video/policy');
+      openSheet(`<h2>Short video</h2><p>Each video should capture a meaningful moment.</p>
+        <div class="policy-card"><strong>${escapeHtml(policy.plan==='plus'?'Plus':'Free')} video allowance</strong>
+          Up to <b>${Number(policy.max_seconds)} seconds</b> per video · <b>${Math.round(Number(policy.max_bytes)/1048576)} MB</b> maximum<br>
+          <b>${Number(policy.remaining)}</b> of ${Number(policy.monthly_uploads)} uploads remaining this month.
+          <small>Monthly uploads reset at the beginning of each UTC month. Removing a post does not reset the usage count.</small></div>
+        <div class="micro">Longer clips and higher monthly allowances will require a verified paid plan. Payments are not available in staging yet.</div>
+        <div class="actions"><button id="videoBack">Back</button><button class="primary" id="pickVideo" ${policy.remaining<=0?'disabled':''}>Choose video</button></div>`);
+      $("videoBack").onclick=showContentStep;
+      $("pickVideo").onclick=()=>{
+        fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';fileInput.setAttribute('capture','environment');fileInput.value='';
+        fileInput.onchange=async()=>{
+          const file=fileInput.files?.[0];if(!file)return videoRules();
+          try{
+            if(file.size>Number(policy.max_bytes))throw new Error(`Maximum size ${Math.round(policy.max_bytes/1048576)} MB. Choose a shorter or smaller video.`);
+            const seconds=await durationFromFile(file);
+            if(!Number.isFinite(seconds)||seconds<=0)throw new Error('Could not verify video length. Try MP4 or MOV.');
+            if(seconds>Number(policy.max_seconds)+.05)throw new Error(`This clip is ${Math.ceil(seconds)} seconds. Maximum is ${policy.max_seconds} seconds. Trim it first.`);
+            openSheet('<h2>Uploading video…</h2><p>Your Cosmos video is being secured.</p><div class="look-progress"></div>');
+            const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();
+          }catch(error){toastMsg(error.message,4500);videoRules();}
+        };
+        fileInput.click();
+      };
+    }catch(error){openSheet(`<h2>Video unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="videoBack">Back</button></div>`);$("videoBack").onclick=showContentStep;}
+  }
+
+  async function deleteOwnPost(id,after){
+    if(!confirm('Delete this Cosmos? It will disappear from your timeline and recipients’ view. This cannot be undone.'))return;
+    try{
+      await api('/api/cosmos/'+encodeURIComponent(id),{method:'DELETE'});
+      if(journeyFocus?.id===id){journeyFocus=null;journeyKey='';journeyStatus='This station was deleted.';}
+      nearbyConnections.nearby=(nearbyConnections.nearby||[]).filter(x=>x.id!==id);
+      nearbyConnections.inbox=(nearbyConnections.inbox||[]).filter(x=>x.id!==id);
+      nearbyConnections.memories=(nearbyConnections.memories||[]).filter(x=>x.id!==id);
+      if(typeof after==='function')await after();
+      else {closeSheet();await scanHere(false);renderJourney();refreshConnections();}
+      toastMsg('Cosmos deleted.');
+    }catch(error){toastMsg(error.message,4500);}
   }
 
   function textEntry(title,isUrl){
@@ -556,9 +625,10 @@
   async function renderCosmos(item,thread){
     const content=await contentHtml(item);
     const chain=(thread||[]).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button class="danger" id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button class="danger" id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
     $("closeCosmos").onclick=()=>{closeSheet();scanHere(false);};
-    if($("replyCosmos"))$("replyCosmos").onclick=()=>showReplyStep(item);
+    if($('"replyCosmos"'))$('"replyCosmos"').onclick=()=>showReplyStep(item);
+    if($('"deleteCosmos"'))$('"deleteCosmos"').onclick=()=>deleteOwnPost(item.id);
     if($("blockSender"))$("blockSender").onclick=async()=>{if(!confirm("Block this sender from contacting you through Cosmos?"))return;try{await api("/api/block",{method:"POST",body:JSON.stringify({user_id:item.creator_user_id})});closeSheet();toastMsg("Blocked.");}catch(e){toastMsg(e.message);}};
     if($("reportCosmos"))$("reportCosmos").onclick=async()=>{const reason=prompt("What should Cosmos review?","")?.trim();if(!reason)return;try{await api("/api/report",{method:"POST",body:JSON.stringify({item_id:item.id,reason})});toastMsg("Thank you. This was reported for review.");}catch(e){toastMsg(e.message);}};
   }
@@ -574,8 +644,9 @@
     panel.hidden=false;panel.innerHTML=`<div class="panel-head"><h1>${space==="mine"?"Mine":"Waiting"}</h1><button class="close" id="panelClose">Close</button></div><div class="empty">Loading…</div>`;$("panelClose").onclick=closePanel;
     try{
       const r=await api(`/api/cosmos/${space}`);const items=r.items||[];
-      panel.innerHTML=`<div class="panel-head"><h1>${space==="mine"?"Mine":"Waiting"}</h1><button class="close" id="panelClose">Close</button></div>${items.length?`<div class="list">${items.map(item=>`<div class="card" data-item="${escapeHtml(item.id)}"><div class="card-title">${escapeHtml(item.title||item.recipient_label||item.sender_name||"Cosmos")}</div><div class="card-meta">${escapeHtml(item.state_label||item.unlock_label||"")} · ${new Date(item.created_at).toLocaleDateString()}</div><div class="card-body">${escapeHtml(item.preview||"")}</div></div>`).join("")}</div>`:`<div class="empty">${space==="mine"?"Your Cosmos grows as life happens.":"Nothing you are allowed to see is waiting here right now."}</div>`}`;
-      $("panelClose").onclick=closePanel;panel.querySelectorAll("[data-item]").forEach(c=>c.onclick=()=>openCosmos(c.dataset.item));
+      panel.innerHTML=`<div class="panel-head"><h1>${space==="mine"?"Mine":"Waiting"}</h1><button class="close" id="panelClose">Close</button></div>${items.length?`<div class="list">${items.map(item=>`<div class="card" data-item="${escapeHtml(item.id)}"><div class="card-title">${escapeHtml(item.title||item.recipient_label||item.sender_name||"Cosmos")}</div><div class="card-meta">${escapeHtml(item.state_label||item.unlock_label||"")} · ${new Date(item.created_at).toLocaleDateString()}</div><div class="card-body">${escapeHtml(item.preview||"")}</div>${item.can_delete?`<div class="post-card-actions"><button type="button" class="post-delete" data-delete="${escapeHtml(item.id)}" aria-label="Delete my Cosmos">Delete</button></div>`:''}</div>`).join("")}</div>`:`<div class="empty">${space==="mine"?"Your Cosmos grows as life happens.":"Nothing you are allowed to see is waiting here right now."}</div>`}`;
+      $("panelClose").onclick=closePanel;panel.querySelectorAll("[data-item]").forEach(c=>c.onclick=e=>{if(e.target.closest('[data-delete]'))return;openCosmos(c.dataset.item);});
+      panel.querySelectorAll('[data-delete]').forEach(b=>b.onclick=e=>{e.stopPropagation();deleteOwnPost(b.dataset.delete,()=>showSpace(space));});
     }catch(e){panel.querySelector(".empty").textContent=e.message;}
   }
 
