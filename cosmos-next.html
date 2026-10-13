@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v1.8.1-connections-camera-repair" />
+  <meta name="cosmos-build" content="cosmos-next-v1.8.2-connections-direct" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -165,6 +165,12 @@
     .friend-overview .overview-separator{height:1px;background:rgba(16,45,70,.12);margin:3px 0}
     #journeyStage{scrollbar-width:thin}
     @media(max-width:360px){.friend-overview .overview-row{align-items:flex-start;flex-wrap:wrap}.friend-overview .overview-row .row-buttons{width:100%;justify-content:flex-start}.sheet-quickbar{padding-left:12px;padding-right:12px}}
+    /* v1.8.2 — Connections opens a reliable sheet over the LIVE camera. */
+    .connections-timeline{width:100%;min-height:46px;margin-top:12px;padding:11px 14px;border:1px solid rgba(23,48,72,.18);border-radius:15px;background:#f3f7fb;color:#173048;font-size:13px;font-weight:750;text-align:center}
+    .sheet-quickbar{position:relative;z-index:2}
+    .friend-row .person{font-size:14px}
+    .friend-group-title{letter-spacing:.01em}
+    @media(max-width:360px){.friend-row{padding:11px}.friend-row .friend-actions{width:100%;justify-content:flex-start}}
   </style>
 </head>
 <body>
@@ -271,6 +277,7 @@
   let journeyBusy=false, travelQueue=0, journeyGeneration=0, lastTravelAt=0, lastSwipeDir=0, swipeStreak=0;
   let journeyStatus="", neighbors=[], nearbyConnections={nearby:[],inbox:[],memories:[]};
   let lastConnectionPoll=0, gestureStart=null, suppressStationClickUntil=0;
+  let friendsViewGeneration=0;
   const NOTICE_KEY="cosmos_life_nearby_notice_v1";
   let noticesEnabled=localStorage.getItem(NOTICE_KEY)==="on";
   const NOTIFIED_KEY="cosmos_life_seen_nearby_v1";
@@ -282,7 +289,7 @@
     const back=$("cameraEscape");
     if(back)back.hidden=(!me || (dimension==="mine" && timeMode==="now" && sheet.hidden && panel.hidden));
   }
-  function closeSheet(){sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function closeSheet(){friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
   function openSheet(html){
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
@@ -606,19 +613,28 @@
   async function refreshFriendsSummary(){
     if(!token||!me)return;
     try{const data=await api('/api/friends');friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
-      const connectionsButton=document.querySelector('[data-dimension="connections"]');
+      const connectionsButton=document.querySelector('button[data-dimension="connections"]');
+      if(!connectionsButton)throw new Error('Connections navigation is missing.');
       connectionsButton.textContent='CONNECTIONS';
       connectionsButton.setAttribute('aria-label',friendsCache.incoming.length?`Connections: ${friendsCache.incoming.length} pending invitation(s)`:'Connections');
       if(dimension==='connections' && timeMode==='now' && !journeyFocus)renderJourney();
     }catch(err){console.warn('Could not load Connections',err.message);if(dimension==='connections' && timeMode==='now') {journeyStatus='Could not refresh your people. Tap People & requests to retry.';renderJourney();}}
   }
   async function openFriends(){
-    openSheet('<h2>Connections</h2><p>People must accept your invitation before you can exchange private Cosmoses.</p><div class="look-loading">Loading your people…</div>');
+    // Selecting Connections from the live camera ALWAYS opens this sheet.
+    // It does not replace the camera with a separate full-screen page.
+    const requestGeneration=++friendsViewGeneration;
+    openSheet('<h2>Your Connections</h2><p>Loading your accepted people and invitations…</p><div class="look-loading" role="status">Finding your connections…</div><div class="actions"><button type="button" id="cancelFriendLoad">Back to camera</button></div>');
+    $("cancelFriendLoad").onclick=returnToCamera;
     try{
-      const data=await api('/api/friends');friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
+      const data=await api('/api/friends');
+      // If the person returned to the camera while fetching, never reopen the old sheet.
+      if(requestGeneration!==friendsViewGeneration||sheet.hidden)return;
+      friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
       const entry=(person,type)=>`<div class="friend-row"><div><div class="person">${escapeHtml(person.name)}</div><div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Connected'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button data-friend-send="${escapeHtml(person.user_id)}">Send ◯</button><button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
       openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
-        <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Close</button></div>
+        <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Back to camera</button></div>
+        <button class="connections-timeline" type="button" id="exploreConnectionTimeline">◯ Explore our connected timeline →</button>
         <div class="friend-group-title">Requests received ${data.incoming?.length?`<span class="friend-badge">${data.incoming.length}</span>`:''}</div>
         ${data.incoming?.length?data.incoming.map(x=>entry(x,'incoming')).join(''):'<div class="friend-empty">No pending requests.</div>'}
         <div class="friend-group-title">Connected people (${data.accepted?.length||0})</div>
@@ -628,6 +644,14 @@
         <div class="micro">Messages previously left for someone are only made available to that person after connection acceptance, subject to the original time and place rules.</div>`);
       $('inviteContact').onclick=openInvite;
       $('closeFriends').onclick=returnToCamera;
+      $('exploreConnectionTimeline').onclick=()=>{
+        closeSheet();
+        // Enter the connected universe at NOW, with friends already cached.
+        journeyAt=new Date().toISOString(); journeyFocus=null; journeyKey='';
+        timeMode='now'; journeyStatus=''; neighbors=[];
+        if(dimension==='connections'){renderJourney();refreshConnections();refreshFriendsSummary();}
+        else setDimension('connections');
+      };
       sheet.querySelectorAll('[data-friend-accept],[data-friend-decline],[data-friend-remove]').forEach(btn=>btn.onclick=async()=>{
         const action=btn.hasAttribute('data-friend-accept')?'accept':btn.hasAttribute('data-friend-decline')?'decline':'remove';
         const id=btn.getAttribute('data-friend-'+action);
@@ -642,7 +666,12 @@
         closeSheet();beginCompose();compose.recipient_mode='person';compose.recipient_user_id=p.user_id;compose.recipient_label=p.name;showContentStep();
       });
       refreshFriendsSummary();
-    }catch(error){openSheet(`<h2>Connections unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="tryFriends">Retry</button></div>`);$('tryFriends').onclick=openFriends;}
+    }catch(error){
+      if(requestGeneration!==friendsViewGeneration||sheet.hidden)return;
+      openSheet(`<h2>Connections unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="tryFriends">Retry</button><button id="backCameraError">Back to camera</button></div>`);
+      $('tryFriends').onclick=openFriends;
+      $('backCameraError').onclick=returnToCamera;
+    }
   }
   function openInvite(){
     openSheet(`<h2>Invite someone</h2><p>Enter a phone number or email they used for Cosmos. We won't reveal whether the person has an account.</p>
@@ -798,14 +827,14 @@
     // Keep the TIME, but never show a station from a different private dimension.
     journeyFocus=null;journeyKey="";journeyStatus="";neighbors=[];
     // Keep the selected point in time when changing dimensions.
-    document.querySelectorAll('[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension===dimension));
+    document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension===dimension));
     renderJourney();
     if(dimension==="connections"){refreshConnections();refreshFriendsSummary();}
   }
   function goNow(){
     dimension="mine";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
     timeMode="now";journeyStatus="";neighbors=[];journeyGeneration++;travelQueue=0;journeyBusy=false;
-    document.querySelectorAll('[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='mine'));
+    document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='mine'));
     renderJourney();scanHere(false);
     if(!cameraVideo.srcObject)startCamera(false);
   }
@@ -1015,7 +1044,17 @@
     $("cancelJump").onclick=closeSheet;
     $("acceptJump").onclick=()=>{const v=$("journeyDate").value;if(!v)return toastMsg("Choose a date.");closeSheet();jumpToDate(v);};
   });
-  document.querySelectorAll('[data-dimension]').forEach(b=>b.addEventListener('click',()=>setDimension(b.dataset.dimension)));
+  document.querySelectorAll('button[data-dimension]').forEach(b=>b.addEventListener('click',e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    // Use the already working People & requests sheet. Swipe DOWN remains
+    // available for traveling through friends' stations by date.
+    if(b.dataset.dimension==='connections'){
+      openFriends();
+      return;
+    }
+    setDimension(b.dataset.dimension);
+  }));
   // Use the background as the gesture surface, not the sheet or its scrollable content.
   const shouldIgnoreGesture=t=>{
     if(t?.closest?.('.journey-station'))return false; // Swipe over a station; tapping still opens it.
