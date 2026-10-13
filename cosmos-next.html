@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v1.4-vision-reliability-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v1.5-time-metro-staging" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -68,6 +68,52 @@
     .list{display:grid;gap:10px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:0 8px 28px rgba(25,35,60,.05)}.card-title{font-weight:750;font-size:14px}.card-meta{color:#7a8190;font-size:11px;margin-top:5px;line-height:1.45}.card-body{margin-top:10px;font-size:13px;color:#313849;line-height:1.5;white-space:pre-wrap}.empty{color:#7a8190;font-size:13px;line-height:1.6;padding:26px 6px}
     .auth{position:absolute;z-index:50;inset:0;background:#fff;display:grid;place-items:center;padding:28px}.auth-card{width:min(420px,100%)}.auth-orb{width:94px;height:94px;margin:0 auto 22px;border-radius:50%;border:1.4px solid rgba(14,18,32,.48);position:relative}.auth-orb::after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(14,18,32,.18)}.auth h1{text-align:center;margin:0;font-size:31px;letter-spacing:.15em;font-weight:800}.auth h2{text-align:center;margin:8px 0 28px;font-size:16px;font-weight:500;color:#697183}.auth .field{margin-top:12px}.auth button{width:100%;min-height:48px;border:0;border-radius:15px;background:#111827;color:white;margin-top:16px;font-weight:700}.auth-note{text-align:center;color:#89909d;font-size:11px;line-height:1.5;margin-top:14px}.auth-error{color:var(--danger);font-size:12px;margin-top:12px;text-align:center}.auth-secondary{background:#fff!important;color:#313849!important;border:1px solid var(--line)!important}
     @media(min-width:760px){.sheet{left:50%;right:auto;width:min(560px,calc(100% - 40px));transform:translateX(-50%);border-radius:28px;margin-bottom:18px}.choices{grid-template-columns:repeat(3,minmax(0,1fr))}.choice.wide{grid-column:auto}.panel{left:50%;right:auto;width:min(650px,100%);transform:translateX(-50%);box-shadow:0 0 70px rgba(25,35,60,.10)}}
+
+    /* TIME METRO: a continuous world around the original camera and circle. */
+    .app{--time-depth:0;--time-blur:0px;--time-sepia:0;--time-gray:0;--time-saturation:1;--time-video-opacity:1;--time-world-opacity:0}
+    .camera video{transition:filter .7s ease, opacity .7s ease;}
+    .app[data-time="past"] .camera video{filter:grayscale(var(--time-gray)) sepia(var(--time-sepia)) blur(var(--time-blur));opacity:var(--time-video-opacity)}
+    .app[data-time="future"] .camera video{filter:saturate(var(--time-saturation)) blur(var(--time-blur));opacity:var(--time-video-opacity)}
+    .time-world{position:absolute;z-index:2;inset:0;pointer-events:none;opacity:0;transition:opacity .65s ease;background:radial-gradient(ellipse at 50% 28%,rgba(255,255,255,.20),rgba(247,240,226,.87) 73%,rgba(222,214,203,.98))}
+    .app[data-time="past"] .time-world{opacity:var(--time-world-opacity)}
+    .app[data-time="future"] .time-world{opacity:var(--time-world-opacity);background:radial-gradient(ellipse at 50% 25%,rgba(255,255,255,.24),rgba(223,236,248,.89) 72%,rgba(205,221,240,.97))}
+    .time-world::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 27%,rgba(255,255,255,.86) 0 1px,transparent 2px),radial-gradient(circle at 82% 68%,rgba(255,255,255,.72) 0 2px,transparent 3px);background-size:150px 187px,210px 234px;opacity:.7}
+    .time-console{position:absolute;z-index:7;top:calc(env(safe-area-inset-top) + 85px);left:0;right:0;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px;pointer-events:none}
+    .time-console button,.time-console .time-pill{pointer-events:auto;min-height:37px;border-radius:99px;border:1px solid rgba(14,18,32,.13);background:rgba(255,255,255,.82);backdrop-filter:blur(14px);color:#222c41;box-shadow:0 5px 22px rgba(30,40,60,.07)}
+    .time-console button{min-width:44px;padding:7px 10px;font-size:18px}
+    .time-console .time-pill{min-width:116px;padding:9px 13px;font-size:12px;text-align:center;letter-spacing:.07em;font-weight:800}
+    .time-console .now-button{min-width:57px;font-size:11px;font-weight:750}
+    .time-console .metro-button{min-width:54px;font-size:11px;font-weight:750}
+    .app[data-time="now"] .time-console .now-button{display:none}
+    .time-stage{position:absolute;z-index:4;left:50%;top:43%;transform:translate(-50%,-50%);width:min(86vw,440px);max-height:45%;overflow-y:auto;pointer-events:auto;display:grid;justify-items:center;gap:12px;scrollbar-width:thin;text-align:center;padding:12px 5px}
+    .time-heading{font-size:clamp(30px,8vw,52px);letter-spacing:-.055em;line-height:1.04;font-weight:700;color:#192338;text-shadow:0 1px 25px #fff}
+    .time-caption{font-size:12px;color:#556176;line-height:1.5;max-width:280px}
+    .time-station-list{display:grid;gap:8px;width:100%;max-width:340px;text-align:left}
+    .time-station{width:100%;min-height:58px;border-radius:17px;border:1px solid rgba(17,30,50,.14);background:rgba(255,255,255,.86);text-align:left;padding:11px 13px;box-shadow:0 5px 20px rgba(12,22,44,.05);color:#1f2b3d}
+    .time-station b{display:block;font-size:13px;font-weight:750;line-height:1.3}.time-station span{display:block;font-size:11px;color:#6c7789;margin-top:4px;line-height:1.4}
+    .time-control{width:min(82vw,310px);display:grid;gap:3px;color:#647088;font-size:11px}
+    .time-control input{width:100%;accent-color:#243650;min-height:24px;touch-action:pan-x}
+    .connections-pill{position:absolute;z-index:6;top:calc(env(safe-area-inset-top) + 134px);right:12px;border:1px solid rgba(14,18,32,.12);background:rgba(255,255,255,.80);border-radius:99px;padding:9px 12px;font-size:11px;color:#26344a;backdrop-filter:blur(12px)}
+    .metro{position:absolute;z-index:9;top:calc(env(safe-area-inset-top) + 184px);bottom:calc(env(safe-area-inset-bottom) + 186px);right:9px;width:min(82vw,315px);background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border:1px solid rgba(14,18,32,.1);border-radius:20px;padding:12px 12px 14px 16px;display:flex;flex-direction:column;box-shadow:0 14px 38px rgba(20,34,50,.16)}
+    .metro-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:800;font-size:12px;letter-spacing:.055em;color:#273348}
+    .metro-head button{border:1px solid var(--line);border-radius:99px;background:white;padding:6px 10px;min-width:35px;min-height:35px}
+    .metro-lines{min-height:0;flex:1;overflow-y:auto;margin-top:12px;padding:1px 0 12px 20px;border-left:2px solid rgba(32,58,92,.25);scrollbar-width:thin}
+    .metro-stop{position:relative;display:block;width:100%;margin:0 0 10px;border:1px solid rgba(32,58,92,.13);border-radius:13px;background:#fff;text-align:left;padding:10px 11px;color:#1d2b3e;min-height:55px}
+    .metro-stop:before{content:"";position:absolute;left:-29px;top:16px;width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid #637a98}
+    .metro-stop[data-type="friend"]:before{border-color:#23806d}.metro-stop[data-type="future"]:before{border-color:#a58f62}
+    .metro-line-label{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.10em;color:#576982;margin-bottom:3px}
+    .metro-stop[data-type="friend"] .metro-line-label{color:#23806d}
+    .metro-stop[data-type="future"] .metro-line-label{color:#8d763f}
+    .metro-stop[data-type="vision"] .metro-line-label{color:#5662a7}
+    .metro-stop b{display:block;font-size:12px;font-weight:700}.metro-stop small{display:block;color:#768293;margin-top:3px;font-size:10px;line-height:1.4}
+    .metro-empty{font-size:12px;color:#667385;line-height:1.6;padding:11px}
+    .metro-note{font-size:10px;line-height:1.45;color:#737e8e;padding-top:6px;border-top:1px solid var(--line)}
+    .gesture-guide{position:absolute;z-index:4;bottom:calc(env(safe-area-inset-bottom) + 169px);left:50%;transform:translateX(-50%);font-size:10px;white-space:nowrap;color:#5b6679;background:rgba(255,255,255,.56);border-radius:99px;padding:6px 10px;pointer-events:none}
+    .app[data-time="past"] .ambient,.app[data-time="future"] .ambient{opacity:0;pointer-events:none}
+    .app[data-time="past"] .camera-fallback,.app[data-time="future"] .camera-fallback{opacity:0;pointer-events:none}
+    .app[data-time="past"] .found-orb,.app[data-time="future"] .found-orb{pointer-events:none}
+    @media(max-width:370px){.time-console{gap:4px;padding:0 5px}.time-console .time-pill{min-width:78px;padding:8px 5px}.time-console .now-button{min-width:47px}.time-console .metro-button{min-width:44px}.connections-pill{right:8px}.metro{width:min(90vw,315px)}}
+    @media(prefers-reduced-motion:reduce){.time-world,.camera video{transition:none!important}}
   </style>
 </head>
 <body>
@@ -76,6 +122,23 @@
     <video id="cameraVideo" autoplay muted playsinline hidden></video>
     <div class="camera-fallback" id="cameraFallback">Reality stays visible here. Camera access is requested only when you choose to use it.</div>
   </div>
+
+  <div class="time-world" id="timeWorld" aria-hidden="true"></div>
+  <div class="time-stage" id="timeStage" hidden aria-live="polite"></div>
+  <div class="time-console" id="timeConsole" aria-label="Time travel">
+    <button id="travelPast" title="Earlier" aria-label="Travel toward the past">‹</button>
+    <div class="time-pill" id="timePill">◯ NOW</div>
+    <button id="travelFuture" title="Later" aria-label="Travel toward the future">›</button>
+    <button class="now-button" id="returnNow" title="Return to live camera">NOW</button>
+    <button class="metro-button" id="openMetro" title="Explore connections">LINES</button>
+  </div>
+  <button class="connections-pill" id="connectionsPill" hidden>◯ Connections</button>
+  <div class="metro" id="metro" hidden aria-label="Cosmos connection stations">
+    <div class="metro-head"><span>◯ CONNECTED STATIONS</span><button id="closeMetro" aria-label="Hide connections">×</button></div>
+    <div class="metro-lines" id="metroLines"></div>
+    <div class="metro-note">Private stations only · Places are shown only with permission · Public stations await safety review.</div>
+  </div>
+  <div class="gesture-guide" id="gestureGuide">→ Past · Future ← · ↑ Connections</div>
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
@@ -158,6 +221,17 @@
   let lastLookFrame = null;
   let lastLookResult = null;
   let lookHistory = [];
+  const app = $("app"), timeStage = $("timeStage"), timePill = $("timePill"), metro = $("metro");
+  const metroLines = $("metroLines"), connectionsPill = $("connectionsPill");
+  const todayYear = new Date().getFullYear();
+  let timeMode = "now", timeYear = todayYear, timeRequest = 0;
+  let timelineItems = [], nearbyConnections = {nearby:[],inbox:[],memories:[]};
+  let metroOpen = false, lastConnectionPoll = 0;
+  const NOTICE_KEY = "cosmos_life_nearby_notice_v1";
+  let noticesEnabled = localStorage.getItem(NOTICE_KEY) === "on";
+  const NOTIFIED_KEY = "cosmos_life_seen_nearby_v1";
+  let gestureStart = null;
+
 
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function toastMsg(message, ms=2600){toast.textContent=message;toast.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>toast.hidden=true,ms);}
@@ -188,6 +262,7 @@
       accountButton.textContent = me.display_name || "You";
       startCamera(false);
       scanHere(false);
+      loadTimeline();
     }catch(e){
       localStorage.removeItem(TOKEN_KEY); token=""; auth.hidden=false;
     }
@@ -213,7 +288,7 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);loadTimeline();
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -239,10 +314,11 @@
 
   async function scanHere(showErrors=true){
     if(!token) return;
+    if(timeMode!=="now") {await refreshConnections(showErrors);return;}
     hint.textContent="Looking here…";ambientTitle.textContent="Looking deeper…";ambientSub.textContent="Only Cosmoses you are allowed to see can appear.";
     foundOrb.hidden=true;foundLabel.hidden=true;currentFound=null;
     let loc=null;
-    try{loc=await getLocation();lastScanLoc=loc;}catch(e){lastScanLoc=null;if(showErrors) toastMsg(e.message);}
+    if(showErrors || noticesEnabled){try{loc=await getLocation();lastScanLoc=loc;}catch(e){lastScanLoc=null;if(showErrors) toastMsg(e.message);}}
     try{
       const params=new URLSearchParams(); if(loc){params.set("lat",loc.lat);params.set("lng",loc.lng);params.set("accuracy",loc.accuracy||0);}
       const r=await api(`/api/cosmos/here?${params.toString()}`);
@@ -255,6 +331,7 @@
     }catch(e){
       ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper.";hint.textContent="Tap to look · hold to leave";if(showErrors)toastMsg(e.message);
     }
+    await refreshConnections(false);
   }
 
   foundOrb.addEventListener("click",()=>{if(currentFound)openCosmos(currentFound.id);});
@@ -351,7 +428,7 @@
     e.preventDefault();held=false;coreOrb.setPointerCapture?.(e.pointerId);coreOrb.classList.add("holding");
     holdTimer=setTimeout(()=>{held=true;coreOrb.classList.remove("holding");beginCompose();},520);
   });
-  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held)lookDeeper();held=false;};
+  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held){if(timeMode!=="now")goNow();else lookDeeper();}held=false;};
   coreOrb.addEventListener("pointerup",releaseCore);coreOrb.addEventListener("pointercancel",()=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");held=false;});
   coreOrb.addEventListener("contextmenu",e=>e.preventDefault());
 
@@ -459,7 +536,7 @@
   async function createCosmos(){
     $("leaveFinal").disabled=true;$("leaveFinal").textContent="Leaving…";
     try{
-      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper. Hold ◯ to leave something.";},3200);
+      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();loadTimeline();refreshConnections();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper. Hold ◯ to leave something.";},3200);
     }catch(e){toastMsg(e.message,4200);$("leaveFinal").disabled=false;$("leaveFinal").textContent="Leave ◯";}
   }
 
@@ -514,10 +591,195 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. No background iPhone tracking or push messages yet. Public place-stations are not enabled until safety moderation exists.</div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
     $("logout").onclick=()=>{localStorage.removeItem(TOKEN_KEY);location.reload();};
   });
+
+
+  const shortDate = (d) => {
+    const n = new Date(d);
+    return Number.isFinite(n.getTime()) ? n.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}) : "Saved moment";
+  };
+  function stationHtml(item) {
+    const lock = item.locked ? " · waiting" : "";
+    const preview = item.preview ? ` · ${escapeHtml(item.preview)}` : "";
+    const linked = item.parent_id ? " ↳ connected reply" : "";
+    return `<button class="time-station" data-station="${escapeHtml(item.id)}" type="button"><b>${item.locked?"◌ ":"◯ "}${escapeHtml(item.title||"Cosmos station")}</b><span>${shortDate(item.date)} · ${escapeHtml(item.kind||"moment")}${lock}${linked}${preview}</span></button>`;
+  }
+  function timelineRange(){
+    const futureYears = 30, pastYears = 60;
+    return {min:Math.max(1900,todayYear-pastYears),max:Math.min(2200,todayYear+futureYears)};
+  }
+  async function loadTimeline() {
+    if (!token) return;
+    const seq = ++timeRequest;
+    const phase=timeMode === "now" ? "now" : timeMode;
+    try {
+      const r = await api(`/api/cosmos/timeline?year=${timeYear}&phase=${encodeURIComponent(phase)}`);
+      if (seq !== timeRequest) return;
+      timelineItems = Array.isArray(r.items)?r.items:[];
+      paintTimeStage();
+      if (metroOpen) paintMetro();
+    } catch(e) {
+      if(seq!==timeRequest) return;
+      timelineItems=[];
+      if(!timeStage.hidden)timeStage.innerHTML=`<div class="time-caption">Could not load stations: ${escapeHtml(e.message)}</div>`;
+      if(metroOpen)paintMetro();
+      toastMsg("Timeline couldn't load. Check the Worker version.",3500);
+    }
+  }
+  function paintTimeStage(){
+    if(timeMode==="now") {timeStage.hidden=true;return;}
+    timeStage.hidden=false;
+    const r=timelineRange();
+    const isPast=timeMode==="past";
+    const visible=timelineItems.slice(0,7);
+    timeStage.innerHTML=`<div class="time-heading">${timeYear}</div>
+      <div class="time-caption">${isPast?"PAST · Recorded moments":"FUTURE · Scheduled moments"}<br>${timelineItems.length?`${timelineItems.length} station${timelineItems.length===1?"":"s"} on this line`:(isPast?"Nothing recorded in this year yet.":"No moments scheduled for this year yet.")}</div>
+      ${visible.length?`<div class="time-station-list">${visible.map(stationHtml).join("")}</div>`:""}
+      ${timelineItems.length>7?`<div class="time-caption">Open LINES to explore all ${timelineItems.length} stations.</div>`:""}
+      <label class="time-control">Travel to a year
+       <input id="timeScrubber" aria-label="Travel to a year" type="range" min="${r.min}" max="${r.max}" value="${timeYear}" step="1"></label>`;
+    timeStage.querySelectorAll("[data-station]").forEach(b=>b.addEventListener("click",()=>openStation(b.dataset.station)));
+    $("timeScrubber").addEventListener("input",e=>{
+      const y=Number(e.target.value);
+      // Keep the timeline navigable without posting imaginary content.
+      jumpYear(y);
+    });
+  }
+  function renderTimeView(){
+    app.dataset.time=timeMode;
+    const distance = timeMode==="now"?0:Math.min(1,(Math.abs(timeYear-todayYear)+1)/8);
+    app.style.setProperty("--time-depth",String(distance));
+    app.style.setProperty("--time-blur",(distance*8).toFixed(2)+"px");
+    app.style.setProperty("--time-gray",(distance*.90).toFixed(2));
+    app.style.setProperty("--time-sepia",(distance*.13).toFixed(2));
+    app.style.setProperty("--time-saturation",(1-distance*.55).toFixed(2));
+    app.style.setProperty("--time-video-opacity",(1-distance*.76).toFixed(2));
+    app.style.setProperty("--time-world-opacity",(.38+distance*.60).toFixed(2));
+    timePill.textContent = timeMode==="now"?"◯ NOW":`${timeMode==="past"?"←":"→"} ${timeYear}`;
+    timeStage.hidden=timeMode==="now";
+    $("gestureGuide").textContent=timeMode==="now"?"→ Past · Future ← · ↑ Connections":"Swipe through years · NOW returns to live camera";
+    // The live video continues only as a softened present-day background, not a fabricated historical recording.
+    if (timeMode === "now") {
+      ambientTitle.textContent=currentFound?"Something is here for you.":"The world has more.";
+      ambientSub.textContent=currentFound?"A private Cosmos is ready nearby.":"Point at anything. Tap ◯ to look deeper.";
+      hint.textContent="Tap to look · hold to leave";
+    } else {
+      hint.textContent="◯ Return to NOW · hold to leave";
+      timeStage.innerHTML='<div class="time-heading">'+timeYear+'</div><div class="time-caption">Finding your Cosmos stations…</div>';
+    }
+    loadTimeline();
+    if(metroOpen)paintMetro();
+  }
+  function goNow(){timeMode="now";timeYear=todayYear;renderTimeView();}
+  function shiftTime(delta){
+    if(delta<0){
+      if(timeMode==="now"){timeMode="past";timeYear=todayYear;}
+      else if(timeMode==="future"){if(timeYear<=todayYear)goNow();else timeYear--;}
+      else timeYear=Math.max(1900,timeYear-1);
+    } else {
+      if(timeMode==="now"){timeMode="future";timeYear=todayYear;}
+      else if(timeMode==="past"){if(timeYear>=todayYear)goNow();else timeYear++;}
+      else timeYear=Math.min(2200,timeYear+1);
+    }
+    if(timeMode!=="now")renderTimeView();
+  }
+  function jumpYear(y){
+    if(!Number.isInteger(y)||y<1900||y>2200)return;
+    timeYear=y;timeMode=y<todayYear?"past":(y>todayYear?"future":(timeMode==="now"?"past":timeMode));
+    renderTimeView();
+  }
+  async function openStation(id){
+    const station=timelineItems.find(s=>s.id===id);
+    if(!station)return;
+    if(station.locked){
+      openSheet(`<h2>Future station</h2><p>${escapeHtml(station.title)}</p><div class="look-card"><div class="look-what">This moment is waiting until ${shortDate(station.date)}. The contents won't be opened early by time travel.</div></div><div class="actions"><button id="closeWaitingStation">Close</button></div>`);
+      $("closeWaitingStation").onclick=closeSheet;
+      return;
+    }
+    await openCosmos(station.id);
+  }
+  function paintMetro(){
+    if(!metroOpen)return;
+    const all=[];
+    if(timeMode==="now"){
+      for(const x of nearbyConnections.nearby||[]) all.push({id:x.id,title:x.sender_name?`From ${x.sender_name}`:"A friend's Cosmos",when:"Waiting at this place",type:"friend",open:true});
+      for(const x of nearbyConnections.memories||[]) all.push({id:x.id,title:x.title||"Your place-memory",when:shortDate(x.created_at),type:"memory",open:true});
+      for(const x of nearbyConnections.inbox||[]) all.push({id:x.id,title:x.sender_name?`From ${x.sender_name}`:"A private Cosmos for you",when:"Ready for you",type:"friend",open:true});
+      for(const x of timelineItems.slice(0,12)) all.push({id:x.id,title:x.title||"A remembered moment",when:shortDate(x.date)+(x.parent_id?" · connected reply":""),type:"past",open:!x.locked});
+      all.push({id:"_vision",title:"Look deeper into what is here",when:"Follow discoveries from the live camera",type:"vision",open:true});
+    }else{
+      for(const x of timelineItems) all.push({id:x.id,title:x.title||"Cosmos station",when:shortDate(x.date)+(x.locked?" · locked":"")+(x.parent_id?" · connected reply":""),type:x.locked?"future":"past",open:!x.locked});
+    }
+    const unique=all.filter((s,i)=>all.findIndex(t=>t.id===s.id)===i);
+    metroLines.innerHTML=unique.length?unique.slice(0,75).map(x=>`<button type="button" class="metro-stop" data-metro-id="${escapeHtml(x.id)}" data-type="${escapeHtml(x.type)}"><span class="metro-line-label">${{friend:"PEOPLE",memory:"PLACE",past:"TIME",future:"FUTURE",vision:"DISCOVERY"}[x.type]||"COSMOS"}</span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.when)}</small></button>`).join(""):
+      `<div class="metro-empty">No stations on this line yet.<br><br>Hold ◯ and leave a note, photo, or voice for future you or someone you choose.</div>`;
+    metroLines.querySelectorAll("[data-metro-id]").forEach(btn=>btn.addEventListener("click",async()=>{
+      const id=btn.dataset.metroId;
+      if(id==="_vision"){setMetro(false);goNow();await lookDeeper();return;}
+      const linked=timelineItems.find(s=>s.id===id);
+      if(linked)await openStation(id);
+      else await openCosmos(id);
+    }));
+  }
+  function setMetro(open){
+    metroOpen=Boolean(open);metro.hidden=!metroOpen;
+    if(metroOpen)paintMetro();
+    $("openMetro").setAttribute("aria-expanded",String(metroOpen));
+  }
+  async function refreshConnections(showErrors=false){
+    if(!token||!me)return;
+    const params=new URLSearchParams();
+    if(lastScanLoc){params.set('lat',String(lastScanLoc.lat));params.set('lng',String(lastScanLoc.lng));}
+    try{
+      const r=await api('/api/cosmos/connections?'+params.toString());
+      nearbyConnections={nearby:r.nearby||[],inbox:r.inbox||[],memories:r.memories||[]};
+      const count=new Set([...nearbyConnections.nearby,...nearbyConnections.inbox,...nearbyConnections.memories].map(x=>x.id)).size;
+      connectionsPill.hidden=count===0;
+      connectionsPill.textContent=`◯ ${count} connection${count===1?"":"s"}`;
+      if(metroOpen)paintMetro();
+      if(noticesEnabled && timeMode==="now" && !document.hidden){
+        const first=nearbyConnections.nearby.find(x=>x.id && !localStorage.getItem(NOTIFIED_KEY+':'+x.id));
+        if(first){
+          localStorage.setItem(NOTIFIED_KEY+':'+first.id,String(Date.now()));
+          toastMsg("A private Cosmos is waiting at this place. Open LINES to explore.",5200);
+        }
+      }
+    }catch(e){if(showErrors)toastMsg(e.message,3500);}
+  }
+  async function periodicNearby(){
+    if(!noticesEnabled||!token||document.hidden||!sheet.hidden||!panel.hidden||!auth.hidden)return;
+    if(Date.now()-lastConnectionPoll < 85000)return;
+    lastConnectionPoll=Date.now();
+    try{lastScanLoc=await getLocation();await refreshConnections();}catch(e){}
+  }
+  $("travelPast").addEventListener("click",()=>shiftTime(-1));
+  $("travelFuture").addEventListener("click",()=>shiftTime(1));
+  $("returnNow").addEventListener("click",goNow);
+  $("openMetro").addEventListener("click",()=>setMetro(!metroOpen));
+  $("closeMetro").addEventListener("click",()=>setMetro(false));
+  connectionsPill.addEventListener("click",()=>setMetro(true));
+  // Swipes work on the background only; sheet text, forms, timeline slider and the central circle keep their own gestures.
+  const shouldIgnoreGesture = t => Boolean(t?.closest?.('button,input,textarea,select,.sheet,.sheet-backdrop,.panel,.auth,.bottom,.time-console,.metro,.topbar')); 
+  app.addEventListener("touchstart",e=>{
+    if(e.touches.length!==1||shouldIgnoreGesture(e.target)||!sheet.hidden||!panel.hidden||!auth.hidden)return;
+    gestureStart={x:e.touches[0].clientX,y:e.touches[0].clientY,onStage:Boolean(e.target.closest?.(".time-stage"))};
+  },{passive:true});
+  app.addEventListener("touchend",e=>{
+    if(!gestureStart||!e.changedTouches.length)return;
+    const start=gestureStart;gestureStart=null;
+    const dx=e.changedTouches[0].clientX-start.x,dy=e.changedTouches[0].clientY-start.y;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<65)return;
+    if(Math.abs(dx)>Math.abs(dy)*1.3){shiftTime(dx>0?-1:1);}
+    else if(Math.abs(dy)>Math.abs(dx)*1.3 && !start.onStage){if(dy<0)setMetro(true);else if(metroOpen)setMetro(false);else goNow();}
+  },{passive:true});
+  app.addEventListener("touchcancel",()=>gestureStart=null,{passive:true});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)periodicNearby();});
+  setInterval(periodicNearby,90000);
+  app.dataset.time="now";
 
   bootstrap();
 })();
