@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v2.1-family-invites-ios" />
+  <meta name="cosmos-build" content="cosmos-next-v2.1.1-iphone-code-input-fix" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -208,9 +208,11 @@
     .inline-video{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;margin-top:10px;background:#121824}
     .moment-status{margin-top:12px;border:1px solid #bfcbd9;background:#f6f9fc;border-radius:14px;padding:14px;font-size:13px;line-height:1.5}
     .moment-status button{min-height:44px;padding:9px 14px;border:1px solid #bdc7d4;background:#fff;border-radius:12px}
-    .secret-code{display:flex;align-items:stretch;gap:8px}
-    .secret-code input{min-width:0;flex:1}
-    .secret-code button{flex:0 0 auto;min-height:44px;min-width:62px;background:#fff!important;color:#182338!important;border:1px solid #d2d9e2!important;margin:0!important;padding:8px 10px}
+    /* v2.1.1: prevent the global .auth button{width:100%} rule from squeezing code inputs on iPhone. */
+    .secret-code{display:grid;grid-template-columns:minmax(0,1fr) 76px;align-items:stretch;gap:9px;width:100%;min-width:0}
+    .auth .secret-code input{display:block;width:100%!important;min-width:0;max-width:100%;height:52px;box-sizing:border-box;flex:none;font-size:20px;letter-spacing:.16em;font-variant-numeric:tabular-nums;padding:11px 13px}
+    .auth .secret-code button{width:76px!important;min-width:76px;max-width:76px;flex:none;min-height:52px;box-sizing:border-box;background:#fff!important;color:#182338!important;border:1px solid #d2d9e2!important;margin:0!important;padding:8px 6px!important;white-space:nowrap;font-size:13px}
+    .auth .secret-code input:focus-visible,.auth .secret-code button:focus-visible{outline:2px solid #2777cb;outline-offset:2px}
     @media(max-width:360px){.moment-tools button{flex:1 1 40%}.moment-palette input[type=range]{width:90px}}
 
     /* v2.1 — invite/share card: single column on narrow screens, no sideways clipping */
@@ -282,8 +284,8 @@
         <div class="auth-note">Phone identifies your Cosmos. Email protects it. Neither is public.</div>
       </div>
       <div id="authVerify" hidden>
-        <div class="field"><label>Phone code</label><div class="secret-code"><input id="phoneCodeInput" type="password" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="phoneCodeInput" aria-label="Show phone code">Show</button></div></div>
-        <div class="field"><label>Email code</label><div class="secret-code"><input id="emailCodeInput" type="password" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="emailCodeInput" aria-label="Show email code">Show</button></div></div>
+        <div class="field"><label>Phone code</label><div class="secret-code"><input id="phoneCodeInput" type="password" aria-label="Phone verification code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="phoneCodeInput" aria-label="Show phone code">Show</button></div></div>
+        <div class="field"><label>Email code</label><div class="secret-code"><input id="emailCodeInput" type="password" aria-label="Email verification code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="emailCodeInput" aria-label="Show email code">Show</button></div></div>
         <button id="verifyCodesButton">Enter Cosmos</button>
         <button class="auth-secondary" id="restartAuthButton">Use different phone/email</button>
         <div class="auth-note" id="devAuthNote" hidden>Staging mode is active. Use the verification code configured in the Worker secret <b>AUTH_DEV_CODE</b>.</div>
