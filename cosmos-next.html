@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v2.1.1-iphone-code-input-fix" />
+  <meta name="cosmos-build" content="cosmos-next-v2.1.2-fire-drag-resize" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -225,6 +225,26 @@
     .invite-options .dark{background:#121928;color:white}
     .invite-note{display:block;font-size:11px;color:#667287;line-height:1.55;margin-top:10px}
     @media(max-width:360px){.invite-options{grid-template-columns:1fr}}
+
+    /* v2.1.2: movable artwork layers and visibly fiery lettering. */
+    .moment-editor{display:flex;align-items:center;justify-content:center;padding:0;background:#dce3e9;min-height:150px}
+    .moment-editor canvas{width:auto!important;max-width:100%!important;height:auto!important;max-height:min(49dvh,530px)!important;object-fit:contain;touch-action:none;cursor:crosshair}
+    .art-word-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:12px}
+    .art-word-row input{min-width:0;width:100%;height:47px;border:1px solid #cbd6e2;border-radius:12px;padding:10px 12px;font-size:16px}
+    .art-word-row button{min-height:47px;border:0;border-radius:12px;background:#182a43;color:#fff;padding:0 14px;font-weight:750;white-space:nowrap}
+    .art-size-control{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .art-size-control label{font-size:13px;font-weight:650;color:#28384e}
+    .art-size-control input[type=range]{flex:1;min-width:90px;max-width:280px;accent-color:#ff6b1b}
+    .art-size-control button{width:42px;height:44px;border-radius:12px;border:1px solid #cbd5e1;background:#fff;font-size:22px}
+    .art-size-control output{min-width:38px;font-size:12px;color:#516078;text-align:center}
+    .art-foreground{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+    .art-foreground button{background:#fff;border:1px solid #cad3df;border-radius:10px;min-height:42px;padding:8px 11px;font-weight:700}
+    .art-foreground input[type=color]{width:50px;height:42px;border:1px solid #ccd5e1;border-radius:10px}
+    .art-foreground button[disabled]{opacity:.42;cursor:not-allowed}
+    .art-feedback{margin-top:10px;padding:10px 12px;background:#fff7ed;border:1px solid #ffdab5;border-radius:12px;color:#7a3716;font-size:12px;line-height:1.45}
+    .moment-tools button.fire-tool{border-color:#ff9452;color:#97320d;background:#fff2de}
+    .moment-tools button.fire-tool.selected{background:#9c3411;border-color:#9c3411;color:#fff}
+    @media(max-width:360px){.art-word-row{grid-template-columns:1fr}.art-word-row button{width:100%}}
   </style>
 </head>
 <body>
@@ -642,51 +662,207 @@
     try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('Could not open this photo.'));img.src=objectUrl;});}
     catch(e){URL.revokeObjectURL(objectUrl);toastMsg(e.message);return showContentStep();}
     URL.revokeObjectURL(objectUrl);
-    const width=img.naturalWidth,height=img.naturalHeight,maxSide=1400,ratio=Math.min(1,maxSide/Math.max(width,height));
-    const w=Math.round(width*ratio),h=Math.round(height*ratio);
-    openSheet(`<h2>Make this moment yours</h2><p>Write on the image, draw, or create a glowing fire-style message. These are artistic photo overlays, not actual flames or live AR graffiti.</p>
-      <div class="moment-editor"><canvas id="photoArt" width="${w}" height="${h}" aria-label="Draw on your photo"></canvas></div>
-      <div class="moment-tools"><button id="toolPen" class="selected" type="button">✎ Draw</button><button id="toolText" type="button">T Text</button><button id="toolGlow" type="button">✦ Fire glow</button><button id="toolUndo" type="button">↶ Undo</button></div>
-      <div class="moment-palette"><label>Color <input type="color" id="artColor" value="#ffffff"></label><label>Size <input type="range" id="artSize" min="2" max="44" value="10"></label></div>
+    const naturalW=img.naturalWidth,naturalH=img.naturalHeight;
+    if(!naturalW||!naturalH){toastMsg('This photo has no usable dimensions.');return showContentStep();}
+    const scale=Math.min(1,1400/Math.max(naturalW,naturalH));
+    const w=Math.max(1,Math.round(naturalW*scale)),h=Math.max(1,Math.round(naturalH*scale));
+    const startSize=Math.round(Math.max(20,Math.min(200,w*.082)));
+    openSheet(`<h2>Make this moment yours</h2><p>Add writing to your photo. Drag any text to move it, then resize it with the slider, +/− buttons, or two fingers.</p>
+      <div class="moment-editor"><canvas id="photoArt" width="${w}" height="${h}" aria-label="Editable photo with movable text layers"></canvas></div>
+      <div class="moment-tools"><button id="toolSelect" type="button">☝ Move</button><button id="toolPen" type="button">✎ Draw</button><button id="toolText" class="selected" type="button">T Text</button><button id="toolGlow" class="fire-tool" type="button">🔥 Fire glow</button><button id="toolGraffiti" type="button">✦ Graffiti</button><button id="toolUndo" type="button">↶ Undo</button></div>
+      <div class="art-word-row"><input type="text" id="artWord" maxlength="90" placeholder="Write something, e.g. I love you" aria-label="Words to add to the photo" /><button id="artAdd" type="button">Add text</button></div>
+      <div class="art-size-control"><label for="artSize">Text size</label><button type="button" id="artSmaller" aria-label="Make text smaller">−</button><input type="range" id="artSize" min="16" max="220" step="1" value="${startSize}" aria-label="Text or brush size" /><button type="button" id="artLarger" aria-label="Make text larger">+</button><output id="artSizeValue">${startSize}</output></div>
+      <div class="art-foreground"><label for="artColor">Color</label><input type="color" id="artColor" value="#ffffff" /><button type="button" id="artUpdate" disabled>Update selected text</button><button type="button" id="artRemove" disabled>Delete selected</button></div>
+      <div class="art-feedback" id="artFeedback" aria-live="polite">🔥 To make fire letters: tap <b>Fire glow</b>, type your words, then <b>Add fire</b>. Tap and drag the writing to reposition it.</div>
       <div class="field"><label>Caption (optional)</label><input id="photoCaption" maxlength="240" placeholder="A moment worth remembering…"></div>
       <div class="field"><label>Attached https link (optional)</label><input id="photoExtraLink" type="url" placeholder="https://…"></div>
-      <div class="moment-preview">Draw with your finger. Text and glow tools place words where you tap on the image. The saved image keeps your artwork.</div>
+      <div class="moment-preview">Layers can be moved or resized until you save. This creates artwork on a photo, not live graffiti on a real surface. The saved photo includes the final effects.</div>
       <div class="actions"><button id="artCancel">Back</button><button id="artSave" class="primary">Save photo moment →</button></div>`);
-    const canvas=$('photoArt'),ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,w,h);
-    let tool='draw',drawing=false,history=[];
-    const saveHistory=()=>{if(history.length>=8)history.shift();history.push(ctx.getImageData(0,0,w,h));};
-    saveHistory();
-    const chooseTool=(key)=>{tool=key;[['toolPen','draw'],['toolText','text'],['toolGlow','glow']].forEach(([id,name])=>$(id).classList.toggle('selected',key===name));};
-    $('toolPen').onclick=()=>chooseTool('draw');$('toolText').onclick=()=>chooseTool('text');$('toolGlow').onclick=()=>chooseTool('glow');
-    $('toolUndo').onclick=()=>{if(history.length>1){history.pop();ctx.putImageData(history.at(-1),0,0);}};
-    const position=e=>{const box=canvas.getBoundingClientRect();return {x:(e.clientX-box.left)*w/box.width,y:(e.clientY-box.top)*h/box.height};};
-    const penWidth=()=>Math.max(2,Number($('artSize').value))*Math.max(.5,w/850);
+
+    const canvas=$('photoArt'),ctx=canvas.getContext('2d');
+    let tool='text',layers=[],selectedId=null,activePointer=null,dragLast=null,gesture=null,renderScheduled=false;
+    let currentSize=startSize,nextId=1,undoStack=[],exporting=false,sliderDirty=false;
+    const pointers=new Map();
+    const clamp=(v,low,high)=>Math.min(high,Math.max(low,v));
+    const notify=text=>{$('artFeedback').textContent=text;};
+    const snapshot=()=>{undoStack.push(JSON.stringify({layers,selectedId}));if(undoStack.length>24)undoStack.shift();};
+    const layerById=id=>layers.find(l=>l.id===id)||null;
+    const selected=()=>layerById(selectedId);
+    const fontFor=s=>`800 ${Math.round(s)}px system-ui,-apple-system,BlinkMacSystemFont,sans-serif`;
+    const textLines=t=>String(t||'').split(/\n/).slice(0,3);
+    const metrics=layer=>{
+      ctx.save();ctx.font=fontFor(layer.size);
+      const lines=textLines(layer.text);
+      const width=Math.max(1,...lines.map(line=>ctx.measureText(line).width));
+      ctx.restore();
+      return {width,height:Math.max(layer.size*1.26,lines.length*layer.size*1.21),lines};
+    };
+    const textBox=layer=>{const m=metrics(layer);return {x:layer.x-m.width/2-14,y:layer.y-m.height/2-14,w:m.width+28,h:m.height+28};};
+    const findTextAt=p=>{
+      for(let i=layers.length-1;i>=0;i--){const l=layers[i];if(l.type!=='text')continue;
+        const b=textBox(l);if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h)return l;
+      }return null;
+    };
+    const drawStroke=l=>{
+      if(!l.points.length)return;
+      ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=l.color;ctx.fillStyle=l.color;ctx.lineWidth=l.size;
+      if(l.points.length===1){ctx.beginPath();ctx.arc(l.points[0].x,l.points[0].y,l.size/2,0,Math.PI*2);ctx.fill();}
+      else{ctx.beginPath();ctx.moveTo(l.points[0].x,l.points[0].y);for(let i=1;i<l.points.length;i++)ctx.lineTo(l.points[i].x,l.points[i].y);ctx.stroke();}
+      ctx.restore();
+    };
+    const drawFireLine=(line,x,y,size)=>{
+      ctx.save();ctx.font=fontFor(size);ctx.textAlign='center';ctx.textBaseline='middle';
+      const width=ctx.measureText(line).width;
+      // Stable tongues and multiple luminous strokes create a visible flame-like PHOTO effect.
+      const count=Math.min(34,Math.max(5,Math.floor(width/Math.max(10,size*.38))));
+      const base=y-size*.3;
+      for(let i=0;i<count;i++){
+        const xx=x-width/2+(i+.45)*width/count;
+        const rise=size*(.21+.25*(.5+.5*Math.sin(i*5.83+line.length)));
+        const thick=Math.max(2,size*(.045+.03*(.5+.5*Math.cos(i*3.1))));
+        const grad=ctx.createLinearGradient(xx,base,xx,base-rise);
+        grad.addColorStop(0,'rgba(255,65,0,.60)');grad.addColorStop(.65,'rgba(255,169,0,.77)');grad.addColorStop(1,'rgba(255,248,130,.07)');
+        ctx.fillStyle=grad;ctx.beginPath();ctx.moveTo(xx-thick*1.6,base+size*.06);
+        ctx.quadraticCurveTo(xx-thick,base-rise*.32,xx+thick*.36,base-rise);
+        ctx.quadraticCurveTo(xx+thick*.55,base-rise*.38,xx+thick*1.7,base+size*.06);
+        ctx.closePath();ctx.fill();
+      }
+      ctx.shadowColor='#f12400';ctx.shadowBlur=size*.50;ctx.lineJoin='round';ctx.strokeStyle='rgba(218,32,0,.92)';ctx.lineWidth=size*.27;ctx.strokeText(line,x,y);
+      ctx.shadowColor='#ff7200';ctx.shadowBlur=size*.30;ctx.strokeStyle='#ff7808';ctx.lineWidth=size*.12;ctx.strokeText(line,x,y);
+      ctx.shadowBlur=size*.18;ctx.shadowColor='#ffef39';
+      const fill=ctx.createLinearGradient(0,y-size*.6,0,y+size*.47);
+      fill.addColorStop(0,'#fffbd5');fill.addColorStop(.27,'#ffef71');fill.addColorStop(.57,'#ffac19');fill.addColorStop(.83,'#ff4a05');fill.addColorStop(1,'#d82304');
+      ctx.fillStyle=fill;ctx.fillText(line,x,y);
+      ctx.restore();
+    };
+    const drawText=l=>{
+      const lines=textLines(l.text),lineHeight=l.size*1.21,firstY=l.y-(lines.length-1)*lineHeight/2;
+      for(let index=0;index<lines.length;index++){
+        const line=lines[index],y=firstY+index*lineHeight;
+        if(l.style==='fire'){drawFireLine(line,l.x,y,l.size);continue;}
+        ctx.save();ctx.font=fontFor(l.size);ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+        if(l.style==='graffiti'){
+          ctx.strokeStyle='#13202d';ctx.lineWidth=Math.max(3,l.size*.17);ctx.strokeText(line,l.x,y);
+          ctx.shadowColor=l.color;ctx.shadowBlur=l.size*.12;ctx.fillStyle=l.color;ctx.fillText(line,l.x,y);
+          ctx.shadowBlur=0;
+          const width=ctx.measureText(line).width;
+          for(let d=0;d<Math.min(100,Math.floor(width/5));d++){
+            const rx=l.x-width/2+((d*47.3)%Math.max(1,width));const ry=y+l.size*(.3+.2*Math.sin(d*2.4));
+            ctx.beginPath();ctx.arc(rx,ry,Math.max(1,l.size*.008),0,Math.PI*2);ctx.fill();
+          }
+        }else{ctx.fillStyle=l.color;ctx.fillText(line,l.x,y);}
+        ctx.restore();
+      }
+    };
+    const render=(showSelection=true)=>{
+      ctx.clearRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+      for(const l of layers){if(l.type==='text')drawText(l);else drawStroke(l);}
+      const s=selected();
+      if(showSelection&&s&&s.type==='text'){
+        const b=textBox(s);ctx.save();ctx.strokeStyle='#ffffff';ctx.lineWidth=3;ctx.setLineDash([Math.max(5,w*.008),Math.max(4,w*.005)]);ctx.strokeRect(b.x,b.y,b.w,b.h);
+        ctx.strokeStyle='#244366';ctx.lineWidth=1.5;ctx.setLineDash([Math.max(5,w*.008),Math.max(4,w*.005)]);ctx.strokeRect(b.x,b.y,b.w,b.h);
+        ctx.setLineDash([]);ctx.fillStyle='#ffffff';ctx.strokeStyle='#244366';ctx.lineWidth=3;
+        for(const [bx,by] of [[b.x,b.y],[b.x+b.w,b.y+b.h]]){ctx.beginPath();ctx.arc(bx,by,Math.max(7,w*.007),0,Math.PI*2);ctx.fill();ctx.stroke();}
+        ctx.restore();
+      }
+    };
+    const queueRender=()=>{if(renderScheduled)return;renderScheduled=true;requestAnimationFrame(()=>{renderScheduled=false;if(canvas.isConnected&&!exporting)render();});};
+    const syncSelected=()=>{
+      const s=selected();const isText=Boolean(s&&s.type==='text');
+      $('artUpdate').disabled=!isText;$('artRemove').disabled=!isText;
+      if(isText){currentSize=Math.round(s.size);$('artSize').value=currentSize;$('artSizeValue').textContent=currentSize;$('artColor').value=s.color;}
+      else{$('artSizeValue').textContent=Math.round(Number($('artSize').value));}
+    };
+    const chooseTool=key=>{
+      tool=key;
+      for(const [id,name] of [['toolSelect','select'],['toolPen','draw'],['toolText','text'],['toolGlow','fire'],['toolGraffiti','graffiti']])$(id).classList.toggle('selected',key===name);
+      $('artAdd').textContent=key==='fire'?'Add 🔥 fire':key==='graffiti'?'Add graffiti':'Add text';
+      if(key==='select')notify('Drag a text layer to move it. Use the +/− buttons, size slider, or pinch with two fingers to resize.');
+      else if(key==='draw')notify('Draw with your finger. Adjust brush size and color below. Tap Move afterward to reposition text.');
+      else notify(key==='fire'?'🔥 Fire lettering: type your message and tap Add fire. This creates bright flame-style artwork on your photo.':'Type your message and tap Add, or tap the photo to place it exactly where you want.');
+    };
+    $('toolSelect').onclick=()=>chooseTool('select');$('toolPen').onclick=()=>chooseTool('draw');
+    $('toolText').onclick=()=>chooseTool('text');$('toolGlow').onclick=()=>chooseTool('fire');$('toolGraffiti').onclick=()=>chooseTool('graffiti');
+    $('toolUndo').onclick=()=>{if(!undoStack.length){toastMsg('Nothing to undo.');return;}const previous=JSON.parse(undoStack.pop());layers=previous.layers;selectedId=previous.selectedId;syncSelected();render();};
+    const setSize=(value,record=true)=>{
+      const v=clamp(Math.round(Number(value)||startSize),16,220);
+      const s=selected();if(s&&s.type==='text'&&s.size!==v){if(record)snapshot();s.size=v;}
+      $('artSize').value=v;$('artSizeValue').textContent=v;currentSize=v;queueRender();
+    };
+    $('artSize').addEventListener('input',()=>{if(!sliderDirty&&selected()){snapshot();sliderDirty=true;}setSize($('artSize').value,false);});
+    $('artSize').addEventListener('change',()=>{sliderDirty=false;syncSelected();});
+    $('artSmaller').onclick=()=>setSize(Number($('artSize').value)-12);
+    $('artLarger').onclick=()=>setSize(Number($('artSize').value)+12);
+    $('artColor').addEventListener('change',()=>{const s=selected();if(s&&s.type==='text'&&s.style!=='fire'){snapshot();s.color=$('artColor').value;queueRender();}});
+    const addText=(x=w/2,y=h/2)=>{
+      const word=$('artWord').value.trim();if(!word){notify('Type your message above first (for example: I love you).');$('artWord').focus();return;}
+      snapshot();const style=tool==='fire'?'fire':tool==='graffiti'?'graffiti':'plain';
+      const layer={id:nextId++,type:'text',text:word.slice(0,90),x:clamp(x,0,w),y:clamp(y,0,h),size:currentSize,style,color:$('artColor').value};
+      // Keep a long message fully visible at insertion. It can still be enlarged later.
+      ctx.save();ctx.font=fontFor(layer.size);const measured=ctx.measureText(layer.text).width;ctx.restore();
+      if(measured>w*.90)layer.size=clamp(layer.size*(w*.90/measured),16,220);
+      layers.push(layer);selectedId=layer.id;syncSelected();chooseTool('select');render();
+      notify(style==='fire'?'🔥 Your fire writing is on the photo. Drag it, then adjust its size.':"Text added. Drag it anywhere, or pinch and use the size controls.");
+    };
+    $('artAdd').onclick=()=>addText();
+    $('artWord').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addText();}});
+    $('artUpdate').onclick=()=>{
+      const s=selected(),word=$('artWord').value.trim();if(!s||s.type!=='text'||!word)return;
+      snapshot();s.text=word.slice(0,90);s.color=$('artColor').value;render();notify('Selected text updated. Drag or resize it before saving.');
+    };
+    $('artRemove').onclick=()=>{if(!selected())return;snapshot();layers=layers.filter(l=>l.id!==selectedId);selectedId=null;syncSelected();render();notify('Selected writing removed.');};
+    const position=e=>{
+      const box=canvas.getBoundingClientRect();
+      return {x:clamp((e.clientX-box.left)*w/Math.max(1,box.width),0,w),y:clamp((e.clientY-box.top)*h/Math.max(1,box.height),0,h)};
+    };
     canvas.addEventListener('pointerdown',e=>{
-      e.preventDefault();const p=position(e);saveHistory();
-      if(tool==='draw'){drawing=true;canvas.setPointerCapture?.(e.pointerId);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle=$('artColor').value;ctx.lineWidth=penWidth();ctx.lineCap='round';ctx.lineJoin='round';return;}
-      const word=prompt('Write on your photo:','I love you')?.trim();
-      if(!word)return;
-      ctx.save();ctx.textBaseline='middle';ctx.textAlign='center';ctx.font=`bold ${Math.max(22,penWidth()*3.2)}px system-ui`;
-      if(tool==='glow'){ctx.shadowColor='#ff5a00';ctx.shadowBlur=penWidth()*6;ctx.fillStyle='#ffe586';}
-      else ctx.fillStyle=$('artColor').value;
-      ctx.fillText(word.slice(0,90),p.x,p.y,Math.max(60,w-20));ctx.restore();
+      e.preventDefault();const p=position(e);pointers.set(e.pointerId,p);canvas.setPointerCapture?.(e.pointerId);
+      if(pointers.size>=2){
+        const s=selected();if(s&&s.type==='text'){const arr=[...pointers.values()];gesture={start:Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y),size:s.size};snapshot();notify('Pinch to resize the selected text.');}
+        return;
+      }
+      const hit=findTextAt(p);
+      if(hit){selectedId=hit.id;syncSelected();$('artWord').value=hit.text;
+        snapshot();activePointer={id:e.pointerId,type:'move',layer:hit.id};dragLast=p;queueRender();return;
+      }
+      if(tool==='draw'){
+        snapshot();selectedId=null;syncSelected();const stroke={id:nextId++,type:'stroke',color:$('artColor').value,size:Math.max(2,Number($('artSize').value)*.23),points:[p]};
+        layers.push(stroke);activePointer={id:e.pointerId,type:'draw',layer:stroke.id};queueRender();return;
+      }
+      if(tool==='text'||tool==='fire'||tool==='graffiti'){addText(p.x,p.y);return;}
+      selectedId=null;syncSelected();queueRender();
     });
-    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=position(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
-    const stopDrawing=()=>{if(drawing){drawing=false;ctx.closePath();}};
-    canvas.addEventListener('pointerup',stopDrawing);canvas.addEventListener('pointercancel',stopDrawing);
+    canvas.addEventListener('pointermove',e=>{
+      if(!pointers.has(e.pointerId))return;
+      e.preventDefault();const p=position(e);pointers.set(e.pointerId,p);
+      if(gesture&&pointers.size>=2){
+        const s=selected();if(!s||s.type!=='text')return;
+        const arr=[...pointers.values()];const distance=Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y);
+        s.size=clamp(Math.round(gesture.size*distance/Math.max(5,gesture.start)),16,220);
+        $('artSize').value=s.size;$('artSizeValue').textContent=s.size;currentSize=s.size;queueRender();return;
+      }
+      if(!activePointer||activePointer.id!==e.pointerId)return;
+      const l=layerById(activePointer.layer);if(!l)return;
+      if(activePointer.type==='move'&&dragLast){l.x=clamp(l.x+p.x-dragLast.x,0,w);l.y=clamp(l.y+p.y-dragLast.y,0,h);dragLast=p;queueRender();}
+      else if(activePointer.type==='draw'&&l.points.length<3500){const last=l.points[l.points.length-1];if(Math.hypot(last.x-p.x,last.y-p.y)>1.6){l.points.push(p);queueRender();}}
+    });
+    const finish=e=>{pointers.delete(e.pointerId);if(!pointers.size){activePointer=null;dragLast=null;gesture=null;}else if(pointers.size<2)gesture=null;};
+    canvas.addEventListener('pointerup',finish);canvas.addEventListener('pointercancel',finish);
     $('artCancel').onclick=showContentStep;
     $('artSave').onclick=async()=>{
       const link=$('photoExtraLink').value.trim();
       if(link){try{if(new URL(link).protocol!=='https:')throw 0;}catch{return toastMsg('Use a valid https:// link.');}}
       const save=$('artSave');save.disabled=true;save.textContent='Saving photo…';
       try{
-        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.82));if(!blob)throw new Error('Could not save the image.');
+        exporting=true;render(false);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.85));exporting=false;render();
+        if(!blob)throw new Error('Could not save the image.');
         const final=new File([blob],`cosmos-art-${Date.now()}.jpg`,{type:'image/jpeg'});
         const media=await uploadFile(final);
         compose.media_id=media.id;compose.content_text=$('photoCaption').value.trim();compose.content_url=link;
         afterContentStep();
-      }catch(e){toastMsg(e.message,4500);if($('artSave')){$('artSave').disabled=false;$('artSave').textContent='Save photo moment →';}}
+      }catch(e){exporting=false;toastMsg(e.message,4500);if($('artSave')){$('artSave').disabled=false;$('artSave').textContent='Save photo moment →';}render();}
     };
+    render();
   }
 
   async function durationFromFile(file){
