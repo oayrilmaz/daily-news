@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v2.0-family-moments" />
+  <meta name="cosmos-build" content="cosmos-next-v2.1-family-invites-ios" />
+  <link rel="manifest" href="/cosmos.webmanifest" />
+  <link rel="apple-touch-icon" href="/cosmos-app-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -212,6 +216,17 @@
     .secret-code input{min-width:0;flex:1}
     .secret-code button{flex:0 0 auto;min-height:44px;min-width:62px;background:#fff!important;color:#182338!important;border:1px solid #d2d9e2!important;margin:0!important;padding:8px 10px}
     @media(max-width:360px){.moment-tools button{flex:1 1 40%}.moment-palette input[type=range]{width:90px}}
+
+    /* v2.1 — invite/share card: single column on narrow screens, no sideways clipping */
+    .invite-card{border:1px solid var(--line);background:#f8fafd;border-radius:18px;padding:14px;margin-top:18px}
+    .invite-card h3{font-size:15px;margin:0 0 5px;font-weight:750}
+    .invite-card p{font-size:12px;line-height:1.55;margin:0 0 12px}
+    .invite-url{display:block;width:100%;min-width:0;background:white;border:1px solid var(--line);padding:13px;border-radius:12px;font-size:13px;color:#17233b;overflow:hidden;text-overflow:ellipsis}
+    .invite-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+    .invite-options button{border:1px solid var(--line);min-height:48px;border-radius:13px;background:white;color:#14243a;padding:9px 10px;font-size:13px;font-weight:650}
+    .invite-options .dark{background:#121928;color:white}
+    .invite-note{display:block;font-size:11px;color:#667287;line-height:1.55;margin-top:10px}
+    @media(max-width:360px){.invite-options{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -288,9 +303,14 @@
 (() => {
   const DEFAULT_API = "https://ptdtoday-cosmos-life.ptdtoday.workers.dev";
   const qs = new URLSearchParams(location.search);
-  if (qs.get("api")) localStorage.setItem("cosmos_life_api", qs.get("api"));
-  const API = String(localStorage.getItem("cosmos_life_api") || DEFAULT_API).replace(/\/$/,"");
+  // Never allow an invitation URL to change the API host and steal session tokens.
+  const API = DEFAULT_API;
+  localStorage.removeItem("cosmos_life_api");
   const TOKEN_KEY = "cosmos_life_token_v1";
+  const SESSION_RENEW_KEY = "cosmos_life_last_renew_v21";
+  const FAMILY_INVITE_CODE = (qs.get("invite") || "").slice(0,1200);
+  const INVITE_HOME = `${location.origin}/cosmos-next.html?v=21`;
+
 
   const $ = id => document.getElementById(id);
   const auth = $("auth"), authStart = $("authStart"), authVerify = $("authVerify"), authError = $("authError");
@@ -299,7 +319,10 @@
   const cameraVideo = $("cameraVideo"), cameraFallback = $("cameraFallback"), coreOrb = $("coreOrb"), hint = $("hint"), ambientTitle = $("ambientTitle"), ambientSub = $("ambientSub"), foundOrb = $("foundOrb"), foundLabel = $("foundLabel");
   const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput");
 
+  // Same browser + same web origin retains a session across ordinary visits.
+  // Authenticated sessions still expire for safety if unused for too long.
   let token = localStorage.getItem(TOKEN_KEY) || "";
+
   let me = null;
   let challengeId = "";
   let currentFound = null;
@@ -361,18 +384,52 @@
     return data;
   }
 
+  async function renewSessionIfDue(force=false){
+    if(!token || document.hidden)return;
+    const last=Number(localStorage.getItem(SESSION_RENEW_KEY)||0);
+    if(!force && Date.now()-last < 7*24*60*60*1000)return;
+    try{
+      const r=await api('/api/session/renew',{method:'POST'});
+      if(r.token){token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));}
+    }catch(e){if(e.status===401){token='';localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);auth.hidden=false;}}
+  }
+
+  function clearFamilyInviteFromUrl(){
+    if(!qs.has('invite'))return;
+    const u=new URL(location.href);u.searchParams.delete('invite');
+    history.replaceState(null,'',u.pathname+u.search+u.hash);
+  }
+  function showFamilyInvitation(){
+    if(!FAMILY_INVITE_CODE || !me || !auth.hidden)return;
+    // The visitor opts in; opening a link NEVER automatically creates a connection.
+    openSheet(`<h2>Connect on Cosmos?</h2><p>Someone shared their Cosmos connection link with you. Would you like to send them a connection request?</p><div class="actions"><button id="inviteLater">Not now</button><button class="primary" id="inviteJoin">Request connection</button></div><div class="micro">They must accept before private timelines become connected. Your phone and email remain hidden.</div>`);
+    $('inviteLater').onclick=()=>{clearFamilyInviteFromUrl();closeSheet();};
+    $('inviteJoin').onclick=async()=>{
+      $('inviteJoin').disabled=true;
+      try{
+        const result=await api('/api/invites/redeem',{method:'POST',body:JSON.stringify({code:FAMILY_INVITE_CODE})});
+        clearFamilyInviteFromUrl();closeSheet();toastMsg(result.message||'Connection requested.');await refreshFriendsSummary();
+      }catch(e){toastMsg(e.message,4200);$('inviteJoin').disabled=false;}
+    };
+  }
+
   async function bootstrap(){
     if(!token){auth.hidden=false;return;}
     try{
       me = await api("/api/me");
-      auth.hidden=true;
+      auth.hidden=true;showAuthError('');
       accountButton.textContent = me.display_name || "You";
-      startCamera(false);
-      scanHere(false);
-      renderJourney();
-      refreshFriendsSummary();
+      startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
+      renewSessionIfDue();
+      if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     }catch(e){
-      localStorage.removeItem(TOKEN_KEY); token=""; auth.hidden=false;
+      if(e.status===401 || e.status===403){
+        localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);
+        token="";auth.hidden=false;showAuthError('Your session expired. Sign in again.');
+      }else{
+        // A temporary Wi-Fi or backend failure must NEVER silently sign a person out.
+        auth.hidden=false;showAuthError('Cannot reach Cosmos right now. Your sign-in is preserved. Reconnect and refresh this page.');
+      }
     }
   }
 
@@ -396,7 +453,7 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -876,17 +933,85 @@
     }catch(e){openSheet(`<h2>Circle preferences unavailable</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="circlePrivacyBack">Connections</button></div>`);$('circlePrivacyBack').onclick=openFriends;}
   }
 
+  function pickContactWeb(){
+    if(window.webkit?.messageHandlers?.cosmosContacts){
+      window.webkit.messageHandlers.cosmosContacts.postMessage({action:'pick'});
+      return;
+    }
+    if(navigator.contacts?.select){
+      navigator.contacts.select(['name','tel','email'],{multiple:false}).then(contacts=>{
+        const contact=contacts?.[0];if(!contact)return;
+        const value=(contact.tel||[])[0]||(contact.email||[])[0]||'';
+        if($('friendContact') && value){$('friendContact').value=value;toastMsg(`Selected ${contact.name?.[0]||'contact'}.`);}
+        else toastMsg('This contact has no phone or email.');
+      }).catch(()=>toastMsg('Contact selection was canceled.'));
+      return;
+    }
+    toastMsg('Safari does not allow websites to read your phone contacts. Tap Share to choose people in Messages or WhatsApp, or use the Cosmos iPhone app.',6500);
+  }
+
+  window.addEventListener('cosmos:native-contact',event=>{
+    const detail=event.detail||{};
+    const input=$('friendContact');
+    if(input && typeof detail.value==='string'){
+      input.value=detail.value;
+      toastMsg(`Selected ${String(detail.name||'contact').slice(0,50)}. Tap Send invitation.`);
+    }
+  });
+
+  async function copyInviteLink(){
+    const input=$('familyInviteLink');if(!input)return;
+    try{
+      if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(input.value);
+      else {input.focus();input.select();if(!document.execCommand('copy'))throw new Error('Copy blocked');}
+      toastMsg('Invitation link copied.');
+    }catch(e){input.focus();input.select();toastMsg('Link selected. Long-press it to copy.');}
+  }
+  async function shareInviteLink(){
+    const input=$('familyInviteLink');if(!input)return;
+    const url=input.value;
+    if(!/^https:\/\/ptdtoday\.com\//.test(url)){toastMsg('Your link is still loading. Try again in a moment.');return;}
+    if(window.webkit?.messageHandlers?.cosmosShare){
+      window.webkit.messageHandlers.cosmosShare.postMessage({url,title:'Join me on Cosmos'});return;
+    }
+    if(navigator.share){
+      try{await navigator.share({title:'Join me on Cosmos',text:'Join my circle on Cosmos. We can share memories, places and moments.',url});}catch(e){if(e.name!=='AbortError')toastMsg('Share is unavailable; copy the link instead.');}
+    }else copyInviteLink();
+  }
+
   function openInvite(){
-    openSheet(`<h2>Invite someone</h2><p>Enter a phone number or email they used for Cosmos. We won't reveal whether the person has an account.</p>
-      <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Phone or email"></div>
-      <div class="actions"><button id="inviteBack">Back</button><button class="primary" id="sendInvite">Send invitation</button></div>`);
+    openSheet(`<h2>Invite family & friends</h2><p>Choose a contact or send a connection invitation directly. You can also share one private invitation link with your family group.</p>
+      <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Phone number or email"></div>
+      <div class="invite-options"><button type="button" id="pickCosmosContact">Choose from contacts</button><button type="button" id="sendInvite" class="dark">Send invitation</button></div>
+      <div class="invite-card"><h3>Invite your family group</h3><p>Share this link via Messages, WhatsApp, or any family chat. After signing in, each person chooses whether to request a connection with you.</p>
+        <label for="familyInviteLink" class="look-kicker">Your connection link</label>
+        <input id="familyInviteLink" class="invite-url" readonly value="Preparing your link…" aria-label="Your family invitation link">
+        <div class="invite-options"><button type="button" id="copyCosmosLink">Copy link</button><button type="button" id="shareCosmosLink" class="dark">Share…</button></div>
+        <small class="invite-note" id="linkExpiration">The connection link expires after 30 days. People still need your approval to become connections. A generic signup link does not send a connection request.</small>
+      </div>
+      <div class="actions"><button type="button" id="inviteBack">Back to connections</button></div>
+      <div class="micro">On iPhone Safari, choose people through the Share sheet. Direct Contacts selection is available inside the Cosmos iOS app. Cosmos does not upload your address book.</div>`);
     $('inviteBack').onclick=openFriends;
+    const nativePicker=Boolean(window.webkit?.messageHandlers?.cosmosContacts || navigator.contacts?.select);
+    $('pickCosmosContact').textContent=nativePicker?'Choose from contacts':'Choose via Messages…';
+    $('pickCosmosContact').onclick=nativePicker?pickContactWeb:shareInviteLink;
+    $('copyCosmosLink').onclick=copyInviteLink;
+    $('shareCosmosLink').onclick=shareInviteLink;
     $('sendInvite').onclick=async()=>{
-      const contact=$('friendContact').value.trim();if(!contact)return toastMsg('Enter a phone or email.');
+      const contact=$('friendContact').value.trim();if(!contact)return toastMsg('Enter a phone or email, or choose a contact.');
       $('sendInvite').disabled=true;
       try{const r=await api('/api/friends/invite',{method:'POST',body:JSON.stringify({contact})});await refreshFriendsSummary();toastMsg(r.message||'Invitation submitted.',4200);openFriends();}
       catch(e){toastMsg(e.message,4400);$('sendInvite').disabled=false;}
     };
+    api('/api/invites/link').then(r=>{
+      const input=$('familyInviteLink');if(!input)return;
+      input.value=r.url;
+      $('linkExpiration').textContent='Expires '+new Date(r.expires_at).toLocaleDateString()+'. New members must request a connection; you decide whether to accept.';
+    }).catch(e=>{
+      const input=$('familyInviteLink');if(!input)return;
+      input.value=INVITE_HOME;
+      $('linkExpiration').textContent='Personal connection link is currently unavailable. This basic link allows signup but does not automatically request a connection.';
+    });
   }
 
   function afterContentStep(){
@@ -1187,7 +1312,7 @@
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
-    $("logout").onclick=()=>{localStorage.removeItem(TOKEN_KEY);location.reload();};
+    $("logout").onclick=()=>{localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);location.reload();};
   });
 
 
@@ -1484,6 +1609,7 @@
   setInterval(periodicNearby,90000);
   app.dataset.dimension="mine";app.dataset.time="now";
 
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden && auth.hidden && token)renewSessionIfDue();});
   bootstrap();
 })();
 </script>
