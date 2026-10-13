@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v1.8.2-connections-direct" />
+  <meta name="cosmos-build" content="cosmos-next-v2.0-family-moments" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -171,6 +171,47 @@
     .friend-row .person{font-size:14px}
     .friend-group-title{letter-spacing:.01em}
     @media(max-width:360px){.friend-row{padding:11px}.friend-row .friend-actions{width:100%;justify-content:flex-start}}
+    /* v1.9: individual connection timeline and clearly scoped audiences. */
+    .friend-person{border:0;background:transparent;font-weight:800;color:#19364d;font-size:15px;text-align:left;padding:7px 0;min-height:40px;text-decoration:underline;text-decoration-color:rgba(24,58,81,.26);text-underline-offset:4px}
+    .friend-person:focus-visible{outline:2px solid #286d65;outline-offset:2px}
+    .circle-info{margin:12px 0 16px;background:#f1f5f8;border:1px solid #dce4ec;padding:14px;border-radius:17px;color:#405167;font-size:12px;line-height:1.55}
+    .circle-head{display:flex;align-items:center;justify-content:space-between;gap:7px;flex-wrap:wrap;margin:14px 0}
+    .circle-header-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+    .circle-header-actions button,.circle-step button{min-height:43px;border:1px solid #d8e0e6;background:white;padding:9px 12px;border-radius:12px;font-size:12px;font-weight:700;color:#22394c}
+    .circle-date{font-size:26px;line-height:1.14;letter-spacing:-.04em;font-weight:800;color:#172c45;margin:18px 0 12px}
+    .circle-card{width:100%;border-radius:18px;border:1px solid #d7dfe8;background:#fff;text-align:left;padding:13px 15px;margin:9px 0;min-height:65px}
+    .circle-card strong{color:#172e45;font-size:14px}
+    .circle-card p{font-size:12px;color:#59697e;margin:6px 0 0;overflow-wrap:anywhere}
+    .circle-card .circle-meta{display:block;font-size:11px;color:#68788d;line-height:1.4;margin-top:4px}
+    .circle-place-group{border-left:3px solid #2a8571;margin-top:13px;padding-left:10px}
+    .circle-step{display:flex;gap:9px;margin-top:13px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .circle-step button{flex:1;min-width:92px}
+    .circle-audience{display:grid;gap:11px;margin:15px 0}
+    .circle-audience button{display:block;text-align:left;border:1px solid #d7e1e8;border-radius:17px;padding:14px;background:#fff;min-height:82px;width:100%}
+    .circle-audience b{display:block;font-size:14px;color:#172e45;margin-bottom:5px}.circle-audience span{display:block;color:#617086;font-size:12px;line-height:1.45}
+    .circle-audience .recommended{border:2px solid #2a8571;background:#f4faf7}
+    .circle-empty{padding:26px 8px;color:#708095;font-size:13px;text-align:center;line-height:1.6}
+    .circle-review{display:flex;gap:7px;margin-top:8px}.circle-review button{border-radius:12px;padding:10px;min-height:42px;background:#f6f8fa;border:1px solid #dde4eb;font-size:12px}
+    /* v2.0 family moment editor and attached media */
+    .moment-editor{margin-top:12px;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#eef0f4;position:relative;touch-action:none}
+    .moment-editor canvas{display:block;width:100%;height:auto;max-height:52vh;object-fit:contain;touch-action:none}
+    .moment-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .moment-tools button{border:1px solid #d6dce5;border-radius:12px;background:#fff;min-height:44px;padding:9px 12px;font-weight:650}
+    .moment-tools button.selected{background:#162b44;color:#fff}
+    .moment-palette{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px}
+    .moment-palette input[type=color]{width:54px;height:44px;border:1px solid #cbd5e1;border-radius:10px}
+    .moment-palette input[type=range]{width:126px}
+    .moment-preview{font-size:12px;color:#637084;margin:9px 0 0;line-height:1.5}
+    .attachment-row{background:white;border:1px solid #dce2e8;border-radius:15px;padding:12px;margin-top:9px;overflow-wrap:anywhere}
+    .attachment-row b{display:block;font-size:12px;margin-bottom:7px}
+    .attachment-row audio,.attachment-row video{width:100%;max-height:280px;border-radius:10px}
+    .inline-video{width:100%;aspect-ratio:16/9;border:0;border-radius:12px;margin-top:10px;background:#121824}
+    .moment-status{margin-top:12px;border:1px solid #bfcbd9;background:#f6f9fc;border-radius:14px;padding:14px;font-size:13px;line-height:1.5}
+    .moment-status button{min-height:44px;padding:9px 14px;border:1px solid #bdc7d4;background:#fff;border-radius:12px}
+    .secret-code{display:flex;align-items:stretch;gap:8px}
+    .secret-code input{min-width:0;flex:1}
+    .secret-code button{flex:0 0 auto;min-height:44px;min-width:62px;background:#fff!important;color:#182338!important;border:1px solid #d2d9e2!important;margin:0!important;padding:8px 10px}
+    @media(max-width:360px){.moment-tools button{flex:1 1 40%}.moment-palette input[type=range]{width:90px}}
   </style>
 </head>
 <body>
@@ -230,8 +271,8 @@
         <div class="auth-note">Phone identifies your Cosmos. Email protects it. Neither is public.</div>
       </div>
       <div id="authVerify" hidden>
-        <div class="field"><label>Phone code</label><input id="phoneCodeInput" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" /></div>
-        <div class="field"><label>Email code</label><input id="emailCodeInput" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="6-digit code" /></div>
+        <div class="field"><label>Phone code</label><div class="secret-code"><input id="phoneCodeInput" type="password" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="phoneCodeInput" aria-label="Show phone code">Show</button></div></div>
+        <div class="field"><label>Email code</label><div class="secret-code"><input id="emailCodeInput" type="password" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="emailCodeInput" aria-label="Show email code">Show</button></div></div>
         <button id="verifyCodesButton">Enter Cosmos</button>
         <button class="auth-secondary" id="restartAuthButton">Use different phone/email</button>
         <div class="auth-note" id="devAuthNote" hidden>Staging mode is active. Use the verification code configured in the Worker secret <b>AUTH_DEV_CODE</b>.</div>
@@ -278,10 +319,16 @@
   let journeyStatus="", neighbors=[], nearbyConnections={nearby:[],inbox:[],memories:[]};
   let lastConnectionPoll=0, gestureStart=null, suppressStationClickUntil=0;
   let friendsViewGeneration=0;
+  let circleTarget=null, circlePosts=[], circleIndex=0, circleBusy=false, circleViewGeneration=0;
+  let pendingCircleReturn=null;
   const NOTICE_KEY="cosmos_life_nearby_notice_v1";
   let noticesEnabled=localStorage.getItem(NOTICE_KEY)==="on";
   const NOTIFIED_KEY="cosmos_life_seen_nearby_v1";
 
+  document.querySelectorAll('[data-reveal]').forEach(btn=>btn.addEventListener('click',()=>{
+    const input=$(btn.dataset.reveal);if(!input)return;
+    input.type=input.type==='password'?'text':'password';btn.textContent=input.type==='text'?'Hide':'Show';
+  }));
   function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
   function toastMsg(message, ms=2600){toast.textContent=message;toast.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>toast.hidden=true,ms);}
   function showAuthError(msg){authError.textContent=msg;authError.hidden=!msg;}
@@ -496,6 +543,7 @@
   sheetBackdrop.addEventListener("click",returnToCamera);
 
   function beginCompose(){
+    pendingCircleReturn=null;
     compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null};
     showContentStep();
   }
@@ -526,9 +574,64 @@
     if(kind==="photo"||kind==="video"){
       fileInput.accept=kind==="photo"?"image/*":"video/*";fileInput.setAttribute("capture",kind==="photo"?"environment":"environment");fileInput.value="";fileInput.onchange=async()=>{
         const file=fileInput.files?.[0]; if(!file) return showContentStep();
-        try{toastMsg("Securing media…");const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();}catch(e){toastMsg(e.message);showContentStep();}
+        if(kind==='photo')return photoMomentEditor(file);
+        try{toastMsg("Securing media…");const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();}catch(e){toastMsg(e.message);showContentStep();}
       };fileInput.click();
     }
+  }
+
+
+  async function photoMomentEditor(file){
+    const objectUrl=URL.createObjectURL(file);
+    const img=new Image();
+    try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('Could not open this photo.'));img.src=objectUrl;});}
+    catch(e){URL.revokeObjectURL(objectUrl);toastMsg(e.message);return showContentStep();}
+    URL.revokeObjectURL(objectUrl);
+    const width=img.naturalWidth,height=img.naturalHeight,maxSide=1400,ratio=Math.min(1,maxSide/Math.max(width,height));
+    const w=Math.round(width*ratio),h=Math.round(height*ratio);
+    openSheet(`<h2>Make this moment yours</h2><p>Write on the image, draw, or create a glowing fire-style message. These are artistic photo overlays, not actual flames or live AR graffiti.</p>
+      <div class="moment-editor"><canvas id="photoArt" width="${w}" height="${h}" aria-label="Draw on your photo"></canvas></div>
+      <div class="moment-tools"><button id="toolPen" class="selected" type="button">✎ Draw</button><button id="toolText" type="button">T Text</button><button id="toolGlow" type="button">✦ Fire glow</button><button id="toolUndo" type="button">↶ Undo</button></div>
+      <div class="moment-palette"><label>Color <input type="color" id="artColor" value="#ffffff"></label><label>Size <input type="range" id="artSize" min="2" max="44" value="10"></label></div>
+      <div class="field"><label>Caption (optional)</label><input id="photoCaption" maxlength="240" placeholder="A moment worth remembering…"></div>
+      <div class="field"><label>Attached https link (optional)</label><input id="photoExtraLink" type="url" placeholder="https://…"></div>
+      <div class="moment-preview">Draw with your finger. Text and glow tools place words where you tap on the image. The saved image keeps your artwork.</div>
+      <div class="actions"><button id="artCancel">Back</button><button id="artSave" class="primary">Save photo moment →</button></div>`);
+    const canvas=$('photoArt'),ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,w,h);
+    let tool='draw',drawing=false,history=[];
+    const saveHistory=()=>{if(history.length>=8)history.shift();history.push(ctx.getImageData(0,0,w,h));};
+    saveHistory();
+    const chooseTool=(key)=>{tool=key;[['toolPen','draw'],['toolText','text'],['toolGlow','glow']].forEach(([id,name])=>$(id).classList.toggle('selected',key===name));};
+    $('toolPen').onclick=()=>chooseTool('draw');$('toolText').onclick=()=>chooseTool('text');$('toolGlow').onclick=()=>chooseTool('glow');
+    $('toolUndo').onclick=()=>{if(history.length>1){history.pop();ctx.putImageData(history.at(-1),0,0);}};
+    const position=e=>{const box=canvas.getBoundingClientRect();return {x:(e.clientX-box.left)*w/box.width,y:(e.clientY-box.top)*h/box.height};};
+    const penWidth=()=>Math.max(2,Number($('artSize').value))*Math.max(.5,w/850);
+    canvas.addEventListener('pointerdown',e=>{
+      e.preventDefault();const p=position(e);saveHistory();
+      if(tool==='draw'){drawing=true;canvas.setPointerCapture?.(e.pointerId);ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.strokeStyle=$('artColor').value;ctx.lineWidth=penWidth();ctx.lineCap='round';ctx.lineJoin='round';return;}
+      const word=prompt('Write on your photo:','I love you')?.trim();
+      if(!word)return;
+      ctx.save();ctx.textBaseline='middle';ctx.textAlign='center';ctx.font=`bold ${Math.max(22,penWidth()*3.2)}px system-ui`;
+      if(tool==='glow'){ctx.shadowColor='#ff5a00';ctx.shadowBlur=penWidth()*6;ctx.fillStyle='#ffe586';}
+      else ctx.fillStyle=$('artColor').value;
+      ctx.fillText(word.slice(0,90),p.x,p.y,Math.max(60,w-20));ctx.restore();
+    });
+    canvas.addEventListener('pointermove',e=>{if(!drawing)return;e.preventDefault();const p=position(e);ctx.lineTo(p.x,p.y);ctx.stroke();});
+    const stopDrawing=()=>{if(drawing){drawing=false;ctx.closePath();}};
+    canvas.addEventListener('pointerup',stopDrawing);canvas.addEventListener('pointercancel',stopDrawing);
+    $('artCancel').onclick=showContentStep;
+    $('artSave').onclick=async()=>{
+      const link=$('photoExtraLink').value.trim();
+      if(link){try{if(new URL(link).protocol!=='https:')throw 0;}catch{return toastMsg('Use a valid https:// link.');}}
+      const save=$('artSave');save.disabled=true;save.textContent='Saving photo…';
+      try{
+        const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.82));if(!blob)throw new Error('Could not save the image.');
+        const final=new File([blob],`cosmos-art-${Date.now()}.jpg`,{type:'image/jpeg'});
+        const media=await uploadFile(final);
+        compose.media_id=media.id;compose.content_text=$('photoCaption').value.trim();compose.content_url=link;
+        afterContentStep();
+      }catch(e){toastMsg(e.message,4500);if($('artSave')){$('artSave').disabled=false;$('artSave').textContent='Save photo moment →';}}
+    };
   }
 
   async function durationFromFile(file){
@@ -567,7 +670,7 @@
             if(!Number.isFinite(seconds)||seconds<=0)throw new Error('Could not verify video length. Try MP4 or MOV.');
             if(seconds>Number(policy.max_seconds)+.05)throw new Error(`This clip is ${Math.ceil(seconds)} seconds. Maximum is ${policy.max_seconds} seconds. Trim it first.`);
             openSheet('<h2>Uploading video…</h2><p>Your Cosmos video is being secured.</p><div class="look-progress"></div>');
-            const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();
+            const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();
           }catch(error){toastMsg(error.message,4500);videoRules();}
         };
         fileInput.click();
@@ -591,7 +694,7 @@
 
   function textEntry(title,isUrl){
     openSheet(`<h2>${escapeHtml(title)}</h2><p>${isUrl?"Cosmos stores the relationship; the original app still hosts the content.":"Keep it human. Cosmos is for good."}</p><div class="field"><label>${isUrl?"Link":"Text"}</label>${isUrl?'<input id="composeValue" inputmode="url" placeholder="https://…">':'<textarea id="composeValue" placeholder="Write something worth leaving…"></textarea>'}</div><div class="actions"><button id="backCompose">Back</button><button class="primary" id="nextCompose">Continue</button></div>`);
-    $("backCompose").onclick=showContentStep;$("nextCompose").onclick=()=>{const v=$("composeValue").value.trim();if(!v)return toastMsg("Add something first.");if(isUrl)compose.content_url=v;else compose.content_text=v;showRecipientStep();};
+    $("backCompose").onclick=showContentStep;$("nextCompose").onclick=()=>{const v=$("composeValue").value.trim();if(!v)return toastMsg("Add something first.");if(isUrl)compose.content_url=v;else compose.content_text=v;afterContentStep();};
   }
 
   function voiceEntry(){
@@ -600,7 +703,7 @@
     $("recordVoice").onclick=async()=>{
       if(mediaRecorder?.state==="recording"){mediaRecorder.stop();return;}
       try{
-        const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data?.size)voiceChunks.push(e.data)};mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||"audio/webm"});const file=new File([blob],`cosmos-voice-${Date.now()}.webm`,{type:blob.type});$("voiceStatus").textContent="Securing voice…";try{const media=await uploadFile(file);compose.media_id=media.id;showRecipientStep();}catch(e){toastMsg(e.message);showContentStep();}};mediaRecorder.start();$("recordVoice").textContent="Stop recording";$("voiceStatus").textContent="Recording…";
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});voiceChunks=[];mediaRecorder=new MediaRecorder(stream);mediaRecorder.ondataavailable=e=>{if(e.data?.size)voiceChunks.push(e.data)};mediaRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(voiceChunks,{type:mediaRecorder.mimeType||"audio/webm"});const file=new File([blob],`cosmos-voice-${Date.now()}.webm`,{type:blob.type});$("voiceStatus").textContent="Securing voice…";try{const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();}catch(e){toastMsg(e.message);showContentStep();}};mediaRecorder.start();$("recordVoice").textContent="Stop recording";$("voiceStatus").textContent="Recording…";
       }catch(e){toastMsg("Microphone permission was not granted.");}
     };
   }
@@ -620,6 +723,88 @@
       if(dimension==='connections' && timeMode==='now' && !journeyFocus)renderJourney();
     }catch(err){console.warn('Could not load Connections',err.message);if(dimension==='connections' && timeMode==='now') {journeyStatus='Could not refresh your people. Tap People & requests to retry.';renderJourney();}}
   }
+  function startShareToTimeline(person,placeStationId=null){
+    closeSheet();beginCompose();
+    pendingCircleReturn={id:person.user_id||person.id,name:person.name};compose.recipient_mode='person';compose.recipient_user_id=person.user_id||person.id;
+    compose.recipient_label=person.name;compose.place_station_id=placeStationId;showContentStep();
+  }
+  async function openFriendTimeline(ownerId,name){
+    circleTarget={id:ownerId,name};circleBusy=true;const gen=++circleViewGeneration;
+    openSheet(`<h2>◯ ${escapeHtml(name)}'s Cosmos</h2><p>Personal connection timeline · loading…</p><div class="look-loading">Following the shared moments…</div><div class="actions"><button id="circleLoadingBack">Connections</button></div>`);
+    $('circleLoadingBack').onclick=openFriends;
+    try{
+      let loc=lastScanLoc;
+      const qs=new URLSearchParams();if(loc){qs.set('lat',String(loc.lat));qs.set('lng',String(loc.lng));}
+      const r=await api('/api/circles/'+encodeURIComponent(ownerId)+'?'+qs);
+      if(gen!==circleViewGeneration||sheet.hidden)return;
+      circlePosts=r.items||[];circleBusy=false;
+      circleIndex=circlePosts.reduce((acc,p,i)=>Date.parse(p.date)<=Date.now()?i:acc,-1);
+      if(circleIndex<0)circleIndex=0;
+      renderFriendTimeline();
+    }catch(e){circleBusy=false;openSheet(`<h2>Connection timeline unavailable</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="circleTryAgain" class="primary">Retry</button><button id="circleGoBack">Connections</button></div>`);
+      $('circleTryAgain').onclick=()=>openFriendTimeline(ownerId,name);$('circleGoBack').onclick=openFriends;
+    }
+  }
+  function renderFriendTimeline(){
+    if(!circleTarget||circleBusy)return;
+    const {id,name}=circleTarget;
+    const len=circlePosts.length,idx=Math.max(0,Math.min(len-1,circleIndex));
+    const current=len?circlePosts[idx]:null;
+    const moment=current?new Date(current.date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'NOW';
+    const grouped=current?.place_group && current.audience==='connections'?circlePosts.filter(x=>x.place_group===current.place_group && x.audience==='connections'):current?[current]:[];
+    const marker=current?.place_group && current.audience==='connections'?`<div class="circle-place-group"><b>◯ Shared place station · ${grouped.length} contribution${grouped.length===1?'':'s'}</b>
+      <p>Connections can leave their own moments here while visiting this location. Coordinates are not disclosed.</p>
+      <button id="addCirclePlace" type="button" style="margin:9px 0;padding:10px 12px;border-radius:11px;border:1px solid #cfdde4;background:#fff">+ Add at this place</button></div>`:'';
+    const cards=grouped.map(p=>`<div class="circle-card"><strong>${escapeHtml(p.author)} · ${escapeHtml(p.kind)}</strong>
+      <span class="circle-meta">${p.audience==='between_us'?'♡ Only us':'◯ Connections'} · ${p.review_status==='pending'?'Awaiting '+escapeHtml(name)+"'s approval":p.locked?'Locked until its moment':'Available'}</span>
+      <p>${escapeHtml(p.locked?'This station will become available at its intended time or place.':p.preview||'A saved Cosmos moment.')}</p>
+      ${p.pending&&p.can_review?`<div class="circle-review"><button data-circle-review="approve" data-post="${escapeHtml(p.id)}">Approve for connections</button><button data-circle-review="reject" data-post="${escapeHtml(p.id)}">Decline</button></div>`:''}
+      ${!p.locked?`<button type="button" data-circle-open="${escapeHtml(p.id)}" style="margin-top:10px;border-radius:12px;border:1px solid #dce4ec;background:#f7fafc;padding:10px 13px;min-height:42px;font-size:12px">Open moment →</button>`:''}
+    </div>`).join('');
+    openSheet(`<h2>◯ ${escapeHtml(name)}'s Cosmos</h2>
+      <div class="circle-info"><b>Shared with you:</b> posts ${escapeHtml(name)} shared with connections, contributions from other people in this circle, and private moments between you two. Private posts belonging to other pairs are never shown here.</div>
+      <div class="circle-header-actions"><button id="circleShare" class="primary">+ Leave a Cosmos here</button><button id="circleBackFriends">Connections</button></div>
+      <div class="circle-date" aria-live="polite">${escapeHtml(moment)}</div>
+      <div class="circle-head"><b>${len?`Station ${idx+1} of ${len}`:'No moments yet'}</b><small>${len?escapeHtml(current.author):'Invite a moment into this timeline'}</small></div>
+      <div id="circleSwipeArea" aria-label="Swipe right to travel into the past or left for the future">
+        ${marker}${cards||'<div class="circle-empty">No shared moments yet. Leave a first Cosmos and choose who may discover it.</div>'}
+      </div>
+      <div class="circle-step"><button id="circleEarlier" ${idx===0?'disabled':''}>← Past</button><button id="circleNow">NOW</button><button id="circleLater" ${idx>=len-1?'disabled':''}>Future →</button></div>
+      <div class="micro">Swipe right for past; left for future. A faster flick skips more moments. Scroll vertically to read.</div>`);
+    $('circleBackFriends').onclick=openFriends;
+    $('circleShare').onclick=()=>startShareToTimeline({user_id:id,name});
+    if($('addCirclePlace'))$('addCirclePlace').onclick=()=>startShareToTimeline({user_id:id,name},current.id);
+    $('circleEarlier').onclick=()=>stepCircle(-1,1);
+    $('circleLater').onclick=()=>stepCircle(1,1);
+    $('circleNow').onclick=()=>{const nowIdx=circlePosts.reduce((acc,p,i)=>Date.parse(p.date)<=Date.now()?i:acc,-1);circleIndex=Math.max(0,nowIdx);renderFriendTimeline();};
+    sheet.querySelectorAll('[data-circle-open]').forEach(b=>b.onclick=()=>openCircleMoment(b.dataset.circleOpen));
+    sheet.querySelectorAll('[data-circle-review]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.post,action=b.dataset.circleReview;b.disabled=true;
+      try{await api('/api/circles/posts/'+encodeURIComponent(id)+'/'+action,{method:'POST'});toastMsg(action==='approve'?'Approved for their Connections.':'Contribution declined.');openFriendTimeline(circleTarget.id,circleTarget.name);}
+      catch(e){toastMsg(e.message,4000);b.disabled=false;}
+    });
+    const swipe=$('circleSwipeArea');let start=null;
+    swipe.addEventListener('touchstart',e=>{if(e.touches.length===1)start={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now()};},{passive:true});
+    swipe.addEventListener('touchend',e=>{if(!start||!e.changedTouches.length)return;
+      const dx=e.changedTouches[0].clientX-start.x,dy=e.changedTouches[0].clientY-start.y,ms=Math.max(1,Date.now()-start.t);start=null;
+      if(Math.abs(dx)<40||Math.abs(dx)<Math.abs(dy)*1.3)return;
+      const speed=Math.abs(dx)/ms;stepCircle(dx>0?-1:1,speed>1.5?16:speed>.85?5:1);
+    },{passive:true});
+  }
+  function stepCircle(delta,count){if(!circlePosts.length)return;
+    const next=Math.max(0,Math.min(circlePosts.length-1,circleIndex+delta*count));
+    if(next!==circleIndex){circleIndex=next;renderFriendTimeline();}
+  }
+  async function openCircleMoment(id){
+    const back={...circleTarget};
+    try{
+      const body=lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{};
+      const r=await api('/api/cosmos/'+encodeURIComponent(id)+'/open',{method:'POST',body:JSON.stringify(body)});
+      renderCosmos(r.item,r.thread||[],r.additions||[]);
+      if($('closeCosmos'))$('closeCosmos').onclick=()=>openFriendTimeline(back.id,back.name);
+    }catch(e){toastMsg(e.message,4200);}
+  }
+
   async function openFriends(){
     // Selecting Connections from the live camera ALWAYS opens this sheet.
     // It does not replace the camera with a separate full-screen page.
@@ -631,10 +816,11 @@
       // If the person returned to the camera while fetching, never reopen the old sheet.
       if(requestGeneration!==friendsViewGeneration||sheet.hidden)return;
       friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
-      const entry=(person,type)=>`<div class="friend-row"><div><div class="person">${escapeHtml(person.name)}</div><div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Connected'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button data-friend-send="${escapeHtml(person.user_id)}">Send ◯</button><button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
+      const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name for their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button data-friend-send="${escapeHtml(person.user_id)}">Send ◯</button><button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
       openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
         <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Back to camera</button></div>
-        <button class="connections-timeline" type="button" id="exploreConnectionTimeline">◯ Explore our connected timeline →</button>
+        <button class="connections-timeline" type="button" id="mySharedTimeline">◯ My shared timeline & contributions →</button>
+        <button class="connections-timeline" type="button" id="circlePrivacy">⚙️ Who can add to my circle?</button>
         <div class="friend-group-title">Requests received ${data.incoming?.length?`<span class="friend-badge">${data.incoming.length}</span>`:''}</div>
         ${data.incoming?.length?data.incoming.map(x=>entry(x,'incoming')).join(''):'<div class="friend-empty">No pending requests.</div>'}
         <div class="friend-group-title">Connected people (${data.accepted?.length||0})</div>
@@ -643,15 +829,9 @@
         ${data.outgoing?.length?data.outgoing.map(x=>entry(x,'outgoing')).join(''):'<div class="friend-empty">No invitations waiting.</div>'}
         <div class="micro">Messages previously left for someone are only made available to that person after connection acceptance, subject to the original time and place rules.</div>`);
       $('inviteContact').onclick=openInvite;
+      $('mySharedTimeline').onclick=()=>openFriendTimeline(me.id,me.display_name||'My');
+      $('circlePrivacy').onclick=openCirclePreferences;
       $('closeFriends').onclick=returnToCamera;
-      $('exploreConnectionTimeline').onclick=()=>{
-        closeSheet();
-        // Enter the connected universe at NOW, with friends already cached.
-        journeyAt=new Date().toISOString(); journeyFocus=null; journeyKey='';
-        timeMode='now'; journeyStatus=''; neighbors=[];
-        if(dimension==='connections'){renderJourney();refreshConnections();refreshFriendsSummary();}
-        else setDimension('connections');
-      };
       sheet.querySelectorAll('[data-friend-accept],[data-friend-decline],[data-friend-remove]').forEach(btn=>btn.onclick=async()=>{
         const action=btn.hasAttribute('data-friend-accept')?'accept':btn.hasAttribute('data-friend-decline')?'decline':'remove';
         const id=btn.getAttribute('data-friend-'+action);
@@ -659,6 +839,10 @@
         btn.disabled=true;
         try{await api('/api/friends/'+encodeURIComponent(id)+'/'+action,{method:'POST'});await refreshFriendsSummary();await openFriends();refreshConnections();}
         catch(e){toastMsg(e.message,4300);btn.disabled=false;}
+      });
+      sheet.querySelectorAll('[data-friend-timeline]').forEach(btn=>btn.onclick=()=>{
+        const person=friendsCache.accepted.find(x=>x.user_id===btn.dataset.friendTimeline);
+        if(person)openFriendTimeline(person.user_id,person.name);
       });
       sheet.querySelectorAll('[data-friend-send]').forEach(btn=>btn.onclick=()=>{
         const p=friendsCache.accepted.find(x=>x.user_id===btn.dataset.friendSend);
@@ -673,6 +857,25 @@
       $('backCameraError').onclick=returnToCamera;
     }
   }
+  async function openCirclePreferences(){
+    openSheet('<h2>My Connections circle</h2><p>Checking who may add written moments to your timeline…</p>');
+    try{
+      const settings=await api('/api/circles/settings');
+      openSheet(`<h2>My Connections circle</h2>
+        <p>All public Cosmos content is still disabled. This setting affects only your accepted connections.</p>
+        <div class="circle-info"><b>Timeline approval</b><br>By default, a connection's written contribution waits for you to approve it before the rest of your accepted connections can see it.</div>
+        <div class="field"><label style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:700"><input id="autoCircleApprove" type="checkbox" style="width:auto;margin-right:10px" ${settings.auto_approve_text?'checked':''} ${settings.auto_approval_available?'':'disabled'}> Automatically approve TEXT contributions from people I've accepted.</label></div>
+        <div class="micro">Automatic approval is unavailable until a moderation service is configured. Other media remains private between two people. You can disable automatic approval at any time; previously approved posts are not retroactively hidden.</div>
+        <div class="actions"><button id="circlePrivacyBack">Back</button><button class="primary" id="saveCirclePrivacy">Save</button></div>`);
+      $('circlePrivacyBack').onclick=openFriends;
+      $('saveCirclePrivacy').onclick=async()=>{const v=$('autoCircleApprove').checked;
+        $('saveCirclePrivacy').disabled=true;
+        try{await api('/api/circles/settings',{method:'PATCH',body:JSON.stringify({auto_approve_text:v})});toastMsg('Circle preferences saved.');openFriends();}
+        catch(e){toastMsg(e.message,3800);$('saveCirclePrivacy').disabled=false;}
+      };
+    }catch(e){openSheet(`<h2>Circle preferences unavailable</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="circlePrivacyBack">Connections</button></div>`);$('circlePrivacyBack').onclick=openFriends;}
+  }
+
   function openInvite(){
     openSheet(`<h2>Invite someone</h2><p>Enter a phone number or email they used for Cosmos. We won't reveal whether the person has an account.</p>
       <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Phone or email"></div>
@@ -686,13 +889,45 @@
     };
   }
 
+  function afterContentStep(){
+    if(compose?.recipient_mode==='person' && compose.recipient_user_id)return showAudienceStep();
+    if(compose?.recipient_mode==='self' && compose.circle_audience==='connections')return showWhenStep();
+    return showRecipientStep();
+  }
+  function showAudienceStep(){
+    if(!compose?.recipient_user_id)return showRecipientStep();
+    const name=escapeHtml(compose.recipient_label||'your connection');
+    // The choice is Connections for TEXT posts. Non-text stays between two people
+    // while group media moderation is not enabled.
+    const groupAllowed=compose.content_kind==='text';
+    openSheet(`<h2>Share on ${name}'s timeline</h2><p>Who can discover this Cosmos?</p>
+      <div class="circle-audience">
+        ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Recommended</b><span>Share with their accepted connections. The timeline owner reviews contributions unless they opted into automatic text approval.</span></button>`:'<div class="circle-info">Voice, photos and videos can currently be sent privately between two people. Wider sharing requires additional media moderation.</div>'}
+        <button type="button" id="audiencePair"><b>♡ Only us</b><span>A private moment between you and ${name}; their other connections cannot see it.</span></button>
+      </div><div class="actions"><button id="audienceBack">Back</button></div>`);
+    if($('audienceGroup'))$('audienceGroup').onclick=async()=>{compose.circle_audience='connections';
+      if(compose.place_station_id){compose.unlock_mode='here';showPlaceStep();return;}
+      showWhenStep();};
+    $('audiencePair').onclick=()=>{compose.circle_audience='between_us';compose.place_station_id=null;showWhenStep();};
+    $('audienceBack').onclick=showRecipientStep;
+  }
   function showRecipientStep(){
     openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices">
       <button class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
       <button class="choice" data-recipient="person"><strong>Someone</strong><span>A person you choose.</span></button>
+      <button class="choice" data-recipient="circle"><strong>My Connections</strong><span>Share a text moment with your accepted circle.</span></button>
       <button class="choice" disabled><strong>Anyone</strong><span>Release / Message in a Bottle comes next.</span></button>
     </div><div class="actions"><button id="backRecipient">Back</button></div>`);
-    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{compose.recipient_mode=b.dataset.recipient;if(compose.recipient_mode==="person"){if(compose.recipient_user_id)showWhenStep();else showPersonStep();}else{compose.recipient_user_id=null;showWhenStep();}});
+    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{
+      const choice=b.dataset.recipient;
+      if(choice==='circle'){
+        if(compose.content_kind!=='text')return toastMsg('Your Connections timeline currently supports text only.');
+        compose.recipient_mode='self';compose.recipient_user_id=null;compose.circle_audience='connections';return showWhenStep();
+      }
+      compose.recipient_mode=choice;compose.circle_audience=null;
+      if(choice==='person')return compose.recipient_user_id?showAudienceStep():showPersonStep();
+      compose.recipient_user_id=null;showWhenStep();
+    });
   }
 
   async function showPersonStep(){
@@ -708,7 +943,7 @@
         const p=friendsCache.accepted.find(x=>x.user_id===btn.dataset.choosePerson);
         if(!p)return;
         compose.recipient_user_id=p.user_id;compose.recipient_target='';compose.recipient_label=p.name;
-        showWhenStep();
+        showAudienceStep();
       });
     }catch(err){toastMsg(err.message,4300);openFriends();}
   }
@@ -719,12 +954,38 @@
       <button class="choice" data-when="here"><strong>When here</strong><span>Wait for this place.</span></button>
       <button class="choice" data-when="date"><strong>Future date</strong><span>Wait until a date you choose.</span></button>
     </div><div class="actions"><button id="backWhen">Back</button></div>`);
-    $("backWhen").onclick=showRecipientStep;sheet.querySelectorAll("[data-when]").forEach(b=>b.onclick=async()=>{
+    $("backWhen").onclick=()=>compose?.recipient_mode==='person'?showAudienceStep():showRecipientStep();sheet.querySelectorAll("[data-when]").forEach(b=>b.onclick=async()=>{
       compose.unlock_mode=b.dataset.when;
       if(compose.unlock_mode==="here"){
-        try{const loc=await getLocation();compose.lat=loc.lat;compose.lng=loc.lng;showFinalStep();}catch(e){toastMsg(e.message);}
+        showPlaceStep();
       }else if(compose.unlock_mode==="date") showDateStep(); else showFinalStep();
     });
+  }
+
+
+  function showPlaceStep(){
+    if(!compose)return;
+    openSheet(`<h2>Leave this at a place</h2><p>Use your phone's current location to anchor your moment here. The recipient will only discover it within approximately 180 meters of this spot.</p>
+      <div class="moment-status"><b>For:</b> ${escapeHtml(compose.recipient_label||'Your Cosmos')}<br><button type="button" id="placeChangePerson">Change recipient</button></div>
+      <div id="placeFeedback" class="moment-status" role="status">Location has not been selected. Tap below to request permission.</div>
+      <div class="actions"><button type="button" id="placeBack">Back</button><button type="button" class="primary" id="placeCheck">Find this place</button></div>
+      <div class="actions"><button type="button" id="placeConfirm" class="primary" disabled>Use this location →</button></div>
+      <div class="micro">Requires location permission in Safari. Your exact coordinates are not displayed to other connections. The current web version finds nearby messages only when opened.</div>`);
+    $('placeBack').onclick=showWhenStep;
+    $('placeChangePerson').onclick=showRecipientStep;
+    $('placeCheck').onclick=async()=>{
+      const button=$('placeCheck'),feedback=$('placeFeedback');button.disabled=true;feedback.textContent='Finding your current location… Please allow location access if Safari asks.';
+      try{
+        const loc=await getLocation();
+        compose.lat=loc.lat;compose.lng=loc.lng;
+        feedback.textContent=`Location ready · Accuracy about ${Math.round(loc.accuracy||0)} m. You can leave this moment here.`;
+        $('placeConfirm').disabled=false;
+      }catch(e){feedback.innerHTML=`Could not obtain your location. Check Safari → Website Settings → Location → Allow, then retry. <br>${escapeHtml(e.message)}`;}
+      finally{if($('placeCheck'))$('placeCheck').disabled=false;}
+    };
+    $('placeConfirm').onclick=()=>{
+      if(!Number.isFinite(compose.lat)||!Number.isFinite(compose.lng))return toastMsg('Find the location first.');showFinalStep();
+    };
   }
 
   function showDateStep(){
@@ -736,21 +997,26 @@
   function showFinalStep(){
     const who=compose.recipient_mode==="self"?"Future you":compose.recipient_label||"Someone";
     const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString():"Now";
-    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)}</p><div class="micro good">Private by default. The recipient's location is never exposed to you by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    const sharing=compose.circle_audience==='connections'?'Connections (owner-controlled)':compose.circle_audience==='between_us'?'Only us':'Private';
+    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} Your location is not shared with others by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
     $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
   }
 
   async function createCosmos(){
     $("leaveFinal").disabled=true;$("leaveFinal").textContent="Leaving…";
     try{
-      await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});closeSheet();renderJourney();refreshConnections();toastMsg("Left in Cosmos.");ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper. Hold ◯ to leave something.";},3200);
+      const out=await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});
+      const backTarget=pendingCircleReturn;pendingCircleReturn=null;
+      closeSheet();renderJourney();refreshConnections();
+      toastMsg(out.circle_status==='pending'?'Sent to their timeline for approval.':'Left in Cosmos.');
+      if(backTarget){openFriendTimeline(backTarget.id,backTarget.name);return;}ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to look deeper. Hold ◯ to leave something.";},3200);
     }catch(e){toastMsg(e.message,4200);$("leaveFinal").disabled=false;$("leaveFinal").textContent="Leave ◯";}
   }
 
   async function openCosmos(id){
     try{
       const body = lastScanLoc ? JSON.stringify({lat:lastScanLoc.lat,lng:lastScanLoc.lng}) : JSON.stringify({});
-      const r=await api(`/api/cosmos/${encodeURIComponent(id)}/open`,{method:"POST",body});currentFound=null;foundOrb.hidden=true;foundLabel.hidden=true;renderCosmos(r.item,r.thread||[]);
+      const r=await api(`/api/cosmos/${encodeURIComponent(id)}/open`,{method:"POST",body});currentFound=null;foundOrb.hidden=true;foundLabel.hidden=true;renderCosmos(r.item,r.thread||[],r.additions||[]);
     }catch(e){toastMsg(e.message);}
   }
 
@@ -758,24 +1024,139 @@
     const res=await fetch(`${API}/api/media/${encodeURIComponent(mediaId)}`,{headers:{Authorization:`Bearer ${token}`}});if(!res.ok)throw new Error("Media could not be opened.");const blob=await res.blob();return URL.createObjectURL(blob);
   }
 
+
+  function inlineProvider(url){
+    try{
+      const u=new URL(url);if(u.protocol!=='https:')return '';
+      const h=u.hostname.toLowerCase().replace(/^www\./,'');
+      let src='';
+      if(h==='youtube.com'||h==='m.youtube.com'){
+        const id=u.searchParams.get('v');if(id&&/^[\w-]{11}$/.test(id))src='https://www.youtube-nocookie.com/embed/'+id;
+      } else if(h==='youtu.be'){
+        const id=u.pathname.slice(1);if(/^[\w-]{11}$/.test(id))src='https://www.youtube-nocookie.com/embed/'+id;
+      } else if(h==='vimeo.com'){
+        const id=u.pathname.slice(1);if(/^\d{4,12}$/.test(id))src='https://player.vimeo.com/video/'+id;
+      } else if(h==='music.apple.com'){
+        if(u.pathname.length<350)src='https://embed.music.apple.com'+u.pathname+u.search;
+      } else if(h==='open.spotify.com'){
+        const m=u.pathname.match(/^\/(track|episode|album|playlist)\/([a-zA-Z0-9]+)\/?$/);
+        if(m)src='https://open.spotify.com/embed/'+m[1]+'/'+m[2];
+      }
+      return src?`<iframe class="inline-video" src="${escapeHtml(src)}" allow="encrypted-media;picture-in-picture;fullscreen" loading="lazy" title="External media player" referrerpolicy="strict-origin-when-cross-origin"></iframe>`:'';
+    }catch{return '';}
+  }
+  async function momentAttachmentHtml(a,ownerCanRemove=false,cosmosId=''){
+    const removable=(a.can_remove||ownerCanRemove) ? `<button class="post-delete" type="button" data-remove-extra="${escapeHtml(a.id)}" data-cosmos="${escapeHtml(cosmosId)}" style="margin:10px 0 0;min-height:44px">Remove addition</button>`:'';
+    const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</b>`;
+    if(a.media_id){
+      try{const url=await mediaObjectUrl(a.media_id);
+        if(a.kind==='photo')return `<div class="attachment-row">${title}<img style="width:100%;max-height:340px;object-fit:contain;border-radius:10px" src="${url}" alt="Shared photo">${removable}</div>`;
+        if(a.kind==='voice')return `<div class="attachment-row">${title}<audio controls preload="none" src="${url}"></audio>${removable}</div>`;
+        if(a.kind==='video')return `<div class="attachment-row">${title}<video controls playsinline preload="metadata" src="${url}"></video>${removable}</div>`;
+      }catch(e){return `<div class="attachment-row">${title}<p>Media unavailable: ${escapeHtml(e.message)}</p></div>`;}
+    }
+    if(a.url)return `<div class="attachment-row">${title}${inlineProvider(a.url)}<a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>${removable}</div>`;
+    return `<div class="attachment-row">${title}<div class="card-body">${escapeHtml(a.text||'')}</div>${removable}</div>`;
+  }
+  async function buildMomentExtras(additions,ownerCanRemove,cosmosId){
+    const parts=await Promise.all((additions||[]).map(a=>momentAttachmentHtml(a,ownerCanRemove,cosmosId)));return parts.join('');
+  }
+  function openAddToMoment(item){
+    openSheet(`<h2>Add to this moment</h2><p>Write a comment, record your voice, share media or attach a link. Visible only to the original private participants. Connections-wide posts use the separately approved shared-station flow.</p>
+      <div class="choices"><button class="choice" data-extra="text"><strong>Comment</strong><span>Leave words here.</span></button>
+      <button class="choice" data-extra="voice"><strong>Voice</strong><span>Record an audio note.</span></button>
+      <button class="choice" data-extra="link"><strong>Link</strong><span>Secure web address.</span></button>
+      <button class="choice" data-extra="music"><strong>Music</strong><span>YouTube / Spotify and more.</span></button>
+      <button class="choice" data-extra="photo"><strong>Photo</strong><span>Attach another photo.</span></button>
+      <button class="choice" data-extra="video"><strong>Video</strong><span>Short video allowance applies.</span></button></div>
+      <div class="actions"><button id="extraBack">Back to moment</button></div>`);
+    $('extraBack').onclick=()=>openCosmos(item.id);
+    sheet.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>chooseMomentAddition(item,b.dataset.extra));
+  }
+  function chooseMomentAddition(item,kind){
+    if(['text','music','link'].includes(kind)){
+      openSheet(`<h2>${kind==='text'?'Comment':kind==='music'?'Music link':'Link'}</h2><div class="field"><label>${kind==='text'?'Message':'https:// address'}</label><textarea id="additionValue" maxlength="${kind==='text'?1200:1600}" placeholder="${kind==='text'?'Leave a meaningful comment…':'https://…'}"></textarea></div><div class="actions"><button id="extraCancel">Back</button><button class="primary" id="extraSubmit">Add →</button></div>`);
+      $('extraCancel').onclick=()=>openAddToMoment(item);
+      $('extraSubmit').onclick=async()=>{
+        const value=$('additionValue').value.trim();if(!value)return toastMsg('Add something first.');
+        try{$('extraSubmit').disabled=true;await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind,text:kind==='text'?value:'',url:kind==='text'?'':value})});await openCosmos(item.id);toastMsg('Added to this moment.');}
+        catch(e){toastMsg(e.message,4500);if($('extraSubmit'))$('extraSubmit').disabled=false;}
+      };return;
+    }
+    if(kind==='voice'){
+      openSheet(`<h2>Record a voice moment</h2><p>Private between the moment's participants.</p><div class="actions"><button class="primary" id="extraRecord">Start recording</button><button id="extraCancel">Back</button></div><div id="extraRecordStatus" class="micro">Microphone starts only when requested.</div>`);
+      $('extraCancel').onclick=()=>openAddToMoment(item);
+      $('extraRecord').onclick=async()=>{
+        if(mediaRecorder?.state==='recording'){mediaRecorder.stop();return;}
+        try{
+          const stream=await navigator.mediaDevices.getUserMedia({audio:true});let chunks=[];
+          const rec=new MediaRecorder(stream);mediaRecorder=rec;
+          rec.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
+          rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());
+            try{const blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'});
+              const media=await uploadFile(new File([blob],`moment-voice-${Date.now()}.webm`,{type:blob.type}));
+              await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'voice',media_id:media.id})});
+              await openCosmos(item.id);toastMsg('Voice added.');
+            }catch(e){toastMsg(e.message,4500);openAddToMoment(item);}};
+          rec.start();$('extraRecord').textContent='Stop recording';$('extraRecordStatus').textContent='Recording…';
+        }catch(e){toastMsg('Microphone permission was not granted.');}
+      };return;
+    }
+    if(kind==='photo'||kind==='video'){
+      const select=()=>{
+        fileInput.accept=kind==='photo'?'image/*':'video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
+        fileInput.removeAttribute('capture');fileInput.value='';fileInput.onchange=async()=>{
+          const file=fileInput.files?.[0];if(!file)return openAddToMoment(item);
+          try{
+            if(kind==='video'){
+              const policy=await api('/api/video/policy');if(policy.remaining<1)throw new Error('Monthly video allowance exhausted.');
+              if(file.size>policy.max_bytes)throw new Error('Video file is over the allowed size.');
+              const duration=await durationFromFile(file);
+              if(!Number.isFinite(duration)||duration>policy.max_seconds+.05)throw new Error('Trim video to '+policy.max_seconds+' seconds.');
+            }
+            openSheet('<h2>Saving attachment…</h2><p>Protecting your media.</p>');
+            const upload=await uploadFile(file);
+            await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind,media_id:upload.id})});
+            await openCosmos(item.id);toastMsg('Added to this moment.');
+          }catch(e){toastMsg(e.message,4200);openAddToMoment(item);}
+        };fileInput.click();
+      };
+      select();
+    }
+  }
+
   async function contentHtml(item){
     const kind=item.content_kind;
     if(item.media_id){
       const url=await mediaObjectUrl(item.media_id);
-      if(kind==="photo")return `<div class="media-preview"><img src="${url}" alt="Cosmos photo"></div>`;
+      if(kind==="photo")return `<div class="media-preview"><img src="${url}" alt="Cosmos photo">${item.content_text?`<div class="card-body">${escapeHtml(item.content_text)}</div>`:''}${item.content_url?inlineProvider(item.content_url)+`<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open attached link ↗</a>`:''}</div>`;
       if(kind==="video")return `<div class="media-preview"><video controls playsinline src="${url}"></video></div>`;
       if(kind==="voice")return `<div class="media-preview"><audio controls src="${url}"></audio></div>`;
     }
-    if(item.content_url){return `<div class="media-preview"><a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.content_url)}</a></div>`;}
+    if(item.content_url){return `<div class="media-preview">${inlineProvider(item.content_url)}<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open source ↗ ${escapeHtml(item.content_url)}</a></div>`;}
     return `<div class="card-body">${escapeHtml(item.content_text||"")}</div>`;
   }
 
-  async function renderCosmos(item,thread){
+  async function renderCosmos(item,thread,additions=[]){
     const content=await contentHtml(item);
-    const chain=(thread||[]).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button class="danger" id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    const additionsHtml=await buildMomentExtras(additions,item.creator_user_id===me?.id,item.id);
+    const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">+ Add to moment</button></div>':''}${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
     $("closeCosmos").onclick=()=>{closeSheet();scanHere(false);};
     if($('"replyCosmos"'))$('"replyCosmos"').onclick=()=>showReplyStep(item);
+    sheet.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Remove this addition from the moment for all participants?'))return;
+      b.disabled=true;
+      try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions/'+encodeURIComponent(b.dataset.removeExtra),{method:'DELETE'});
+        await openCosmos(item.id);toastMsg('Addition removed.');}
+      catch(e){toastMsg(e.message,4400);b.disabled=false;}
+    });
+    if($('addToMoment'))$('addToMoment').onclick=()=>openAddToMoment(item);
+    if($('hideReceived'))$('hideReceived').onclick=async()=>{
+      if(!confirm('Hide this moment only from your Cosmos? It will not delete the sender’s post.'))return;
+      try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/hide',{method:'POST'});returnToCamera();toastMsg('Hidden from your Cosmos.');scanHere(false);refreshConnections();}
+      catch(e){toastMsg(e.message,4300);}
+    };
     if($('"deleteCosmos"'))$('"deleteCosmos"').onclick=()=>deleteOwnPost(item.id);
     if($("blockSender"))$("blockSender").onclick=async()=>{if(!confirm("Block this sender from contacting you through Cosmos?"))return;try{await api("/api/block",{method:"POST",body:JSON.stringify({user_id:item.creator_user_id})});closeSheet();toastMsg("Blocked.");}catch(e){toastMsg(e.message);}};
     if($("reportCosmos"))$("reportCosmos").onclick=async()=>{const reason=prompt("What should Cosmos review?","")?.trim();if(!reason)return;try{await api("/api/report",{method:"POST",body:JSON.stringify({item_id:item.id,reason})});toastMsg("Thank you. This was reported for review.");}catch(e){toastMsg(e.message);}};
@@ -962,7 +1343,7 @@
     }else if(dimension==="connections"&&timeMode==="now"){
       const pending=friendsCache.incoming||[], accepted=friendsCache.accepted||[], outgoing=friendsCache.outgoing||[];
       const pendingCards=pending.slice(0,2).map(p=>`<div class="overview-row"><div><div class="person">${escapeHtml(p.name||'Cosmos member')}</div><div class="detail">Would like to connect with you</div></div><div class="row-buttons"><button type="button" class="approve" data-inline-response="accept" data-connection-id="${escapeHtml(p.id)}">Accept</button><button type="button" data-inline-response="decline" data-connection-id="${escapeHtml(p.id)}">Decline</button></div></div>`).join('');
-      const peopleCards=accepted.slice(0,3).map(p=>`<div class="overview-row"><div><div class="person">◯ ${escapeHtml(p.name||'Cosmos member')}</div><div class="detail">Connected · Private Cosmos</div></div><div class="row-buttons"><button type="button" data-inline-send="${escapeHtml(p.user_id)}">Send ◯</button></div></div>`).join('');
+      const peopleCards=accepted.slice(0,3).map(p=>`<div class="overview-row"><div><button type="button" class="friend-person" data-inline-timeline="${escapeHtml(p.user_id)}">◯ ${escapeHtml(p.name||'Cosmos member')} →</button><div class="detail">Tap to explore their timeline</div></div><div class="row-buttons"><button type="button" data-inline-send="${escapeHtml(p.user_id)}">Send ◯</button></div></div>`).join('');
       const all=[...(nearbyConnections.nearby||[]),...(nearbyConnections.inbox||[])];
       const unique=all.filter((x,i)=>x.id && all.findIndex(z=>z.id===x.id)===i).slice(0,3);
       main=`<div class="friend-overview">
@@ -997,6 +1378,10 @@
         await refreshConnections();
         toastMsg(action==='accept'?'Connection accepted. You can now exchange private Cosmoses.':'Invitation declined.',3500);
       }catch(e){toastMsg('Could not update connection: '+e.message,4500);btn.disabled=false;}
+    });
+    journeyStage.querySelectorAll('[data-inline-timeline]').forEach(btn=>btn.onclick=()=>{
+      const p=(friendsCache.accepted||[]).find(x=>x.user_id===btn.dataset.inlineTimeline);
+      if(p)openFriendTimeline(p.user_id,p.name);
     });
     journeyStage.querySelectorAll('[data-inline-send]').forEach(btn=>btn.onclick=()=>{
       const p=(friendsCache.accepted||[]).find(x=>x.user_id===btn.dataset.inlineSend);
