@@ -2383,16 +2383,23 @@
     const sunday=weekMetroDay.getDay(),left=sunday>=4;
     const trunkPct=((sunday+.5)*100/7).toFixed(2);
     const rows=[...events].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
-    // Real stations within a 30-minute window use one junction with a
-    // horizontal, independently scrollable branch. No fabricated relationships.
     const grouped=new Map();
-    for(const x of rows){const d=new Date(x.date);if(!Number.isFinite(d.getTime()))continue;
+    for(const x of rows){
+      const d=new Date(x.date);if(!Number.isFinite(d.getTime()))continue;
       const bucket=Math.floor((d.getHours()*60+d.getMinutes())/30);
-      if(!grouped.has(bucket))grouped.set(bucket,[]);grouped.get(bucket).push(x);}
-    const branches=[];let lastY=-100;
-    for(const [bucket,items] of grouped){
+      if(!grouped.has(bucket))grouped.set(bucket,[]);
+      grouped.get(bucket).push(x);
+    }
+    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]);
+    const branches=[];
+    const compactTop=74;
+    const compactStep=88;
+    const compactMinHeight=430;
+    branchEntries.forEach(([bucket,items],idx)=>{
+      const y=compactTop+idx*compactStep;
       const minute=bucket*30;
-      const y=Math.max(38+minute*.70,lastY+83);lastY=y;
+      const hh=Math.floor(minute/60), mm=minute%60;
+      const firstStamp=new Date(weekMetroDay.getFullYear(),weekMetroDay.getMonth(),weekMetroDay.getDate(),hh,mm).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
       const cards=items.map(item=>{
         const d=new Date(item.date),stamp=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         const title=metroCardTitle(item),type=metroCardType(item);
@@ -2405,20 +2412,17 @@
           <span class="living-entry-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(type)} · ${escapeHtml(stamp)}</small></span>
           <span class="living-entry-more" aria-hidden="true">›</span></button>`;
       }).join('');
-      const firstStamp=new Date(items[0].date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
       branches.push(`<div class="living-branch" style="top:${Math.round(y)}px" aria-label="${items.length} real Cosmos moment${items.length===1?'':'s'}">
         <span class="living-junction" aria-hidden="true"></span>
         <span class="living-time-label" aria-hidden="true">${escapeHtml(firstStamp)}</span>
         <div class="living-rail" aria-label="${items.length>1?'Swipe sideways for more moments':'Moment at '+firstStamp}">${cards}</div></div>`);
-    }
-    const height=Math.max(1140,lastY+128);
-    const hours=[0,6,12,18,24];
-    const ticks=hours.map(h=>`<div class="living-tick" style="top:${Math.round(38+h*60*.70)}px"><span>${h===0?'12 AM':h===12?'12 PM':h===24?'12 AM':h<12?h+' AM':(h-12)+' PM'}</span></div>`).join('');
+    });
+    const height=Math.max(compactMinHeight,compactTop+Math.max(1,branchEntries.length)*compactStep+90);
     const empty=rows.length?'':`<div class="living-empty">No saved moments for this day. Hold the Cosmos circle to create one.</div>`;
     return heading(`${events.length} real moment${events.length===1?'':'s'} · tap a circle or card`)+
-      `<div class="metro-day-scroll" id="metroDayScroll" aria-label="Daily Cosmos Metro. Scroll vertically through moments.">
+      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Scroll vertically through moments.">
         <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="height:${Math.round(height)}px;--selected-day-trunk:${trunkPct}%">
-          <div class="living-trunk" aria-hidden="true"></div>${ticks}${branches.join('')}${empty}</div></div>`;
+          <div class="living-trunk" aria-hidden="true"></div>${branches.join('')}${empty}</div></div>`;
   }
   function metroPeekHtml(item,record,extraCount=0,thumbnail=''){
     const headline=record?.sender_name||item.title||'Cosmos';
