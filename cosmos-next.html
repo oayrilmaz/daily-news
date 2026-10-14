@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v2.2-family-notifications-staging" />
+  <meta name="cosmos-build" content="cosmos-life-v2.2.1-direct-moment-links" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -346,6 +346,9 @@
   const FAMILY_INVITE_CODE = (qs.get("invite") || "").slice(0,1200);
   const INVITE_HOME = `${location.origin}/cosmos-next.html?v=22`;
   const OPEN_INBOX_FROM_LINK=qs.get("inbox")==="1";
+  // Direct notification ID is resolved only through the authenticated recipient's inbox.
+  // A URL parameter alone NEVER grants access to a private moment.
+  const DIRECT_NOTICE_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qs.get("notice")||"") ? qs.get("notice") : "";
 
 
   const $ = id => document.getElementById(id);
@@ -449,16 +452,60 @@
     };
   }
 
+  function clearNotificationLink(){
+    const url=new URL(location.href);
+    url.searchParams.delete('notice');
+    url.searchParams.delete('inbox');
+    history.replaceState(null,'',url.pathname+url.search+url.hash);
+  }
+
+  let directNoticeOpening=false;
+  async function openNotificationMomentFromLink(){
+    if(!DIRECT_NOTICE_ID||!token||!me||directNoticeOpening)return;
+    directNoticeOpening=true;
+    openSheet('<h2>Opening your moment…</h2><p>Taking you directly to the Cosmos someone shared with you.</p><div class="look-loading">Opening…</div>');
+    try{
+      // Validate ownership on the server; do not trust the URL or the push payload.
+      const response=await api('/api/notifications');
+      const notice=(response.items||[]).find(n=>n.id===DIRECT_NOTICE_ID);
+      clearNotificationLink();
+      if(!notice||!notice.cosmos_id){
+        closeSheet();
+        toastMsg('That notification is not available. Opening your inbox instead.',3800);
+        await showCosmosNotifications();
+        return;
+      }
+      // /api/cosmos/:id/open independently enforces friendship, time and place rules.
+      const opened=await openCosmos(notice.cosmos_id);
+      if(opened){
+        try{await api(`/api/notifications/${encodeURIComponent(notice.id)}/read`,{method:'POST'});}catch{}
+        refreshNoticeBadge();
+      }else{
+        openSheet(`<h2>Moment not available</h2><p>This Cosmos may still be waiting for its date or location, or its sharing permissions may have changed.</p><div class="actions"><button id="directNoticeInbox">Notifications</button><button id="directNoticeCamera">Camera / NOW</button></div>`);
+        $('directNoticeInbox').onclick=showCosmosNotifications;
+        $('directNoticeCamera').onclick=returnToCamera;
+      }
+    }catch(e){
+      clearNotificationLink();
+      openSheet(`<h2>Couldn't open this moment</h2><p>Check your connection, then try from Notifications.</p><div class="actions"><button id="directNoticeRetry">Notifications</button><button id="directNoticeExit">Camera / NOW</button></div>`);
+      $('directNoticeRetry').onclick=showCosmosNotifications;
+      $('directNoticeExit').onclick=returnToCamera;
+    }finally{directNoticeOpening=false;}
+  }
+
   async function bootstrap(){
     if(!token){auth.hidden=false;return;}
     try{
       me = await api("/api/me");
       auth.hidden=true;showAuthError('');
       refreshNoticeBadge();
-      if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,350);
+      if(DIRECT_NOTICE_ID&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,300);
+      else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,350);
       accountButton.textContent = me.display_name || "You";
       startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
       renewSessionIfDue();
+      // Update the existing service worker for already-installed iPhone Home Screen apps.
+      navigator.serviceWorker?.getRegistration('/cosmos-next.html').then(r=>r?.update()).catch(()=>{});
       if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     }catch(e){
       if(e.status===401 || e.status===403){
@@ -491,7 +538,7 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,300);
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(DIRECT_NOTICE_ID)setTimeout(openNotificationMomentFromLink,300);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,300);
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -1335,8 +1382,8 @@
   async function openCosmos(id){
     try{
       const body = lastScanLoc ? JSON.stringify({lat:lastScanLoc.lat,lng:lastScanLoc.lng}) : JSON.stringify({});
-      const r=await api(`/api/cosmos/${encodeURIComponent(id)}/open`,{method:"POST",body});currentFound=null;foundOrb.hidden=true;foundLabel.hidden=true;renderCosmos(r.item,r.thread||[],r.additions||[]);
-    }catch(e){toastMsg(e.message);}
+      const r=await api(`/api/cosmos/${encodeURIComponent(id)}/open`,{method:"POST",body});currentFound=null;foundOrb.hidden=true;foundLabel.hidden=true;await renderCosmos(r.item,r.thread||[],r.additions||[]);return true;
+    }catch(e){toastMsg(e.message);return false;}
   }
 
   async function mediaObjectUrl(mediaId){
