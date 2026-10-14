@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v2.2.2-direct-moment-routing" />
+  <meta name="cosmos-build" content="cosmos-life-v2.3-camera-metro-reveal" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -262,6 +262,71 @@
     .notice-settings p{font-size:12px;line-height:1.6;color:#48566a}
     .notice-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:10px}
     .notice-actions button{flex:1;min-width:110px}
+
+    /* v2.3: live camera remains the origin; time is a horizontal Metro, not a feed. */
+    .app:not([data-dimension="mine"][data-time="now"]) .camera-fallback{visibility:hidden}
+    .camera-swipe-guide{position:absolute;z-index:5;top:37%;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:0 15px;pointer-events:none;color:#26354b;text-shadow:0 1px 12px rgba(255,255,255,.95);font-size:10px;font-weight:700;letter-spacing:.06em}
+    .camera-swipe-guide .guide-edge{display:flex;flex-direction:column;gap:5px;align-items:center;max-width:88px;opacity:.69}
+    .camera-swipe-guide .guide-edge span{font-size:19px;font-weight:500;line-height:1}
+    .app:not([data-dimension="mine"][data-time="now"]) .camera-swipe-guide{display:none}
+    .journey-controls{gap:8px}
+    .journey-label{font-size:12px;letter-spacing:.075em;box-shadow:0 4px 18px rgba(20,35,55,.06)}
+    .journey-stage{width:min(95vw,470px);padding:7px 9px 14px;gap:10px}
+    .journey-era{font-size:clamp(22px,6vw,31px)}
+    .journey-era:empty,.journey-sub:empty{display:none}
+    .journey-track{width:100%;max-width:none}
+    .journey-station.sealed,.circle-card.sealed{border-style:dashed;background:rgba(245,248,255,.90)}
+    .journey-station.sealed b,.circle-card.sealed strong{color:#314866}
+    .sealed-label{display:inline-block;margin-bottom:8px;font-size:11px;letter-spacing:.05em;color:#546987;font-weight:800}
+    .metro{position:relative;width:100%;margin:15px 0 8px;padding:4px 0 12px;min-height:210px;display:grid;align-items:center}
+    .metro-track{position:absolute;top:50%;left:5px;right:5px;height:2px;transform:translateY(-50%);background:linear-gradient(90deg,transparent,rgba(58,77,104,.45) 8%,rgba(58,77,104,.45) 92%,transparent)}
+    .metro-items{position:relative;display:flex;justify-content:center;align-items:stretch;gap:0;min-height:190px}
+    .metro-item{flex:1 1 0;min-width:0;max-width:92px;background:none;border:0;padding:4px 2px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#23344d;position:relative;gap:4px}
+    .metro-item .metro-mark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:9px;height:9px;border:2px solid #a1afc4;border-radius:50%;background:#fff;z-index:1}
+    .metro-item.active .metro-mark{width:13px;height:13px;background:#283e5c;border:3px solid white;box-shadow:0 0 0 2px #283e5c}
+    .metro-item .metro-orb{overflow:hidden;width:clamp(37px,10vw,58px);height:clamp(37px,10vw,58px);display:grid;place-items:center;border:2px solid white;border-radius:50%;box-shadow:0 3px 15px rgba(28,50,80,.14);background:radial-gradient(circle at 30% 24%,#fff,#e2e8f2 70%);font-size:20px;line-height:1;z-index:1}
+    .metro-item.active .metro-orb{box-shadow:0 0 0 2px #456182,0 4px 18px rgba(28,50,80,.16)}
+    .metro-item .metro-orb img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}.metro-item .metro-orb img[hidden]{display:none}
+    .metro-item.sealed .metro-orb{background:linear-gradient(140deg,#e5eafb,#d7dfec);color:#394f6e}
+    .metro-item .metro-date{font-size:10px;line-height:1.25;white-space:nowrap;font-weight:750}
+    .metro-item .metro-caption{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#69798c}
+    .metro-item:nth-child(odd){padding-bottom:98px}
+    .metro-item:nth-child(even){padding-top:98px}
+    .metro-item .metro-stem{position:absolute;width:1px;height:30px;background:rgba(67,88,113,.35);left:50%;top:calc(50% - 30px)}
+    .metro-item:nth-child(even) .metro-stem{top:50%}
+    .metro-note{padding:6px 0 10px;font-size:11px;color:#56667a;line-height:1.4;text-align:center}
+    .metro-note strong{color:#223c5e}
+    .friend-overview{width:100%;border:1px solid rgba(255,255,255,.74);background:rgba(255,255,255,.64);box-shadow:0 18px 38px rgba(25,35,60,.11);backdrop-filter:blur(16px);border-radius:23px;padding:14px 12px}
+    .friend-overview .overview-row{background:rgba(255,255,255,.76)}
+    .friend-overview .overview-head{color:#1a304b}
+    .friend-overview .overview-all{background:rgba(24,47,76,.92);color:#fff;border:0;font-weight:700}
+    .friend-overview .overview-all.secondary{background:rgba(255,255,255,.74);color:#253c58;border:1px solid rgba(25,45,75,.14)}
+    .friend-overview .overview-row .friend-person{border:0;background:transparent;box-shadow:none;padding:0;min-height:38px;text-align:left;font-size:15px;line-height:1.4;text-decoration:none}
+    .circle-card{border-radius:18px;overflow-wrap:anywhere}
+    .circle-header-actions{gap:8px}
+    .circle-header-actions button{border-radius:14px}
+    @media(max-width:370px){.metro-item .metro-date{font-size:9px}.metro-item .metro-orb{font-size:17px}.camera-swipe-guide{padding:0 9px}}
+    /* On smaller iPhones the chosen moment must remain visible without
+       having to scroll past the entire timeline. */
+    @media(max-height:760px){
+      .journey-stage{top:calc(env(safe-area-inset-top) + 119px);bottom:calc(env(safe-area-inset-bottom) + 205px);gap:6px}
+      .journey-era{font-size:23px}
+      .metro{min-height:146px;margin:2px 0 1px;padding:0 0 4px}
+      .metro-items{min-height:138px}
+      .metro-item:nth-child(odd){padding-bottom:65px}
+      .metro-item:nth-child(even){padding-top:65px}
+      .metro-item .metro-stem{height:20px;top:calc(50% - 20px)}
+      .metro-item:nth-child(even) .metro-stem{top:50%}
+      .metro-item:nth-child(odd) .metro-date,.metro-item:nth-child(odd) .metro-caption{position:relative;top:-7px}
+      .metro-item:nth-child(even) .metro-date,.metro-item:nth-child(even) .metro-caption{position:relative;top:7px}
+      .metro-note{display:none}
+      .journey-stage > .micro{display:none}
+      .journey-actions{margin-top:3px}
+      .journey-actions button{min-height:35px}
+      .app[data-dimension="connections"] .journey-stage,.app[data-dimension="public"] .journey-stage{top:calc(env(safe-area-inset-top) + 129px)}
+    }
+
+    @media(prefers-reduced-motion:reduce){.camera video,.time-world{transition:none}.found-orb{animation:none}}
   </style>
 </head>
 <body>
@@ -279,7 +344,8 @@
     <button class="jump" id="jumpDate" type="button" aria-label="Jump to a date">▦</button>
   </div>
   <div class="journey-stage" id="journeyStage" hidden></div>
-  <div class="journey-lane" id="journeyGuide">→ Past · Future ← &nbsp;·&nbsp; ↑ Public · Friends ↓</div>
+  <div class="journey-lane" id="journeyGuide" aria-hidden="true"></div>
+  <div class="camera-swipe-guide" aria-hidden="true"><div class="guide-edge"><span>→</span>PAST</div><div class="guide-edge"><span>←</span>FUTURE</div></div>
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
@@ -381,7 +447,7 @@
   const app = $("app"), journeyStage=$("journeyStage"), journeyLabel=$("journeyLabel"), journeyGuide=$("journeyGuide");
   let dimension="mine", timeMode="now", journeyFocus=null, journeyAt=new Date().toISOString(), journeyKey="";
   let journeyBusy=false, travelQueue=0, journeyGeneration=0, lastTravelAt=0, lastSwipeDir=0, swipeStreak=0;
-  let journeyStatus="", neighbors=[], nearbyConnections={nearby:[],inbox:[],memories:[]};
+  let journeyStatus="", neighbors=[], metroAround=[], metroFetchSeq=0, metroMediaPromises=new Map(), nearbyConnections={nearby:[],inbox:[],memories:[]};
   let lastConnectionPoll=0, gestureStart=null, suppressStationClickUntil=0;
   let friendsViewGeneration=0;
   let circleTarget=null, circlePosts=[], circleIndex=0, circleBusy=false, circleViewGeneration=0;
@@ -399,7 +465,7 @@
   function showAuthError(msg){authError.textContent=msg;authError.hidden=!msg;}
   function updateCameraEscape(){
     const back=$("cameraEscape");
-    if(back)back.hidden=(!me || (dimension==="mine" && timeMode==="now" && sheet.hidden && panel.hidden));
+    if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
   function closeSheet(){friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
   function openSheet(html){
@@ -1107,15 +1173,22 @@
     const marker=current?.place_group && current.audience==='connections'?`<div class="circle-place-group"><b>◯ Shared place station · ${grouped.length} contribution${grouped.length===1?'':'s'}</b>
       <p>Connections can leave their own moments here while visiting this location. Coordinates are not disclosed.</p>
       <button id="addCirclePlace" type="button" style="margin:9px 0;padding:10px 12px;border-radius:11px;border:1px solid #cfdde4;background:#fff">+ Add at this place</button></div>`:'';
-    const cards=grouped.map(p=>`<div class="circle-card"><strong>${escapeHtml(p.author)} · ${escapeHtml(p.kind)}</strong>
-      <span class="circle-meta">${p.audience==='between_us'?'♡ Only us':'◯ Connections'} · ${p.review_status==='pending'?'Awaiting '+escapeHtml(name)+"'s approval":p.locked?'Locked until its moment':'Available'}</span>
-      <p>${escapeHtml(p.locked?'This station will become available at its intended time or place.':p.preview||'A saved Cosmos moment.')}</p>
-      ${p.pending&&p.can_review?`<div class="circle-review"><button data-circle-review="approve" data-post="${escapeHtml(p.id)}">Approve for connections</button><button data-circle-review="reject" data-post="${escapeHtml(p.id)}">Decline</button></div>`:''}
-      ${!p.locked?`<button type="button" data-circle-open="${escapeHtml(p.id)}" style="margin-top:10px;border-radius:12px;border:1px solid #dce4ec;background:#f7fafc;padding:10px 13px;min-height:42px;font-size:12px">Open moment →</button>`:''}
-    </div>`).join('');
-    openSheet(`<h2>◯ ${escapeHtml(name)}'s Cosmos</h2>
-      <div class="circle-info"><b>Shared with you:</b> posts ${escapeHtml(name)} shared with connections, contributions from other people in this circle, and private moments between you two. Private posts belonging to other pairs are never shown here.</div>
-      <div class="circle-header-actions"><button id="circleShare" class="primary">+ Leave a Cosmos here</button><button id="circleBackFriends">Connections</button></div>
+    const cards=grouped.map(p=>{
+      const futureHidden=p.locked && Date.parse(p.date||'')>Date.now();
+      const metaState=p.review_status==='pending'?'Awaiting '+escapeHtml(name)+"'s approval":futureHidden?'Waiting for its reveal':p.locked?'Locked here':'Available';
+      const copy=futureHidden
+        ? `A sealed Cosmos is waiting for its reveal on ${new Date(p.date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}. The contents stay private until then.`
+        : (p.locked?'This station will become available at its intended place.':p.preview||'A saved Cosmos moment.');
+      return `<div class="circle-card ${futureHidden?'sealed':''}">${futureHidden?'<span class="sealed-label">◌ SEALED · A SURPRISE FOR YOU</span>':''}<strong>${escapeHtml(p.author)}${futureHidden?'':` · ${escapeHtml(p.kind)}`}</strong>
+        <span class="circle-meta">${p.audience==='between_us'?'♡ Only us':'◯ Connections'} · ${metaState}</span>
+        <p>${escapeHtml(copy)}</p>
+        ${p.pending&&p.can_review?`<div class="circle-review"><button data-circle-review="approve" data-post="${escapeHtml(p.id)}">Approve for connections</button><button data-circle-review="reject" data-post="${escapeHtml(p.id)}">Decline</button></div>`:''}
+        ${!p.locked?`<button type="button" data-circle-open="${escapeHtml(p.id)}" style="margin-top:10px;border-radius:12px;border:1px solid #dce4ec;background:#f7fafc;padding:10px 13px;min-height:42px;font-size:12px">Open moment →</button>`:''}
+      </div>`;
+    }).join('');
+    openSheet(`<h2>◯ ${escapeHtml(name)}'s timeline</h2>
+      <p>Shared moments, from the past into the future. Only posts meant for you will be visible.</p>
+      <div class="circle-header-actions"><button id="circleShare" class="primary">+ Leave a Cosmos here</button><button id="circleBackFriends">Back to connections</button></div>
       <div class="circle-date" aria-live="polite">${escapeHtml(moment)}</div>
       <div class="circle-head"><b>${len?`Station ${idx+1} of ${len}`:'No moments yet'}</b><small>${len?escapeHtml(current.author):'Invite a moment into this timeline'}</small></div>
       <div id="circleSwipeArea" aria-label="Swipe right to travel into the past or left for the future">
@@ -1168,7 +1241,7 @@
       // If the person returned to the camera while fetching, never reopen the old sheet.
       if(requestGeneration!==friendsViewGeneration||sheet.hidden)return;
       friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
-      const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name for their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button data-friend-send="${escapeHtml(person.user_id)}">Send ◯</button><button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
+      const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name to open their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
       openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
         <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Back to camera</button></div>
         <button class="connections-timeline" type="button" id="mySharedTimeline">◯ My shared timeline & contributions →</button>
@@ -1195,11 +1268,6 @@
       sheet.querySelectorAll('[data-friend-timeline]').forEach(btn=>btn.onclick=()=>{
         const person=friendsCache.accepted.find(x=>x.user_id===btn.dataset.friendTimeline);
         if(person)openFriendTimeline(person.user_id,person.name);
-      });
-      sheet.querySelectorAll('[data-friend-send]').forEach(btn=>btn.onclick=()=>{
-        const p=friendsCache.accepted.find(x=>x.user_id===btn.dataset.friendSend);
-        if(!p)return;
-        closeSheet();beginCompose();compose.recipient_mode='person';compose.recipient_user_id=p.user_id;compose.recipient_label=p.name;showContentStep();
       });
       refreshFriendsSummary();
     }catch(error){
@@ -1709,7 +1777,7 @@
     if(dimension===next)return;
     dimension=next; journeyGeneration++;travelQueue=0;journeyBusy=false;
     // Keep the TIME, but never show a station from a different private dimension.
-    journeyFocus=null;journeyKey="";journeyStatus="";neighbors=[];
+    journeyFocus=null;journeyKey="";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;
     // Keep the selected point in time when changing dimensions.
     document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension===dimension));
     renderJourney();
@@ -1717,7 +1785,7 @@
   }
   function goNow(){
     dimension="mine";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
-    timeMode="now";journeyStatus="";neighbors=[];journeyGeneration++;travelQueue=0;journeyBusy=false;
+    timeMode="now";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;journeyGeneration++;travelQueue=0;journeyBusy=false;
     document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='mine'));
     renderJourney();scanHere(false);
     if(!cameraVideo.srcObject)startCamera(false);
@@ -1727,6 +1795,55 @@
     const t=Date.parse(item.date);
     timeMode=t>Date.now()?"future":"past";
     journeyStatus="";
+    loadMetroAround(item);
+  }
+  async function loadMetroAround(item){
+    if(!item||dimension==='public')return;
+    const seq=++metroFetchSeq,focusKey=item.key,currentDimension=dimension;
+    metroAround=[item];
+    const base={dimension:currentDimension,at:item.date,key:item.key,limit:'2'};
+    try{
+      const [older,newer]=await Promise.all(['older','newer'].map(direction=>
+        api('/api/cosmos/journey?'+new URLSearchParams({...base,direction}).toString())));
+      if(seq!==metroFetchSeq||journeyFocus?.key!==focusKey||dimension!==currentDimension)return;
+      metroAround=[...(older.items||[]).reverse(),item,...(newer.items||[])].filter((x,i,a)=>a.findIndex(t=>t.key===x.key)===i);
+      renderJourney();
+    }catch(e){/* Keep the selected real station visible if contextual loading fails. */}
+  }
+  // Load previews only when the authorized moment is visible. Never request
+  // media IDs for sealed future deliveries. Cached blobs stay private to this tab.
+  function populateMetroMedia(){
+    journeyStage.querySelectorAll('img[data-metro-media]').forEach(async img=>{
+      const id=img.dataset.metroMedia;
+      if(!id)return;
+      let pending=metroMediaPromises.get(id);
+      if(!pending){
+        pending=mediaObjectUrl(id);
+        metroMediaPromises.set(id,pending);
+        if(metroMediaPromises.size>16){
+          const first=metroMediaPromises.keys().next().value;
+          if(first && first!==id){metroMediaPromises.get(first)?.then(url=>URL.revokeObjectURL(url)).catch(()=>{});metroMediaPromises.delete(first);}
+        }
+      }
+      try{const url=await pending;if(!img.isConnected)return;img.src=url;img.hidden=false;}
+      catch{metroMediaPromises.delete(id);}
+    });
+  }
+  function renderMetro(){
+    if(!journeyFocus)return '';
+    // Keep each travel lane legible: Past shows real past stations, Future
+    // shows future stations (sealed for recipients). Don't mix both at once.
+    const aligned=metroAround.filter(s=>timeMode==='past' ? Date.parse(s.date)<=Date.now() :
+      timeMode==='future' ? Date.parse(s.date)>Date.now() : true);
+    const stations=aligned.some(x=>x.key===journeyFocus.key)?aligned:[journeyFocus];
+    const icon=kind=>({photo:'◉',video:'▶',voice:'♫',music:'♫',link:'↗',text:'✦',sealed:'✧'})[kind]||'◯';
+    const items=stations.map(s=>{
+      const sealed=s.locked&&Date.parse(s.date||'')>Date.now();
+      const label=new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const active=s.key===journeyFocus.key;
+      return `<button type="button" class="metro-item ${active?'active':''} ${sealed?'sealed':''}" data-metro-key="${escapeHtml(s.key)}" aria-label="${sealed?'Sealed future moment':escapeHtml(s.title||'Cosmos moment')} · ${label}" aria-current="${active?'true':'false'}"><span class="metro-stem"></span><span class="metro-orb" aria-hidden="true">${sealed?'◌':icon(s.kind)}${!sealed&&s.kind==='photo'&&s.media_id?`<img data-metro-media="${escapeHtml(s.media_id)}" alt="" hidden />`:''}</span><span class="metro-date">${escapeHtml(label)}</span><span class="metro-caption">${sealed?'Secret':escapeHtml(s.title||'Moment')}</span><span class="metro-mark"></span></button>`;
+    }).join('');
+    return `<div class="metro" aria-label="Time metro: swipe right into the past, left into the future"><div class="metro-track"></div><div class="metro-items">${items}</div></div><div class="metro-note"><strong>← Earlier · Later →</strong><br>Swipe across days, months and years; a quick flick skips farther.</div>`;
   }
   function travel(direction,steps=1){
     if(!token || !auth.hidden || !sheet.hidden || !panel.hidden)return;
@@ -1822,7 +1939,8 @@
     app.style.setProperty("--time-world-opacity",(timeMode==="now"?0:(.44+distance*.55)).toFixed(2));
     app.style.setProperty("--dim-wash",dimension==="mine"?"0":(timeMode==="now"?".64":".4"));
     const labels={mine:"MY",connections:"CONNECTIONS",public:"PUBLIC"};
-    journeyLabel.textContent=`${labels[dimension]} · ${timeMode==="now"?"NOW":formatMoment(journeyAt,false)}`;
+    journeyLabel.textContent= timeMode==="now" ? labels[dimension] : `${labels[dimension]} · ${timeMode==="past"?"PAST":"FUTURE"}`;
+    $("returnNow").hidden=(dimension==='mine'&&timeMode==='now');
     journeyGuide.textContent=''; // The old floating label overlapped the station controls.
     const openStage=!(dimension==="mine"&&timeMode==="now"&&!journeyStatus);
     journeyStage.hidden=!openStage;
@@ -1833,28 +1951,35 @@
       hint.textContent="Tap to look · hold to leave";
       return;
     }
-    hint.textContent="Tap ◯ for NOW · hold to leave";
-    const dateText=timeMode==="now"?"NOW":formatMoment(journeyAt,true);
-    const label=dimension==="mine"?"MY COSMOS":dimension==="connections"?"CONNECTIONS COSMOS":"PUBLIC COSMOS";
+    hint.textContent="Tap to look · hold to leave";
+    const dateText=timeMode==="now"?"":formatMoment(journeyAt,true);
     const selected=journeyFocus;
     let main="";
     if(dimension==="public"){
-      main=`<div class="journey-track"><div class="journey-node"></div><div class="journey-connector"></div><div class="journey-station" role="note"><b>Public Cosmos is preparing</b><span>Only reviewed, opt-in place stories will appear here.</span><p>Public publishing and nearby public notifications are not enabled yet. No simulated stories are shown.</p></div></div>`;
+      const publicFuture=timeMode==='future';
+      main=`<div class="journey-track"><div class="journey-node"></div><div class="journey-connector"></div><div class="journey-station sealed" role="note"><b>${publicFuture?'Future public Cosmoses will be sealed':'Public Cosmos is preparing'}</b><span>${publicFuture?'When public Cosmos launches, future public posts will remain hidden until their reveal date.':'Only reviewed, opt-in place stories will appear here.'}</span><p>${publicFuture?'You may know a public reveal is ahead, but the content stays sealed until its intended date.':'Public publishing and nearby public notifications are not enabled yet. No simulated stories are shown.'}</p></div></div>`;
     }else if(selected){
-      const details=[escapeHtml(selected.event==="scheduled"?"Future delivery":selected.source==="received"?"From a connection":"A saved moment"), escapeHtml(selected.kind||"moment"),selected.locked?"locked": "available"].join(' · ');
-      main=`<div class="journey-track"><div class="journey-node"></div><div class="journey-connector"></div><button type="button" class="journey-station" data-selected="${escapeHtml(selected.id)}"><b>${selected.locked?"◌":"◯"} ${escapeHtml(stationTitle(selected))}</b><span>${details}${selected.parent_id?" · ↳ reply":""}</span>${selected.locked?"<p>Waiting for its moment. Contents remain protected.</p>":selected.preview?`<p>${escapeHtml(selected.preview)}</p>`:""}</button><div class="journey-connector"></div><div class="journey-node"></div></div>`;
+      const hiddenFuture=selected.locked && Date.parse(selected.date||'')>Date.now();
+      const details=hiddenFuture ? '◌ Sealed · Waiting for its reveal' : [escapeHtml(selected.event==="scheduled"?"Future delivery":selected.source==="received"?"From a connection":"A saved moment"), escapeHtml(selected.kind||"moment"),selected.locked?"locked":"available"].join(' · ');
+      const message=hiddenFuture
+        ? (selected.source==='mine'
+            ? `A surprise for future you is waiting until ${formatMoment(selected.date,true)}. Even you cannot open it early.`
+            : `This was left for you and is waiting until ${formatMoment(selected.date,true)} to reveal what is inside.`)
+        : (selected.locked?"Waiting for its place or moment. Contents remain protected.":(selected.preview?escapeHtml(selected.preview):""));
+      main=`${renderMetro()}<div class="journey-track"><button type="button" class="journey-station ${hiddenFuture?'sealed':''}" data-selected="${escapeHtml(selected.id)}"><b>${selected.locked?"◌":"◯"} ${hiddenFuture?(selected.source==='mine'?'A surprise for future you':'A Cosmos is waiting for you'):escapeHtml(stationTitle(selected))}</b><span>${details}</span>${message?`<p>${message}</p>`:""}</button></div>`;
     }else if(dimension==="connections"&&timeMode==="now"){
       const pending=friendsCache.incoming||[], accepted=friendsCache.accepted||[], outgoing=friendsCache.outgoing||[];
       const pendingCards=pending.slice(0,2).map(p=>`<div class="overview-row"><div><div class="person">${escapeHtml(p.name||'Cosmos member')}</div><div class="detail">Would like to connect with you</div></div><div class="row-buttons"><button type="button" class="approve" data-inline-response="accept" data-connection-id="${escapeHtml(p.id)}">Accept</button><button type="button" data-inline-response="decline" data-connection-id="${escapeHtml(p.id)}">Decline</button></div></div>`).join('');
-      const peopleCards=accepted.slice(0,3).map(p=>`<div class="overview-row"><div><button type="button" class="friend-person" data-inline-timeline="${escapeHtml(p.user_id)}">◯ ${escapeHtml(p.name||'Cosmos member')} →</button><div class="detail">Tap to explore their timeline</div></div><div class="row-buttons"><button type="button" data-inline-send="${escapeHtml(p.user_id)}">Send ◯</button></div></div>`).join('');
+      const peopleCards=accepted.slice(0,3).map(p=>`<div class="overview-row"><div><button type="button" class="friend-person" data-inline-timeline="${escapeHtml(p.user_id)}">◯ ${escapeHtml(p.name||'Cosmos member')} →</button><div class="detail">Tap to open their shared timeline</div></div></div>`).join('');
       const all=[...(nearbyConnections.nearby||[]),...(nearbyConnections.inbox||[])];
       const unique=all.filter((x,i)=>x.id && all.findIndex(z=>z.id===x.id)===i).slice(0,3);
       main=`<div class="friend-overview">
-        <div class="overview-head">Your people <span>${accepted.length} connected · ${pending.length} request${pending.length===1?'':'s'}</span></div>
+        <div class="overview-head">Your connections <span>${accepted.length} connected · ${pending.length} request${pending.length===1?'':'s'}</span></div>
         ${pendingCards||''}
         ${peopleCards||(!pendingCards?'<div class="overview-empty">No accepted connections yet. Invite someone you know to start a private connection.</div>':'')}
         ${outgoing.length?`<div class="overview-empty">${outgoing.length} invitation${outgoing.length===1?'':'s'} waiting for acceptance</div>`:''}
-        <button type="button" class="overview-all" id="viewFriends">People & requests${pending.length?' · '+pending.length+' new':''} →</button>
+        <button type="button" class="overview-all" id="inlineInviteSomeone">+ Invite someone</button>
+        <button type="button" class="overview-all secondary" id="viewFriends">People & requests${pending.length?' · '+pending.length+' new':''} →</button>
         <div class="overview-separator"></div>
         <div class="overview-head">Nearby & shared moments</div>
         ${unique.length?unique.map(x=>`<button type="button" class="journey-station" data-private="${escapeHtml(x.id)}"><b>◯ ${escapeHtml(x.sender_name?'From '+x.sender_name:'Private Cosmos')}</b><span>${escapeHtml(x.content_kind||'moment')} · ${x.unlock_mode==='here'?'At this place':'Available now'}</span></button>`).join(''):'<div class="overview-empty">No private messages currently available here. Your accepted connections can leave a message for this place or another moment.</div>'}
@@ -1863,13 +1988,20 @@
     }else{
       main=`<div class="journey-sub">${dimension==="mine"?"Your saved moments appear as you travel through time.":"Only your real, permissioned connections appear on this line."}</div>`;
     }
-    const footer=dimension!=="public"?`<div class="journey-actions"><button type="button" id="earlier" aria-label="Travel to an earlier saved station">← Earlier</button><button type="button" id="later" aria-label="Travel to a later saved station">Later →</button>${dimension==='connections'?'<button type="button" id="footerPeople">👥 People</button>':''}</div>`:"";
-    journeyStage.innerHTML=`<div class="journey-era">${escapeHtml(dateText)}</div><div class="journey-sub">${label}</div>${main}${footer}<div class="journey-status" role="status">${escapeHtml(journeyStatus)}</div><div class="micro" style="margin-top:4px;text-align:center">← Future · Past → · ↑ Public · ↓ Connections</div>`;
+    const footer=(dimension!=="public" && !(dimension==="connections" && timeMode==="now"))?`<div class="journey-actions"><button type="button" id="earlier" aria-label="Travel to an earlier saved station">← Earlier</button><button type="button" id="later" aria-label="Travel to a later saved station">Later →</button></div>`:"";
+    journeyStage.innerHTML=`${dateText?`<div class="journey-era">${escapeHtml(dateText)}</div>`:""}${main}${footer}<div class="journey-status" role="status">${escapeHtml(journeyStatus)}</div><div class="micro" style="margin-top:4px;text-align:center">Swipe right → Past &nbsp; · &nbsp; Swipe left → Future &nbsp; · &nbsp; ↑ Public &nbsp; · &nbsp; ↓ Connections</div>`;
     journeyStage.querySelector('[data-selected]')?.addEventListener('click',()=>{if(performance.now()>suppressStationClickUntil)openJourneyStation(selected);});
+    populateMetroMedia();
+    journeyStage.querySelectorAll('[data-metro-key]').forEach(btn=>btn.addEventListener('click',()=>{
+      if(performance.now()<=suppressStationClickUntil)return;
+      const item=metroAround.find(s=>s.key===btn.dataset.metroKey);
+      if(item){setJourneyFocus(item);renderJourney();}
+    }));
     journeyStage.querySelectorAll('[data-private]').forEach(b=>b.addEventListener('click',()=>{if(performance.now()>suppressStationClickUntil)openCosmos(b.dataset.private); }));
     $("footerPeople")?.addEventListener('click',openFriends);
     $("earlier")?.addEventListener('click',()=>travel(-1,1));
     $("later")?.addEventListener('click',()=>travel(1,1));
+    $("inlineInviteSomeone")?.addEventListener('click',openInvite);
     $("viewFriends")?.addEventListener('click',openFriends);
     journeyStage.querySelectorAll('[data-inline-response]').forEach(btn=>btn.onclick=async()=>{
       const action=btn.dataset.inlineResponse, id=btn.dataset.connectionId;
@@ -1886,11 +2018,6 @@
       const p=(friendsCache.accepted||[]).find(x=>x.user_id===btn.dataset.inlineTimeline);
       if(p)openFriendTimeline(p.user_id,p.name);
     });
-    journeyStage.querySelectorAll('[data-inline-send]').forEach(btn=>btn.onclick=()=>{
-      const p=(friendsCache.accepted||[]).find(x=>x.user_id===btn.dataset.inlineSend);
-      if(!p)return;
-      beginCompose();compose.recipient_mode='person';compose.recipient_user_id=p.user_id;compose.recipient_label=p.name;showContentStep();
-    });
     $("findNearby")?.addEventListener('click',async()=>{
       try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(e){toastMsg(e.message,3900);}
     });
@@ -1898,7 +2025,13 @@
   async function openJourneyStation(item){
     if(!item)return;
     if(item.locked){
-      openSheet(`<h2>Future station</h2><p>${escapeHtml(stationTitle(item))}</p><div class="look-card"><div class="look-what">This station is scheduled for ${formatMoment(item.date)}. It cannot be unlocked by traveling into the future.</div></div><div class="actions"><button id="closeLocked">Close</button></div>`);
+      const hiddenFuture=Date.parse(item.date||'')>Date.now();
+      const msg=hiddenFuture
+        ? (item.source==='mine'
+            ? `A surprise for future you is sealed until ${formatMoment(item.date,true)}.`
+            : `This station was left for you and is waiting until ${formatMoment(item.date,true)} to reveal what is inside.`)
+        : 'This station is tied to another place or moment and cannot be opened yet.';
+      openSheet(`<h2>${hiddenFuture?'Waiting station':'Locked station'}</h2><p>${escapeHtml(stationTitle(item))}</p><div class="look-card"><div class="look-what">${msg}</div></div><div class="actions"><button id="closeLocked">Close</button></div>`);
       $("closeLocked").onclick=closeSheet;return;
     }
     await openCosmos(item.id);
@@ -1935,17 +2068,13 @@
   document.querySelectorAll('button[data-dimension]').forEach(b=>b.addEventListener('click',e=>{
     e.preventDefault();
     e.stopPropagation();
-    // Use the already working People & requests sheet. Swipe DOWN remains
-    // available for traveling through friends' stations by date.
-    if(b.dataset.dimension==='connections'){
-      openFriends();
-      return;
-    }
+    // A dimension lives inside the camera universe. People management
+    // is available on demand, not as a full-screen popup on every tap.
     setDimension(b.dataset.dimension);
   }));
   // Use the background as the gesture surface, not the sheet or its scrollable content.
   const shouldIgnoreGesture=t=>{
-    if(t?.closest?.('.journey-station'))return false; // Swipe over a station; tapping still opens it.
+    if(t?.closest?.('.journey-station,.metro-item'))return false; // Swipe over a station; tapping still opens it.
     return Boolean(t?.closest?.('button,input,textarea,select,.sheet,.sheet-backdrop,.panel,.auth,.bottom,.journey-controls,.topbar'));
   };
   app.addEventListener('touchstart',e=>{
