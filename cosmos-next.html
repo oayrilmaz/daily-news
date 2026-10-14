@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v2.4-week-day-metro" />
+  <meta name="cosmos-build" content="cosmos-life-v2.5-living-metro" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -422,6 +422,113 @@
     .app.metro-day-active .metro-week-note{font-size:9px}
     @media(prefers-reduced-motion:reduce){.day-moment .bubble{animation:none}}
 
+
+    /* COSMOS v2.5: the Metro IS the screen. No week-only panel or auto-opened card. */
+    .app.metro-live .journey-stage{
+      top:calc(env(safe-area-inset-top) + 120px)!important;
+      bottom:calc(env(safe-area-inset-bottom) + 152px)!important;
+      padding:0 12px 5px!important;gap:0!important;
+      overflow:hidden!important;background:transparent!important;
+    }
+    .app.metro-live .journey-controls{top:calc(env(safe-area-inset-top) + 68px)!important}
+    .app.metro-live .week-metro{padding:0 1px 0!important;margin:0;flex:0 0 auto;
+      background:none!important;border:0!important;border-radius:0!important}
+    .app.metro-live .week-navigation{margin:0 0 2px;min-height:26px;font-size:10px;gap:7px;letter-spacing:.055em;color:#253a5a}
+    .app.metro-live .week-navigation button{width:27px;height:27px;min-width:27px;min-height:27px;
+      padding:0;font-size:17px;background:rgba(255,255,255,.64);border-color:rgba(18,34,58,.13)}
+    .app.metro-live .week-weekdays{gap:0;padding-top:0}
+    .app.metro-live .week-weekdays::before{top:68px!important;left:3%;right:3%;height:2px;background:rgba(255,255,255,.95)}
+    .app.metro-live .metro-week-day{height:101px!important;padding:0;justify-content:flex-start;touch-action:pan-y}
+    .app.metro-live .metro-week-day .wd-name{font-size:9px;line-height:14px}
+    .app.metro-live .metro-week-day .wd-date{font-size:10px;line-height:15px}
+    .app.metro-live .metro-week-day .wd-branch{height:37px!important;gap:2px;padding-bottom:1px}
+    .app.metro-live .metro-week-day .wd-branch::before{background:rgba(255,255,255,.84)}
+    .app.metro-live .metro-week-day .wd-bubble{height:7px!important;width:7px!important;box-shadow:0 1px 3px #172c4b55}
+    .app.metro-live .metro-week-day .wd-bubble:nth-child(odd){height:10px!important;width:10px!important}
+    .app.metro-live .metro-week-day .wd-stop{height:14px;width:14px;border-width:4px}
+    .app.metro-live .metro-week-day.active .wd-stop{height:23px;width:23px;border-width:5px;
+      box-shadow:0 0 0 2px white,0 0 12px 3px rgba(170,209,255,.85)}
+    .app.metro-live .metro-week-day .wd-count{font-size:9px;margin-top:3px}
+    .app.metro-live .metro-week-note{font-size:9px;line-height:1.3;white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis;margin:0 0 2px}
+    .app.metro-live .camera-swipe-guide{display:none!important}
+    .app.metro-live .camera-fallback{opacity:.10;pointer-events:none}
+    .app.metro-live .metro-main{background:transparent!important;border:none;min-height:0;flex:1 1 0;overflow:hidden;
+      border-radius:0;display:flex;flex-direction:column}
+    .app.metro-live .metro-day-heading{padding:3px 6px 4px;min-height:50px;align-items:center;flex-shrink:0}
+    .app.metro-live .metro-day-heading h2{font-size:21px;font-weight:820;letter-spacing:-.04em;
+      text-shadow:0 1px 9px #ffffffc2}
+    .app.metro-live .metro-day-heading p{font-size:11px;color:#3d5370;margin-top:0}
+    .app.metro-live .metro-day-heading .metro-people-pill{font-size:11px;border:1px solid #cbd7e6;
+      border-radius:20px;min-height:30px;padding:4px 11px;background:rgba(255,255,255,.78);color:#153453}
+    .app.metro-live .metro-day-scroll{padding:0 2px 12px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+      scrollbar-width:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+      mask-image:linear-gradient(to bottom,transparent 0,#000 12px,#000 calc(100% - 22px),transparent 100%)}
+    .app.metro-live .metro-day-scroll::-webkit-scrollbar{display:none}
+    .living-day-chart{position:relative;--trunk:29%;--text-edge:30%;min-height:980px;padding:0;overflow:visible}
+    .living-day-chart.branch-left{--trunk:var(--selected-day-trunk,71%)}
+    .living-day-chart.branch-right{--trunk:var(--selected-day-trunk,29%)}
+    .living-day-chart.trunk-near-left .living-tick span,.living-day-chart.trunk-near-left .living-period{left:13%}
+    .living-day-chart.trunk-near-right .living-tick span{left:auto;right:13%}
+    .living-day-chart.trunk-near-right .living-period{left:auto;right:13%}
+    .living-day-chart .living-trunk{position:absolute;left:var(--trunk);top:8px;bottom:12px;width:2px;
+      background:rgba(255,255,255,.96);box-shadow:0 0 4px #36527766;transform:translateX(-50%)}
+    .living-day-chart .living-tick{position:absolute;left:0;right:0;border-top:1px solid rgba(248,250,255,.43);
+      font-size:10px;font-weight:650;color:#364c6b;letter-spacing:.015em;pointer-events:none;min-height:1px}
+    .living-day-chart .living-tick span{position:absolute;top:-12px;left:2px;background:rgba(255,255,255,.68);
+      padding:2px 7px;border-radius:99px}
+    .living-day-chart .living-period{position:absolute;left:3px;font-size:9px;font-weight:820;letter-spacing:.2em;
+      color:#2a4564;text-shadow:0 1px 8px white;pointer-events:none}
+    .living-branch{position:absolute;left:0;right:0;height:74px;display:flex;align-items:center;
+      pointer-events:none;z-index:2}
+    .living-branch .living-junction{position:absolute;left:var(--trunk);top:50%;width:13px;height:13px;
+      transform:translate(-50%,-50%);background:#1c3352;border:3px solid white;
+      border-radius:50%;z-index:3;box-shadow:0 0 0 1px #637a99}
+    .living-branch .living-rail{pointer-events:auto;position:absolute;top:6px;bottom:2px;left:var(--trunk);
+      right:0;display:flex;align-items:center;gap:12px;padding:0 14px 0 22px;
+      overflow-x:auto;overscroll-behavior-x:contain;touch-action:pan-x;
+      scrollbar-width:none;scroll-snap-type:x proximity}
+    .living-branch .living-rail::-webkit-scrollbar{display:none}
+    .living-branch .living-rail::before{content:'';position:absolute;left:0;right:0;top:50%;height:2px;
+      background:rgba(255,255,255,.82);pointer-events:none;z-index:0}
+    .living-day-chart.branch-left .living-rail{left:0;right:calc(100% - var(--trunk));
+      justify-content:flex-start;flex-direction:row-reverse;padding:0 22px 0 14px}
+    .living-branch .living-bubble{flex:0 0 47px;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:3px;scroll-snap-align:center;position:relative;z-index:1;
+      border:0;padding:0;background:transparent;color:#162d4c;min-height:65px}
+    .living-branch .living-orb{display:grid;place-items:center;height:42px;width:42px;border:2px solid white;
+      background:radial-gradient(circle at 28% 22%,white,#e1e9f5 75%);box-shadow:0 3px 12px #223a5938;
+      border-radius:50%;font-size:19px;color:#142c4e;transition:transform .16s,box-shadow .16s}
+    .living-branch .living-bubble:active .living-orb,.living-branch .living-bubble.selected .living-orb{
+      box-shadow:0 0 0 3px #a7c9f3,0 0 15px 5px #b1d3ffb8;transform:scale(1.055)}
+    .living-branch .living-bubble.sealed .living-orb{background:#dce2eb;color:#42536d;border-style:dashed}
+    .living-branch .living-clock{display:block;text-align:center;font-size:9px;font-weight:800;
+      color:#274362;white-space:nowrap;text-shadow:0 1px 5px white}
+    .living-branch .living-more{pointer-events:none;flex:0 0 auto;padding:0 8px;font-size:10px;color:#314560;
+      font-weight:700;text-shadow:0 1px 6px white;z-index:1}
+    .living-day-chart .living-empty{position:absolute;top:24%;left:4%;right:4%;padding:14px 18px;
+      border:1px solid #fff9;border-radius:17px;background:#ffffffad;text-align:center;color:#314760;font-size:12px}
+    .app.metro-live .metro-popover{left:7px;right:7px;max-height:min(55vh,460px);border-radius:22px;
+      box-shadow:0 18px 43px #1d34584d;z-index:25}
+    .app.metro-live .metro-popover::before{content:'';position:absolute;top:-9px;left:30%;height:17px;
+      width:17px;transform:rotate(45deg);background:rgba(255,255,255,.97);border-left:1px solid #e1e8f2;
+      border-top:1px solid #e1e8f2}
+    .app.metro-live .metro-day-error{margin:9px;padding:12px 15px;border-radius:14px;
+      background:#fffdf4ed;color:#67441b;font-size:12px;line-height:1.5}
+    .app.metro-live .metro-day-error button{padding:8px 11px;border:1px solid #d9b77c;border-radius:12px;
+      background:white;color:#55401b;margin-top:8px}
+    @media(max-width:375px){.app.metro-live .journey-stage{top:calc(env(safe-area-inset-top) + 112px)!important;
+        bottom:calc(env(safe-area-inset-bottom) + 137px)!important;padding:0 6px!important}
+      .living-branch .living-rail{gap:9px;padding-right:6px}
+      .living-branch .living-bubble{flex-basis:43px}.living-branch .living-orb{width:38px;height:38px;font-size:17px}
+      .app.metro-live .metro-day-heading h2{font-size:18px}}
+    @media(max-height:730px){.app.metro-live .journey-stage{top:calc(env(safe-area-inset-top) + 114px)!important;
+        bottom:calc(env(safe-area-inset-bottom) + 127px)!important}
+      .app.metro-live .metro-week-day{height:86px!important}
+      .app.metro-live .week-weekdays::before{top:60px!important}
+      .app.metro-live .metro-week-day .wd-branch{height:29px!important}}
+    @media(prefers-reduced-motion:reduce){.living-branch .living-orb{transition:none}}
+
   </style>
 </head>
 <body>
@@ -542,7 +649,7 @@
   const app = $("app"), journeyStage=$("journeyStage"), journeyLabel=$("journeyLabel"), journeyGuide=$("journeyGuide");
   let dimension="mine", timeMode="now", journeyFocus=null, journeyAt=new Date().toISOString(), journeyKey="";
   // v2.4 independent local-calendar metro. No simulated moments or prior hidden content.
-  let weekMetroDay=new Date(),weekMetroView='week',weekMetroItems=[],weekMetroCacheKey='',weekMetroBusy=false,
+  let weekMetroDay=new Date(),weekMetroView='day',weekMetroItems=[],weekMetroCacheKey='',weekMetroBusy=false,
       weekMetroError='',weekMetroLimited=false,weekMetroRequestId=0,weekMetroPopId=null;
 
   let journeyBusy=false, travelQueue=0, journeyGeneration=0, lastTravelAt=0, lastSwipeDir=0, swipeStreak=0;
@@ -1885,7 +1992,7 @@
   }
   function goNow(){
     dimension="mine";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
-    timeMode="now";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;weekMetroDay=new Date();weekMetroView="week";weekMetroPopId=null;weekMetroCacheKey="";journeyGeneration++;travelQueue=0;journeyBusy=false;
+    timeMode="now";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;weekMetroDay=new Date();weekMetroView="day";weekMetroPopId=null;weekMetroCacheKey="";journeyGeneration++;travelQueue=0;journeyBusy=false;
     document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='mine'));
     renderJourney();scanHere(false);
     if(!cameraVideo.srcObject)startCamera(false);
@@ -1940,7 +2047,7 @@
   function metroIcon(item){return item.locked?'🔒':({text:'▤',photo:'▧',video:'▷',voice:'♫',music:'♫',link:'↗'})[item.kind]||'◯';}
   function setMetroDay(day,view='day'){
     weekMetroDay=new Date(day);weekMetroDay.setHours(12,0,0,0);
-    weekMetroView=view;weekMetroPopId=null;timeMode=metroKeyLocal(weekMetroDay)===metroKeyLocal(new Date())?'now':(weekMetroDay>Date.now()?'future':'past');
+    weekMetroView='day';weekMetroPopId=null;timeMode=metroKeyLocal(weekMetroDay)===metroKeyLocal(new Date())?'now':(weekMetroDay>Date.now()?'future':'past');
     journeyAt=weekMetroDay.toISOString();renderWeekMetro();
   }
   function shiftWeekMetro(direction,jump=1){
@@ -1967,106 +2074,141 @@
     }catch(e){if(requestId!==weekMetroRequestId)return;weekMetroBusy=false;weekMetroError=e.message;
       renderWeekMetro();}
   }
+  // Native haptics are intentionally not simulated: iPhone browser/PWA APIs
+  // do not reliably expose Taptic Engine controls. Provide visual cues here.
+  function metroClickFeedback(button){
+    if(!button)return;button.classList.add('metro-touched');
+    setTimeout(()=>button.classList.remove('metro-touched'),200);
+  }
+  function moveMetroDays(count){
+    if(!token||!auth.hidden||!sheet.hidden||!panel.hidden)return;
+    const d=new Date(weekMetroDay);d.setDate(d.getDate()+count);
+    if(d.getFullYear()<1900||d.getFullYear()>2200)return toastMsg('Metro supports 1900–2200.');
+    setMetroDay(d,'day');
+  }
   function renderWeekMetro(){
-    app.dataset.dimension=dimension;app.classList.add('metro-live');app.classList.toggle('metro-day-active',weekMetroView==='day');journeyStage.hidden=false;
+    app.dataset.dimension=dimension;app.classList.add('metro-live');
+    app.classList.add('metro-day-active');journeyStage.hidden=false;
     const today=metroKeyLocal(new Date()),chosen=metroKeyLocal(weekMetroDay);
-    timeMode=chosen===today?'now':weekMetroDay>new Date()?'future':'past';
+    weekMetroView='day';timeMode=chosen===today?'now':weekMetroDay>new Date()?'future':'past';
     app.dataset.time=timeMode;
-    // Preserve camera as background, gently blur only time away from NOW.
-    const years=Math.min(1,Math.abs(weekMetroDay.getTime()-Date.now())/(365*86400000*7));
-    app.style.setProperty('--time-blur',(years*5).toFixed(2)+'px');
-    app.style.setProperty('--time-gray',(years*.55).toFixed(2));
-    app.style.setProperty('--time-sepia',(years*.16).toFixed(2));
-    app.style.setProperty('--time-saturation',(1-years*.35).toFixed(2));
-    app.style.setProperty('--time-video-opacity',(1-years*.7).toFixed(2));
-    app.style.setProperty('--time-world-opacity',(years*.7).toFixed(2));
-    app.style.setProperty('--dim-wash',dimension==='mine'?'0':'.25');
+    // Keep the camera live under the Time Metro. Age only softens the image.
+    const age=Math.min(1,Math.abs(weekMetroDay.getTime()-Date.now())/(365*86400000*8));
+    app.style.setProperty('--time-blur',(age*3.2).toFixed(2)+'px');
+    app.style.setProperty('--time-gray',(age*.35).toFixed(2));
+    app.style.setProperty('--time-sepia',(age*.1).toFixed(2));
+    app.style.setProperty('--time-saturation',(1-age*.3).toFixed(2));
+    app.style.setProperty('--time-video-opacity',(1-age*.56).toFixed(2));
+    app.style.setProperty('--time-world-opacity',(age*.5).toFixed(2));
+    app.style.setProperty('--dim-wash',dimension==='mine'?'0':'.19');
     const names={mine:'MY',connections:'CONNECTIONS',public:'PUBLIC'};
-    journeyLabel.textContent=`${names[dimension]}${timeMode==='now'?'':(timeMode==='past'?' · PAST':' · FUTURE')}`;
+    journeyLabel.textContent=`${names[dimension]}${timeMode==='now'?'':timeMode==='past'?' · PAST':' · FUTURE'}`;
+    $('returnNow').hidden=(dimension==='mine'&&timeMode==='now');
     journeyGuide.textContent='';
-    const ds=metroDays(),range=ds[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})+' – '+ds[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const ds=metroDays(),range=ds[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})+
+      ' – '+ds[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
     const countFor=d=>weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(d));
     const week=ds.map(d=>{
       const key=metroKeyLocal(d),items=countFor(d),active=key===chosen;
-      const orbs=Array.from({length:Math.min(items.length,4)},()=>'<i class="wd-bubble" aria-hidden="true"></i>').join('');
-      const count=items.length?`${items.length}${items.length>4?'+':''}`:'';
-      return `<button type="button" class="metro-week-day ${active?'active':''}" data-metro-day="${key}" aria-pressed="${active}" aria-label="${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}, ${items.length} Cosmos moments. Open day timeline.">
+      const orbs=Array.from({length:Math.min(items.length,3)},()=>'<i class="wd-bubble" aria-hidden="true"></i>').join('');
+      const count=items.length?`${items.length}${items.length>500?'+':''}`:'';
+      return `<button type="button" class="metro-week-day ${active?'active':''}" data-metro-day="${key}" aria-pressed="${active}"
+        aria-label="${d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}, ${items.length} Cosmos moments. Explore day.">
         <span class="wd-name">${d.toLocaleDateString('en-US',{weekday:'short'}).toUpperCase()}</span>
         <span class="wd-date">${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
-        <span class="wd-branch">${orbs}</span><span class="wd-stop" aria-hidden="true"></span><span class="wd-count">${count}</span></button>`;
+        <span class="wd-branch">${orbs}</span><span class="wd-stop" aria-hidden="true"></span>
+        <span class="wd-count">${count}</span></button>`;
     }).join('');
-    let main='';
-    const selectedEvents=countFor(weekMetroDay);
-    if(weekMetroView==='week'){
-      const date=weekMetroDay.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-      main=`<section class="metro-week-focus" aria-label="Selected day"><h2>${date}</h2><p>${weekMetroBusy?'Loading real moments…':weekMetroError?'Timeline temporarily unavailable':selectedEvents.length?`${selectedEvents.length} Cosmos moment${selectedEvents.length===1?'':'s'} on this day.`:'No saved moments on this day.'}<br>Tap a day to explore its moments, hour by hour.</p>
-        <button class="metro-enter-day" id="metroOpenDay" type="button">View day timeline →</button>
-        ${dimension==='connections'?'<button class="metro-enter-day" id="metroPeople" type="button">◯ Your connections</button>':''}</section>`;
-    } else main=metroRenderDay(selectedEvents);
-    if(dimension==='public')main=`<div class="metro-zero"><b>Public Cosmos is preparing.</b><br>Public posting remains disabled until moderation is ready.<br>Future public reveals will remain sealed until their time.</div>`;
-    journeyStage.innerHTML=`<div class="week-metro" aria-label="Always-visible weekly Cosmos Metro"><div class="week-navigation">
-      <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button><span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button>
-      </div><div class="week-weekdays">${week}</div><div class="metro-week-note">Swipe right for past · left for future · flick faster to skip months or years</div></div>
+    let main=metroRenderDay(countFor(weekMetroDay));
+    if(dimension==='public')main=`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(weekMetroDay.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}</h2><p>Public Cosmos</p></div></div>
+      <div class="metro-zero"><strong>Public Cosmos is preparing.</strong><br>Only moderated, opt-in public stories will appear here once enabled.<br>Future surprises will remain sealed until reveal.</div>`;
+    journeyStage.innerHTML=`<div class="week-metro" aria-label="Permanent weekly Cosmos Metro"><div class="week-navigation">
+      <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button>
+      <span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button></div>
+      <div class="week-weekdays">${week}</div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
       <div class="metro-main" id="metroMain">${main}</div>
-      ${weekMetroError?`<div class="metro-week-note" role="alert">${escapeHtml(weekMetroError)}</div>`:''}
-      ${weekMetroLimited?'<div class="metro-week-note">This week has more than 500 moments; narrow your date to view more.</div>':''}`;
-    journeyStage.querySelectorAll('[data-metro-day]').forEach(btn=>btn.onclick=()=>{if(performance.now()>suppressStationClickUntil)setMetroDay(metroDateLocal(btn.dataset.metroDay),'day');});
+      ${weekMetroLimited?'<div class="metro-week-note">Over 500 real moments this week; some are not yet shown.</div>':''}`;
+    journeyStage.querySelectorAll('[data-metro-day]').forEach(btn=>btn.onclick=()=>{
+      if(performance.now()>suppressStationClickUntil){metroClickFeedback(btn);setMetroDay(metroDateLocal(btn.dataset.metroDay),'day');}
+    });
     journeyStage.querySelectorAll('[data-week-shift]').forEach(btn=>btn.onclick=()=>shiftWeekMetro(Number(btn.dataset.weekShift)));
-    $('metroOpenDay')?.addEventListener('click',()=>setMetroDay(weekMetroDay,'day'));
     $('metroPeople')?.addEventListener('click',openFriends);
-    $('metroBackWeek')?.addEventListener('click',()=>{weekMetroView='week';weekMetroPopId=null;renderWeekMetro();});
-    journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=()=>{if(performance.now()>suppressStationClickUntil)openMetroBubble(btn.dataset.metroOpen,btn);});
-    // On entering a populated day, bring the first actual post into view;
-    // don't strand someone staring at empty overnight hours.
-    const metroScroller=$('metroDayScroll');
-    if(metroScroller){const first=metroScroller.querySelector('.day-moment');
-      if(first)metroScroller.scrollTop=Math.max(0,parseFloat(first.style.top||'0')-25);}
-
+    $('metroRetry')?.addEventListener('click',()=>{weekMetroCacheKey='';fetchMetroWeek();renderWeekMetro();});
+    journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=()=>{
+      if(performance.now()>suppressStationClickUntil){metroClickFeedback(btn);openMetroBubble(btn.dataset.metroOpen,btn);}
+    });
+    const scroller=$('metroDayScroll');
+    if(scroller){
+      // Live day: show nearby hours. Historic day: show first real moment.
+      const first=scroller.querySelector('.living-branch');
+      if(first){const y=parseFloat(first.style.top||'0');scroller.scrollTop=Math.max(0,y-80);}
+      else if(chosen===today){const now=new Date();scroller.scrollTop=Math.max(0,(now.getHours()*60+now.getMinutes())*.73-130);}
+    }
     if(!weekMetroBusy && !weekMetroError)fetchMetroWeek();
   }
-  // One permanent swipe listener; rerenders must not accumulate stale handlers.
+  // Never convert horizontal browsing inside a moment branch into a date change.
   let metroTouchStart=null;
   journeyStage.addEventListener('touchstart',e=>{
     if(!app.classList.contains('metro-live')||e.touches.length!==1)return;
-    metroTouchStart={x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now()};
+    metroTouchStart=e.target.closest('.living-rail,.metro-popover')?null:
+      {x:e.touches[0].clientX,y:e.touches[0].clientY,t:Date.now()};
     e.stopPropagation();
   },{passive:true});
   journeyStage.addEventListener('touchend',e=>{
-    if(!metroTouchStart||!app.classList.contains('metro-live'))return;
-    const dx=e.changedTouches[0].clientX-metroTouchStart.x;
-    const dy=e.changedTouches[0].clientY-metroTouchStart.y;
-    const ms=Math.max(1,Date.now()-metroTouchStart.t);metroTouchStart=null;
-    if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.35){
-      suppressStationClickUntil=performance.now()+440;
-      const speed=Math.abs(dx)/ms;
-      shiftWeekMetro(dx>0?-1:1,speed>2.5?52:speed>1.35?4:1);
+    if(!app.classList.contains('metro-live'))return;
+    if(metroTouchStart && e.changedTouches.length){
+      const dx=e.changedTouches[0].clientX-metroTouchStart.x;
+      const dy=e.changedTouches[0].clientY-metroTouchStart.y;
+      const ms=Math.max(1,Date.now()-metroTouchStart.t);metroTouchStart=null;
+      if(Math.abs(dx)>49&&Math.abs(dx)>Math.abs(dy)*1.35){
+        suppressStationClickUntil=performance.now()+350;
+        const speed=Math.abs(dx)/ms;
+        // Fast flicks skip weeks/months/years; gentle swipe travels one day.
+        moveMetroDays((dx>0?-1:1)*(speed>2.8?365:speed>1.6?28:speed>.9?7:1));
+      }
     }
     e.stopPropagation();
   },{passive:true});
   journeyStage.addEventListener('touchcancel',()=>metroTouchStart=null,{passive:true});
   function metroRenderDay(events){
     const label=weekMetroDay.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
-    if(weekMetroBusy)return `<div class="metro-day-heading"><div class="d-text"><h2>${label}</h2><p>Loading…</p></div><button class="metro-to-week" id="metroBackWeek">← Week</button></div><div class="metro-zero">Loading real Cosmos moments…</div>`;
-    if(!events.length)return `<div class="metro-day-heading"><div class="d-text"><h2>${label}</h2><p>0 moments</p></div><button class="metro-to-week" id="metroBackWeek">← Week</button></div><div class="metro-zero">No Cosmoses were left on this date.<br>Choose another day, or swipe across weeks.</div>`;
+    const heading=(sub='')=>`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(label)}</h2><p>${escapeHtml(sub)}</p></div>
+      ${dimension==='connections'?'<button type="button" class="metro-people-pill" id="metroPeople">People →</button>':''}</div>`;
+    if(weekMetroBusy)return heading('Finding your real Cosmoses…')+'<div class="metro-zero">Loading moments…</div>';
+    if(weekMetroError)return heading('Unable to load')+`<div class="metro-day-error" role="alert">Could not load your moments: ${escapeHtml(weekMetroError)}<br>Nothing has been deleted.<br><button type="button" id="metroRetry">Try again</button></div>`;
+    const sunday=weekMetroDay.getDay(),left=sunday>=4;
+    const trunkPct=((sunday+.5)*100/7).toFixed(2);
     const rows=[...events].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
-    let prev=-100;
-    const placed=rows.map(x=>{
-      const dt=new Date(x.date);const minutes=dt.getHours()*60+dt.getMinutes();
-      const wanted=Math.max(34,Math.round(35+minutes*.66));
-      const y=Math.max(wanted,prev+70);prev=y;return {item:x,y};
-    });
-    const H=Math.max(1040,prev+86);
-    const markers=[['12 AM',35],['3 AM',35+180*.66],['6 AM',35+360*.66],['9 AM',35+540*.66],['12 PM',35+720*.66],['3 PM',35+900*.66],['6 PM',35+1080*.66],['9 PM',35+1260*.66]];
-    const ticks=markers.map(([label,y])=>`<div class="metro-time-tick" style="top:${Math.round(y)}px"><span>${label}</span></div>`).join('');
-    const posts=placed.map(({item,y})=>{
-      const dt=new Date(item.date),time=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-      const title=metroTitleShort(item), desc=item.locked?'Sealed until reveal':item.kind+' · '+(item.preview||'Saved moment');
-      return `<button type="button" class="day-moment ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}" style="top:${y}px" aria-label="${escapeHtml(time+' '+title)}">
-        <span class="time-before">${escapeHtml(time)}</span><span class="bubble" aria-hidden="true">${metroIcon(item)}</span>
-        <span class="d-copy"><strong class="d-title">${escapeHtml(title)}</strong><span class="d-desc">${escapeHtml(desc)}</span></span></button>`;
-    }).join('');
-    return `<div class="metro-day-heading"><div class="d-text"><h2>${label}</h2><p>${events.length} moment${events.length===1?'':'s'} · tap a bubble to open it</p></div><button type="button" class="metro-to-week" id="metroBackWeek">← Week</button></div>
-      <div class="metro-day-scroll" id="metroDayScroll"><div class="metro-day-chart" style="height:${H}px">${ticks}${posts}</div></div>`;
+    // Each half-hour with real moments is one metro junction, all its Cosmoses
+    // branch horizontally. No fabricated circles or invented relationships.
+    const grouped=new Map();
+    for(const x of rows){const d=new Date(x.date);if(!Number.isFinite(d.getTime()))continue;
+      const bucket=Math.floor((d.getHours()*60+d.getMinutes())/30);
+      if(!grouped.has(bucket))grouped.set(bucket,[]);grouped.get(bucket).push(x);}
+    const branches=[];let lastY=-100;
+    for(const [bucket,items] of grouped){
+      const minute=bucket*30;
+      const y=Math.max(40+minute*.74,lastY+80);lastY=y;
+      const points=items.map(item=>{
+        const d=new Date(item.date),stamp=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        return `<button type="button" class="living-bubble ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
+          aria-label="${escapeHtml(stamp+', '+(item.locked?'sealed future Cosmos':(item.kind||'Cosmos')+' moment'))}">
+          <span class="living-orb" aria-hidden="true">${metroIcon(item)}</span><span class="living-clock">${escapeHtml(stamp)}</span></button>`;
+      }).join('');
+      branches.push(`<div class="living-branch" style="top:${Math.round(y)}px" aria-label="${items.length} Cosmos moment${items.length===1?'':'s'}">
+        <span class="living-junction" aria-hidden="true"></span>
+        <div class="living-rail" aria-label="Swipe sideways to explore moments at this stop">${points}</div></div>`);
+    }
+    const height=Math.max(1200,lastY+145);
+    const hours=[0,3,9,15,21,24];
+    const ticks=hours.map(h=>`<div class="living-tick" style="top:${Math.round(40+h*60*.74)}px"><span>${h===0?'12 AM':h===12?'12 PM':h===24?'12 AM':h<12?h+' AM':(h-12)+' PM'}</span></div>`).join('');
+    const periods=[['MORNING',6],['AFTERNOON',12],['EVENING',18],['NIGHT',22]]
+      .map(([name,h])=>`<div class="living-period" style="top:${Math.round(45+h*60*.74)}px">${name}</div>`).join('');
+    const empty=rows.length?'':`<div class="living-empty">No Cosmos moments were saved for this day. The Metro is ready when you leave one.</div>`;
+    return heading(`${events.length} real moment${events.length===1?'':'s'} · tap a circle to reveal`)+
+      `<div class="metro-day-scroll" id="metroDayScroll" aria-label="Vertical day timeline. Scroll up and down for hours.">
+        <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="height:${Math.round(height)}px;--selected-day-trunk:${trunkPct}%">
+          <div class="living-trunk" aria-hidden="true"></div>${ticks}${periods}${branches.join('')}${empty}</div></div>`;
   }
   async function openMetroBubble(key,button){
     const item=weekMetroItems.find(i=>i.key===key);if(!item)return;
@@ -2120,7 +2262,7 @@
     return `<div class="metro" aria-label="Time metro: swipe right into the past, left into the future"><div class="metro-track"></div><div class="metro-items">${items}</div></div><div class="metro-note"><strong>← Earlier · Later →</strong><br>Swipe across days, months and years; a quick flick skips farther.</div>`;
   }
   function travel(direction,steps=1){
-    if(token && me && auth.hidden && sheet.hidden && panel.hidden){shiftWeekMetro(direction,steps>=12?52:steps>=5?4:1);return;}
+    if(token && me && auth.hidden && sheet.hidden && panel.hidden){moveMetroDays(direction*(steps>=12?365:steps>=5?28:1));return;}
     if(!token || !auth.hidden || !sheet.hidden || !panel.hidden)return;
     const amount=Math.min(48,Math.max(1,Math.floor(steps)));
     const signed=direction*amount;
