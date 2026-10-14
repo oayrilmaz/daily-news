@@ -7,8 +7,8 @@
   <link rel="manifest" href="/cosmos.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
-  <meta name="theme-color" content="#dceaf7" />
-  <meta name="cosmos-build" content="cosmos-life-v2.6.3-liquid-metro" />
+  <meta name="theme-color" content="#e5effa" />
+  <meta name="cosmos-build" content="cosmos-life-v2.6.4-liquid-glass-connections" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -774,7 +774,7 @@
     .handle{background:linear-gradient(90deg,#bfcede,#88adcc,#bfcede);box-shadow:0 1px 2px rgba(255,255,255,.87)}
     .sheet h2{color:#102d53;letter-spacing:-.042em}
     .sheet p{color:#4f6482}
-    .sheet.liquid-compose-menu{height:min(540px,88dvh);max-height:calc(100dvh - 36px)}
+    .sheet.liquid-compose-menu{height:min(630px,86dvh);max-height:calc(100dvh - 36px)}
     .sheet.liquid-compose-menu .sheet-inner{padding-top:13px;padding-bottom:calc(env(safe-area-inset-bottom) + 16px)}
     .sheet.liquid-compose-menu .choices{margin-top:16px}
     .liquid-choices{gap:10px}
@@ -832,6 +832,42 @@
     @supports not ((-webkit-backdrop-filter:blur(2px)) or (backdrop-filter:blur(2px))){
       .living-entry,.sheet,.account,.journey-label,.dim-nav button,.sheet-quickbar{background:rgba(248,251,255,.97)!important}}
 
+    /* v2.6.4 — Real liquid transparency: camera remains perceptible through panels. */
+    :root{--liquid-glass:linear-gradient(137deg,rgba(255,255,255,.61) 0%,rgba(221,238,255,.36) 47%,rgba(250,253,255,.54) 100%);
+      --liquid-shadow:0 8px 28px rgba(22,58,108,.12),0 2px 7px rgba(38,95,165,.05)}
+    .sheet-backdrop{background:rgba(10,28,50,.10);
+      -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+    .sheet{background:linear-gradient(145deg,rgba(250,253,255,.64) 0%,rgba(222,238,255,.50) 52%,rgba(250,253,255,.64) 100%);
+      -webkit-backdrop-filter:blur(12px) saturate(1.24);backdrop-filter:blur(12px) saturate(1.24);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 -12px 44px rgba(20,51,98,.14)}
+    .sheet-quickbar{background:linear-gradient(115deg,rgba(255,255,255,.59),rgba(219,239,255,.37));
+      -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+    .sheet .choices .choice,.sheet .liquid-choices .choice{
+      border:1px solid rgba(255,255,255,.81);
+      background:linear-gradient(135deg,rgba(255,255,255,.65),rgba(218,239,255,.46),rgba(251,253,255,.60));
+      -webkit-backdrop-filter:blur(11px) saturate(1.25);backdrop-filter:blur(11px) saturate(1.25);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.94),0 5px 19px rgba(37,91,150,.10)}
+    .sheet .choices .choice[disabled]{background:rgba(236,241,250,.48)}
+    .sheet .choices .choice strong,.sheet h2{color:#142e53}
+    .sheet .circle-info{background:rgba(242,249,255,.58);border-color:rgba(175,205,235,.45);
+      -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);border-radius:19px}
+    .circle-member-names{margin-top:8px;font-size:13px;font-weight:600;color:#395d82;line-height:1.5}
+    .sheet .circle-info small{display:block;margin-top:9px;line-height:1.45;color:#516e8c}
+    .sheet .actions button:not(.primary),.sheet .friend-row,.sheet .media-preview,
+    .sheet .connections-timeline,.sheet .circle-card,.sheet .look-card{
+      background:var(--liquid-glass)}
+    .sheet .field input,.sheet .field textarea,.sheet .invite-url{background:rgba(255,255,255,.66)}
+    .app.metro-live .metro-popover{background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(218,239,255,.75))!important}
+    .living-entry{background:var(--liquid-glass);border-color:rgba(255,255,255,.78)}
+    .account,.cosmos-bell,.journey-controls button,.journey-label,.dim-nav button,.hint{background:var(--liquid-glass)}
+    .sheet.liquid-compact-step{height:auto;max-height:min(86dvh,720px)}
+    .sheet.liquid-compact-step .sheet-inner{flex:0 1 auto;max-height:min(75dvh,620px);overflow-y:auto}
+    .toast{z-index:90;max-width:min(90vw,440px);border-radius:18px;
+      box-shadow:0 11px 38px rgba(17,41,75,.22);white-space:normal;line-height:1.4}
+    .circle-arrow{font-size:16px;color:#346bb0;float:right}
+    @supports not ((-webkit-backdrop-filter:blur(2px)) or (backdrop-filter:blur(2px))){
+      .sheet{background:rgba(248,252,255,.96)}.sheet .choices .choice{background:rgba(246,250,255,.96)}}
+
   </style>
 </head>
 <body>
@@ -875,7 +911,7 @@
   </div>
 
   <button type="button" id="cameraEscape" class="camera-escape" hidden aria-label="Return to live camera">◯ Camera / NOW</button>
-  <div class="toast" id="toast" hidden></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
   <div class="sheet" id="sheet" hidden></div>
   <div class="panel" id="panel" hidden></div>
@@ -976,8 +1012,8 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  function closeSheet(){sheet.classList.remove('metro-expanded','liquid-compose-menu');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheet.classList.remove('metro-expanded','liquid-compose-menu');
+  function closeSheet(){sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -1911,22 +1947,73 @@
     $('audienceBack').onclick=showRecipientStep;
   }
   function showRecipientStep(){
-    openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices">
-      <button class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
-      <button class="choice" data-recipient="person"><strong>Someone</strong><span>A person you choose.</span></button>
-      <button class="choice" data-recipient="circle"><strong>My Connections</strong><span>Share a text moment with your accepted circle.</span></button>
-      <button class="choice" disabled><strong>Anyone</strong><span>Release / Message in a Bottle comes next.</span></button>
+    const textAllowed=compose?.content_kind==='text';
+    openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices recipient-choices">
+      <button type="button" class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
+      <button type="button" class="choice" data-recipient="person"><strong>Someone</strong><span>Choose an accepted connection.</span></button>
+      <button type="button" class="choice" data-recipient="circle"><strong>My Connections <span class="circle-arrow">→</span></strong><span>${textAllowed?'Share text with your accepted circle.':'Group media coming later · send privately now.'}</span></button>
+      <button type="button" class="choice" disabled><strong>Anyone</strong><span>Public posting is not enabled.</span></button>
     </div><div class="actions"><button id="backRecipient">Back</button></div>`);
-    $("backRecipient").onclick=showContentStep;sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{
+    sheet.classList.add('liquid-compact-step');
+    $("backRecipient").onclick=showContentStep;
+    sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{
       const choice=b.dataset.recipient;
-      if(choice==='circle'){
-        if(compose.content_kind!=='text')return toastMsg('Your Connections timeline currently supports text only.');
-        compose.recipient_mode='self';compose.recipient_user_id=null;compose.circle_audience='connections';return showWhenStep();
-      }
+      if(choice==='circle')return showMyConnectionsChoice();
       compose.recipient_mode=choice;compose.circle_audience=null;
       if(choice==='person')return compose.recipient_user_id?showAudienceStep():showPersonStep();
-      compose.recipient_user_id=null;showWhenStep();
+      compose.recipient_user_id=null;compose.recipient_label='';showWhenStep();
     });
+  }
+
+  // v2.6.4: A deliberate audience screen, never an invisible toast behind a sheet.
+  // The v2.4 Worker permits Connections-wide text only. Do not mislabel group
+  // media or silently publish it to a narrower/wider audience.
+  async function showMyConnectionsChoice(){
+    if(!compose)return;
+    const kind=String(compose.content_kind||'moment');
+    if(kind!=='text'){
+      const types={photo:'photos',voice:'voice messages',video:'videos',music:'music',link:'links'};
+      openSheet(`<h2>My Connections</h2><p>Sharing ${escapeHtml(types[kind]||'this media')} with everyone in your circle is not enabled yet.</p>
+        <div class="circle-info"><b>Private sharing is available now.</b><br>You can share this moment with one accepted connection using <b>Someone</b>. Group media needs additional safety review before launch.</div>
+        <div class="actions"><button type="button" id="circleBack">Back</button><button type="button" class="primary" id="circlePickOne">Choose a person →</button></div>`);
+      sheet.classList.add('liquid-compact-step');
+      $('circleBack').onclick=showRecipientStep;
+      $('circlePickOne').onclick=()=>{compose.recipient_mode='person';compose.circle_audience=null;compose.recipient_user_id=null;showPersonStep();};
+      return;
+    }
+    openSheet(`<h2>My Connections</h2><p>Checking your accepted connections…</p><div class="look-loading" role="status">Loading your circle…</div>
+      <div class="actions"><button type="button" id="circleBack">Back</button></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('circleBack').onclick=showRecipientStep;
+    try{
+      const r=await api('/api/friends');
+      // Ignore a response if the user left this step while it was loading.
+      if(!compose||sheet.hidden||!$('circleBack'))return;
+      friendsCache.accepted=r.accepted||[];
+      const count=friendsCache.accepted.length;
+      const names=friendsCache.accepted.slice(0,5).map(p=>escapeHtml(p.name||'Connection')).join(' · ');
+      openSheet(`<h2>My Connections</h2>
+        <p>${count?`Share this <b>text</b> moment with your ${count} accepted connection${count===1?'':'s'}.`:'You have no accepted connections yet.'}</p>
+        <div class="circle-info"><b>${count?`◯ Your circle · ${count} connected`:'◯ Your circle is waiting'}</b>
+          <div class="circle-member-names">${count?names+(count>5?` · +${count-5} more`:''):'Invite someone and accept their request to start sharing.'}</div>
+          ${count?'<small>Your message will appear only after it is approved under your circle settings. It is never public.</small>':''}</div>
+        <div class="actions"><button type="button" id="circleBack">Back</button>
+          <button type="button" class="primary" id="circleContinue">${count?'Continue →':'Invite someone →'}</button></div>`);
+      sheet.classList.add('liquid-compact-step');
+        $('circleBack').onclick=showRecipientStep;
+      $('circleContinue').onclick=()=>{
+        if(!count){openInvite();return;}
+        compose.recipient_mode='self';compose.recipient_user_id=null;compose.recipient_label='My Connections';
+        compose.circle_audience='connections';showWhenStep();
+      };
+    }catch(e){
+      if(!compose||sheet.hidden||!$('circleBack'))return;
+      openSheet(`<h2>Connections unavailable</h2><p>Couldn't check your circle: ${escapeHtml(e.message)}</p>
+        <div class="actions"><button id="circleBack">Back</button><button id="circleRetry" class="primary">Try again</button></div>`);
+      sheet.classList.add('liquid-compact-step');
+        $('circleBack').onclick=showRecipientStep;
+      $('circleRetry').onclick=showMyConnectionsChoice;
+    }
   }
 
   async function showPersonStep(){
@@ -1953,6 +2040,7 @@
       <button class="choice" data-when="here"><strong>When here</strong><span>Wait for this place.</span></button>
       <button class="choice" data-when="date"><strong>Future date</strong><span>Wait until a date you choose.</span></button>
     </div><div class="actions"><button id="backWhen">Back</button></div>`);
+    sheet.classList.add('liquid-compact-step');
     $("backWhen").onclick=()=>compose?.recipient_mode==='person'?showAudienceStep():showRecipientStep();sheet.querySelectorAll("[data-when]").forEach(b=>b.onclick=async()=>{
       compose.unlock_mode=b.dataset.when;
       if(compose.unlock_mode==="here"){
@@ -1994,21 +2082,29 @@
   }
 
   function showFinalStep(){
-    const who=compose.recipient_mode==="self"?"Future you":compose.recipient_label||"Someone";
+    const who=compose.circle_audience==='connections' && compose.recipient_mode==='self'?'My Connections':compose.recipient_mode==='self'?'Future you':compose.recipient_label||'Someone';
     const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString():"Now";
     const sharing=compose.circle_audience==='connections'?'Connections (owner-controlled)':compose.circle_audience==='between_us'?'Only us':'Private';
     openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} Your location is not shared with others by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    sheet.classList.add('liquid-compact-step');
     $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
   }
 
   async function createCosmos(){
     $("leaveFinal").disabled=true;$("leaveFinal").textContent="Leaving…";
     try{
+      const forOwnCircle=compose.recipient_mode==='self' && compose.circle_audience==='connections';
       const out=await api("/api/cosmos",{method:"POST",body:JSON.stringify(compose)});
       const backTarget=pendingCircleReturn;pendingCircleReturn=null;
       weekMetroCacheKey="";weekMetroPopId=null;closeSheet();renderJourney();refreshConnections();
+      if(forOwnCircle){
+        toastMsg(out.circle_status==='pending'?'Saved. Review and approve it in your shared timeline.':'Shared with your Connections.',4400);
+        openFriendTimeline(me.id,me.display_name||'My');return;
+      }
       toastMsg(out.circle_status==='pending'?'Sent to their timeline for approval.':'Left in Cosmos.');
-      if(backTarget){openFriendTimeline(backTarget.id,backTarget.name);return;}ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to leave something. Hold ◯ to look deeper. Hold ◯ to leave something.";},3200);
+      if(backTarget){openFriendTimeline(backTarget.id,backTarget.name);return;}
+      ambientTitle.textContent="The world remembers.";ambientSub.textContent="Your Cosmos will wait for its moment.";
+      setTimeout(()=>{ambientTitle.textContent="The world has more.";ambientSub.textContent="Point at anything. Tap ◯ to leave something. Hold ◯ to look deeper.";},3200);
     }catch(e){toastMsg(e.message,4200);$("leaveFinal").disabled=false;$("leaveFinal").textContent="Leave ◯";}
   }
 
