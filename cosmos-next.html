@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v2.5-living-metro" />
+  <meta name="cosmos-build" content="cosmos-life-v2.5.1-compact-expandable-moments" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -529,6 +529,63 @@
       .app.metro-live .metro-week-day .wd-branch{height:29px!important}}
     @media(prefers-reduced-motion:reduce){.living-branch .living-orb{transition:none}}
 
+
+    /* COSMOS v2.5.1: a compact *peek*, not a large card that blocks the Metro. */
+    .app.metro-live .metro-popover{
+      left:12px!important;right:12px!important;max-height:170px!important;
+      min-height:104px;overflow:hidden!important;padding:12px 13px 12px!important;
+      border-radius:19px;box-shadow:0 12px 36px rgba(15,36,65,.27);
+      touch-action:manipulation;
+    }
+    .app.metro-live .metro-popover .metro-close-pop{top:8px;right:8px;min-height:35px;min-width:35px}
+    .app.metro-live .metro-popover .metro-peek-name{display:block;font-size:12px;font-weight:850;
+      white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-width:calc(100% - 37px)}
+    .app.metro-live .metro-popover .metro-peek-meta{display:block;color:#63738a;font-size:10px;margin-top:3px}
+    .app.metro-live .metro-popover .metro-peek-content{display:flex;align-items:center;gap:12px;
+      margin-top:9px;min-height:52px}
+    .app.metro-live .metro-popover .metro-peek-image{width:58px;height:58px;flex:none;
+      object-fit:cover;border-radius:10px;border:1px solid #e6eaf1;background:#edf2f8}
+    .app.metro-live .metro-popover .metro-peek-icon{width:52px;height:52px;flex:none;
+      border-radius:50%;display:grid;place-items:center;background:#edf3fb;color:#1b3559;font-size:23px}
+    .app.metro-live .metro-popover .metro-peek-copy{min-width:0;flex:1;display:grid;gap:4px}
+    .app.metro-live .metro-popover .metro-peek-copy strong{font-size:12px;line-height:1.3;display:-webkit-box;
+      -webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+    .app.metro-live .metro-popover .metro-peek-copy span{font-size:10px;color:#66738a}
+    .app.metro-live .metro-popover .metro-peek-open{border:1px solid #cfd9e9;background:#f0f5fc;
+      border-radius:12px;font-size:12px;font-weight:850;color:#143157;min-height:41px;
+      padding:8px 11px;flex:0 0 auto}
+    .app.metro-live .metro-popover .metro-peek-body{display:block;width:100%;border:0;text-align:left;
+      padding:0;margin:0;background:transparent;color:#18304d}
+    .app.metro-live .metro-popover .metro-peek-body:focus-visible,
+    .app.metro-live .metro-popover .metro-peek-open:focus-visible{outline:3px solid #5e89bd;outline-offset:2px}
+    .sheet.metro-expanded{height:min(96dvh,950px);max-height:calc(100dvh - env(safe-area-inset-top) - 10px);
+      border-radius:23px 23px 0 0;bottom:0;overflow:hidden}
+    .sheet.metro-expanded .sheet-inner{flex:1;min-height:0;overflow-y:auto!important;-webkit-overflow-scrolling:touch;
+      touch-action:pan-y;overscroll-behavior:contain;padding-bottom:calc(env(safe-area-inset-bottom) + 42px)}
+    .sheet.metro-expanded .sheet-quickbar{padding:calc(env(safe-area-inset-top) + 7px) 12px 9px;
+      flex:none;background:#fff}
+    .sheet.metro-expanded .metro-reader-bar{width:100%;min-width:0;display:flex;gap:6px;
+      align-items:center;justify-content:space-between}
+    .sheet.metro-expanded .metro-reader-bar .metro-reader-back{padding:8px 10px;font-size:12px;
+      border-radius:13px;white-space:nowrap}
+    .sheet.metro-expanded .metro-reader-bar .metro-reader-count{min-width:0;text-align:center;
+      font-size:10px;font-weight:850;color:#586b87;line-height:1.25}
+    .sheet.metro-expanded .metro-reader-bar .metro-reader-nav{display:flex;gap:4px}
+    .sheet.metro-expanded .metro-reader-bar .metro-reader-nav button{width:40px;min-width:40px;
+      min-height:39px;padding:0;font-size:19px;border-radius:11px}
+    .sheet.metro-expanded .metro-reader-bar .metro-reader-nav button:disabled{opacity:.28}
+    .sheet.metro-expanded .media-preview img,.sheet.metro-expanded .media-preview video{
+      max-height:none!important;height:auto!important;max-width:100%;object-fit:contain;
+      display:block;margin:auto}
+    .sheet.metro-expanded .media-preview audio,.sheet.metro-expanded .inline-video{width:100%}
+    .sheet.metro-expanded .media-preview .inline-video{height:clamp(170px,48vw,340px)}
+    .sheet.metro-expanded .attachment-row img,.sheet.metro-expanded .attachment-row video{
+      max-height:none!important;height:auto!important;max-width:100%;object-fit:contain}
+    .sheet.metro-expanded .card-body,.sheet.metro-expanded .attachment-row{overflow-wrap:anywhere}
+    @media(min-width:760px){.sheet.metro-expanded{width:min(760px,calc(100% - 32px));margin-bottom:0}}
+    @media(max-width:355px){.app.metro-live .metro-popover{left:5px!important;right:5px!important;padding:10px!important}
+      .app.metro-live .metro-peek-image{width:48px;height:48px}}
+
   </style>
 </head>
 <body>
@@ -673,8 +730,8 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  function closeSheet(){friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){
+  function closeSheet(){sheet.classList.remove('metro-expanded');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){sheet.classList.remove('metro-expanded');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -1832,12 +1889,12 @@
     return `<div class="card-body">${escapeHtml(item.content_text||"")}</div>`;
   }
 
-  async function renderCosmos(item,thread,additions=[]){
+  async function renderCosmos(item,thread,additions=[],fromMetro=false){
     const content=await contentHtml(item);
     const additionsHtml=await buildMomentExtras(additions,item.creator_user_id===me?.id,item.id);
     const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
     openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_add!==false?'<button type="button" id="addToMoment" class="primary">+ Add moment</button>':''}</div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
-    $("closeCosmos").onclick=()=>{closeSheet();scanHere(false);};
+    $("closeCosmos").onclick=()=>{closeSheet();if(!fromMetro)scanHere(false);};
     sheet.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=async()=>{
       if(!confirm('Remove this addition from the moment for all participants?'))return;
       b.disabled=true;
@@ -1854,6 +1911,41 @@
     if($('deleteCosmos'))$('deleteCosmos').onclick=()=>deleteOwnPost(item.id);
     if($("blockSender"))$("blockSender").onclick=async()=>{if(!confirm("Block this sender from contacting you through Cosmos?"))return;try{await api("/api/block",{method:"POST",body:JSON.stringify({user_id:item.creator_user_id})});closeSheet();toastMsg("Blocked.");}catch(e){toastMsg(e.message);}};
     if($("reportCosmos"))$("reportCosmos").onclick=async()=>{const reason=prompt("What should Cosmos review?","")?.trim();if(!reason)return;try{await api("/api/report",{method:"POST",body:JSON.stringify({item_id:item.id,reason})});toastMsg("Thank you. This was reported for review.");}catch(e){toastMsg(e.message);}};
+  }
+
+
+  // Only the Metro's expanded reader gets these controls; standard Cosmos
+  // sheets, including notification deep-links, are left unchanged.
+  function styleMetroFullReader(item){
+    sheet.classList.add('metro-expanded');
+    const available=weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(weekMetroDay)&&!i.locked)
+      .sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+    const idx=available.findIndex(i=>i.id===item.id);
+    const bar=sheet.querySelector('.sheet-quickbar');
+    if(!bar)return;
+    bar.innerHTML=`<div class="metro-reader-bar"><button type="button" class="metro-reader-back" id="metroReaderBack">← Metro</button>
+      <span class="metro-reader-count">${idx>=0?`Moment ${idx+1} of ${available.length}`:'Cosmos moment'}<br>${escapeHtml(weekMetroDay.toLocaleDateString('en-US',{month:'short',day:'numeric'}))}</span>
+      <nav class="metro-reader-nav" aria-label="Explore moments on this day"><button id="metroReaderPrev" aria-label="Previous moment" ${idx<=0?'disabled':''}>‹</button><button id="metroReaderNext" aria-label="Next moment" ${idx<0||idx===available.length-1?'disabled':''}>›</button></nav></div>`;
+    const back=()=>{closeSheet();weekMetroPopId=null;const peek=$('metroPopover');if(peek)peek.remove();};
+    $('metroReaderBack').onclick=back;
+    if($('closeCosmos'))$('closeCosmos').onclick=back;
+    const prev=$('metroReaderPrev'),next=$('metroReaderNext');
+    if(prev&&idx>0)prev.onclick=()=>openMetroExpandedByKey(available[idx-1].key);
+    if(next&&idx>=0&&idx<available.length-1)next.onclick=()=>openMetroExpandedByKey(available[idx+1].key);
+    // Start every new moment at the top; native sheet-inner scroll handles
+    // arbitrarily tall photos, videos, threaded posts, and additions.
+    const inner=sheet.querySelector('.sheet-inner');if(inner)inner.scrollTop=0;
+  }
+  async function openMetroExpandedByKey(key,cached=null){
+    const record=weekMetroItems.find(i=>i.key===key);if(!record||record.locked)return;
+    weekMetroPopId=null;$('metroPopover')?.remove();
+    try{
+      const r=cached||await api('/api/cosmos/'+encodeURIComponent(record.id)+'/open',{
+        method:'POST',body:JSON.stringify(lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{})});
+      if(!r?.item)return;
+      await renderCosmos(r.item,r.thread||[],r.additions||[],true);
+      styleMetroFullReader(r.item);
+    }catch(e){toastMsg(e.message,4500);}
   }
 
   async function showSpace(space){
@@ -2210,40 +2302,67 @@
         <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="height:${Math.round(height)}px;--selected-day-trunk:${trunkPct}%">
           <div class="living-trunk" aria-hidden="true"></div>${ticks}${periods}${branches.join('')}${empty}</div></div>`;
   }
+  function metroPeekHtml(item,record,extraCount=0,thumbnail=''){
+    const headline=record?.sender_name||item.title||'Cosmos';
+    const stamp=new Date(item.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const type=record?.content_kind||item.kind||'moment';
+    const copy=record?.content_text||item.preview||'';
+    const limit=118;
+    const summary=copy.length>limit?copy.slice(0,limit).trim()+'…':copy;
+    const symbol=({photo:'▧',video:'▶',voice:'♫',music:'♫',link:'↗',text:'✎'})[type]||'◯';
+    const image=thumbnail&&type==='photo'?`<img class="metro-peek-image" src="${thumbnail}" alt="Photo thumbnail">`:
+      `<span class="metro-peek-icon" aria-hidden="true">${symbol}</span>`;
+    return `<div class="metro-peek-head"><strong class="metro-peek-name">${escapeHtml(headline)}</strong>
+      <span class="metro-peek-meta">${escapeHtml(stamp)} · ${escapeHtml(type)}${extraCount?' · '+extraCount+' additions':''}</span></div>
+      <div class="metro-peek-content"><button type="button" class="metro-peek-body" id="metroPeekBody" aria-label="Expand this Cosmos moment">
+        <span style="display:flex;align-items:center;gap:10px">${image}<span class="metro-peek-copy"><strong>${escapeHtml(summary||'Tap to view this moment')}</strong>
+        <span>${type==='photo'?'View image and all contributions':type==='video'?'Open to play video':type==='voice'?'Open to play voice':type==='music'?'Open to play music':'Open and explore'}</span></span></span></button>
+        <button type="button" class="metro-peek-open" id="metroPeekExpand">↗ Open</button></div>`;
+  }
   async function openMetroBubble(key,button){
     const item=weekMetroItems.find(i=>i.key===key);if(!item)return;
     if(weekMetroPopId===key){$('metroPopover')?.remove();weekMetroPopId=null;return;}
     weekMetroPopId=key;
-    const safeTitle=escapeHtml(metroTitleShort(item));
-    showMetroPopover(`<h3>${safeTitle}</h3><p class="metro-pop-meta">${escapeHtml(new Date(item.date).toLocaleString())}</p><div class="metro-pop-content">${item.locked?(item.reveal_at?'🔒 Something is waiting for you. It will reveal '+new Date(item.reveal_at).toLocaleString()+'.':'🔒 This Cosmos opens when its place condition is met.'):'Opening moment…'}</div>`,button);
-    if(item.locked)return;
+    const preview=()=>showMetroPopover(`<div class="metro-peek-head"><strong class="metro-peek-name">${escapeHtml(metroTitleShort(item))}</strong>
+      <span class="metro-peek-meta">${escapeHtml(new Date(item.date).toLocaleString())}</span></div>
+      <div class="metro-peek-content"><span class="metro-peek-icon" aria-hidden="true">${item.locked?'🔒':'◯'}</span>
+      <span class="metro-peek-copy"><strong>${item.locked?'A surprise is waiting to reveal':'Opening moment…'}</strong></span></div>`,button);
+    preview();
+    if(item.locked){
+      const text=item.reveal_at?'It will reveal '+new Date(item.reveal_at).toLocaleString()+'.':'It will reveal only when its original conditions are met.';
+      showMetroPopover(`<strong class="metro-peek-name">🔒 Something is waiting for you</strong><p class="metro-pop-meta">${escapeHtml(text)}</p>`,button);
+      return;
+    }
     try{
       const body=lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{};
       const r=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/open',{method:'POST',body:JSON.stringify(body)});
       if(weekMetroPopId!==key)return;
-      const content=await contentHtml(r.item);
+      let thumb='';
+      if(r.item.content_kind==='photo'&&r.item.media_id){
+        try{thumb=await mediaObjectUrl(r.item.media_id);}catch{} 
+      }
       if(weekMetroPopId!==key)return;
-      const title=escapeHtml(r.item.sender_name||item.title||'Cosmos moment');
-      const html=`<h3>${title}</h3><p class="metro-pop-meta">${escapeHtml(new Date(item.date).toLocaleString())} · ${escapeHtml(item.kind)}</p>
-        <div class="metro-pop-content">${content}</div>
-        <div class="metro-pop-actions"><button id="metroViewFull" type="button">Open full moment →</button>${r.item.can_add===false?'':'<button id="metroAddMoment" class="primary" type="button">+ Add moment</button>'}</div>`;
-      showMetroPopover(html,button);
-      $('metroViewFull')?.addEventListener('click',()=>{weekMetroPopId=null;$('metroPopover')?.remove();renderCosmos(r.item,r.thread||[],r.additions||[]);});
-      $('metroAddMoment')?.addEventListener('click',()=>{weekMetroPopId=null;$('metroPopover')?.remove();openAddToMoment(r.item);});
-    }catch(e){if(weekMetroPopId===key)showMetroPopover(`<h3>Moment unavailable</h3><p>${escapeHtml(e.message)}</p>`,button);}
+      showMetroPopover(metroPeekHtml(item,r.item,(r.additions||[]).length,thumb),button);
+      const expand=()=>openMetroExpandedByKey(key,r);
+      $('metroPeekBody')?.addEventListener('click',expand);
+      $('metroPeekExpand')?.addEventListener('click',expand);
+    }catch(e){if(weekMetroPopId===key)showMetroPopover(`<strong class="metro-peek-name">Moment unavailable</strong><p class="metro-pop-meta">${escapeHtml(e.message)}</p>`,button);}
   }
   function showMetroPopover(inner,button){
     const holder=$('metroMain');if(!holder)return;
     $('metroPopover')?.remove();const box=document.createElement('aside');box.className='metro-popover';box.id='metroPopover';
-    box.setAttribute('role','dialog');box.setAttribute('aria-label','Selected Cosmos moment');
-    box.innerHTML=`<button type="button" class="metro-close-pop" aria-label="Close moment" id="metroClosePop">×</button>`+inner;
+    box.setAttribute('role','dialog');box.setAttribute('aria-label','Cosmos moment preview');
+    box.innerHTML=`<button type="button" class="metro-close-pop" aria-label="Close preview" id="metroClosePop">×</button>`+inner;
     holder.appendChild(box);$('metroClosePop').onclick=()=>{weekMetroPopId=null;box.remove();};
     const holderRect=holder.getBoundingClientRect(),tap=button?.getBoundingClientRect();
-    const eventY=tap?tap.top-holderRect.top:150;
-    // Keep popover visible on small screens, without replacing the Metro view.
-    const contentHeight=Math.min(box.scrollHeight,Math.min(window.innerHeight*.52,450));
-    const y=Math.min(Math.max(6,eventY+28),Math.max(6,holderRect.height-contentHeight-9));
-    box.style.top=Math.round(y)+'px';
+    const eventY=tap?tap.top-holderRect.top:holderRect.height*.46;
+    // A constant small preview height means it can never trap long images or
+    // cover the shutter / navigation; full content belongs to the reader.
+    const height=Math.min(170,Math.max(104,box.scrollHeight));
+    const below=eventY+33;
+    const above=eventY-height-16;
+    const y=below+height<holderRect.height-9?below:Math.max(5,above);
+    box.style.top=Math.max(5,Math.min(y,holderRect.height-height-6))+'px';
   }
   function renderMetro(){
     if(!journeyFocus)return '';
