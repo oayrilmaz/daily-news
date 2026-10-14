@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-life-v2.2.1-direct-moment-links" />
+  <meta name="cosmos-build" content="cosmos-life-v2.2.2-direct-moment-routing" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -348,7 +348,10 @@
   const OPEN_INBOX_FROM_LINK=qs.get("inbox")==="1";
   // Direct notification ID is resolved only through the authenticated recipient's inbox.
   // A URL parameter alone NEVER grants access to a private moment.
-  const DIRECT_NOTICE_ID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(qs.get("notice")||"") ? qs.get("notice") : "";
+  const NOTICE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const DIRECT_NOTICE_ID=NOTICE_ID_PATTERN.test(qs.get("notice")||"") ? qs.get("notice") : "";
+  let pendingNoticeId=DIRECT_NOTICE_ID;
+  let lastOpenedNoticeId='';
 
 
   const $ = id => document.getElementById(id);
@@ -460,36 +463,85 @@
   }
 
   let directNoticeOpening=false;
-  async function openNotificationMomentFromLink(){
-    if(!DIRECT_NOTICE_ID||!token||!me||directNoticeOpening)return;
-    directNoticeOpening=true;
-    openSheet('<h2>Opening your moment…</h2><p>Taking you directly to the Cosmos someone shared with you.</p><div class="look-loading">Opening…</div>');
+  function ackPushNotice(id){
+    if(!NOTICE_ID_PATTERN.test(id||'')||!navigator.serviceWorker)return;
+    navigator.serviceWorker.getRegistration('/cosmos-next.html').then(r=>r?.active?.postMessage({type:'COSMOS_ACK_NOTIFICATION',notice_id:id})).catch(()=>{});
+  }
+  // Both URLs and messages from the installed Home Screen app use this path.
+  function receivePushNotice(id){
+    if(!NOTICE_ID_PATTERN.test(id||''))return;
+    if(id===lastOpenedNoticeId && !sheet.hidden)return;
+    pendingNoticeId=id;
+    if(token&&me&&auth.hidden&&!directNoticeOpening){setTimeout(openNotificationMomentFromLink,70);}
+  }
+  async function recoverTappedNotification(){
+    if(!navigator.serviceWorker)return;
     try{
-      // Validate ownership on the server; do not trust the URL or the push payload.
-      const response=await api('/api/notifications');
-      const notice=(response.items||[]).find(n=>n.id===DIRECT_NOTICE_ID);
-      clearNotificationLink();
-      if(!notice||!notice.cosmos_id){
-        closeSheet();
-        toastMsg('That notification is not available. Opening your inbox instead.',3800);
-        await showCosmosNotifications();
+      const reg=await navigator.serviceWorker.getRegistration('/cosmos-next.html');
+      if(!reg?.active)return;
+      const channel=new MessageChannel();
+      const answer=new Promise(resolve=>{
+        let done=false;
+        channel.port1.onmessage=e=>{if(!done){done=true;resolve(e.data?.notice_id||'');}};
+        setTimeout(()=>{if(!done){done=true;resolve('');}},1300);
+      });
+      reg.active.postMessage({type:'COSMOS_GET_PENDING'},[channel.port2]);
+      const id=await answer;
+      if(id)receivePushNotice(id);
+    }catch{}
+  }
+  if(navigator.serviceWorker){
+    navigator.serviceWorker.addEventListener('message',event=>{
+      if(event.data?.type==='COSMOS_OPEN_NOTIFICATION')receivePushNotice(event.data.notice_id);
+    });
+    navigator.serviceWorker.addEventListener('controllerchange',()=>setTimeout(recoverTappedNotification,90));
+    navigator.serviceWorker.ready.then(()=>recoverTappedNotification()).catch(()=>{});
+  }
+  window.addEventListener('pageshow',()=>setTimeout(recoverTappedNotification,180));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(recoverTappedNotification,180);});
+
+  async function openNotificationMomentFromLink(){
+    const noticeId=pendingNoticeId;
+    if(!NOTICE_ID_PATTERN.test(noticeId||'')||!token||!me||directNoticeOpening)return;
+    if(noticeId===lastOpenedNoticeId && !sheet.hidden)return;
+    directNoticeOpening=true;
+    openSheet('<h2>Opening your Cosmos…</h2><p>Finding the moment that was shared with you.</p><div class="look-loading">Opening…</div>');
+    try{
+      let notice=null;
+      // A recent notification can precede the read API replica briefly.
+      for(let attempt=0;attempt<2;attempt++){
+        const response=await api('/api/notifications');
+        notice=(response.items||[]).find(n=>n.id===noticeId);
+        if(notice)break;
+        await new Promise(resolve=>setTimeout(resolve,500));
+      }
+      if(pendingNoticeId!==noticeId)return;
+      if(!notice){
+        openSheet(`<h2>Couldn't find this notification</h2><p>It may be for another signed-in account, or the moment may no longer be shared with you.</p><div class="actions"><button id="directRetry">Try again</button><button id="directSeeNotices">Notifications</button></div>`);
+        $('directRetry').onclick=()=>openNotificationMomentFromLink();
+        $('directSeeNotices').onclick=()=>{pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);showCosmosNotifications();};
         return;
       }
-      // /api/cosmos/:id/open independently enforces friendship, time and place rules.
+      if(!notice.cosmos_id){
+        pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);
+        await showCosmosNotifications();return;
+      }
+      // The existing Cloudflare Worker verifies recipient identity and unlock conditions.
       const opened=await openCosmos(notice.cosmos_id);
       if(opened){
-        try{await api(`/api/notifications/${encodeURIComponent(notice.id)}/read`,{method:'POST'});}catch{}
+        lastOpenedNoticeId=noticeId;pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);
+        try{await api(`/api/notifications/${encodeURIComponent(noticeId)}/read`,{method:'POST'});}catch{}
         refreshNoticeBadge();
       }else{
-        openSheet(`<h2>Moment not available</h2><p>This Cosmos may still be waiting for its date or location, or its sharing permissions may have changed.</p><div class="actions"><button id="directNoticeInbox">Notifications</button><button id="directNoticeCamera">Camera / NOW</button></div>`);
-        $('directNoticeInbox').onclick=showCosmosNotifications;
-        $('directNoticeCamera').onclick=returnToCamera;
+        // Date-, place-, and permission-locked items do not bypass the backend.
+        openSheet(`<h2>This moment isn't available yet</h2><p>It may still be waiting for a date or a location, or its sender may have changed who can view it.</p><div class="actions"><button id="directGoNotices">Notifications</button><button id="directGoCamera">Camera / NOW</button></div>`);
+        $('directGoNotices').onclick=()=>{pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);showCosmosNotifications();};
+        $('directGoCamera').onclick=()=>{pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);returnToCamera();};
       }
     }catch(e){
-      clearNotificationLink();
-      openSheet(`<h2>Couldn't open this moment</h2><p>Check your connection, then try from Notifications.</p><div class="actions"><button id="directNoticeRetry">Notifications</button><button id="directNoticeExit">Camera / NOW</button></div>`);
-      $('directNoticeRetry').onclick=showCosmosNotifications;
-      $('directNoticeExit').onclick=returnToCamera;
+      openSheet(`<h2>Couldn't load this moment</h2><p>${escapeHtml(e.message||'Check your connection and try again.')}</p><div class="actions"><button id="directReload">Try again</button><button id="directDismiss">Camera / NOW</button></div>`);
+      $('directReload').onclick=()=>openNotificationMomentFromLink();
+      $('directDismiss').onclick=()=>{pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);returnToCamera();};
     }finally{directNoticeOpening=false;}
   }
 
@@ -499,13 +551,14 @@
       me = await api("/api/me");
       auth.hidden=true;showAuthError('');
       refreshNoticeBadge();
-      if(DIRECT_NOTICE_ID&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,300);
-      else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,350);
+      if(pendingNoticeId&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,220);
+      else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,550);
       accountButton.textContent = me.display_name || "You";
       startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
       renewSessionIfDue();
       // Update the existing service worker for already-installed iPhone Home Screen apps.
       navigator.serviceWorker?.getRegistration('/cosmos-next.html').then(r=>r?.update()).catch(()=>{});
+      setTimeout(recoverTappedNotification,320);
       if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     }catch(e){
       if(e.status===401 || e.status===403){
@@ -538,7 +591,8 @@
     verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
     try{
       const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(DIRECT_NOTICE_ID)setTimeout(openNotificationMomentFromLink,300);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,300);
+      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,550);
+      setTimeout(recoverTappedNotification,350);
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
   });
 
@@ -1428,7 +1482,7 @@
     const parts=await Promise.all((additions||[]).map(a=>momentAttachmentHtml(a,ownerCanRemove,cosmosId)));return parts.join('');
   }
   function openAddToMoment(item){
-    openSheet(`<h2>Add to this moment</h2><p>Write a comment, record your voice, share media or attach a link. Visible only to the original private participants. Connections-wide posts use the separately approved shared-station flow.</p>
+    openSheet(`<h2>Add a moment</h2><p>Write a comment, record your voice, share media or attach a link. Visible only to the original private participants. Connections-wide posts use the separately approved shared-station flow.</p>
       <div class="choices"><button class="choice" data-extra="text"><strong>Comment</strong><span>Leave words here.</span></button>
       <button class="choice" data-extra="voice"><strong>Voice</strong><span>Record an audio note.</span></button>
       <button class="choice" data-extra="link"><strong>Link</strong><span>Secure web address.</span></button>
@@ -1507,9 +1561,8 @@
     const content=await contentHtml(item);
     const additionsHtml=await buildMomentExtras(additions,item.creator_user_id===me?.id,item.id);
     const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_reply?'<button class="primary" id="replyCosmos">Reply</button>':''}</div>${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">+ Add to moment</button></div>':''}${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_add!==false?'<button type="button" id="addToMoment" class="primary">+ Add moment</button>':''}</div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
     $("closeCosmos").onclick=()=>{closeSheet();scanHere(false);};
-    if($('"replyCosmos"'))$('"replyCosmos"').onclick=()=>showReplyStep(item);
     sheet.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=async()=>{
       if(!confirm('Remove this addition from the moment for all participants?'))return;
       b.disabled=true;
@@ -1523,14 +1576,9 @@
       try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/hide',{method:'POST'});returnToCamera();toastMsg('Hidden from your Cosmos.');scanHere(false);refreshConnections();}
       catch(e){toastMsg(e.message,4300);}
     };
-    if($('"deleteCosmos"'))$('"deleteCosmos"').onclick=()=>deleteOwnPost(item.id);
+    if($('deleteCosmos'))$('deleteCosmos').onclick=()=>deleteOwnPost(item.id);
     if($("blockSender"))$("blockSender").onclick=async()=>{if(!confirm("Block this sender from contacting you through Cosmos?"))return;try{await api("/api/block",{method:"POST",body:JSON.stringify({user_id:item.creator_user_id})});closeSheet();toastMsg("Blocked.");}catch(e){toastMsg(e.message);}};
     if($("reportCosmos"))$("reportCosmos").onclick=async()=>{const reason=prompt("What should Cosmos review?","")?.trim();if(!reason)return;try{await api("/api/report",{method:"POST",body:JSON.stringify({item_id:item.id,reason})});toastMsg("Thank you. This was reported for review.");}catch(e){toastMsg(e.message);}};
-  }
-
-  function showReplyStep(item){
-    openSheet(`<h2>Reply</h2><p>Your reply deepens this Cosmos. It does not create a public comment.</p><div class="field"><label>Your reply</label><textarea id="replyText" placeholder="Leave something worth adding…"></textarea></div><div class="actions"><button id="cancelReply">Back</button><button class="primary" id="sendReply">Reply ◯</button></div>`);
-    $("cancelReply").onclick=()=>openCosmos(item.id);$("sendReply").onclick=async()=>{const text=$("replyText").value.trim();if(!text)return toastMsg("Write a reply first.");try{await api(`/api/cosmos/${encodeURIComponent(item.id)}/reply`,{method:"POST",body:JSON.stringify({content_kind:"text",content_text:text})});closeSheet();toastMsg("Reply added to the Cosmos.");scanHere(false);}catch(e){toastMsg(e.message);}};
   }
 
   async function showSpace(space){
