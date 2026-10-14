@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.6.4-liquid-glass-connections" />
+  <meta name="cosmos-build" content="cosmos-life-v2.7-family-beta-liquid-glass-connections" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1729,12 +1729,12 @@
       return `<div class="circle-card ${futureHidden?'sealed':''}">${futureHidden?'<span class="sealed-label">◌ SEALED · A SURPRISE FOR YOU</span>':''}<strong>${escapeHtml(p.author)}${futureHidden?'':` · ${escapeHtml(p.kind)}`}</strong>
         <span class="circle-meta">${p.audience==='between_us'?'♡ Only us':'◯ Connections'} · ${metaState}</span>
         <p>${escapeHtml(copy)}</p>
-        ${p.pending&&p.can_review?`<div class="circle-review"><button data-circle-review="approve" data-post="${escapeHtml(p.id)}">Approve for connections</button><button data-circle-review="reject" data-post="${escapeHtml(p.id)}">Decline</button></div>`:''}
+        ${p.can_review?`<div class="circle-review">${p.pending?`<button data-circle-review="approve" data-post="${escapeHtml(p.id)}">Approve for connections</button>`:''}<button data-circle-review="reject" data-post="${escapeHtml(p.id)}">${p.pending?'Decline':'Remove from circle'}</button></div>`:''}
         ${!p.locked?`<button type="button" data-circle-open="${escapeHtml(p.id)}" style="margin-top:10px;border-radius:12px;border:1px solid #dce4ec;background:#f7fafc;padding:10px 13px;min-height:42px;font-size:12px">Open moment →</button>`:''}
       </div>`;
     }).join('');
     openSheet(`<h2>◯ ${escapeHtml(name)}'s timeline</h2>
-      <p>Shared moments, from the past into the future. Only posts meant for you will be visible.</p>
+      <p>Shared moments, from the past into the future. Only approved posts from accepted connections are visible. Future surprises stay sealed.</p>
       <div class="circle-header-actions"><button id="circleShare" class="primary">+ Leave a Cosmos here</button><button id="circleBackFriends">Back to connections</button></div>
       <div class="circle-date" aria-live="polite">${escapeHtml(moment)}</div>
       <div class="circle-head"><b>${len?`Station ${idx+1} of ${len}`:'No moments yet'}</b><small>${len?escapeHtml(current.author):'Invite a moment into this timeline'}</small></div>
@@ -1830,9 +1830,9 @@
       const settings=await api('/api/circles/settings');
       openSheet(`<h2>My Connections circle</h2>
         <p>All public Cosmos content is still disabled. This setting affects only your accepted connections.</p>
-        <div class="circle-info"><b>Timeline approval</b><br>By default, a connection's written contribution waits for you to approve it before the rest of your accepted connections can see it.</div>
+        <div class="circle-info"><b>Timeline approval</b><br>By default, someone else’s contribution waits for your approval before your accepted connections can see it. Photos, audio, video, music and links always require your approval.</div>
         <div class="field"><label style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:700"><input id="autoCircleApprove" type="checkbox" style="width:auto;margin-right:10px" ${settings.auto_approve_text?'checked':''} ${settings.auto_approval_available?'':'disabled'}> Automatically approve TEXT contributions from people I've accepted.</label></div>
-        <div class="micro">Automatic approval is unavailable until a moderation service is configured. Other media remains private between two people. You can disable automatic approval at any time; previously approved posts are not retroactively hidden.</div>
+        <div class="micro">Automatic approval of text requires a moderation service. Media contributions always require manual approval. You can reject someone’s previously approved contribution from your timeline. Public sharing remains disabled.</div>
         <div class="actions"><button id="circlePrivacyBack">Back</button><button class="primary" id="saveCirclePrivacy">Save</button></div>`);
       $('circlePrivacyBack').onclick=openFriends;
       $('saveCirclePrivacy').onclick=async()=>{const v=$('autoCircleApprove').checked;
@@ -1932,26 +1932,35 @@
   function showAudienceStep(){
     if(!compose?.recipient_user_id)return showRecipientStep();
     const name=escapeHtml(compose.recipient_label||'your connection');
-    // The choice is Connections for TEXT posts. Non-text stays between two people
-    // while group media moderation is not enabled.
-    const groupAllowed=compose.content_kind==='text';
+    // Every supported moment type may be shared inside an approved private circle.
+    // Owner approval is mandatory for media contributed to someone else's timeline.
+    const groupAllowed=true;
     openSheet(`<h2>Share on ${name}'s timeline</h2><p>Who can discover this Cosmos?</p>
       <div class="circle-audience">
-        ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Recommended</b><span>Share with their accepted connections. The timeline owner reviews contributions unless they opted into automatic text approval.</span></button>`:'<div class="circle-info">Voice, photos and videos can currently be sent privately between two people. Wider sharing requires additional media moderation.</div>'}
+        ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Family beta</b><span>Share with their accepted connections only after they approve your contribution. Never public. Media requires verified sign-in.</span></button>`:''}
         <button type="button" id="audiencePair"><b>♡ Only us · Notify ${name}</b><span>A private moment between you and ${name}; their other connections cannot see it. Cosmos adds a notification when the moment becomes available.</span></button>
       </div><div class="actions"><button id="audienceBack">Back</button></div>`);
-    if($('audienceGroup'))$('audienceGroup').onclick=async()=>{compose.circle_audience='connections';
+    if($('audienceGroup'))$('audienceGroup').onclick=async()=>{
+      if(compose.content_kind!=='text'){
+        try{
+          const policy=await api('/api/family/policy');
+          if(!policy.group_media_enabled){
+            openSheet(`<h2>Family media needs setup</h2><p>To share media with a full Connections circle, first configure real phone and email verification in Cloudflare.</p><div class="circle-info">Development-code login is not secure enough for your family. Public Cosmos stays disabled.</div><div class="actions"><button id="familyPolicyBack">Back</button></div>`);
+            $('familyPolicyBack').onclick=showAudienceStep;return;
+          }
+        }catch(e){toastMsg(e.message,4000);return;}
+      }
+      compose.circle_audience='connections';
       if(compose.place_station_id){compose.unlock_mode='here';showPlaceStep();return;}
       showWhenStep();};
     $('audiencePair').onclick=()=>{compose.circle_audience='between_us';compose.place_station_id=null;showWhenStep();};
     $('audienceBack').onclick=showRecipientStep;
   }
   function showRecipientStep(){
-    const textAllowed=compose?.content_kind==='text';
     openSheet(`<h2>For whom?</h2><p>Who should this Cosmos belong to?</p><div class="choices recipient-choices">
       <button type="button" class="choice" data-recipient="self"><strong>Me</strong><span>Leave it for future you.</span></button>
       <button type="button" class="choice" data-recipient="person"><strong>Someone</strong><span>Choose an accepted connection.</span></button>
-      <button type="button" class="choice" data-recipient="circle"><strong>My Connections <span class="circle-arrow">→</span></strong><span>${textAllowed?'Share text with your accepted circle.':'Group media coming later · send privately now.'}</span></button>
+      <button type="button" class="choice" data-recipient="circle"><strong>My Connections <span class="circle-arrow">→</span></strong><span>Share photos, voice, video, music, links and text privately with your accepted circle.</span></button>
       <button type="button" class="choice" disabled><strong>Anyone</strong><span>Public posting is not enabled.</span></button>
     </div><div class="actions"><button id="backRecipient">Back</button></div>`);
     sheet.classList.add('liquid-compact-step');
@@ -1970,16 +1979,23 @@
   // media or silently publish it to a narrower/wider audience.
   async function showMyConnectionsChoice(){
     if(!compose)return;
-    const kind=String(compose.content_kind||'moment');
-    if(kind!=='text'){
-      const types={photo:'photos',voice:'voice messages',video:'videos',music:'music',link:'links'};
-      openSheet(`<h2>My Connections</h2><p>Sharing ${escapeHtml(types[kind]||'this media')} with everyone in your circle is not enabled yet.</p>
-        <div class="circle-info"><b>Private sharing is available now.</b><br>You can share this moment with one accepted connection using <b>Someone</b>. Group media needs additional safety review before launch.</div>
-        <div class="actions"><button type="button" id="circleBack">Back</button><button type="button" class="primary" id="circlePickOne">Choose a person →</button></div>`);
-      sheet.classList.add('liquid-compact-step');
-      $('circleBack').onclick=showRecipientStep;
-      $('circlePickOne').onclick=()=>{compose.recipient_mode='person';compose.circle_audience=null;compose.recipient_user_id=null;showPersonStep();};
-      return;
+    // Never silently fall back to one-to-one if family group sharing is disabled.
+    if(compose.content_kind!=='text'){
+      try{
+        const policy=await api('/api/family/policy');
+        if(!policy.group_media_enabled){
+          openSheet(`<h2>Family media needs setup</h2><p>Before sharing photos or videos across Connections, enable real verification and the private family beta on Cloudflare.</p>
+          <div class="circle-info">Your phone and email sign-in must use genuine one-time codes. This protects your daughters' accounts. Public remains OFF.</div>
+          <div class="actions"><button id="circleBack">Back</button><button class="primary" id="circlePickOne">Send privately instead</button></div>`);
+          sheet.classList.add('liquid-compact-step');
+          $('circleBack').onclick=showRecipientStep;
+          $('circlePickOne').onclick=()=>{compose.recipient_mode='person';compose.circle_audience=null;compose.recipient_user_id=null;showPersonStep();};
+          return;
+        }
+      }catch(e){
+        openSheet(`<h2>Cannot verify family sharing</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="circleBack">Back</button></div>`);
+        $('circleBack').onclick=showRecipientStep;return;
+      }
     }
     openSheet(`<h2>My Connections</h2><p>Checking your accepted connections…</p><div class="look-loading" role="status">Loading your circle…</div>
       <div class="actions"><button type="button" id="circleBack">Back</button></div>`);
@@ -1993,10 +2009,10 @@
       const count=friendsCache.accepted.length;
       const names=friendsCache.accepted.slice(0,5).map(p=>escapeHtml(p.name||'Connection')).join(' · ');
       openSheet(`<h2>My Connections</h2>
-        <p>${count?`Share this <b>text</b> moment with your ${count} accepted connection${count===1?'':'s'}.`:'You have no accepted connections yet.'}</p>
+        <p>${count?`Share this <b>Cosmos</b> moment with your ${count} accepted connection${count===1?'':'s'}.`:'You have no accepted connections yet.'}</p>
         <div class="circle-info"><b>${count?`◯ Your circle · ${count} connected`:'◯ Your circle is waiting'}</b>
           <div class="circle-member-names">${count?names+(count>5?` · +${count-5} more`:''):'Invite someone and accept their request to start sharing.'}</div>
-          ${count?'<small>Your message will appear only after it is approved under your circle settings. It is never public.</small>':''}</div>
+          ${count?'<small>Your own posts appear in your accepted circle; contributions made to someone else’s circle wait for their approval. Never public.</small>':''}</div>
         <div class="actions"><button type="button" id="circleBack">Back</button>
           <button type="button" class="primary" id="circleContinue">${count?'Continue →':'Invite someone →'}</button></div>`);
       sheet.classList.add('liquid-compact-step');
@@ -2037,7 +2053,7 @@
   function showWhenStep(){
     openSheet(`<h2>When?</h2><p>A Cosmos can wait until the moment belongs.</p><div class="choices">
       <button class="choice" data-when="now"><strong>Now</strong><span>Ready as soon as they open Cosmos.</span></button>
-      <button class="choice" data-when="here"><strong>When here</strong><span>Wait for this place.</span></button>
+      <button class="choice" data-when="here" ${compose.circle_audience==='connections'&&compose.content_kind!=='text'?'disabled':''}><strong>When here</strong><span>${compose.circle_audience==='connections'&&compose.content_kind!=='text'?'Coming later for family media.':'Wait for this place.'}</span></button>
       <button class="choice" data-when="date"><strong>Future date</strong><span>Wait until a date you choose.</span></button>
     </div><div class="actions"><button id="backWhen">Back</button></div>`);
     sheet.classList.add('liquid-compact-step');
