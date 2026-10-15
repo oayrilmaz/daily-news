@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.8.6-ios-native-controls-layout" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8.8-moment-captions-comments" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1257,6 +1257,72 @@
       .sheet.future-date-sheet .future-input-value{font-size:15px}
     }
 
+
+    /* COSMOS v2.8.7 — opt-in places, contextual sharing, private section links */
+    .liquid-choices.location-enabled{gap:10px}
+    .liquid-share-context{display:flex;align-items:center;justify-content:space-between;gap:9px;
+      margin:11px 0 16px;flex-wrap:wrap}
+    .liquid-share-context button,.cosmos-share-pill{min-height:39px;border-radius:999px;padding:8px 13px;
+      border:1px solid rgba(106,144,191,.32);background:rgba(247,251,255,.76);color:#193657;
+      font-size:12px;font-weight:750;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+    .cosmos-part{min-width:0;max-width:100%;border-radius:18px;scroll-margin-top:65px}
+    .cosmos-part-highlight{outline:2px solid rgba(92,154,236,.7);outline-offset:4px;transition:outline-color 2.3s}
+    .cosmos-part .cosmos-share-pill{margin:8px 0 12px;display:inline-flex;gap:5px;align-items:center}
+    .cosmos-part .attachment-row{min-width:0;overflow-wrap:anywhere}
+    .cosmos-maps{padding:12px;border-radius:18px;border:1px solid rgba(140,173,210,.34);
+      background:rgba(249,252,255,.55);margin:12px 0}
+    .cosmos-maps .map-title{font-size:14px;line-height:1.35;color:#18334d;font-weight:800}
+    .cosmos-maps .map-caption{font-size:12px;line-height:1.4;color:#52647c;margin-top:5px;overflow-wrap:anywhere}
+    .cosmos-maps .map-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+    .cosmos-maps .map-actions a,.cosmos-maps .map-actions button{flex:1 1 120px;min-height:43px;
+      padding:10px;border-radius:13px;border:1px solid rgba(139,171,208,.44);color:#19446d;
+      background:rgba(255,255,255,.8);font-weight:700;font-size:12px;text-align:center;text-decoration:none}
+    .cosmos-maps .map-preview-frame{margin-top:12px;width:100%;height:min(36dvh,260px);
+      border:1px solid rgba(139,171,208,.35);border-radius:13px;background:#edf3fa}
+    .cosmos-maps .map-privacy{font-size:11px;color:#5b6d81;margin-top:10px;line-height:1.5}
+    .cosmos-map-compose .field input{width:100%;min-width:0}
+    .cosmos-map-compose .actions{flex-wrap:wrap}
+    .cosmos-map-compose .actions button{min-width:0}
+    .cosmos-share-intro{font-size:12px;color:#4f647e;line-height:1.5}
+    .cosmos-share-actions{display:flex;gap:10px;flex-wrap:wrap}
+    .cosmos-share-actions button{flex:1 1 110px;min-height:46px;border-radius:14px;
+      border:1px solid rgba(116,158,202,.32);background:rgba(255,255,255,.75);color:#183453;font-weight:750}
+    .cosmos-share-actions button.primary{background:#153a68;color:white}
+    @media(max-width:390px){.cosmos-maps .map-actions a,.cosmos-maps .map-actions button{flex-basis:100%}}
+
+    /* COSMOS v2.8.8 — native caption under every non-text moment. */
+    .cosmos-caption{margin:11px 0 2px;padding:12px 14px;border-radius:17px;
+      background:linear-gradient(135deg,rgba(255,255,255,.8),rgba(227,240,255,.51));
+      border:1px solid rgba(255,255,255,.86);box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+      backdrop-filter:blur(15px);-webkit-backdrop-filter:blur(15px)}
+    .cosmos-caption-label{font-size:10px;letter-spacing:.12em;font-weight:800;color:#47709a;margin-bottom:4px;text-transform:uppercase}
+    .cosmos-caption-text{color:#1c3558;font-size:14px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
+    .cosmos-comment-compose{border-radius:22px;padding:14px 15px;
+      border:1px solid rgba(255,255,255,.84);
+      background:linear-gradient(130deg,rgba(255,255,255,.66),rgba(222,236,254,.62));
+      box-shadow:0 7px 27px rgba(27,70,130,.08);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+    .cosmos-comment-compose textarea{min-height:102px;max-height:32vh;width:100%;resize:vertical;
+      background:rgba(255,255,255,.82);border:1px solid rgba(148,181,224,.46);
+      border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.5;box-sizing:border-box}
+    .cosmos-comment-compose label{display:block;font-size:11px;letter-spacing:.11em;color:#335a89;font-weight:850;margin-bottom:8px}
+    .cosmos-comment-compose .micro{margin:7px 0 0}
+    .cosmos-comments{margin:16px 0 0;padding:13px 14px 15px;border-radius:19px;
+      border:1px solid rgba(224,238,255,.87);
+      background:linear-gradient(140deg,rgba(247,252,255,.77),rgba(218,233,254,.56));
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+    .cosmos-comments-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .cosmos-comments-header strong{font-size:15px;color:#1c3b63}
+    .cosmos-comments-header button{min-height:35px;padding:7px 13px;border:1px solid #c0d6ee;border-radius:999px;
+      background:rgba(255,255,255,.88);color:#174375;font-weight:760;font-size:12px}
+    .cosmos-comment-row{padding:10px 0;border-top:1px solid rgba(108,155,211,.19);overflow-wrap:anywhere}
+    .cosmos-comment-row:first-of-type{margin-top:9px}
+    .cosmos-comment-meta{color:#547293;font-size:11px;font-weight:750;margin-bottom:5px}
+    .cosmos-comment-message{color:#173456;font-size:13px;line-height:1.55;white-space:pre-wrap}
+    .cosmos-comment-row .cosmos-share-pill{min-height:30px;padding:5px 10px;font-size:11px}
+    .cosmos-no-comments{font-size:12px;line-height:1.5;color:#617992;margin:11px 0 0}
+    .sheet .attachment-row .cosmos-caption{margin-top:9px}
+    @media(max-width:360px){.cosmos-comment-compose{padding:12px}.cosmos-comments{padding:12px}
+      .cosmos-caption{padding:10px 11px}.cosmos-comments-header button{padding:7px 9px}}
   </style>
 </head>
 <body>
@@ -1349,6 +1415,11 @@
   const FAMILY_INVITE_CODE = (qs.get("invite") || "").slice(0,1200);
   const INVITE_HOME = `${location.origin}/cosmos-next.html?v=22`;
   const OPEN_INBOX_FROM_LINK=qs.get("inbox")==="1";
+  // A link names a moment, never grants permission: access is always checked by /open.
+  const SHARE_MOMENT_ID=/^[A-Za-z0-9_-]{1,80}$/.test(qs.get('moment')||'')?(qs.get('moment')||''):'';
+  const SHARE_PART_ID=/^(main|[A-Za-z0-9_-]{1,80})$/.test(qs.get('part')||'')?(qs.get('part')||''):'';
+  let pendingSharedMoment=SHARE_MOMENT_ID;
+
   // Direct notification ID is resolved only through the authenticated recipient's inbox.
   // A URL parameter alone NEVER grants access to a private moment.
   const NOTICE_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1570,6 +1641,7 @@
       auth.hidden=true;showAuthError('');
       refreshNoticeBadge();
       if(pendingNoticeId&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,220);
+      else if(pendingSharedMoment&&!FAMILY_INVITE_CODE)setTimeout(openSharedMomentFromLink,360);
       else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,550);
       accountButton.textContent = me.display_name || "You";
       startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
@@ -1782,7 +1854,7 @@
 
   function beginCompose(){
     pendingCircleReturn=null;
-    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null};
+    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null,location_title:"",comment_ready:false};
     showContentStep();
   }
 
@@ -1794,16 +1866,21 @@
       <button class="choice" data-kind="video"><span class="liquid-choice-icon" aria-hidden="true">▶</span><span class="liquid-choice-words"><strong>Video</strong><span>30s · 5/month free</span></span></button>
       <button class="choice" data-kind="music"><span class="liquid-choice-icon" aria-hidden="true">♫</span><span class="liquid-choice-words"><strong>Music</strong><span>Share a song</span></span></button>
       <button class="choice" data-kind="link"><span class="liquid-choice-icon" aria-hidden="true">↗</span><span class="liquid-choice-words"><strong>Link</strong><span>Share a link</span></span></button>
+      <button class="choice" data-kind="location"><span class="liquid-choice-icon" aria-hidden="true">⌖</span><span class="liquid-choice-words"><strong>Location</strong><span>Apple Maps · Google Maps</span></span></button>
     </div><div class="micro liquid-privacy"><span aria-hidden="true">◌</span> Private by default. You control who can see it.</div>`);
     sheet.classList.add('liquid-compose-menu');
     sheet.querySelectorAll("[data-kind]").forEach(b=>b.addEventListener("click",()=>chooseContent(b.dataset.kind)));
   }
 
   async function chooseContent(kind){
-    compose.content_kind=kind;
+    compose.content_kind=kind;compose.comment_ready=false;compose.location_title="";compose.content_text="";compose.content_url="";compose.media_id=null;
     if(kind==="text") return textEntry("What would you leave here?",false);
     if(kind==="music") return textEntry("Paste the music link",true);
     if(kind==="link") return textEntry("Paste a link",true);
+    if(kind==="location") return locationEntry((url,title)=>{
+      compose.content_kind='link';compose.content_url=url;compose.location_title=title||'Shared location';
+      compose.content_text='⌖ '+compose.location_title;afterContentStep();
+    },showContentStep);
     if(kind==="voice") return voiceEntry();
     if(kind==="video")return videoRules();
     if(kind==="photo")return selectMediaForCompose("photo");
@@ -1838,7 +1915,6 @@
       <div class="art-size-control"><label for="artSize">Text size</label><button type="button" id="artSmaller" aria-label="Make text smaller">−</button><input type="range" id="artSize" min="16" max="220" step="1" value="${startSize}" aria-label="Text or brush size" /><button type="button" id="artLarger" aria-label="Make text larger">+</button><output id="artSizeValue">${startSize}</output></div>
       <div class="art-foreground"><label for="artColor">Color</label><input type="color" id="artColor" value="#ffffff" /><button type="button" id="artUpdate" disabled>Update selected text</button><button type="button" id="artRemove" disabled>Delete selected</button></div>
       <div class="art-feedback" id="artFeedback" aria-live="polite">🔥 To make fire letters: tap <b>Fire glow</b>, type your words, then <b>Add fire</b>. Tap and drag the writing to reposition it.</div>
-      <div class="field"><label>Caption (optional)</label><input id="photoCaption" maxlength="240" placeholder="A moment worth remembering…"></div>
       <div class="field"><label>Attached https link (optional)</label><input id="photoExtraLink" type="url" placeholder="https://…"></div>
       <div class="moment-preview">Layers can be moved or resized until you save. This creates artwork on a photo, not live graffiti on a real surface. The saved photo includes the final effects.</div>
       <div class="actions"><button id="artCancel">Back</button><button id="artSave" class="primary">Save photo moment →</button></div>`);
@@ -2022,7 +2098,7 @@
         if(!blob)throw new Error('Could not save the image.');
         const final=new File([blob],`cosmos-art-${Date.now()}.jpg`,{type:'image/jpeg'});
         const media=await uploadFile(final);
-        compose.media_id=media.id;compose.content_text=$('photoCaption').value.trim();compose.content_url=link;
+        compose.media_id=media.id;compose.content_url=link;
         afterContentStep();
       }catch(e){exporting=false;toastMsg(e.message,4500);if($('artSave')){$('artSave').disabled=false;$('artSave').textContent='Save photo moment →';}render();}
     };
@@ -2086,6 +2162,61 @@
       else {closeSheet();await scanHere(false);renderJourney();refreshConnections();}
       toastMsg('Cosmos deleted.');
     }catch(error){toastMsg(error.message,4500);}
+  }
+
+  // Location moments are stored with content_kind=link. No database or Worker migration.
+  // Exact coordinates are only included if the author deliberately chooses GPS sharing.
+  const MAP_HOSTS=new Set(['maps.apple.com','www.google.com','google.com','maps.google.com','goo.gl','maps.app.goo.gl']);
+  function validMapLink(value){
+    try{const u=new URL(value.trim());return u.protocol==='https:'&&MAP_HOSTS.has(u.hostname.toLowerCase());}
+    catch{return false;}
+  }
+  function urlForCoords(lat,lng){return 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat.toFixed(6)+','+lng.toFixed(6));}
+  function extractMapCoordinates(raw){
+    try{
+      const u=new URL(raw);const params=['q','query','ll','center','sll'];
+      let text='';for(const k of params){const p=u.searchParams.get(k);if(p&&/^-?\d/.test(p)){text=p;break;}}
+      if(!text){const m=u.href.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);if(m)text=m[1]+','+m[2];}
+      const match=text.match(/^(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);if(!match)return null;
+      const lat=Number(match[1]),lng=Number(match[2]);
+      return Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180?{lat,lng}:null;
+    }catch{return null;}
+  }
+  function mapLinkCard(raw,label='Shared location'){
+    if(!validMapLink(raw))return '';
+    const coords=extractMapCoordinates(raw);
+    const google=coords?urlForCoords(coords.lat,coords.lng):raw;
+    const apple=coords?'https://maps.apple.com/?ll='+encodeURIComponent(coords.lat.toFixed(6)+','+coords.lng.toFixed(6)):raw;
+    return `<div class="cosmos-maps"><div class="map-title">⌖ ${escapeHtml(label)}</div>
+      <div class="map-caption">Location shared by the author · Open in your preferred map app</div>
+      <div class="map-actions"><a target="_blank" rel="noopener noreferrer" href="${escapeHtml(google)}">Google Maps ↗</a>
+      <a target="_blank" rel="noopener noreferrer" href="${escapeHtml(apple)}">Apple Maps ↗</a>
+      ${coords?`<button type="button" data-map-preview="${escapeHtml(coords.lat+','+coords.lng)}">Preview map ▦</button>`:''}</div>
+      <div class="map-privacy">Opening a map shares the location with that map provider.${coords?' Map preview uses OpenStreetMap after you tap.':''}</div>
+    </div>`;
+  }
+  // Separate link-creation path for the primary compose and an individual moment addition.
+  function locationEntry(onSubmit,onBack){
+    openSheet(`<div class="cosmos-map-compose"><h2>⌖ Share a location</h2>
+      <p>Add a link from Apple Maps or Google Maps. Or deliberately share your current location.</p>
+      <div class="field"><label for="mapTitle">Place name (optional)</label><input id="mapTitle" type="text" maxlength="110" placeholder="A place worth remembering"></div>
+      <div class="field"><label for="mapLink">Apple Maps or Google Maps URL</label><input id="mapLink" type="url" inputmode="url" autocomplete="off" placeholder="https://maps.apple.com/…"></div>
+      <div class="actions"><button type="button" id="mapBack">← Back</button><button type="button" id="mapMyPosition">⌖ Use my location</button></div>
+      <p id="mapStatus" class="micro" role="status">Your current location is never attached automatically. Copy a place link from a map app, or request GPS deliberately.</p>
+      <div class="actions"><button type="button" id="mapContinue" class="primary">Continue →</button></div></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('mapBack').onclick=onBack;
+    $('mapMyPosition').onclick=async()=>{
+      if(!confirm('Share your current coordinates in this moment? Anyone authorized to open it can view this exact location.'))return;
+      const button=$('mapMyPosition');button.disabled=true;$('mapStatus').textContent='Requesting location permission…';
+      try{const loc=await getLocation();$('mapLink').value=urlForCoords(loc.lat,loc.lng);$('mapStatus').textContent='Location selected. Anyone who can open this moment can see its map position.';}
+      catch(e){$('mapStatus').textContent='Location unavailable. You can still paste a Google Maps or Apple Maps link.';}
+      finally{if($('mapMyPosition'))$('mapMyPosition').disabled=false;}
+    };
+    $('mapContinue').onclick=()=>{
+      const url=$('mapLink').value.trim();if(!validMapLink(url))return toastMsg('Paste a valid https:// Apple Maps or Google Maps link.');
+      const title=$('mapTitle').value.trim();onSubmit(url,title);
+    };
   }
 
   function textEntry(title,isUrl){
@@ -2355,7 +2486,41 @@
     });
   }
 
+  // A short personal note is part of the original non-text moment, not a separate
+  // moment or database row. The existing Worker stores it in content_text.
+  function momentNoteMarkup(text){
+    const cleanText=String(text||'').trim();
+    return cleanText?`<div class="cosmos-caption"><div class="cosmos-caption-label">Comment</div><div class="cosmos-caption-text">${escapeHtml(cleanText)}</div></div>`:'';
+  }
+  function locationTextParts(value){
+    const v=String(value||'');
+    if(v.startsWith('⌖ ')){
+      const at=v.indexOf('\n');
+      return {title:(at<0?v.slice(2):v.slice(2,at)).trim()||'Shared location',comment:at<0?'':v.slice(at).trim()};
+    }
+    return {title:'Shared location',comment:v.trim()};
+  }
+  function showComposeCommentStep(){
+    if(!compose)return showContentStep();
+    const location=compose.content_kind==='link'&&!!compose.location_title;
+    const current=location?locationTextParts(compose.content_text).comment:String(compose.content_text||'').trim();
+    const kind=location?'location':compose.content_kind;
+    openSheet(`<h2>Add your comment</h2><p>Give this ${escapeHtml(kind)} moment context. Your words will appear directly underneath it.</p>
+      <div class="cosmos-comment-compose"><label for="momentAuthorComment">YOUR COMMENT · OPTIONAL</label>
+        <textarea id="momentAuthorComment" maxlength="1200" placeholder="What made this moment special?">${escapeHtml(current)}</textarea>
+        <p class="micro">Only people permitted to open this Cosmos can read the comment. Future moments stay sealed for recipients.</p></div>
+      <div class="actions"><button type="button" id="momentCaptionBack">← Back</button><button class="primary" type="button" id="momentCaptionNext">Continue →</button></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('momentCaptionBack').onclick=showContentStep;
+    $('momentCaptionNext').onclick=()=>{
+      const note=$('momentAuthorComment').value.trim();
+      compose.content_text=location?'⌖ '+(compose.location_title||'Shared location')+(note?'\n\n'+note:''):note;
+      compose.comment_ready=true;
+      afterContentStep();
+    };
+  }
   function afterContentStep(){
+    if(compose && compose.content_kind!=='text' && !compose.comment_ready)return showComposeCommentStep();
     if(compose?.recipient_mode==='person' && compose.recipient_user_id)return showAudienceStep();
     if(compose?.recipient_mode==='self' && compose.circle_audience==='connections')return showWhenStep();
     return showRecipientStep();
@@ -2395,7 +2560,7 @@
       <button type="button" class="choice" disabled><strong>Anyone</strong><span>Public posting is not enabled.</span></button>
     </div><div class="actions"><button id="backRecipient">Back</button></div>`);
     sheet.classList.add('liquid-compact-step');
-    $("backRecipient").onclick=showContentStep;
+    $("backRecipient").onclick=()=>compose?.content_kind!=="text"?showComposeCommentStep():showContentStep();
     sheet.querySelectorAll("[data-recipient]").forEach(b=>b.onclick=()=>{
       const choice=b.dataset.recipient;
       if(choice==='circle')return showMyConnectionsChoice();
@@ -2652,18 +2817,45 @@
   async function momentAttachmentHtml(a,ownerCanRemove=false,cosmosId=''){
     const removable=(a.can_remove||ownerCanRemove) ? `<button class="post-delete" type="button" data-remove-extra="${escapeHtml(a.id)}" data-cosmos="${escapeHtml(cosmosId)}" style="margin:10px 0 0;min-height:44px">Remove addition</button>`:'';
     const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</b>`;
+    const loc=a.url&&validMapLink(a.url)?locationTextParts(a.text):null;
+    const comment=loc?loc.comment:a.text;
+    const note=momentNoteMarkup(comment);
     if(a.media_id){
       try{const url=await mediaObjectUrl(a.media_id);
-        if(a.kind==='photo')return `<div class="attachment-row">${title}<img style="width:100%;max-height:340px;object-fit:contain;border-radius:10px" src="${url}" alt="Shared photo">${removable}</div>`;
-        if(a.kind==='voice')return `<div class="attachment-row">${title}<audio controls preload="none" src="${url}"></audio>${removable}</div>`;
-        if(a.kind==='video')return `<div class="attachment-row">${title}<video controls playsinline preload="metadata" src="${url}"></video>${removable}</div>`;
+        if(a.kind==='photo')return `<div class="attachment-row">${title}<img style="width:100%;max-height:340px;object-fit:contain;border-radius:10px" src="${url}" alt="Shared photo">${note}${removable}</div>`;
+        if(a.kind==='voice')return `<div class="attachment-row">${title}<audio controls preload="none" src="${url}"></audio>${note}${removable}</div>`;
+        if(a.kind==='video')return `<div class="attachment-row">${title}<video controls playsinline preload="metadata" src="${url}"></video>${note}${removable}</div>`;
       }catch(e){return `<div class="attachment-row">${title}<p>Media unavailable: ${escapeHtml(e.message)}</p></div>`;}
     }
-    if(a.url)return `<div class="attachment-row">${title}${inlineProvider(a.url)}<a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>${removable}</div>`;
+    if(a.url)return `<div class="attachment-row">${title}${mapLinkCard(a.url,loc?.title||'Shared location')||inlineProvider(a.url)}<a href="${escapeHtml(a.url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>${note}${removable}</div>`;
     return `<div class="attachment-row">${title}<div class="card-body">${escapeHtml(a.text||'')}</div>${removable}</div>`;
   }
   async function buildMomentExtras(additions,ownerCanRemove,cosmosId){
-    const parts=await Promise.all((additions||[]).map(a=>momentAttachmentHtml(a,ownerCanRemove,cosmosId)));return parts.join('');
+    const parts=await Promise.all((additions||[]).map(async a=>{
+      const content=await momentAttachmentHtml(a,ownerCanRemove,cosmosId);
+      return `<section class="cosmos-part" data-part-id="${escapeHtml(a.id)}">${content}
+        <button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this section</button></section>`;
+    }));return parts.join('');
+  }
+  function showAdditionCommentStep(item,payload,onBack=()=>openAddToMoment(item)){
+    const location=Boolean(payload.locationTitle);
+    const kind=location?'location':payload.kind;
+    openSheet(`<h2>Comment on your ${escapeHtml(kind)}</h2><p>These words will appear underneath this ${escapeHtml(kind)} section, visible only to people who can open the moment.</p>
+      <div class="cosmos-comment-compose"><label for="additionComment">YOUR COMMENT · OPTIONAL</label>
+        <textarea id="additionComment" maxlength="1200" placeholder="Add a little context…"></textarea>
+      </div><div class="actions"><button type="button" id="additionCommentBack">← Back</button>
+      <button type="button" class="primary" id="additionCommentSave">Add to moment →</button></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('additionCommentBack').onclick=onBack;
+    $('additionCommentSave').onclick=async()=>{
+      const button=$('additionCommentSave'),note=$('additionComment').value.trim();
+      const data={...payload};delete data.locationTitle;
+      data.text=location?'⌖ '+payload.locationTitle+(note?'\n\n'+note:''):note;
+      button.disabled=true;button.textContent='Adding…';
+      try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify(data)});
+        await openCosmos(item.id);toastMsg('Added to this moment.');}
+      catch(e){toastMsg(e.message,4500);if($('additionCommentSave')){$('additionCommentSave').disabled=false;$('additionCommentSave').textContent='Add to moment →';}}
+    };
   }
   function openAddToMoment(item){
     openSheet(`<h2>Add a moment</h2><p>Write a comment, record your voice, share media or attach a link. Visible only to the original private participants. Connections-wide posts use the separately approved shared-station flow.</p>
@@ -2672,18 +2864,27 @@
       <button class="choice" data-extra="link"><strong>Link</strong><span>Secure web address.</span></button>
       <button class="choice" data-extra="music"><strong>Music</strong><span>YouTube / Spotify and more.</span></button>
       <button class="choice" data-extra="photo"><strong>Photo</strong><span>Attach another photo.</span></button>
-      <button class="choice" data-extra="video"><strong>Video</strong><span>Short video allowance applies.</span></button></div>
+      <button class="choice" data-extra="video"><strong>Video</strong><span>Short video allowance applies.</span></button>
+      <button class="choice" data-extra="location"><strong>⌖ Location</strong><span>Google Maps or Apple Maps.</span></button></div>
       <div class="actions"><button id="extraBack">Back to moment</button></div>`);
     $('extraBack').onclick=()=>openCosmos(item.id);
     sheet.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>chooseMomentAddition(item,b.dataset.extra));
   }
   function chooseMomentAddition(item,kind){
+    if(kind==='location')return locationEntry((url,title)=>{
+      showAdditionCommentStep(item,{kind:'link',url,locationTitle:title||'Shared location'});
+    },()=>openAddToMoment(item));
     if(['text','music','link'].includes(kind)){
       openSheet(`<h2>${kind==='text'?'Comment':kind==='music'?'Music link':'Link'}</h2><div class="field"><label>${kind==='text'?'Message':'https:// address'}</label><textarea id="additionValue" maxlength="${kind==='text'?1200:1600}" placeholder="${kind==='text'?'Leave a meaningful comment…':'https://…'}"></textarea></div><div class="actions"><button id="extraCancel">Back</button><button class="primary" id="extraSubmit">Add →</button></div>`);
       $('extraCancel').onclick=()=>openAddToMoment(item);
       $('extraSubmit').onclick=async()=>{
         const value=$('additionValue').value.trim();if(!value)return toastMsg('Add something first.');
-        try{$('extraSubmit').disabled=true;await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind,text:kind==='text'?value:'',url:kind==='text'?'':value})});await openCosmos(item.id);toastMsg('Added to this moment.');}
+        if(kind!=='text'){
+          try{if(new URL(value).protocol!=='https:')throw new Error();}
+          catch{return toastMsg('Use a secure https:// link.');}
+          return showAdditionCommentStep(item,{kind,url:value});
+        }
+        try{$('extraSubmit').disabled=true;await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'text',text:value})});await openCosmos(item.id);toastMsg('Comment added.');}
         catch(e){toastMsg(e.message,4500);if($('extraSubmit'))$('extraSubmit').disabled=false;}
       };return;
     }
@@ -2699,8 +2900,7 @@
           rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());
             try{const blob=new Blob(chunks,{type:rec.mimeType||'audio/webm'});
               const media=await uploadFile(new File([blob],`moment-voice-${Date.now()}.webm`,{type:blob.type}));
-              await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'voice',media_id:media.id})});
-              await openCosmos(item.id);toastMsg('Voice added.');
+              showAdditionCommentStep(item,{kind:'voice',media_id:media.id});
             }catch(e){toastMsg(e.message,4500);openAddToMoment(item);}};
           rec.start();$('extraRecord').textContent='Stop recording';$('extraRecordStatus').textContent='Recording…';
         }catch(e){toastMsg('Microphone permission was not granted.');}
@@ -2720,8 +2920,7 @@
             }
             openSheet('<h2>Saving attachment…</h2><p>Protecting your media.</p>');
             const upload=await uploadFile(file);
-            await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind,media_id:upload.id})});
-            await openCosmos(item.id);toastMsg('Added to this moment.');
+            showAdditionCommentStep(item,{kind,media_id:upload.id});
           }catch(e){toastMsg(e.message,4200);openAddToMoment(item);}
         };fileInput.click();
       };
@@ -2731,22 +2930,110 @@
 
   async function contentHtml(item){
     const kind=item.content_kind;
+    const loc=item.content_url&&validMapLink(item.content_url)?locationTextParts(item.content_text):null;
+    const note=momentNoteMarkup(loc?loc.comment:item.content_text);
     if(item.media_id){
       const url=await mediaObjectUrl(item.media_id);
-      if(kind==="photo")return `<div class="media-preview"><img src="${url}" alt="Cosmos photo">${item.content_text?`<div class="card-body">${escapeHtml(item.content_text)}</div>`:''}${item.content_url?inlineProvider(item.content_url)+`<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open attached link ↗</a>`:''}</div>`;
-      if(kind==="video")return `<div class="media-preview"><video controls playsinline src="${url}"></video></div>`;
-      if(kind==="voice")return `<div class="media-preview"><audio controls src="${url}"></audio></div>`;
+      if(kind==='photo')return `<div class="media-preview"><img src="${url}" alt="Cosmos photo">${note}${item.content_url?(mapLinkCard(item.content_url,item.content_text||'Shared location')||inlineProvider(item.content_url))+`<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open attached link ↗</a>`:''}</div>`;
+      if(kind==='video')return `<div class="media-preview"><video controls playsinline src="${url}"></video>${note}</div>`;
+      if(kind==='voice')return `<div class="media-preview"><audio controls src="${url}"></audio>${note}</div>`;
     }
-    if(item.content_url){return `<div class="media-preview">${inlineProvider(item.content_url)}<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open source ↗ ${escapeHtml(item.content_url)}</a></div>`;}
-    return `<div class="card-body">${escapeHtml(item.content_text||"")}</div>`;
+    if(item.content_url)return `<div class="media-preview">${mapLinkCard(item.content_url,loc?.title||'Shared location')||inlineProvider(item.content_url)}<a href="${escapeHtml(item.content_url)}" target="_blank" rel="noopener noreferrer">Open source ↗ ${escapeHtml(item.content_url)}</a>${note}</div>`;
+    return `<div class="card-body">${escapeHtml(item.content_text||'')}</div>`;
+  }
+  function privateMomentUrl(itemId,part=''){
+    // A URL is a pointer only. Backend must authorize identity, relationships and time locks.
+    const url=new URL('https://ptdtoday.com/cosmos-next.html');
+    url.searchParams.set('v','288');url.searchParams.set('moment',itemId);
+    if(part)url.searchParams.set('part',part);
+    return url.href;
+  }
+  async function copyCosmosShareUrl(url){
+    try{await navigator.clipboard.writeText(url);toastMsg('Private link copied. Recipient still needs permission.',3600);return;}
+    catch{}
+    const input=document.createElement('textarea');input.value=url;input.style.position='fixed';input.style.left='-9999px';
+    document.body.appendChild(input);input.focus();input.select();
+    const ok=document.execCommand('copy');input.remove();
+    toastMsg(ok?'Private link copied.':'Copy is unavailable on this browser.',3600);
+  }
+  function shareMomentPart(item,part=''){
+    const url=privateMomentUrl(item.id,part);
+    openSheet(`<h2>↗ Share ${part?'this section':'this Cosmos'}</h2>
+      <p class="cosmos-share-intro">This is a private access-controlled link—not a public post. Only people already authorized by Cosmos can open it. Future moments stay locked until reveal.</p>
+      <div class="cosmos-maps"><div class="map-title">Private moment link</div>
+        <div class="map-caption" style="user-select:all">${escapeHtml(url)}</div></div>
+      <div class="cosmos-share-actions"><button type="button" id="shareBack">← Back</button>
+        <button type="button" id="shareCopy">Copy link</button>
+        <button type="button" id="shareNative" class="primary">Share… ↗</button></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('shareBack').onclick=()=>openCosmos(item.id);
+    $('shareCopy').onclick=()=>copyCosmosShareUrl(url);
+    $('shareNative').onclick=async()=>{
+      if(!navigator.share)return copyCosmosShareUrl(url);
+      try{await navigator.share({title:'A private Cosmos moment',url});}
+      catch(e){if(e.name!=='AbortError')toastMsg('Sharing unavailable. Use Copy link.');}
+    };
+  }
+  function enableMomentMapPreviews(){
+    sheet.querySelectorAll('[data-map-preview]').forEach(button=>button.onclick=()=>{
+      const parts=(button.dataset.mapPreview||'').split(',').map(Number);
+      if(parts.length!==2||!parts.every(Number.isFinite))return;
+      const [lat,lng]=parts,delta=.006;
+      const bbox=[lng-delta,lat-delta,lng+delta,lat+delta].map(n=>n.toFixed(5)).join(',');
+      const src='https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent(bbox)+'&layer=mapnik&marker='+encodeURIComponent(lat+','+lng);
+      const iframe=document.createElement('iframe');iframe.loading='lazy';iframe.title='Map preview';iframe.referrerPolicy='no-referrer';iframe.className='map-preview-frame';iframe.src=src;
+      button.closest('.cosmos-maps').appendChild(iframe);button.disabled=true;button.textContent='Map preview opened';
+    });
+  }
+  async function openSharedMomentFromLink(){
+    const id=pendingSharedMoment;if(!id)return;
+    pendingSharedMoment='';
+    // Delete link target from browser address after remembering it; avoid accidental forwarding.
+    try{const u=new URL(location.href);u.searchParams.delete('moment');u.searchParams.delete('part');history.replaceState({},'',u.pathname+u.search+u.hash);}catch{}
+    const opened=await openCosmos(id);
+    if(!opened){
+      openSheet(`<h2>Private moment unavailable</h2><p>This Cosmos may be private, waiting for its reveal, removed, or unavailable to your account. A link never grants access.</p>
+        <div class="actions"><button type="button" id="sharedLinkClose">Back to Cosmos</button></div>`);
+      $('sharedLinkClose').onclick=returnToCamera;
+      return;
+    }
+    if(SHARE_PART_ID){
+      setTimeout(()=>{
+        const part=[...sheet.querySelectorAll('[data-part-id]')].find(el=>el.dataset.partId===SHARE_PART_ID);
+        if(part){part.scrollIntoView({block:'center',behavior:'smooth'});part.classList.add('cosmos-part-highlight');setTimeout(()=>part.classList.remove('cosmos-part-highlight'),3200);}
+      },180);
+    }
   }
 
+  function momentCommentsHtml(item,additions=[]){
+    if(item.content_kind==='text')return '';
+    const comments=additions.filter(a=>a.kind==='text');
+    const rows=comments.map(a=>`<article class="cosmos-comment-row" data-part-id="${escapeHtml(a.id)}">
+      <div class="cosmos-comment-meta">${escapeHtml(a.author||'Someone')} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</div>
+      <div class="cosmos-comment-message">${escapeHtml(a.text||'')}</div>
+      <div class="liquid-share-context"><button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this comment</button>
+        ${a.can_remove||item.creator_user_id===me?.id?`<button type="button" class="post-delete" data-remove-extra="${escapeHtml(a.id)}">Remove</button>`:''}
+      </div></article>`).join('');
+    return `<section class="cosmos-comments" aria-label="Comments on this moment">
+      <div class="cosmos-comments-header"><strong>◯ Comments ${comments.length?'· '+comments.length:''}</strong>
+        ${item.can_add!==false?'<button type="button" id="commentOnMoment">+ Comment</button>':''}</div>
+      ${rows||'<p class="cosmos-no-comments">No comments yet. Add your thoughts to this moment.</p>'}
+    </section>`;
+  }
   async function renderCosmos(item,thread,additions=[],fromMetro=false){
     const content=await contentHtml(item);
-    const additionsHtml=await buildMomentExtras(additions,item.creator_user_id===me?.id,item.id);
+    const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),item.creator_user_id===me?.id,item.id);
+    const commentsHtml=momentCommentsHtml(item,additions);
     const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${content}${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_add!==false?'<button type="button" id="addToMoment" class="primary">+ Add moment</button>':''}</div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p><section class="cosmos-part" data-part-id="main">${content}
+      <div class="liquid-share-context"><button type="button" class="cosmos-share-pill" data-share-part="main">↗ Share this section</button></div></section>
+      ${commentsHtml}
+      ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button>${item.can_add!==false?'<button type="button" id="addToMoment" class="primary">+ Add moment</button>':''}</div>
+      <div class="actions"><button type="button" id="shareEntireMoment" class="cosmos-share-pill">↗ Share moment link</button></div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
     $("closeCosmos").onclick=()=>{closeSheet();if(!fromMetro)scanHere(false);};
+    $('shareEntireMoment').onclick=()=>shareMomentPart(item);
+    sheet.querySelectorAll('[data-share-part]').forEach(b=>b.onclick=()=>shareMomentPart(item,b.dataset.sharePart));
+    enableMomentMapPreviews();
     sheet.querySelectorAll('[data-remove-extra]').forEach(b=>b.onclick=async()=>{
       if(!confirm('Remove this addition from the moment for all participants?'))return;
       b.disabled=true;
@@ -2755,6 +3042,7 @@
       catch(e){toastMsg(e.message,4400);b.disabled=false;}
     });
     if($('addToMoment'))$('addToMoment').onclick=()=>openAddToMoment(item);
+    if($('commentOnMoment'))$('commentOnMoment').onclick=()=>chooseMomentAddition(item,'text');
     if($('hideReceived'))$('hideReceived').onclick=async()=>{
       if(!confirm('Hide this moment only from your Cosmos? It will not delete the sender’s post.'))return;
       try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/hide',{method:'POST'});returnToCamera();toastMsg('Hidden from your Cosmos.');scanHere(false);refreshConnections();}
