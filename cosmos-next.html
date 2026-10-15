@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.8.4-adaptive-camera-metro" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8.5-ios-future-picker" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1061,6 +1061,136 @@
       .sheet.future-date-sheet .sheet-inner{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
     }
     @media(prefers-reduced-motion:reduce){.sheet.future-date-sheet{scroll-behavior:auto}}
+
+    /* ================================================================
+       COSMOS v2.8.5 — iPhone Future Reveal Card
+       A truly compact, centered sheet with native visible date & time.
+       Does not affect the Metro, other sheets, backend or post rules.
+       ================================================================ */
+    .sheet-backdrop.future-backdrop{
+      background:rgba(13,31,55,.14)!important;
+      -webkit-backdrop-filter:blur(2px) saturate(1.02)!important;
+      backdrop-filter:blur(2px) saturate(1.02)!important;
+    }
+    .sheet.future-date-sheet{
+      position:absolute!important;
+      top:50%!important;
+      bottom:auto!important;
+      left:50%!important;
+      right:auto!important;
+      transform:translate(-50%,-50%)!important;
+      width:min(436px,calc(100vw - 28px))!important;
+      max-width:calc(100vw - 28px)!important;
+      height:auto!important;
+      min-height:0!important;
+      max-height:calc(100dvh - 28px)!important;
+      margin:0!important;
+      display:flex!important;
+      flex-direction:column!important;
+      border-radius:28px!important;
+      border:1px solid rgba(255,255,255,.92)!important;
+      overflow:hidden!important;
+      background:linear-gradient(141deg,rgba(251,254,255,.94),rgba(225,241,255,.88) 52%,rgba(247,252,255,.95))!important;
+      -webkit-backdrop-filter:blur(24px) saturate(1.35)!important;
+      backdrop-filter:blur(24px) saturate(1.35)!important;
+      box-shadow:inset 0 1px rgba(255,255,255,.96),0 22px 64px rgba(21,50,93,.26)!important;
+    }
+    .sheet.future-date-sheet .sheet-quickbar{
+      flex:0 0 auto!important;
+      min-height:53px!important;
+      border-bottom:1px solid rgba(110,157,203,.17)!important;
+      padding:10px 16px!important;
+      background:rgba(255,255,255,.27)!important;
+    }
+    .sheet.future-date-sheet .sheet-quickbar strong{
+      font-size:11px!important;letter-spacing:.23em!important;color:#1c3a5d!important;
+    }
+    .sheet.future-date-sheet .sheet-quickbar button{
+      display:grid!important;place-items:center!important;
+      width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;
+      padding:0!important;font-size:20px!important;line-height:1!important;
+      border:1px solid rgba(144,173,211,.38)!important;
+      background:rgba(255,255,255,.74)!important;color:#223b58!important;
+      border-radius:50%!important;box-shadow:0 2px 10px rgba(51,90,137,.07)!important;
+    }
+    .sheet.future-date-sheet .sheet-inner{
+      display:block!important;
+      flex:0 1 auto!important;
+      min-height:0!important;
+      max-height:calc(100dvh - 86px)!important;
+      padding:15px 19px 20px!important;
+      overflow-y:auto!important;
+      overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+    }
+    .sheet.future-date-sheet .handle{display:none!important}
+    .future-flow{color:#183554}
+    .future-flow .future-top{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+    .future-flow .future-orb{
+      width:43px;height:43px;flex:0 0 43px;display:grid;place-items:center;
+      border:1px solid rgba(255,255,255,.98);border-radius:50%;
+      background:radial-gradient(circle at 30% 23%,#fff 0%,#f2f8ff 32%,#b4d4f3 100%);
+      color:#224d80;font-size:22px;
+      box-shadow:inset 0 0 0 5px rgba(255,255,255,.24),0 5px 20px rgba(56,117,188,.16)
+    }
+    .future-flow .future-eyebrow{font-size:10px;letter-spacing:.15em;font-weight:800;color:#557698}
+    .future-flow h2{font-size:clamp(23px,5.8vw,28px)!important;letter-spacing:-.048em!important;line-height:1.08!important;margin:2px 0 0!important}
+    .future-flow .future-description{font-size:12px!important;line-height:1.45!important;margin:0 0 15px!important;color:#526a84!important}
+    .future-flow .future-controls{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.95fr);gap:10px}
+    .future-flow .future-control{display:block;min-width:0}
+    .future-flow .future-control label{display:block;color:#54708e;font-size:10px;font-weight:800;letter-spacing:.10em;margin-bottom:7px}
+    .future-flow .future-control input{
+      display:block!important;width:100%!important;max-width:100%!important;min-width:0!important;
+      box-sizing:border-box!important;height:50px!important;min-height:50px!important;
+      padding:0 10px!important;margin:0!important;
+      font-family:inherit!important;font-size:16px!important;line-height:1.4!important;
+      letter-spacing:normal!important;color:#173657!important;-webkit-text-fill-color:#173657!important;
+      color-scheme:light!important;text-align:left!important;opacity:1!important;
+      border:1px solid rgba(141,176,212,.52)!important;border-radius:14px!important;
+      background:rgba(255,255,255,.87)!important;
+      -webkit-appearance:auto!important;appearance:auto!important;
+      box-shadow:0 2px 8px rgba(29,72,125,.05),inset 0 1px 0 #fff!important;
+    }
+    .future-flow .future-control input::-webkit-date-and-time-value{
+      text-align:left!important;min-height:1.4em;color:#173657!important;
+    }
+    .future-flow .future-control input::-webkit-datetime-edit{
+      color:#173657!important;padding:0!important;
+    }
+    .future-flow .future-control input:focus-visible{outline:3px solid rgba(60,131,220,.35);outline-offset:2px}
+    .future-flow .future-preview{
+      display:flex;align-items:center;gap:10px;margin:12px 0 0;padding:11px 12px;
+      border:1px solid rgba(126,173,215,.22);border-radius:15px;
+      background:rgba(203,228,251,.25);
+    }
+    .future-flow .future-preview-symbol{font-size:20px;color:#32679c;flex:0 0 24px;text-align:center}
+    .future-flow .future-preview-copy{min-width:0}
+    .future-flow .future-preview-copy small{display:block;font-size:9px;font-weight:800;letter-spacing:.12em;color:#5b7590;margin-bottom:3px}
+    .future-flow .future-preview-copy strong{display:block;font-size:13px;line-height:1.35;color:#193b62;overflow-wrap:anywhere}
+    .future-flow .future-privacy{font-size:11px;line-height:1.5;color:#466684;margin-top:11px}
+    .future-flow .future-actions{display:grid!important;grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr)!important;gap:10px!important;margin-top:16px!important}
+    .future-flow .future-actions button{
+      min-width:0!important;min-height:46px!important;height:46px!important;
+      font-size:13px!important;font-weight:750!important;border-radius:14px!important;
+    }
+    .future-flow .future-actions .primary{
+      border:1px solid #234b78!important;color:white!important;
+      background:linear-gradient(135deg,#244f86,#102b4f)!important;
+      box-shadow:0 8px 19px rgba(28,73,124,.17)!important;
+    }
+    .future-flow .future-actions .primary:disabled{opacity:.52;cursor:not-allowed;box-shadow:none!important}
+    @media(max-width:359px){
+      .sheet.future-date-sheet .sheet-inner{padding:12px 14px 15px!important}
+      .future-flow .future-controls{gap:7px}
+      .future-flow .future-control input{font-size:15px!important;padding:0 7px!important}
+      .future-flow .future-description{font-size:11px!important}
+    }
+    @media(max-height:620px){
+      .sheet.future-date-sheet{max-height:calc(100dvh - 14px)!important}
+      .sheet.future-date-sheet .sheet-inner{max-height:calc(100dvh - 67px)!important;padding-top:11px!important;padding-bottom:12px!important}
+      .future-flow .future-top{margin-bottom:6px}
+      .future-flow .future-description{margin-bottom:9px!important}
+    }
   </style>
 </head>
 <body>
@@ -1223,8 +1353,8 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  function closeSheet(){sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');
+  function closeSheet(){sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -2327,10 +2457,51 @@
   }
 
   function showDateStep(){
-    const soon=new Date(Date.now()+60000);const min=new Date(soon.getTime()-soon.getTimezoneOffset()*60000).toISOString().slice(0,16);
-    openSheet(`<h2>Future date</h2><p>Cosmos will wait. The recipient remains free to open or ignore it when the moment arrives.</p><div class="field"><label>Open after</label><input id="unlockDate" type="datetime-local" min="${min}"></div><div class="actions"><button id="backDate">Back</button><button class="primary" id="nextDate">Continue</button></div>`);
+    // Local calendar dates prevent accidental UTC shifting on iPhone.
+    const now=new Date();
+    const pad=n=>String(n).padStart(2,'0');
+    const localDay=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const localClock=d=>`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const suggestion=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,9,0);
+    const original=compose?.unlock_at?new Date(compose.unlock_at):null;
+    const chosen=original&&Number.isFinite(original.getTime())&&original>now?original:suggestion;
+    openSheet(`<div class="future-flow">
+      <div class="future-top"><div class="future-orb" aria-hidden="true">✧</div>
+        <div><div class="future-eyebrow">A COSMOS FOR LATER</div><h2>Choose the reveal</h2></div></div>
+      <p class="future-description">Pick when this moment will arrive.</p>
+      <div class="future-controls">
+        <div class="future-control"><label for="unlockDay">DATE</label><input id="unlockDay" aria-label="Reveal date" type="date" min="${localDay(now)}" value="${localDay(chosen)}" required></div>
+        <div class="future-control"><label for="unlockTime">TIME</label><input id="unlockTime" aria-label="Reveal time" type="time" value="${localClock(chosen)}" step="60" required></div>
+      </div>
+      <div class="future-preview" aria-live="polite"><span class="future-preview-symbol" aria-hidden="true">◷</span>
+        <div class="future-preview-copy"><small>REVEALS</small><strong id="futureRevealPreview"></strong></div></div>
+      <p class="future-privacy">🔒 You can preview it anytime. Others see a sealed circle until the reveal.</p>
+      <div class="actions future-actions"><button type="button" id="backDate">← Back</button><button type="button" class="primary" id="nextDate">Continue →</button></div>
+    </div>`);
     sheet.classList.add('liquid-compact-step','future-date-sheet');
-    $("backDate").onclick=showWhenStep;$("nextDate").onclick=()=>{const v=$("unlockDate").value;if(!v)return toastMsg("Choose a future date.");compose.unlock_at=new Date(v).toISOString();showFinalStep();};
+    sheetBackdrop.classList.add('future-backdrop');
+    const exit=$('sheetBackCamera');if(exit){exit.textContent='×';exit.setAttribute('aria-label','Close and return to camera');exit.title='Back to camera';}
+    const day=$('unlockDay'),clock=$('unlockTime'),preview=$('futureRevealPreview'),next=$('nextDate');
+    function chosenMoment(){
+      if(!day.value||!clock.value)return null;
+      const selected=new Date(`${day.value}T${clock.value}:00`);
+      return Number.isFinite(selected.getTime())?selected:null;
+    }
+    function updateReveal(){
+      const selected=chosenMoment(),valid=Boolean(selected&&selected.getTime()>Date.now()+60000);
+      next.disabled=!valid;
+      preview.textContent=!selected?'Choose both a date and time':!valid?'Choose a time in the future':
+        selected.toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+    }
+    day.addEventListener('input',updateReveal);day.addEventListener('change',updateReveal);
+    clock.addEventListener('input',updateReveal);clock.addEventListener('change',updateReveal);
+    $('backDate').onclick=showWhenStep;
+    next.onclick=()=>{
+      const selected=chosenMoment();
+      if(!selected||selected.getTime()<=Date.now()+60000){updateReveal();return toastMsg('Choose a future reveal date and time.');}
+      compose.unlock_at=selected.toISOString();showFinalStep();
+    };
+    updateReveal();
   }
 
   function showFinalStep(){
