@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.8.5-ios-future-picker" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8.6-ios-native-controls-layout" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1191,6 +1191,72 @@
       .future-flow .future-top{margin-bottom:6px}
       .future-flow .future-description{margin-bottom:9px!important}
     }
+  
+    /* COSMOS v2.8.6 — Native iOS picker, fixed-size visible controls.
+       Safari date/time inputs have an unshrinkable intrinsic text width and
+       crowd/overflow grid cells. Keep native pickers as invisible tappable
+       controls, display a separately sized and formatted value beneath them. */
+    .sheet.future-date-sheet .future-flow,
+    .sheet.future-date-sheet .future-controls,
+    .sheet.future-date-sheet .future-control{min-width:0;max-width:100%;box-sizing:border-box}
+    .sheet.future-date-sheet .future-controls{
+      display:grid!important;
+      grid-template-columns:minmax(0,1.12fr) minmax(0,.88fr)!important;
+      column-gap:11px!important;
+      align-items:end;
+      width:100%!important;
+      overflow:visible;
+    }
+    .sheet.future-date-sheet .future-input-shell{
+      display:flex;align-items:center;justify-content:space-between;position:relative;
+      width:100%;max-width:100%;min-width:0;min-height:52px;
+      padding:0 12px;gap:6px;
+      border-radius:15px;border:1px solid rgba(134,174,211,.53);
+      background:linear-gradient(150deg,rgba(255,255,255,.95),rgba(249,252,255,.86));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.98),0 2px 8px rgba(29,72,125,.06);
+      overflow:hidden;isolation:isolate;
+    }
+    .sheet.future-date-sheet .future-input-shell:focus-within{
+      outline:2px solid rgba(51,115,198,.50);outline-offset:2px;
+      box-shadow:0 0 0 4px rgba(81,155,244,.14);
+    }
+    .sheet.future-date-sheet .future-input-value{
+      min-width:0;flex:1 1 auto;white-space:nowrap;
+      color:#193957;font-size:clamp(13px,3.7vw,16px);font-weight:550;
+      line-height:1.25;text-align:left;letter-spacing:-.025em;
+      overflow:hidden;text-overflow:clip;
+    }
+    .sheet.future-date-sheet .future-field-icon{
+      width:18px;height:18px;flex:0 0 18px;
+      color:#1d344e;pointer-events:none;
+    }
+    .sheet.future-date-sheet .future-input-shell input[type="date"],
+    .sheet.future-date-sheet .future-input-shell input[type="time"]{
+      position:absolute!important;inset:0!important;display:block!important;
+      margin:0!important;padding:0!important;
+      width:100%!important;max-width:none!important;min-width:0!important;
+      height:100%!important;min-height:100%!important;
+      border:0!important;border-radius:0!important;
+      opacity:0!important;box-shadow:none!important;
+      background:transparent!important;
+      cursor:pointer;z-index:2;
+      -webkit-appearance:none!important;appearance:none!important;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .sheet.future-date-sheet .future-flow .future-actions{margin-top:16px!important}
+    /* Guard against calendar/time fields pushing beyond the right edge. */
+    @media(max-width:390px){
+      .sheet.future-date-sheet .sheet-inner{padding-left:15px!important;padding-right:15px!important}
+      .sheet.future-date-sheet .future-controls{column-gap:9px!important}
+      .sheet.future-date-sheet .future-input-shell{padding-left:10px;padding-right:10px;gap:4px}
+      .sheet.future-date-sheet .future-input-value{font-size:14px}
+      .sheet.future-date-sheet .future-field-icon{width:17px;height:17px;flex-basis:17px}
+    }
+    @media(max-width:350px){
+      .sheet.future-date-sheet .future-controls{grid-template-columns:minmax(0,1fr)!important;row-gap:10px!important}
+      .sheet.future-date-sheet .future-input-value{font-size:15px}
+    }
+
   </style>
 </head>
 <body>
@@ -2470,8 +2536,20 @@
         <div><div class="future-eyebrow">A COSMOS FOR LATER</div><h2>Choose the reveal</h2></div></div>
       <p class="future-description">Pick when this moment will arrive.</p>
       <div class="future-controls">
-        <div class="future-control"><label for="unlockDay">DATE</label><input id="unlockDay" aria-label="Reveal date" type="date" min="${localDay(now)}" value="${localDay(chosen)}" required></div>
-        <div class="future-control"><label for="unlockTime">TIME</label><input id="unlockTime" aria-label="Reveal time" type="time" value="${localClock(chosen)}" step="60" required></div>
+        <div class="future-control"><label for="unlockDay">DATE</label>
+          <div class="future-input-shell">
+            <span id="futureDayText" class="future-input-value" aria-hidden="true"></span>
+            <svg class="future-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18"/></svg>
+            <input id="unlockDay" aria-label="Reveal date" type="date" min="${localDay(now)}" value="${localDay(chosen)}" required>
+          </div>
+        </div>
+        <div class="future-control"><label for="unlockTime">TIME</label>
+          <div class="future-input-shell">
+            <span id="futureTimeText" class="future-input-value" aria-hidden="true"></span>
+            <svg class="future-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            <input id="unlockTime" aria-label="Reveal time" type="time" value="${localClock(chosen)}" step="60" required>
+          </div>
+        </div>
       </div>
       <div class="future-preview" aria-live="polite"><span class="future-preview-symbol" aria-hidden="true">◷</span>
         <div class="future-preview-copy"><small>REVEALS</small><strong id="futureRevealPreview"></strong></div></div>
@@ -2481,13 +2559,21 @@
     sheet.classList.add('liquid-compact-step','future-date-sheet');
     sheetBackdrop.classList.add('future-backdrop');
     const exit=$('sheetBackCamera');if(exit){exit.textContent='×';exit.setAttribute('aria-label','Close and return to camera');exit.title='Back to camera';}
-    const day=$('unlockDay'),clock=$('unlockTime'),preview=$('futureRevealPreview'),next=$('nextDate');
+    const day=$('unlockDay'),clock=$('unlockTime'),preview=$('futureRevealPreview'),next=$('nextDate'),dayText=$('futureDayText'),timeText=$('futureTimeText');
     function chosenMoment(){
       if(!day.value||!clock.value)return null;
       const selected=new Date(`${day.value}T${clock.value}:00`);
       return Number.isFinite(selected.getTime())?selected:null;
     }
     function updateReveal(){
+      // Render a consistent readable value above the real native controls.
+      // The transparent inputs remain fully interactive for Safari's date/time pickers.
+      const displayDay=day.value?new Date(`${day.value}T12:00:00`):null;
+      dayText.textContent=displayDay&&Number.isFinite(displayDay.getTime())?
+        displayDay.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}):'Choose date';
+      const displayTime=clock.value?new Date(`2000-01-01T${clock.value}:00`):null;
+      timeText.textContent=displayTime&&Number.isFinite(displayTime.getTime())?
+        displayTime.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true}):'Choose time';
       const selected=chosenMoment(),valid=Boolean(selected&&selected.getTime()>Date.now()+60000);
       next.disabled=!valid;
       preview.textContent=!selected?'Choose both a date and time':!valid?'Choose a time in the future':
