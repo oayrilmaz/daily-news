@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.7-family-beta-liquid-glass-connections" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8-family-beta-liquid-glass-connections" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -868,6 +868,20 @@
     @supports not ((-webkit-backdrop-filter:blur(2px)) or (backdrop-filter:blur(2px))){
       .sheet{background:rgba(248,252,255,.96)}.sheet .choices .choice{background:rgba(246,250,255,.96)}}
 
+    /* v2.8 email-only login: liquid, native-size, keyboard-safe */
+    .email-auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0 10px;background:rgba(220,233,250,.44);border-radius:22px;padding:5px;border:1px solid rgba(255,255,255,.8);backdrop-filter:blur(24px)}
+    .email-auth-tabs button{min-height:44px;margin:0;background:transparent;color:#50637c;font-size:13px;border-radius:18px}
+    .auth .email-auth-tabs button:not(.selected){background:transparent!important;color:#50637c!important;box-shadow:none!important}
+    .auth .email-auth-tabs button.selected{background:rgba(255,255,255,.94)!important;color:#152d4e!important;box-shadow:0 5px 20px rgba(26,52,90,.12)!important}
+    .auth{overflow-y:auto;align-content:start;background:linear-gradient(145deg,rgba(231,243,252,.92),rgba(255,255,255,.97));padding-top:max(env(safe-area-inset-top),18px)}
+    .auth-card{padding:20px 10px 36px}
+    .auth-eligibility{padding:12px 5px 0;font-size:13px;color:#26364e}
+    .auth-eligibility label{display:flex;align-items:center;gap:10px}
+    .auth-eligibility input{width:20px;height:20px}
+    .auth-eligibility p{color:#65768e;font-size:11px;line-height:1.4}
+    .auth-code-help{font-size:13px;text-align:center;line-height:1.6;color:#536984}
+    .auth .field input{background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 2px rgba(0,0,0,.03);backdrop-filter:blur(14px)}
+    .auth .field input:focus{outline:2px solid rgba(58,133,225,.42);outline-offset:2px}
   </style>
 </head>
 <body>
@@ -921,18 +935,25 @@
       <div class="auth-orb"></div>
       <h1>COSMOS</h1>
       <h2>Look deeper.</h2>
+      <div class="email-auth-tabs" role="group" aria-label="Cosmos sign-in options">
+        <button type="button" id="authModeLogin" class="selected" aria-pressed="true">Sign in</button>
+        <button type="button" id="authModeRegister" aria-pressed="false">Create account</button>
+      </div>
       <div id="authStart">
-        <div class="field"><label>Phone</label><input id="phoneInput" autocomplete="tel" inputmode="tel" placeholder="+1 919 555 0123" /></div>
-        <div class="field"><label>Email</label><input id="emailInput" autocomplete="email" inputmode="email" placeholder="you@example.com" /></div>
-        <button id="sendCodesButton">Continue</button>
-        <div class="auth-note">Phone identifies your Cosmos. Email protects it. Neither is public.</div>
+        <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
+        <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
+        <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>Private family beta. Younger family members can explore with a parent.</p></div>
+        <button type="button" id="sendCodesButton">Sign in</button>
+        <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
+        <div class="auth-note" id="authIntroNote">Use your email and password. No phone number required.</div>
       </div>
       <div id="authVerify" hidden>
-        <div class="field"><label>Phone code</label><div class="secret-code"><input id="phoneCodeInput" type="password" aria-label="Phone verification code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="phoneCodeInput" aria-label="Show phone code">Show</button></div></div>
-        <div class="field"><label>Email code</label><div class="secret-code"><input id="emailCodeInput" type="password" aria-label="Email verification code" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" /><button type="button" data-reveal="emailCodeInput" aria-label="Show email code">Show</button></div></div>
-        <button id="verifyCodesButton">Enter Cosmos</button>
-        <button class="auth-secondary" id="restartAuthButton">Use different phone/email</button>
-        <div class="auth-note" id="devAuthNote" hidden>Staging mode is active. Use the verification code configured in the Worker secret <b>AUTH_DEV_CODE</b>.</div>
+        <p class="auth-code-help" id="authCodeHelp">Enter the six-digit code sent to your email.</p>
+        <div class="field"><label for="emailCodeInput">Email verification code</label><input id="emailCodeInput" type="text" aria-label="Email verification code" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="••••••" /></div>
+        <div class="field" id="authResetPasswordBlock" hidden><label for="authResetNewPassword">New password</label><input id="authResetNewPassword" type="password" autocomplete="new-password" placeholder="At least 12 characters" /><label for="authResetConfirmPassword" style="margin-top:12px">Confirm new password</label><input id="authResetConfirmPassword" type="password" autocomplete="new-password" placeholder="Repeat new password" /></div>
+        <button type="button" id="verifyCodesButton">Verify email &amp; enter Cosmos</button>
+        <button type="button" class="auth-secondary" id="restartAuthButton">Back to sign in</button>
+        <div class="auth-note">Verification codes expire after 10 minutes. Never share a code.</div>
       </div>
       <div class="auth-error" id="authError" hidden></div>
     </div>
@@ -963,13 +984,24 @@
 
   const $ = id => document.getElementById(id);
   const auth = $("auth"), authStart = $("authStart"), authVerify = $("authVerify"), authError = $("authError");
-  const phoneInput = $("phoneInput"), emailInput = $("emailInput"), phoneCodeInput = $("phoneCodeInput"), emailCodeInput = $("emailCodeInput");
-  const sendCodesButton = $("sendCodesButton"), verifyCodesButton = $("verifyCodesButton"), restartAuthButton = $("restartAuthButton"), devAuthNote = $("devAuthNote");
+  const emailInput=$("emailInput"),authPasswordInput=$("authPasswordInput"),emailCodeInput=$("emailCodeInput");
+  const sendCodesButton=$("sendCodesButton"),verifyCodesButton=$("verifyCodesButton"),restartAuthButton=$("restartAuthButton");
+  let authMode='login',authChallengeId='';
   const cameraVideo = $("cameraVideo"), cameraFallback = $("cameraFallback"), coreOrb = $("coreOrb"), hint = $("hint"), ambientTitle = $("ambientTitle"), ambientSub = $("ambientSub"), foundOrb = $("foundOrb"), foundLabel = $("foundLabel");
   const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput"), noticeBell=$("noticeBell"), noticeCount=$("noticeCount");
-
-  // Same browser + same web origin retains a session across ordinary visits.
-  // Authenticated sessions still expire for safety if unused for too long.
+  function setEmailAuthMode(mode){
+    authMode=mode;authStart.hidden=false;authVerify.hidden=true;showAuthError('');
+    $('authModeLogin').classList.toggle('selected',mode==='login');
+    $('authModeRegister').classList.toggle('selected',mode==='register');
+    $('authModeLogin').setAttribute('aria-pressed',String(mode==='login'));
+    $('authModeRegister').setAttribute('aria-pressed',String(mode==='register'));
+    $('authRegisterConsent').hidden=mode!=='register';
+    $('authPasswordField').hidden=mode==='reset';
+    $('authPasswordInput').autocomplete=mode==='register'?'new-password':'current-password';
+    $('authForgotButton').hidden=mode!=='login';
+    sendCodesButton.textContent=mode==='login'?'Sign in':mode==='register'?'Send email code':'Email a password-reset code';
+    $('authIntroNote').textContent=mode==='register'?'We will verify your email before activating your account. Your existing Cosmos identity is preserved if you register with the same email.':mode==='reset'?'A code will be sent if an account exists.':'Use your email and password. No phone number required.';
+  }
   let token = localStorage.getItem(TOKEN_KEY) || "";
 
   let me = null;
@@ -1182,32 +1214,56 @@
     }
   }
 
-  sendCodesButton.addEventListener("click", async()=>{
-    showAuthError("");
-    const phone=phoneInput.value.trim(), email=emailInput.value.trim();
-    if(!phone||!email){showAuthError("Enter both phone and email.");return;}
-    sendCodesButton.disabled=true; sendCodesButton.textContent="Sending…";
+  function completeEmailSignIn(r){
+    token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;
+    auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);
+    refreshFriendsSummary();renderJourney();
+    if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
+    else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
+    else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,550);
+    setTimeout(recoverTappedNotification,350);
+  }
+  $('authModeLogin').addEventListener('click',()=>setEmailAuthMode('login'));
+  $('authModeRegister').addEventListener('click',()=>setEmailAuthMode('register'));
+  $('authForgotButton').addEventListener('click',()=>setEmailAuthMode('reset'));
+  sendCodesButton.addEventListener('click',async()=>{
+    showAuthError('');const email=emailInput.value.trim(),password=authPasswordInput.value;
+    if(!email){showAuthError('Enter your email address.');return;}
+    if(authMode!=='reset' && !password){showAuthError('Enter your password.');return;}
+    if(authMode==='register' && !$('authAgeConfirm').checked){showAuthError('An independent account requires the user to be at least 13.');return;}
+    sendCodesButton.disabled=true;sendCodesButton.textContent='Please wait…';
     try{
-      const r=await api("/api/auth/start",{method:"POST",body:JSON.stringify({phone,email})});
-      challengeId=r.challenge_id;
-      authStart.hidden=true;authVerify.hidden=false;devAuthNote.hidden=!r.dev_mode;
-      phoneCodeInput.focus();
-    }catch(e){showAuthError(e.message);}finally{sendCodesButton.disabled=false;sendCodesButton.textContent="Continue";}
+      if(authMode==='login'){
+        const r=await api('/api/auth/email/login',{method:'POST',body:JSON.stringify({email,password})});completeEmailSignIn(r);return;
+      }
+      const url=authMode==='register'?'/api/auth/email/register/start':'/api/auth/email/reset/start';
+      const body=authMode==='register'?{email,password,age_13_or_older:true,invite_code:FAMILY_INVITE_CODE}:{email};
+      const r=await api(url,{method:'POST',body:JSON.stringify(body)});
+      authChallengeId=r.challenge_id;authStart.hidden=true;authVerify.hidden=false;
+      $('authResetPasswordBlock').hidden=authMode!=='reset';
+      $('authCodeHelp').textContent=authMode==='reset'?'If this account exists, enter the email code and choose a new password.':'Enter the six-digit code sent to your email to finish registration.';
+      verifyCodesButton.textContent=authMode==='reset'?'Reset password':'Verify email & enter Cosmos';
+      emailCodeInput.value='';emailCodeInput.focus();
+    }catch(e){showAuthError(e.message);}finally{sendCodesButton.disabled=false;
+      if(authMode==='login')sendCodesButton.textContent='Sign in';else if(authMode==='register')sendCodesButton.textContent='Send email code';else sendCodesButton.textContent='Email a password-reset code';}
   });
-
-  verifyCodesButton.addEventListener("click", async()=>{
-    showAuthError("");
-    const phone_code=phoneCodeInput.value.trim(), email_code=emailCodeInput.value.trim();
-    if(!challengeId||!phone_code||!email_code){showAuthError("Enter both verification codes.");return;}
-    verifyCodesButton.disabled=true;verifyCodesButton.textContent="Opening…";
+  verifyCodesButton.addEventListener('click',async()=>{
+    showAuthError('');const email_code=emailCodeInput.value.trim();
+    if(!authChallengeId||!/^\d{6}$/.test(email_code)){showAuthError('Enter the six-digit email code.');return;}
+    verifyCodesButton.disabled=true;verifyCodesButton.textContent='Verifying…';
     try{
-      const r=await api("/api/auth/verify",{method:"POST",body:JSON.stringify({challenge_id:challengeId,phone_code,email_code})});
-      token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);refreshFriendsSummary();renderJourney();if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,550);
-      setTimeout(recoverTappedNotification,350);
-    }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent="Enter Cosmos";}
+      if(authMode==='reset'){
+        const password=$('authResetNewPassword').value,confirm=$('authResetConfirmPassword').value;
+        if(password.length<12||password!==confirm){showAuthError('Choose a password of at least 12 characters and confirm it.');return;}
+        await api('/api/auth/email/reset/finish',{method:'POST',body:JSON.stringify({challenge_id:authChallengeId,email_code,password})});
+        setEmailAuthMode('login');authPasswordInput.value='';showAuthError('');toastMsg('Password updated. Sign in now.',4500);return;
+      }
+      const r=await api('/api/auth/email/register/verify',{method:'POST',body:JSON.stringify({challenge_id:authChallengeId,email_code})});
+      completeEmailSignIn(r);
+    }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent=authMode==='reset'?'Reset password':'Verify email & enter Cosmos';}
   });
-
-  restartAuthButton.addEventListener("click",()=>{challengeId="";authVerify.hidden=true;authStart.hidden=false;phoneCodeInput.value="";emailCodeInput.value="";showAuthError("");});
+  restartAuthButton.addEventListener('click',()=>{authChallengeId='';emailCodeInput.value='';setEmailAuthMode('login');});
+  setEmailAuthMode('login');
 
   async function startCamera(showError=true){
     if(!navigator.mediaDevices?.getUserMedia){cameraFallback.textContent="Camera is unavailable in this browser. You can still leave and receive location-based Cosmoses.";return;}
@@ -1853,7 +1909,7 @@
         const contact=contacts?.[0];if(!contact)return;
         const value=(contact.tel||[])[0]||(contact.email||[])[0]||'';
         if($('friendContact') && value){$('friendContact').value=value;toastMsg(`Selected ${contact.name?.[0]||'contact'}.`);}
-        else toastMsg('This contact has no phone or email.');
+        else toastMsg('This contact has no email address.');
       }).catch(()=>toastMsg('Contact selection was canceled.'));
       return;
     }
@@ -1891,7 +1947,7 @@
 
   function openInvite(){
     openSheet(`<h2>Invite family & friends</h2><p>Choose a contact or send a connection invitation directly. You can also share one private invitation link with your family group.</p>
-      <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Phone number or email"></div>
+      <div class="field"><label>Phone or email</label><input id="friendContact" inputmode="email" autocomplete="off" placeholder="Email address"></div>
       <div class="invite-options"><button type="button" id="pickCosmosContact">Choose from contacts</button><button type="button" id="sendInvite" class="dark">Send invitation</button></div>
       <div class="invite-card"><h3>Invite your family group</h3><p>Share this link via Messages, WhatsApp, or any family chat. After signing in, each person chooses whether to request a connection with you.</p>
         <label for="familyInviteLink" class="look-kicker">Your connection link</label>
@@ -1908,7 +1964,7 @@
     $('copyCosmosLink').onclick=copyInviteLink;
     $('shareCosmosLink').onclick=shareInviteLink;
     $('sendInvite').onclick=async()=>{
-      const contact=$('friendContact').value.trim();if(!contact)return toastMsg('Enter a phone or email, or choose a contact.');
+      const contact=$('friendContact').value.trim();if(!contact)return toastMsg('Enter an email or choose a contact.');
       $('sendInvite').disabled=true;
       try{const r=await api('/api/friends/invite',{method:'POST',body:JSON.stringify({contact})});await refreshFriendsSummary();toastMsg(r.message||'Invitation submitted.',4200);openFriends();}
       catch(e){toastMsg(e.message,4400);$('sendInvite').disabled=false;}
@@ -1945,7 +2001,7 @@
         try{
           const policy=await api('/api/family/policy');
           if(!policy.group_media_enabled){
-            openSheet(`<h2>Family media needs setup</h2><p>To share media with a full Connections circle, first configure real phone and email verification in Cloudflare.</p><div class="circle-info">Development-code login is not secure enough for your family. Public Cosmos stays disabled.</div><div class="actions"><button id="familyPolicyBack">Back</button></div>`);
+            openSheet(`<h2>Family media needs setup</h2><p>To share media with a full Connections circle, first configure verified email/password authentication in Cloudflare.</p><div class="circle-info">Development-code login is not secure enough for your family. Public Cosmos stays disabled.</div><div class="actions"><button id="familyPolicyBack">Back</button></div>`);
             $('familyPolicyBack').onclick=showAudienceStep;return;
           }
         }catch(e){toastMsg(e.message,4000);return;}
@@ -1985,7 +2041,7 @@
         const policy=await api('/api/family/policy');
         if(!policy.group_media_enabled){
           openSheet(`<h2>Family media needs setup</h2><p>Before sharing photos or videos across Connections, enable real verification and the private family beta on Cloudflare.</p>
-          <div class="circle-info">Your phone and email sign-in must use genuine one-time codes. This protects your daughters' accounts. Public remains OFF.</div>
+          <div class="circle-info">All participants must verify their email and sign in with a password. This protects your daughters' accounts. Public remains OFF.</div>
           <div class="actions"><button id="circleBack">Back</button><button class="primary" id="circlePickOne">Send privately instead</button></div>`);
           sheet.classList.add('liquid-compact-step');
           $('circleBack').onclick=showRecipientStep;
@@ -2321,7 +2377,7 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your phone and email remain private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openConnections").onclick=openFriends;
