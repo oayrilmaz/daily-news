@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.8.8-moment-captions-comments" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8.9-hold-look-deeper-restored" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1795,7 +1795,9 @@
 
   async function lookDeeper(direction=""){
     if(looking) return;
-    if(currentFound && !direction){openCosmos(currentFound.id);return;}
+    // HOLD must analyze the *live camera frame*, even when a nearby saved Cosmos exists.
+    // A saved Cosmos is opened only by tapping its dedicated foundOrb / Metro bubble.
+    // Do not redirect camera analysis to openCosmos(currentFound.id).
     looking=true;coreOrb.disabled=true;
     ambientTitle.textContent=direction?"Going deeper…":"Looking deeper…";
     ambientSub.textContent=direction?`Following: ${direction}`:"Cosmos is reading this view. The frame is not added to your Cosmos.";
