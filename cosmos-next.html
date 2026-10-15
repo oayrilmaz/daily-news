@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.8-family-beta-liquid-glass-connections" />
+  <meta name="cosmos-build" content="cosmos-life-v2.8.4-adaptive-camera-metro" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -882,6 +882,185 @@
     .auth-code-help{font-size:13px;text-align:center;line-height:1.6;color:#536984}
     .auth .field input{background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.9);box-shadow:inset 0 1px 2px rgba(0,0,0,.03);backdrop-filter:blur(14px)}
     .auth .field input:focus{outline:2px solid rgba(58,133,225,.42);outline-offset:2px}
+
+    /* ================================================================
+       COSMOS v2.8.4: full-device camera Metro + compact Future date
+       Layout only. Keeps existing accounts, post rules and API calls.
+       ================================================================ */
+
+    /* Fluid camera canvas: match the actual visual viewport on phones,
+       tablets, laptops and external monitors. */
+    .app{height:100vh;height:100dvh;min-height:0;width:100%;max-width:none}
+    .camera,.camera video{width:100%;height:100%}
+    .camera video{object-fit:cover}
+
+    /* Do not let a v2.5 minimum height force scrolling through empty time. */
+    .app.metro-live .metro-day-scroll .living-day-chart{min-height:0!important}
+
+    /* The future-date composer is deliberately a small liquid-glass sheet,
+       rather than the default 84vh sheet used by long content forms. */
+    .sheet.future-date-sheet{
+      height:auto!important;
+      min-height:0!important;
+      max-height:calc(100dvh - 14px)!important;
+      overflow:hidden;
+      border-radius:28px 28px 0 0;
+      background:linear-gradient(135deg,rgba(250,253,255,.82),rgba(224,240,255,.68) 55%,rgba(247,251,255,.80));
+      -webkit-backdrop-filter:blur(22px) saturate(1.24);
+      backdrop-filter:blur(22px) saturate(1.24);
+    }
+    .sheet.future-date-sheet .sheet-inner{
+      flex:0 1 auto!important;
+      min-height:0!important;
+      max-height:calc(100dvh - 95px)!important;
+      overflow-y:auto!important;
+      padding:16px clamp(18px,4vw,26px) calc(env(safe-area-inset-bottom) + 24px)!important;
+    }
+    .sheet.future-date-sheet .handle{margin-bottom:14px}
+    .sheet.future-date-sheet h2{font-size:clamp(24px,4.5vw,31px);line-height:1.16}
+    .sheet.future-date-sheet p{font-size:13px;line-height:1.55;max-width:52ch}
+    .sheet.future-date-sheet .field{margin-top:20px}
+    .sheet.future-date-sheet .field label{display:block;margin-bottom:9px;font-size:11px;letter-spacing:.10em}
+    .sheet.future-date-sheet .field input[type="datetime-local"]{
+      display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;
+      min-height:54px;padding:12px 14px;font-size:16px;line-height:1.3;
+      color:#163357;color-scheme:light;
+      border:1px solid rgba(149,186,225,.74);border-radius:17px;
+      background:rgba(255,255,255,.82);
+      box-shadow:inset 0 1px 2px rgba(31,71,124,.05);
+      -webkit-appearance:auto;appearance:auto;
+    }
+    .sheet.future-date-sheet .field input[type="datetime-local"]:focus{
+      outline:3px solid rgba(94,153,232,.40);outline-offset:2px
+    }
+    .sheet.future-date-sheet .actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:22px}
+    .sheet.future-date-sheet .actions button{min-width:0;min-height:48px;padding:10px 13px;font-size:14px}
+    .sheet.future-date-sheet .sheet-quickbar{padding:calc(env(safe-area-inset-top) + 8px) 17px 10px}
+
+    /* Larger screens: bring the week stations and entire day Metro across
+       the available camera, rather than limiting them to a 560px strip
+       left of center. Preserve all seven day stops at every viewport. */
+    @media(min-width:720px){
+      .topbar{padding:calc(env(safe-area-inset-top) + 18px) clamp(20px,2.7vw,48px) 10px!important}
+      .brand{font-size:clamp(14px,1.2vw,20px)}
+      .tagline{font-size:clamp(11px,.9vw,14px)}
+      .app.metro-live .journey-controls{
+        top:calc(env(safe-area-inset-top) + 67px)!important;
+        padding:0 18px!important;
+      }
+      .app.metro-live .journey-label{font-size:13px!important;max-width:460px!important}
+      .app.metro-live .journey-stage{
+        left:50%!important;right:auto!important;
+        transform:translateX(-50%)!important;
+        width:calc(100vw - 34px)!important;
+        max-width:1720px!important;
+        top:calc(env(safe-area-inset-top) + 121px)!important;
+        bottom:calc(env(safe-area-inset-bottom) + 170px)!important;
+        padding:0 clamp(7px,1.5vw,26px) 8px!important;
+        gap:0!important;
+        overflow:hidden!important;
+      }
+      .app.metro-live .week-metro,.app.metro-live .metro-main{width:100%!important;max-width:none!important}
+      .app.metro-live .week-navigation{font-size:13px!important;gap:13px!important;margin-bottom:7px!important;min-height:34px}
+      .app.metro-live .week-navigation button{
+        width:37px!important;height:37px!important;min-height:37px!important;min-width:37px!important;font-size:18px!important;
+      }
+      .app.metro-live .metro-week-day{height:121px!important}
+      .app.metro-live .metro-week-day .wd-name{font-size:12px!important;line-height:18px!important}
+      .app.metro-live .metro-week-day .wd-date{font-size:12px!important;line-height:19px!important}
+      .app.metro-live .metro-week-day .wd-branch{height:48px!important;gap:3px!important}
+      .app.metro-live .week-weekdays::before{top:94px!important}
+      .app.metro-live .metro-week-day .wd-stop{width:17px!important;height:17px!important}
+      .app.metro-live .metro-week-day.active .wd-stop{width:29px!important;height:29px!important}
+      .app.metro-live .metro-week-day .wd-bubble{width:9px!important;height:9px!important}
+      .app.metro-live .metro-week-day .wd-bubble:nth-child(odd){width:12px!important;height:12px!important}
+      .app.metro-live .metro-week-day .wd-count{font-size:11px!important}
+      .app.metro-live .metro-week-note{font-size:11px!important;margin:0 0 4px!important}
+      .app.metro-live .metro-day-heading{
+        min-height:51px!important;padding:6px 10px 9px!important;
+        align-items:center!important
+      }
+      .app.metro-live .metro-day-heading h2{font-size:clamp(19px,1.7vw,28px)!important;white-space:normal!important}
+      .app.metro-live .metro-day-heading p{font-size:12px!important;line-height:1.4!important}
+      .app.metro-live .metro-day-scroll{padding:2px 9px 16px!important;overflow-y:auto!important}
+      .app.metro-live .living-day-chart{width:100%!important;max-width:none!important}
+      .app.metro-live .living-branch{height:76px!important}
+      .app.metro-live .living-entry{
+        flex:0 0 min(315px,72%)!important;min-width:min(170px,70%)!important;
+        height:64px!important;border-radius:18px!important;
+        padding:6px 13px 6px 7px!important
+      }
+      .app.metro-live .living-entry .living-entry-orb{width:45px;height:45px;flex-basis:45px}
+      .app.metro-live .living-entry .living-entry-copy strong{font-size:13px}
+      .app.metro-live .living-entry .living-entry-copy small{font-size:11px}
+      .app.metro-live .living-branch .living-time-label{font-size:11px}
+      .app.metro-live .living-branch .living-rail{gap:11px!important}
+      .app.metro-live .metro-popover{
+        width:min(440px,calc(100vw - 64px))!important;
+        max-width:440px!important;
+        bottom:calc(env(safe-area-inset-bottom) + 190px)!important;
+      }
+      .bottom{bottom:0!important}
+      .bottom .core{width:86px;height:86px}
+      .bottom .hint{font-size:12px}
+      .bottom .dim-nav button{font-size:12px;min-height:40px;padding:9px 17px}
+
+      /* Regular content sheets on desktop are larger; reader's dedicated
+         expanded/compact modes retain their own height behavior. */
+      .sheet:not(.metro-expanded):not(.future-date-sheet){
+        left:50%!important;right:auto!important;
+        transform:translateX(-50%)!important;
+        width:min(790px,calc(100vw - 44px))!important;
+        max-width:790px!important;
+        border-radius:28px!important;
+        bottom:16px!important;margin:0!important;
+      }
+      .sheet:not(.metro-expanded):not(.future-date-sheet) .sheet-inner{padding-left:24px;padding-right:24px}
+
+      /* Future-date picker appears as a readable centered glass card. */
+      .sheet.future-date-sheet{
+        top:50%!important;bottom:auto!important;left:50%!important;right:auto!important;
+        transform:translate(-50%,-50%)!important;
+        width:min(560px,calc(100vw - 48px))!important;
+        max-width:560px!important;max-height:calc(100dvh - 48px)!important;
+        margin:0!important;border-radius:28px!important;
+        border:1px solid rgba(255,255,255,.93)!important;
+        box-shadow:0 27px 85px rgba(20,47,91,.27)!important;
+      }
+      .sheet.future-date-sheet .sheet-quickbar{padding:14px 20px 12px!important}
+      .sheet.future-date-sheet .sheet-inner{max-height:calc(100dvh - 115px)!important;padding:18px 26px 28px!important}
+      .sheet.future-date-sheet .actions button{min-height:53px!important;font-size:15px!important}
+    }
+    /* Short laptop windows: week remains permanently visible while the
+       daily rail gets the largest possible scrollable area. */
+    @media(min-width:720px) and (max-height:740px){
+      .app.metro-live .journey-controls{top:calc(env(safe-area-inset-top) + 54px)!important}
+      .app.metro-live .journey-stage{
+        top:calc(env(safe-area-inset-top) + 99px)!important;
+        bottom:calc(env(safe-area-inset-bottom) + 140px)!important;
+      }
+      .app.metro-live .week-navigation{min-height:26px!important;margin-bottom:1px!important}
+      .app.metro-live .week-navigation button{height:30px!important;min-height:30px!important;width:31px!important;min-width:31px!important}
+      .app.metro-live .metro-week-day{height:96px!important}
+      .app.metro-live .metro-week-day .wd-name{font-size:10px!important;line-height:15px!important}
+      .app.metro-live .metro-week-day .wd-date{font-size:10px!important;line-height:15px!important}
+      .app.metro-live .metro-week-day .wd-branch{height:35px!important}
+      .app.metro-live .week-weekdays::before{top:72px!important}
+      .app.metro-live .metro-day-heading{min-height:38px!important;padding:2px 9px 4px!important}
+      .app.metro-live .metro-day-heading h2{font-size:19px!important}
+      .app.metro-live .metro-day-heading p{font-size:10px!important}
+      .app.metro-live .metro-popover{bottom:calc(env(safe-area-inset-bottom) + 160px)!important}
+      .bottom{gap:7px!important;padding-top:6px!important;padding-bottom:7px!important}
+      .bottom .core{height:66px;width:66px}
+      .bottom .core::after{inset:12px}
+      .bottom .hint{font-size:10px;padding:5px 8px}
+      .bottom .dim-nav button{min-height:31px;padding:6px 10px;font-size:10px}
+    }
+    @media(max-width:719px){
+      .sheet.future-date-sheet{left:0;right:0;bottom:0;top:auto;transform:none;width:100%;margin:0}
+      .sheet.future-date-sheet .sheet-inner{padding-bottom:calc(env(safe-area-inset-bottom) + 20px)!important}
+    }
+    @media(prefers-reduced-motion:reduce){.sheet.future-date-sheet{scroll-behavior:auto}}
   </style>
 </head>
 <body>
@@ -1044,8 +1223,8 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  function closeSheet(){sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step');
+  function closeSheet(){sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -2148,8 +2327,9 @@
   }
 
   function showDateStep(){
-    const min=new Date(Date.now()+60000).toISOString().slice(0,16);
+    const soon=new Date(Date.now()+60000);const min=new Date(soon.getTime()-soon.getTimezoneOffset()*60000).toISOString().slice(0,16);
     openSheet(`<h2>Future date</h2><p>Cosmos will wait. The recipient remains free to open or ignore it when the moment arrives.</p><div class="field"><label>Open after</label><input id="unlockDate" type="datetime-local" min="${min}"></div><div class="actions"><button id="backDate">Back</button><button class="primary" id="nextDate">Continue</button></div>`);
+    sheet.classList.add('liquid-compact-step','future-date-sheet');
     $("backDate").onclick=showWhenStep;$("nextDate").onclick=()=>{const v=$("unlockDate").value;if(!v)return toastMsg("Choose a future date.");compose.unlock_at=new Date(v).toISOString();showFinalStep();};
   }
 
