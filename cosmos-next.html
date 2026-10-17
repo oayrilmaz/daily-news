@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-life-v2.9.1-photo-studio-family-sharing" />
+  <meta name="cosmos-build" content="cosmos-life-v2.9.2-curiosity-private-notices" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1375,6 +1375,20 @@
     @media(max-width:370px){.creative-palette{gap:6px}.creative-palette>button{width:25px;height:25px;flex-basis:25px}.creative-modebar button{padding:7px 10px}.creative-stickers{grid-template-columns:repeat(6,minmax(0,1fr))}.creative-audience-options{gap:5px}.creative-audience-options button strong{font-size:9px}}
     @media(prefers-reduced-motion:reduce){.cosmos-creative-sheet *{scroll-behavior:auto!important}}
 
+
+    /* v2.9.2 — private, curiosity-first reveal. No preview before consent. */
+    .cosmos-reveal-teaser{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:16px 14px;color:#153359}
+    .cosmos-reveal-teaser strong{font-size:17px;line-height:1.35;letter-spacing:-.02em}
+    .cosmos-reveal-teaser p{margin:0 0 5px;font-size:13px;line-height:1.55;color:#55708d;max-width:32ch}
+    .cosmos-reveal-orb{width:64px;height:64px;display:grid;place-items:center;border-radius:50%;font-size:30px;
+      color:white;background:radial-gradient(circle at 32% 26%,#d8f7ff 0%,#6c9dd7 28%,#26487c 57%,#0b2345 100%);
+      border:1px solid rgba(255,255,255,.7);box-shadow:0 0 0 7px rgba(119,166,212,.13),0 0 25px rgba(81,140,215,.36)}
+    .cosmos-reveal-action{appearance:none;border:0;border-radius:999px;padding:13px 22px;min-height:44px;
+      background:#193f71;color:white;font-weight:800;cursor:pointer;box-shadow:0 10px 20px rgba(19,56,101,.23)}
+    .cosmos-reveal-sheet{padding:18px 8px 10px;min-height:240px}
+    .cosmos-reveal-sheet h2{margin:4px 0 2px;color:#153359;font-size:clamp(23px,5vw,30px)}
+    .cosmos-reveal-sheet .actions{width:100%;display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:10px}
+    .cosmos-reveal-sheet .actions button{min-height:46px;flex:1 1 130px}
   </style>
 </head>
 <body>
@@ -1641,6 +1655,27 @@
   window.addEventListener('pageshow',()=>setTimeout(recoverTappedNotification,180));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(recoverTappedNotification,180);});
 
+  // A push opens its exact permitted moment as a teaser: no media or caption
+  // is shown on arrival. Only a deliberate second tap asks the Worker to open it.
+  function openMomentTeaser(momentId,waiting=false){
+    openSheet(`<div class="cosmos-reveal-teaser cosmos-reveal-sheet">
+      <span class="cosmos-reveal-orb" aria-hidden="true">${waiting?'◌':'✧'}</span>
+      <div class="future-eyebrow">COSMOS · LOOK DEEPER</div>
+      <h2>${waiting?'A surprise is waiting':'Someone left you a moment'}</h2>
+      <p>${waiting?'Its contents are sealed until the intended date. You can check whether it is ready, but no one can reveal it early.':'A new moment was shared with you. Open it whenever you are ready.'}</p>
+      <div class="actions"><button type="button" id="momentTeaserBack">Back to camera</button>
+        <button type="button" class="primary" id="momentTeaserReveal">${waiting?'Check if ready →':'✧ Reveal moment →'}</button></div>
+      </div>`);
+    $('momentTeaserBack').onclick=returnToCamera;
+    $('momentTeaserReveal').onclick=async()=>{
+      $('momentTeaserReveal').disabled=true;
+      const didOpen=await openCosmos(momentId);
+      if(!didOpen&&$('momentTeaserReveal'))$('momentTeaserReveal').disabled=false;
+    };
+  }
+  function isWaitingNotice(n){return ['future_tease','circle_future_tease'].includes(n?.kind);}
+  function isRevealNotice(n){return ['direct','circle_now','future','circle_future_ready','future_tease','circle_future_tease'].includes(n?.kind);}
+
   async function openNotificationMomentFromLink(){
     const noticeId=pendingNoticeId;
     if(!NOTICE_ID_PATTERN.test(noticeId||'')||!token||!me||directNoticeOpening)return;
@@ -1666,6 +1701,13 @@
       if(!notice.cosmos_id){
         pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);
         await showCosmosNotifications();return;
+      }
+      if(isRevealNotice(notice)){
+        openMomentTeaser(notice.cosmos_id,isWaitingNotice(notice));
+        lastOpenedNoticeId=noticeId;pendingNoticeId='';clearNotificationLink();ackPushNotice(noticeId);
+        try{await api(`/api/notifications/${encodeURIComponent(noticeId)}/read`,{method:'POST'});}catch{}
+        refreshNoticeBadge();
+        return;
       }
       // The existing Cloudflare Worker verifies recipient identity and unlock conditions.
       const opened=await openCosmos(notice.cosmos_id);
@@ -2909,7 +2951,7 @@
 
   function showFinalStep(){
     const who=compose.circle_audience==='connections' && compose.recipient_mode==='self'?'My Connections':compose.recipient_mode==='self'?'Future you':compose.recipient_label||'Someone';
-    const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString():"Now";
+    const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString()+" · sealed until reveal":"Now · opens when tapped";
     const sharing=compose.circle_audience==='connections'?'Connections (owner-controlled)':compose.circle_audience==='between_us'?'Only us':'Private';
     openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} Your location is not shared with others by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
     sheet.classList.add('liquid-compact-step');
@@ -3230,6 +3272,9 @@
   }
   async function openMetroExpandedByKey(key,cached=null){
     const record=weekMetroItems.find(i=>i.key===key);if(!record||record.locked)return;
+    if(!cached&&!record.is_author&&record.kind!=='text'){
+      openMomentTeaser(record.id,false);return;
+    }
     weekMetroPopId=null;$('metroPopover')?.remove();
     try{
       const r=cached||await api('/api/cosmos/'+encodeURIComponent(record.id)+'/open',{
@@ -3300,7 +3345,7 @@
         : !r.push_configured?'Push credentials are not configured in Cloudflare yet; the inbox works now.'
         : allowed?'Push permission has been granted for this installation.':'Enable notifications to receive alerts even when the app is closed.';
       openSheet(`<h2>Notifications ${unread?'· '+unread+' new':''}</h2>
-        <p>New messages and replies from accepted connections. Private content is not displayed on your lock screen.</p>
+        <p>Someone shared a moment now, or left a surprise for the future. Private content is never displayed on your lock screen.</p>
         <div class="notice-settings"><b>🔔 On your phone</b><p>${escapeHtml(note)}</p>
           <div class="notice-actions"><button type="button" id="enableCosmosPush">Enable notifications</button><button type="button" id="disableCosmosPush">Turn off</button><button type="button" id="testCosmosPush">Send test</button></div></div>
         <div class="notice-list">${noticeListCache.length?noticeListCache.map(n=>`<button type="button" class="notice-item ${n.read_at?'':'unread'}" data-notice-id="${escapeHtml(n.id)}"><strong>${n.read_at?'◯':'●'} ${escapeHtml(n.title)}</strong><span>${escapeHtml(n.body)} · ${escapeHtml(new Date(n.created_at).toLocaleString())}</span></button>`).join(''):'<div class="empty">Nothing waiting yet. Ask a connection to send you a Cosmos now.</div>'}</div>
@@ -3314,7 +3359,7 @@
         const n=noticeListCache.find(x=>x.id===btn.dataset.noticeId);if(!n)return;
         try{await api(`/api/notifications/${encodeURIComponent(n.id)}/read`,{method:'POST'});}catch{}
         refreshNoticeBadge();
-        if(n.cosmos_id){closeSheet();openCosmos(n.cosmos_id);}else showCosmosNotifications();
+        if(n.cosmos_id){if(isRevealNotice(n))openMomentTeaser(n.cosmos_id,isWaitingNotice(n));else{closeSheet();openCosmos(n.cosmos_id);}}else showCosmosNotifications();
       });
     }catch(e){openSheet(`<h2>Notifications</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="noticeAgain">Try again</button><button id="noticeGoBack">Camera</button></div>`);$('noticeAgain').onclick=showCosmosNotifications;$('noticeGoBack').onclick=returnToCamera;}
     finally{inboxOpening=false;}
@@ -3606,7 +3651,7 @@
         const d=new Date(item.date),stamp=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         const title=metroCardTitle(item),type=metroCardType(item);
         const kind=String(item.kind||'text');
-        const img=!item.locked&&kind==='photo'&&item.media_id
+        const img=!item.locked&&item.is_author&&kind==='photo'&&item.media_id
           ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden>`:'';
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
             aria-label="${escapeHtml(stamp+', '+title+(item.locked?', sealed until reveal':''))}">
@@ -3657,6 +3702,19 @@
       showMetroPopover(`<strong class="metro-peek-name">🔒 Something is waiting for you</strong><p class="metro-pop-meta">${escapeHtml(text)}</p>`,button);
       return;
     }
+    // A recipient sees a sealed-style invitation first. No thumbnail is fetched
+    // and the original moment is not marked opened until Reveal is explicitly tapped.
+    if(!item.is_author && item.kind!=='text'){
+      showMetroPopover(`<div class="cosmos-reveal-teaser"><span class="cosmos-reveal-orb" aria-hidden="true">✧</span>
+        <strong>A moment is waiting for you</strong><p>Shared with you now · discover it when you're ready.</p>
+        <button type="button" class="cosmos-reveal-action" id="metroRevealNow">✧ Reveal moment</button></div>`,button);
+      $('metroRevealNow').onclick=()=>revealMetroBubble(key,button);
+      return;
+    }
+    await revealMetroBubble(key,button);
+  }
+  async function revealMetroBubble(key,button){
+    const item=weekMetroItems.find(i=>i.key===key);if(!item||item.locked)return;
     try{
       const body=lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{};
       const r=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/open',{method:'POST',body:JSON.stringify(body)});
@@ -3694,7 +3752,7 @@
       const sealed=s.locked&&Date.parse(s.date||'')>Date.now();
       const label=new Date(s.date).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
       const active=s.key===journeyFocus.key;
-      return `<button type="button" class="metro-item ${active?'active':''} ${sealed?'sealed':''}" data-metro-key="${escapeHtml(s.key)}" aria-label="${sealed?'Sealed future moment':escapeHtml(s.title||'Cosmos moment')} · ${label}" aria-current="${active?'true':'false'}"><span class="metro-stem"></span><span class="metro-orb" aria-hidden="true">${sealed?'◌':icon(s.kind)}${!sealed&&s.kind==='photo'&&s.media_id?`<img data-metro-media="${escapeHtml(s.media_id)}" alt="" hidden />`:''}</span><span class="metro-date">${escapeHtml(label)}</span><span class="metro-caption">${sealed?'Secret':escapeHtml(s.title||'Moment')}</span><span class="metro-mark"></span></button>`;
+      return `<button type="button" class="metro-item ${active?'active':''} ${sealed?'sealed':''}" data-metro-key="${escapeHtml(s.key)}" aria-label="${sealed?'Sealed future moment':escapeHtml(s.title||'Cosmos moment')} · ${label}" aria-current="${active?'true':'false'}"><span class="metro-stem"></span><span class="metro-orb" aria-hidden="true">${sealed?'◌':icon(s.kind)}${!sealed&&s.is_author&&s.kind==='photo'&&s.media_id?`<img data-metro-media="${escapeHtml(s.media_id)}" alt="" hidden />`:''}</span><span class="metro-date">${escapeHtml(label)}</span><span class="metro-caption">${sealed?'Secret':escapeHtml(s.title||'Moment')}</span><span class="metro-mark"></span></button>`;
     }).join('');
     return `<div class="metro" aria-label="Time metro: swipe right into the past, left into the future"><div class="metro-track"></div><div class="metro-items">${items}</div></div><div class="metro-note"><strong>← Earlier · Later →</strong><br>Swipe across days, months and years; a quick flick skips farther.</div>`;
   }
