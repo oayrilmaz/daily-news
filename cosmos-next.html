@@ -1431,6 +1431,43 @@
     @media(max-width:390px){.cosmos-head-actions{gap:5px}.cosmos-camera-tool{padding:4px 6px;min-width:32px;height:35px;font-size:11px}
       .app.metro-live .metro-filters{justify-content:flex-start}
       .app.metro-live .living-entry{flex-basis:calc(100% - 9px)!important;min-width:0!important;max-width:calc(100% - 9px)!important}}
+
+    /* COSMOS v2.9.3.1 — allow explicit reveal controls to fit in the quick preview.
+       The compact 122/136px peek belongs to regular cards, not a consent teaser. */
+    .app.metro-live .metro-popover.metro-reveal-popover{
+      width:min(420px,calc(100vw - 26px))!important;
+      max-width:420px!important;
+      height:auto!important;min-height:0!important;
+      max-height:min(59dvh,360px)!important;
+      overflow-x:hidden!important;overflow-y:auto!important;
+      bottom:calc(env(safe-area-inset-bottom) + 168px)!important;
+      padding:12px 16px 15px!important;
+      touch-action:pan-y!important;
+      -webkit-overflow-scrolling:touch;
+      box-sizing:border-box!important;
+    }
+    .app.metro-live .metro-reveal-popover .cosmos-reveal-teaser{
+      padding:9px 16px 5px;gap:10px;
+    }
+    .app.metro-live .metro-reveal-popover .cosmos-reveal-orb{
+      width:50px;height:50px;font-size:24px;flex:none;
+    }
+    .app.metro-live .metro-reveal-popover .cosmos-reveal-teaser strong{
+      white-space:normal;font-size:17px;line-height:1.3;
+    }
+    .app.metro-live .metro-reveal-popover .cosmos-reveal-teaser p{
+      margin:0;color:#4c6584;font-size:12px;line-height:1.45;
+    }
+    .app.metro-live .metro-reveal-popover #metroRevealNow{
+      width:100%;min-height:46px;padding:11px 16px;
+      flex:none;position:relative;z-index:1;
+    }
+    @media(max-height:600px){
+      .app.metro-live .metro-popover.metro-reveal-popover{
+        bottom:calc(env(safe-area-inset-bottom) + 106px)!important;
+        max-height:min(66dvh,340px)!important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -3809,19 +3846,25 @@
     // and the original moment is not marked opened until Reveal is explicitly tapped.
     if(!item.is_author){
       showMetroPopover(`<div class="cosmos-reveal-teaser"><span class="cosmos-reveal-orb" aria-hidden="true">✧</span>
-        <strong>A moment is waiting for you</strong><p>Shared with you now · discover it when you're ready.</p>
-        <button type="button" class="cosmos-reveal-action" id="metroRevealNow">✧ Reveal moment</button></div>`,button);
-      $('metroRevealNow').onclick=()=>revealMetroBubble(key,button);
+        <strong>Your moment is ready</strong><p>Someone shared something with you. Its contents will appear only when you choose to reveal them.</p>
+        <button type="button" class="cosmos-reveal-action" id="metroRevealNow">✧ Reveal this moment →</button></div>`,button);
+      $('metroRevealNow').onclick=()=>{
+        const reveal=$('metroRevealNow');if(reveal){reveal.disabled=true;reveal.textContent='Opening your moment…';}
+        revealMetroBubble(key,button,true);
+      };
       return;
     }
     await revealMetroBubble(key,button);
   }
-  async function revealMetroBubble(key,button){
+  async function revealMetroBubble(key,button,openFully=false){
     const item=weekMetroItems.find(i=>i.key===key);if(!item||item.locked)return;
     try{
       const body=lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{};
       const r=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/open',{method:'POST',body:JSON.stringify(body)});
       if(weekMetroPopId!==key)return;
+      // One explicit Reveal tap opens the full scrollable moment. Keep the
+      // old small peek for normal quick previews and creator-owned entries.
+      if(openFully){await openMetroExpandedByKey(key,r);return;}
       let thumb='';
       if(r.item.content_kind==='photo'&&r.item.media_id){
         try{thumb=await mediaObjectUrl(r.item.media_id);}catch{} 
@@ -3838,6 +3881,7 @@
     // This avoids clipping and the shutter's stacking context masking buttons.
     $('metroPopover')?.remove();
     const box=document.createElement('aside');box.className='metro-popover';box.id='metroPopover';
+    if(inner.includes('cosmos-reveal-teaser'))box.classList.add('metro-reveal-popover');
     box.setAttribute('role','dialog');box.setAttribute('aria-label','Cosmos moment quick preview');
     box.innerHTML=`<button type="button" class="metro-close-pop" aria-label="Close preview" id="metroClosePop">×</button>`+inner;
     app.appendChild(box);
