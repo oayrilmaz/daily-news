@@ -4,6 +4,13 @@ import crypto from "node:crypto";
 
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim();
 const MODEL = String(process.env.COSMOS_DISCOVERY_MODEL || "gpt-6-luna").trim();
+// An 8-candidate structured response with web citations is large. The old 9,000
+// token ceiling could leave a partially-generated JSON document. Both budgets
+// include the model's hidden reasoning tokens as well as its visible answer.
+const DISCOVERY_PRIMARY_TOKENS = positiveInt(process.env.COSMOS_DISCOVERY_MAX_OUTPUT_TOKENS, 14000);
+const DISCOVERY_RETRY_TOKENS = Math.max(DISCOVERY_PRIMARY_TOKENS,
+  positiveInt(process.env.COSMOS_DISCOVERY_RETRY_OUTPUT_TOKENS, 20000));
+const DISCOVERY_CANDIDATE_COUNT = 8;
 
 const QUEUE_FILE = process.env.SOCIAL_QUEUE_FILE || "data/social-queue.json";
 const STATE_FILE = process.env.SOCIAL_STATE_FILE || "data/social-published.json";
@@ -32,8 +39,8 @@ const DISCOVERY_SCHEMA = {
     generated_at: { type: "string" },
     candidates: {
       type: "array",
-      minItems: 8,
-      maxItems: 12,
+      minItems: DISCOVERY_CANDIDATE_COUNT,
+      maxItems: DISCOVERY_CANDIDATE_COUNT,
       items: {
         type: "object",
         additionalProperties: false,
@@ -732,7 +739,8 @@ function discoveryPrompt(requestTime) {
     "Prioritize developments from roughly the last 24-36 hours. Use older context only when necessary to explain a genuinely fresh change.",
     "",
     "SELECTION",
-    "- Return 8-12 candidates so downstream quality/diversity gates can select the strongest 3-5.",
+    `- Return exactly ${DISCOVERY_CANDIDATE_COUNT} strong candidates so downstream quality/diversity gates can select the strongest 3-5.`,
+    "- Keep candidate fields concise: title <= 110 characters; summary <= 45 words; why_it_matters <= 45 words; answer_explanation <= 55 words; source titles <= 90 characters.",
     "- Prefer developments with meaningful second-order consequences and cross-domain paths.",
     "- attention_score measures whether a normal person would stop, choose and want to see the result — without clickbait.",
     "- Avoid generic headline summaries. Turn each development into a question that creates curiosity, comparison or surprise.",
@@ -778,16 +786,24 @@ function discoveryPrompt(requestTime) {
   ].join("\n");
 }
 
-async function requestUniversalDiscovery() {
-  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required for Cosmos universal discovery.");
-  const requestTime = new Date().toISOString();
+// Do not turn invalid or truncated AI output into publishable questions. A failed
+// attempt must never overwrite the last successful social queue, history or pages.
+class DiscoveryGenerationError extends Error {
+  constructor(message, retryable = false) {
+    super(message);
+    this.name = "DiscoveryGenerationError";
+    this.retryable = retryable;
+  }
+}
+
+async function requestDiscoveryAttempt(requestTime, attempt, maxOutputTokens) {
   const payload = {
     model: MODEL,
     reasoning: { effort: "low" },
     tools: [{ type: "web_search", search_context_size: "medium" }],
     tool_choice: "auto",
     store: false,
-    max_output_tokens: 9000,
+    max_output_tokens: maxOutputTokens,
     text: {
       verbosity: "low",
       format: {
@@ -800,23 +816,85 @@ async function requestUniversalDiscovery() {
     },
     input: [{ role: "user", content: [{ type: "input_text", text: discoveryPrompt(requestTime) }] }]
   };
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(300000)
+    });
+  } catch (error) {
+    throw new DiscoveryGenerationError(`API request failed: ${error.message}`, true);
+  }
+
   const rawText = await response.text();
   let raw = {};
-  try { raw = rawText ? JSON.parse(rawText) : {}; } catch { raw = { raw_text: rawText.slice(0,4000) }; }
+  try { raw = rawText ? JSON.parse(rawText) : {}; }
+  catch { raw = { raw_text: rawText.slice(0, 4000) }; }
   if (!response.ok) {
     const detail = raw?.error?.message || raw?.message || raw?.raw_text || rawText;
-    throw new Error(`OpenAI Responses API ${response.status}: ${String(detail).slice(0,1800)}`);
+    // Retry temporary overloads, but not bad API keys, invalid model/schema, etc.
+    throw new DiscoveryGenerationError(
+      `OpenAI Responses API ${response.status}: ${String(detail).slice(0, 1000)}`,
+      response.status === 429 || response.status >= 500
+    );
   }
+
   const outputText = extractOutputText(raw);
-  if (!outputText) throw new Error("Universal discovery returned no structured output text.");
+  const state = clean(raw?.status || "unknown");
+  const reason = clean(raw?.incomplete_details?.reason || "none");
+  const generatedTokens = raw?.usage?.output_tokens ?? "unknown";
+  // Safe diagnostics: status and lengths only, NEVER bearer tokens or response text.
+  console.log(`COSMOS_DISCOVERY_API attempt=${attempt} status=${state} incomplete_reason=${reason} output_tokens=${generatedTokens} output_chars=${outputText.length} budget=${maxOutputTokens} response_id=${clean(raw?.id || "none")}`);
+
+  if (state === "incomplete") {
+    const wasTokenLimited = ["max_output_tokens", "max_tokens"].includes(reason);
+    throw new DiscoveryGenerationError(
+      `Universal discovery response incomplete (${reason}); output may be truncated.`,
+      wasTokenLimited
+    );
+  }
+  if (state !== "completed" && state !== "unknown") {
+    throw new DiscoveryGenerationError(`Universal discovery response status: ${state}.`, false);
+  }
+  if (!outputText) {
+    const refusal = (raw?.output || []).flatMap(item => item?.content || []).find(part => part?.type === "refusal");
+    if (refusal) throw new DiscoveryGenerationError("Universal discovery was refused; not retrying or publishing.", false);
+    throw new DiscoveryGenerationError("Universal discovery returned no structured output text.", true);
+  }
+
   let parsed;
-  try { parsed = JSON.parse(outputText); } catch (error) { throw new Error(`Could not parse universal discovery JSON: ${error.message}`); }
+  try { parsed = JSON.parse(outputText.replace(/^\uFEFF/, "").trim()); }
+  catch (error) {
+    throw new DiscoveryGenerationError(`Could not parse universal discovery JSON: ${error.message}; status=${state}, output_chars=${outputText.length}.`, true);
+  }
+  if (!Array.isArray(parsed?.candidates) || parsed.candidates.length !== DISCOVERY_CANDIDATE_COUNT) {
+    throw new DiscoveryGenerationError(
+      `Universal discovery returned ${Array.isArray(parsed?.candidates) ? parsed.candidates.length : "no"} candidates (expected ${DISCOVERY_CANDIDATE_COUNT}).`,
+      true
+    );
+  }
   return { raw, parsed, request_time_utc: requestTime };
+}
+
+async function requestUniversalDiscovery() {
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required for Cosmos universal discovery.");
+  const requestTime = new Date().toISOString();
+  for (const [index, budget] of [DISCOVERY_PRIMARY_TOKENS, DISCOVERY_RETRY_TOKENS].entries()) {
+    const attempt = index + 1;
+    try {
+      return await requestDiscoveryAttempt(requestTime, attempt, budget);
+    } catch (error) {
+      if (!error.retryable || attempt === 2) {
+        throw new Error(`Universal discovery failed after ${attempt} attempt(s): ${error.message} Previous queue is preserved.`);
+      }
+      console.warn(`COSMOS_DISCOVERY_RETRY attempt=${attempt} reason=${error.message} Retrying once with token budget ${DISCOVERY_RETRY_TOKENS}.`);
+      await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+  }
+  throw new Error("Universal discovery was not completed; previous queue is preserved.");
 }
 
 function loadMockDiscovery(file) {
