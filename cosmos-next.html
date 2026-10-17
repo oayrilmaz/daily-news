@@ -1389,6 +1389,48 @@
     .cosmos-reveal-sheet h2{margin:4px 0 2px;color:#153359;font-size:clamp(23px,5vw,30px)}
     .cosmos-reveal-sheet .actions{width:100%;display:flex;flex-wrap:wrap;gap:9px;justify-content:center;margin-top:10px}
     .cosmos-reveal-sheet .actions button{min-height:46px;flex:1 1 130px}
+
+    /* COSMOS v2.9.3 — unified time Metro, responsive glass source chips. */
+    .cosmos-camera-tool{min-width:35px;height:38px;padding:4px 8px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.75);background:rgba(242,249,255,.79);color:#193959;
+      font-size:12px;font-weight:800;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+    .cosmos-camera-tool:focus-visible,.metro-filters button:focus-visible{outline:3px solid #3b8bdd;outline-offset:2px}
+    .camera video{transform-origin:center center;transition:transform .18s ease,filter .55s ease,opacity .55s ease}
+    .dim-nav button[data-dimension=all]{min-width:146px;letter-spacing:.075em;border:1px solid rgba(255,255,255,.82)}
+    .app.metro-live .metro-filters{display:flex;justify-content:center;gap:6px;padding:5px 7px 7px;
+      overflow-x:auto;scrollbar-width:none;max-width:100%;flex:0 0 auto}
+    .app.metro-live .metro-filters button{white-space:nowrap;flex:0 0 auto;border:1px solid rgba(182,207,235,.70);
+      border-radius:999px;background:rgba(248,251,255,.79);color:#365979;padding:7px 11px;
+      font-size:11px;font-weight:780;min-height:33px}
+    .app.metro-live .metro-filters button.active{background:#17457c;color:#fff;border-color:#17457c;box-shadow:0 3px 12px #17457c45}
+    .metro-source-badge{align-self:flex-start;font-size:9px!important;letter-spacing:.07em;line-height:1.1;
+      padding:3px 7px;border-radius:999px;background:rgba(57,106,167,.13);color:#164a81;font-weight:860;white-space:nowrap}
+    .metro-source-badge.connections{background:rgba(106,72,183,.15);color:#523c86}
+    .metro-source-badge.public{background:rgba(38,123,89,.14);color:#186746}
+    .living-entry .living-entry-copy{gap:2px!important}
+    /* Single glance: place the Metro junction at left, and cards to the right on ALL days and viewports. */
+    .app.metro-live .living-day-chart{--trunk:clamp(16px,4%,38px)!important;--selected-day-trunk:clamp(16px,4%,38px)!important}
+    .app.metro-live .living-branch .living-rail,.app.metro-live .living-day-chart.branch-left .living-rail{
+      left:var(--trunk)!important;right:0!important;flex-direction:row!important;justify-content:flex-start!important;
+      padding:0 5px 0 16px!important;gap:7px!important}
+    .app.metro-live .living-entry{flex:0 0 clamp(190px,36vw,355px)!important;min-width:165px!important;max-width:calc(100% - 6px)!important;
+      height:69px!important;scroll-snap-align:start}
+    .app.metro-live .living-branch{height:78px!important}
+    .app.metro-live .living-branch .living-time-label{left:auto!important;right:8px!important;top:-6px!important;transform:none!important;
+      font-size:9px!important;color:#244769!important;z-index:1}
+    @media(min-width:760px){.app.metro-live .living-entry{flex-basis:clamp(270px,46vw,520px)!important}}
+    @media(min-width:760px){
+      /* Keep the camera orb reachable without covering the Metro cards on laptops. */
+      .app.metro-live .bottom{left:auto!important;right:18px!important;bottom:10px!important;
+        width:auto!important;padding:7px 9px!important;gap:3px!important;z-index:7}
+      .app.metro-live .bottom .core{height:66px!important;width:66px!important}
+      .app.metro-live .bottom .hint{display:none!important}
+      .app.metro-live .bottom .dim-nav button{min-height:32px!important;padding:5px 10px!important;font-size:10px!important}
+      .app.metro-live .journey-stage{bottom:calc(env(safe-area-inset-bottom) + 68px)!important}
+    }
+    @media(max-width:390px){.cosmos-head-actions{gap:5px}.cosmos-camera-tool{padding:4px 6px;min-width:32px;height:35px;font-size:11px}
+      .app.metro-live .metro-filters{justify-content:flex-start}
+      .app.metro-live .living-entry{flex-basis:calc(100% - 9px)!important;min-width:0!important;max-width:calc(100% - 9px)!important}}
   </style>
 </head>
 <body>
@@ -1411,7 +1453,7 @@
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
-    <div class="cosmos-head-actions"><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
+    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Switch between front and back camera" title="Switch camera">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
   </div>
 
   <div class="ambient" id="ambient">
@@ -1424,10 +1466,8 @@
   <div class="bottom">
     <button class="core" id="coreOrb" aria-label="Tap to leave a moment. Hold to look deeper"></button>
     <div class="hint" id="hint">Tap to leave · hold to look</div>
-    <div class="dim-nav" aria-label="Cosmos dimensions">
-      <button type="button" class="active" data-dimension="mine">MY</button>
-      <button type="button" data-dimension="connections">CONNECTIONS</button>
-      <button type="button" data-dimension="public">PUBLIC</button>
+    <div class="dim-nav" aria-label="Combined Cosmos timeline">
+      <button type="button" class="active" data-dimension="all" aria-label="Show all my authorized Cosmos moments">◎ ALL MOMENTS</button>
     </div>
   </div>
 
@@ -1530,7 +1570,7 @@
   let lastLookResult = null;
   let lookHistory = [];
   const app = $("app"), journeyStage=$("journeyStage"), journeyLabel=$("journeyLabel"), journeyGuide=$("journeyGuide");
-  let dimension="mine", timeMode="now", journeyFocus=null, journeyAt=new Date().toISOString(), journeyKey="";
+  let dimension="all", timeMode="now", journeyFocus=null, journeyAt=new Date().toISOString(), journeyKey="";
   // v2.4 independent local-calendar metro. No simulated moments or prior hidden content.
   let weekMetroDay=new Date(),weekMetroView='day',weekMetroItems=[],weekMetroCacheKey='',weekMetroBusy=false,
       weekMetroError='',weekMetroLimited=false,weekMetroRequestId=0,weekMetroPopId=null;
@@ -1806,16 +1846,42 @@
   restartAuthButton.addEventListener('click',()=>{authChallengeId='';emailCodeInput.value='';setEmailAuthMode('login');});
   setEmailAuthMode('login');
 
+  let preferredCameraFacing='environment',cameraRotation=0,cameraStream=null,cameraSeq=0,selectedCameraDeviceId=null;
+  function orientCamera(){
+    const turn=cameraRotation%180!==0;
+    const frame=cameraVideo.parentElement;
+    const ratio=frame?.clientWidth && frame?.clientHeight?Math.max(frame.clientWidth/frame.clientHeight,frame.clientHeight/frame.clientWidth):1;
+    cameraVideo.style.transform=`rotate(${cameraRotation}deg) scale(${turn?ratio:1})`;
+    $('cameraRotate').textContent='↻ '+cameraRotation+'°';
+  }
   async function startCamera(showError=true){
-    if(!navigator.mediaDevices?.getUserMedia){cameraFallback.textContent="Camera is unavailable in this browser. You can still leave and receive location-based Cosmoses.";return;}
+    if(!navigator.mediaDevices?.getUserMedia){cameraFallback.textContent="Camera unavailable. You can still browse Cosmos moments.";return;}
+    const seq=++cameraSeq;
     try{
-      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
-      cameraVideo.srcObject=stream;cameraVideo.hidden=false;cameraFallback.hidden=true;
+      const stream=await navigator.mediaDevices.getUserMedia({video:selectedCameraDeviceId?{deviceId:{exact:selectedCameraDeviceId}}:{facingMode:{ideal:preferredCameraFacing}},audio:false});
+      if(seq!==cameraSeq){stream.getTracks().forEach(t=>t.stop());return;}
+      const previous=cameraStream;cameraStream=stream;cameraVideo.srcObject=stream;
+      cameraVideo.hidden=false;cameraFallback.hidden=true;orientCamera();
+      previous?.getTracks().forEach(t=>t.stop());
+      cameraVideo.play().catch(()=>{});
     }catch(e){
-      cameraVideo.hidden=true;cameraFallback.hidden=false;cameraFallback.textContent="Camera remains private until you allow it. Cosmos can still use place and time without camera access.";
-      if(showError) toastMsg("Camera permission was not granted.");
+      if(showError)toastMsg('Unable to switch camera: '+(e.name==='NotAllowedError'?'permission needed':e.message),4100);
+      if(!cameraStream){cameraVideo.hidden=true;cameraFallback.hidden=false;cameraFallback.textContent="Camera stays private until permission is granted.";}
     }
   }
+  $('cameraFlip').addEventListener('click',async()=>{
+    try{
+      const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.deviceId);
+      if(devices.length<2){toastMsg('This device has only one camera. Use ↻ to rotate its view.',3500);return;}
+      const activeId=cameraStream?.getVideoTracks()?.[0]?.getSettings()?.deviceId||selectedCameraDeviceId;
+      const current=Math.max(0,devices.findIndex(d=>d.deviceId===activeId));
+      selectedCameraDeviceId=devices[(current+1)%devices.length].deviceId;
+      preferredCameraFacing=preferredCameraFacing==='environment'?'user':'environment';
+      await startCamera(true);
+    }catch(e){toastMsg('Camera switch unavailable: '+e.message,4500);}
+  });
+  $('cameraRotate').addEventListener('click',()=>{cameraRotation=(cameraRotation+90)%360;orientCamera();});
+  window.addEventListener('resize',orientCamera);
 
   function getLocation(){
     return new Promise((resolve,reject)=>{
@@ -1826,7 +1892,7 @@
 
   async function scanHere(showErrors=true){
     if(!token) return;
-    if(dimension!=="mine"||timeMode!=="now") {await refreshConnections(showErrors);return;}
+    if(!["mine","all"].includes(dimension)||timeMode!=="now") {await refreshConnections(showErrors);return;}
     hint.textContent="Looking here…";ambientTitle.textContent="Looking deeper…";ambientSub.textContent="Only Cosmoses you are allowed to see can appear.";
     foundOrb.hidden=true;foundLabel.hidden=true;currentFound=null;
     let loc=null;
@@ -1856,10 +1922,13 @@
     const vw=cameraVideo.videoWidth, vh=cameraVideo.videoHeight;
     const scale=Math.min(1,maxSide/Math.max(vw,vh));
     const canvas=document.createElement("canvas");
-    canvas.width=Math.max(1,Math.round(vw*scale));
-    canvas.height=Math.max(1,Math.round(vh*scale));
+    const sideways=cameraRotation===90||cameraRotation===270;
+    canvas.width=Math.max(1,Math.round((sideways?vh:vw)*scale));
+    canvas.height=Math.max(1,Math.round((sideways?vw:vh)*scale));
     const ctx=canvas.getContext("2d",{alpha:false});
-    ctx.drawImage(cameraVideo,0,0,canvas.width,canvas.height);
+    ctx.translate(canvas.width/2,canvas.height/2);
+    ctx.rotate(cameraRotation*Math.PI/180);
+    ctx.drawImage(cameraVideo,-Math.round(vw*scale)/2,-Math.round(vh*scale)/2,Math.round(vw*scale),Math.round(vh*scale));
     const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.70));
     if(!blob) throw new Error("Cosmos could not capture this view.");
     return new File([blob],`cosmos-look-${Date.now()}.jpg`,{type:"image/jpeg"});
@@ -1940,9 +2009,9 @@
 
   coreOrb.addEventListener("pointerdown",e=>{
     e.preventDefault();held=false;coreOrb.setPointerCapture?.(e.pointerId);coreOrb.classList.add("holding");
-    holdTimer=setTimeout(()=>{held=true;coreOrb.classList.remove("holding");if(timeMode!=="now"||dimension!=="mine"){ goNow(); setTimeout(()=>lookDeeper(),180); } else { lookDeeper(); }},520);
+    holdTimer=setTimeout(()=>{held=true;coreOrb.classList.remove("holding");if(timeMode!=="now"||!["mine","all"].includes(dimension)){ goNow(); setTimeout(()=>lookDeeper(),180); } else { lookDeeper(); }},520);
   });
-  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held){if(timeMode!=="now"||dimension!=="mine"){goNow(); setTimeout(()=>beginCompose(),180);}else beginCompose();}held=false;};
+  const releaseCore=e=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");if(!held){if(timeMode!=="now"||!["mine","all"].includes(dimension)){goNow(); setTimeout(()=>beginCompose(),180);}else beginCompose();}held=false;};
   coreOrb.addEventListener("pointerup",releaseCore);coreOrb.addEventListener("pointercancel",()=>{clearTimeout(holdTimer);coreOrb.classList.remove("holding");held=false;});
   coreOrb.addEventListener("contextmenu",e=>e.preventDefault());
 
@@ -3333,17 +3402,18 @@
     inboxOpening=true;
     openSheet('<h2>Notifications</h2><p>Your private Cosmos inbox</p><div class="look-loading">Loading moments…</div>');
     try{
-      const r=await api('/api/notifications');
+      const [r,delivery]=await Promise.all([api('/api/notifications'),api('/api/notifications/status').catch(()=>null)]);
       noticeListCache=r.items||[];
       const unread=noticeListCache.filter(n=>!n.read_at).length;
       noticeCount.textContent=String(unread);noticeCount.hidden=!unread;
       const allowed=typeof Notification!=='undefined'&&Notification.permission==='granted';
       const support=Boolean(navigator.serviceWorker&&window.PushManager&&window.Notification);
-      const note=isIOS()&&!isStandalone()
+      const deviceStatus=delivery?.this_account_subscriptions===0?'No devices are registered for push yet. ':'';
+      const note=deviceStatus+(isIOS()&&!isStandalone()
         ? 'To receive alerts when Cosmos is closed on iPhone: open Cosmos in Safari → Share → Add to Home Screen → launch the new COSMOS icon → tap Enable notifications. The usual Safari tab still has this inbox.'
         : !support?'Push is unavailable in this browser; the private inbox still works.'
         : !r.push_configured?'Push credentials are not configured in Cloudflare yet; the inbox works now.'
-        : allowed?'Push permission has been granted for this installation.':'Enable notifications to receive alerts even when the app is closed.';
+        : allowed?'Push permission has been granted for this installation.':'Enable notifications to receive alerts even when the app is closed.');
       openSheet(`<h2>Notifications ${unread?'· '+unread+' new':''}</h2>
         <p>Someone shared a moment now, or left a surprise for the future. Private content is never displayed on your lock screen.</p>
         <div class="notice-settings"><b>🔔 On your phone</b><p>${escapeHtml(note)}</p>
@@ -3354,7 +3424,7 @@
       $('noticeRefresh').onclick=showCosmosNotifications;
       $('enableCosmosPush').onclick=enableCosmosPush;
       $('disableCosmosPush').onclick=async()=>{await turnOffCosmosPush();toastMsg('Push turned off for this device.');showCosmosNotifications();};
-      $('testCosmosPush').onclick=async()=>{try{await api('/api/notifications/test',{method:'POST'});toastMsg('Test queued. Check for an alert, or refresh the inbox.',3500);}catch(e){toastMsg(e.message,4500);}};
+      $('testCosmosPush').onclick=async()=>{try{await api('/api/notifications/test',{method:'POST'});toastMsg('Test queued. Check for an alert, or refresh the inbox.',3500);setTimeout(showCosmosNotifications,1350);}catch(e){toastMsg(e.message,4500);}};
       sheet.querySelectorAll('[data-notice-id]').forEach(btn=>btn.onclick=async()=>{
         const n=noticeListCache.find(x=>x.id===btn.dataset.noticeId);if(!n)return;
         try{await api(`/api/notifications/${encodeURIComponent(n.id)}/read`,{method:'POST'});}catch{}
@@ -3407,9 +3477,9 @@
     if(!Number.isFinite(n.getTime()))return "NOW";
     return n.toLocaleDateString(undefined, detail ? {month:"long",day:"numeric",year:"numeric"} : {month:"short",year:"numeric"});
   }
-  function isNow(){return dimension==="mine" && timeMode==="now";}
+  function isNow(){return dimension==="all" && timeMode==="now";}
   function setDimension(next){
-    if(!["mine","connections","public"].includes(next))return;
+    if(!["all","mine","connections","public"].includes(next))return;
     if(dimension===next)return;
     dimension=next; journeyGeneration++;travelQueue=0;journeyBusy=false;
     // Keep the TIME, but never show a station from a different private dimension.
@@ -3417,13 +3487,13 @@
     // Keep the selected point in time when changing dimensions.
     document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension===dimension));
     renderJourney();
-    if(dimension==="connections"){refreshConnections();refreshFriendsSummary();}
+    if(dimension==="connections"||dimension==="all"){refreshConnections();refreshFriendsSummary();}
   }
   function goNow(){
     $('metroPopover')?.remove();
-    dimension="mine";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
+    dimension="all";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
     timeMode="now";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;weekMetroDay=new Date();weekMetroView="day";weekMetroPopId=null;weekMetroCacheKey="";journeyGeneration++;travelQueue=0;journeyBusy=false;
-    document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='mine'));
+    document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='all'));
     renderJourney();scanHere(false);
     if(!cameraVideo.srcObject)startCamera(false);
   }
@@ -3467,6 +3537,18 @@
     });
   }
 
+  let metroViewFilter='all';
+  function metroFilterMatches(i){
+    if(metroViewFilter==='all')return true;
+    if(metroViewFilter==='public')return i.scope==='public';
+    if(metroViewFilter==='mine')return Boolean(i.in_my||i.is_author);
+    return Boolean(i.in_connections||i.scope==='connections'||i.source==='received');
+  }
+  function metroBadge(i){
+    if(i.scope==='public')return 'PUBLIC';
+    if(i.scope==='connections')return i.is_author?'MY · CONNECTIONS':'CONNECTIONS';
+    return i.is_author?'MY':'CONNECTIONS';
+  }
   function metroKeyLocal(date){const d=new Date(date);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
   function metroDateLocal(key){const [y,m,d]=key.split('-').map(Number);return new Date(y,m-1,d,12,0,0);}
   function metroStartSunday(day){const d=new Date(day.getFullYear(),day.getMonth(),day.getDate());d.setDate(d.getDate()-d.getDay());return d;}
@@ -3496,11 +3578,30 @@
     const requestId=++weekMetroRequestId;
     weekMetroCacheKey=key;weekMetroItems=[];weekMetroError='';weekMetroBusy=true;weekMetroLimited=false;weekMetroPopId=null;
     try{
-      const params=new URLSearchParams({dimension,from:start.toISOString(),to:end.toISOString()});
+      const params=new URLSearchParams({from:start.toISOString(),to:end.toISOString()});
       if(lastScanLoc){params.set('lat',String(lastScanLoc.lat));params.set('lng',String(lastScanLoc.lng));}
-      const data=await api('/api/cosmos/metro?'+params.toString());
+      const fetchLane=lane=>api('/api/cosmos/metro?'+new URLSearchParams({...Object.fromEntries(params),dimension:lane}).toString());
+      const responses=dimension==='all'?await Promise.all([fetchLane('mine'),fetchLane('connections')]):[await fetchLane(dimension)];
       if(requestId!==weekMetroRequestId||weekMetroCacheKey!==key)return;
-      weekMetroItems=Array.isArray(data.items)?data.items:[];weekMetroLimited=Boolean(data.limited);
+      const merged=new Map();
+      for(let k=0;k<responses.length;k++)for(const item of responses[k].items||[]){
+        if(!item?.id||!item?.key)continue;
+        const prior=merged.get(item.id);
+        const category=item.event==='family-circle'?'connections':
+          (item.source==='received'||item.event==='arrival'?'connections':
+          (item.recipient_mode==='person'?'connections':(k===1?'connections':'mine')));
+        const candidate={...item,scope:category,is_author:Boolean(item.is_author ?? (item.source==='mine')),
+          in_my:Boolean(item.is_author ?? (item.source==='mine')),
+          in_connections:category==='connections'||(k===1&&item.event!=='scheduled')};
+        if(prior){candidate.in_my=candidate.in_my||prior.in_my;
+          candidate.in_connections=candidate.in_connections||prior.in_connections;
+          // A Connections row accurately reflects visibility and approval, while Mine provides private owner details.
+          if(item.event!=='family-circle'&&prior.event==='family-circle'){merged.set(item.id,{...prior,in_my:candidate.in_my,in_connections:candidate.in_connections});continue;}
+        }
+        merged.set(item.id,candidate);
+      }
+      weekMetroItems=[...merged.values()].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+      weekMetroLimited=responses.some(data=>Boolean(data.limited));
       weekMetroBusy=false;renderWeekMetro();
     }catch(e){if(requestId!==weekMetroRequestId)return;weekMetroBusy=false;weekMetroError=e.message;
       renderWeekMetro();}
@@ -3532,14 +3633,14 @@
     app.style.setProperty('--time-saturation',(1-age*.3).toFixed(2));
     app.style.setProperty('--time-video-opacity',(1-age*.56).toFixed(2));
     app.style.setProperty('--time-world-opacity',(age*.5).toFixed(2));
-    app.style.setProperty('--dim-wash',dimension==='mine'?'0':'.19');
-    const names={mine:'MY',connections:'CONNECTIONS',public:'PUBLIC'};
+    app.style.setProperty('--dim-wash',['all','mine'].includes(dimension)?'0':'.19');
+    const names={all:'ALL MOMENTS',mine:'MY',connections:'CONNECTIONS',public:'PUBLIC'};
     journeyLabel.textContent=`${names[dimension]}${timeMode==='now'?'':timeMode==='past'?' · PAST':' · FUTURE'}`;
-    $('returnNow').hidden=(dimension==='mine'&&timeMode==='now');
+    $('returnNow').hidden=(dimension==='all'&&timeMode==='now');
     journeyGuide.textContent='';
     const ds=metroDays(),range=ds[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})+
       ' – '+ds[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const countFor=d=>weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(d));
+    const countFor=d=>weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(d)&&metroFilterMatches(i));
     const week=ds.map(d=>{
       const key=metroKeyLocal(d),items=countFor(d),active=key===chosen;
       const orbs=Array.from({length:Math.min(items.length,3)},()=>'<i class="wd-bubble" aria-hidden="true"></i>').join('');
@@ -3557,13 +3658,14 @@
     journeyStage.innerHTML=`<div class="week-metro" aria-label="Permanent weekly Cosmos Metro"><div class="week-navigation">
       <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button>
       <span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button></div>
-      <div class="week-weekdays">${week}</div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
+      <div class="week-weekdays">${week}</div><div class="metro-filters" role="group" aria-label="Filter Cosmos moments">${[['all','All'],['mine','My'],['connections','Connections'],['public','Public']].map(([value,label])=>`<button type="button" data-metro-filter="${value}" class="${metroViewFilter===value?'active':''}" aria-pressed="${metroViewFilter===value}">${label}${value==='public'?' · Soon':''}</button>`).join('')}</div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
       <div class="metro-main" id="metroMain">${main}</div>
       ${weekMetroLimited?'<div class="metro-week-note">Over 500 real moments this week; some are not yet shown.</div>':''}`;
     journeyStage.querySelectorAll('[data-metro-day]').forEach(btn=>btn.onclick=()=>{
       if(performance.now()>suppressStationClickUntil){metroClickFeedback(btn);setMetroDay(metroDateLocal(btn.dataset.metroDay),'day');}
     });
     journeyStage.querySelectorAll('[data-week-shift]').forEach(btn=>btn.onclick=()=>shiftWeekMetro(Number(btn.dataset.weekShift)));
+    journeyStage.querySelectorAll('[data-metro-filter]').forEach(btn=>btn.onclick=()=>{metroViewFilter=btn.dataset.metroFilter;renderWeekMetro();});
     $('metroPeople')?.addEventListener('click',openFriends);
     $('metroRetry')?.addEventListener('click',()=>{weekMetroCacheKey='';fetchMetroWeek();renderWeekMetro();});
     journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=()=>{
@@ -3608,6 +3710,7 @@
   // Never synthesize posts or expose any server-sealed future metadata.
   function metroCardTitle(item){
     if(item.locked)return 'A surprise is waiting';
+    if(!item.is_author)return 'A moment shared with you';
     const kind=String(item.kind||'moment').toLowerCase();
     if(kind==='text' && item.preview && item.preview!=='text moment'){
       const cleaned=String(item.preview).replace(/\s+/g,' ').trim();
@@ -3624,7 +3727,7 @@
   function metroRenderDay(events){
     const label=weekMetroDay.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});
     const heading=(sub='')=>`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(label)}</h2><p>${escapeHtml(sub)}</p></div>
-      ${dimension==='connections'?'<button type="button" class="metro-people-pill" id="metroPeople">People →</button>':''}</div>`;
+      ${['all','connections'].includes(dimension)?'<button type="button" class="metro-people-pill" id="metroPeople">People →</button>':''}</div>`;
     if(weekMetroBusy)return heading('Finding your real Cosmoses…')+'<div class="metro-zero">Loading moments…</div>';
     if(weekMetroError)return heading('Unable to load')+`<div class="metro-day-error" role="alert">Could not load your moments: ${escapeHtml(weekMetroError)}<br>Nothing has been deleted.<br><button type="button" id="metroRetry">Try again</button></div>`;
     const sunday=weekMetroDay.getDay(),left=sunday>=4;
@@ -3637,11 +3740,11 @@
       if(!grouped.has(bucket))grouped.set(bucket,[]);
       grouped.get(bucket).push(x);
     }
-    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]);
+    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]).flatMap(([bucket,items])=>items.map(item=>[bucket,[item]]));
     const branches=[];
-    const compactTop=74;
-    const compactStep=88;
-    const compactMinHeight=430;
+    const compactTop=6;
+    const compactStep=72;
+    const compactMinHeight=260;
     branchEntries.forEach(([bucket,items],idx)=>{
       const y=compactTop+idx*compactStep;
       const minute=bucket*30;
@@ -3656,7 +3759,7 @@
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
             aria-label="${escapeHtml(stamp+', '+title+(item.locked?', sealed until reveal':''))}">
           <span class="living-entry-orb kind-${escapeHtml(kind)}" aria-hidden="true">${img}<span class="living-entry-symbol">${metroIcon(item)}</span></span>
-          <span class="living-entry-copy"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(type)} · ${escapeHtml(stamp)}</small></span>
+          <span class="living-entry-copy"><span class="metro-source-badge ${escapeHtml(item.scope||'mine')}">${escapeHtml(metroBadge(item))}</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(item.locked?'🔒 Sealed · '+stamp:type+' · '+stamp)}</small></span>
           <span class="living-entry-more" aria-hidden="true">›</span></button>`;
       }).join('');
       branches.push(`<div class="living-branch" style="top:${Math.round(y)}px" aria-label="${items.length} real Cosmos moment${items.length===1?'':'s'}">
@@ -3664,8 +3767,8 @@
         <span class="living-time-label" aria-hidden="true">${escapeHtml(firstStamp)}</span>
         <div class="living-rail" aria-label="${items.length>1?'Swipe sideways for more moments':'Moment at '+firstStamp}">${cards}</div></div>`);
     });
-    const height=Math.max(compactMinHeight,compactTop+Math.max(1,branchEntries.length)*compactStep+90);
-    const empty=rows.length?'':`<div class="living-empty">No saved moments for this day. Hold the Cosmos circle to create one.</div>`;
+    const height=Math.max(260,compactTop+Math.max(1,branchEntries.length)*compactStep+28);
+    const empty=rows.length?'':`<div class="living-empty">${metroViewFilter==='public'?'Public sharing is not activated yet. No public posts are shown.':metroViewFilter==='all'?'No saved moments for this day. Hold the Cosmos circle to create one.':'No '+metroViewFilter+' moments for this day. Choose All to see everything together.'}</div>`;
     return heading(`${events.length} real moment${events.length===1?'':'s'} · tap a circle or card`)+
       `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Scroll vertically through moments.">
         <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="height:${Math.round(height)}px;--selected-day-trunk:${trunkPct}%">
@@ -3704,7 +3807,7 @@
     }
     // A recipient sees a sealed-style invitation first. No thumbnail is fetched
     // and the original moment is not marked opened until Reveal is explicitly tapped.
-    if(!item.is_author && item.kind!=='text'){
+    if(!item.is_author){
       showMetroPopover(`<div class="cosmos-reveal-teaser"><span class="cosmos-reveal-orb" aria-hidden="true">✧</span>
         <strong>A moment is waiting for you</strong><p>Shared with you now · discover it when you're ready.</p>
         <button type="button" class="cosmos-reveal-action" id="metroRevealNow">✧ Reveal moment</button></div>`,button);
@@ -3987,7 +4090,7 @@
     e.stopPropagation();
     // A dimension lives inside the camera universe. People management
     // is available on demand, not as a full-screen popup on every tap.
-    setDimension(b.dataset.dimension);
+    metroViewFilter='all';setDimension('all');renderWeekMetro();
   }));
   // Use the background as the gesture surface, not the sheet or its scrollable content.
   const shouldIgnoreGesture=t=>{
@@ -4031,6 +4134,7 @@
   });
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)periodicNearby();});
   setInterval(periodicNearby,90000);
+  setInterval(()=>{if(!document.hidden&&token&&me&&auth.hidden)refreshNoticeBadge();},30000);
   app.dataset.dimension="mine";app.dataset.time="now";
 
   document.addEventListener('visibilitychange',()=>{if(!document.hidden && auth.hidden && token)renewSessionIfDue();});
