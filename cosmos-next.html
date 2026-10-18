@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4.5-white-or-live-camera" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.4.6-camera-cycle-white" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1539,9 +1539,19 @@
     .app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) .camera::after{
       background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.05) 24%,rgba(255,255,255,.04) 72%,rgba(255,255,255,.34));
     }
-    .cosmos-view-toggle{display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;min-width:79px;padding-inline:9px}
-    .cosmos-view-toggle[aria-pressed="true"]{border-color:rgba(38,96,165,.48);background:rgba(226,242,255,.95);color:#164a86}
-    @media(max-width:600px){.cosmos-view-toggle{min-width:34px;width:35px;padding:4px 6px}.cosmos-view-toggle .cosmos-view-text{display:none}}
+
+    /* COSMOS v2.9.4.6: White is the LAST step on the camera-cycle button.
+       It replaces the dark/blue camera view, not an overlay on a running camera. */
+    .app.metro-live.cosmos-white-mode{background:#fff!important}
+    .app.metro-live.cosmos-white-mode .camera,
+    .app.metro-live:not(.cosmos-camera-live) .camera{visibility:hidden!important;opacity:0!important}
+    .app.metro-live.cosmos-white-mode .time-world,
+    .app.metro-live.cosmos-white-mode .dimension-wash{opacity:0!important}
+    .app.metro-live.cosmos-white-mode .cosmos-metro-background{opacity:1!important}
+    .app.metro-live.cosmos-white-mode .camera-fallback{display:none!important}
+    .app.metro-live #cameraFlip[data-view="white"]{
+      background:rgba(246,250,255,.98);border-color:rgba(80,119,172,.43);color:#174b87;
+    }
     /* Distinguish the working Metro lines against white artwork. */
     .app.metro-live .week-weekdays::before{
       background:rgba(78,108,151,.44)!important;box-shadow:none!important;
@@ -1579,7 +1589,7 @@
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
-    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool cosmos-view-toggle" id="cosmosViewToggle" aria-label="Show live camera" aria-pressed="false" title="Show live camera"><span id="cosmosViewIcon" aria-hidden="true">📷</span><span class="cosmos-view-text" id="cosmosViewText">Camera</span></button><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Switch between front and back camera" title="Switch camera">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
+    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Next camera or white view" title="Next camera or white view">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
   </div>
 
   <div class="ambient" id="ambient">
@@ -2009,48 +2019,85 @@
   setEmailAuthMode('login');
 
   let preferredCameraFacing='environment',cameraRotation=0,cameraStream=null,cameraSeq=0,selectedCameraDeviceId=null;
-  // The Metro is CAMERA-FIRST when the user has granted access, and clean white otherwise.
-  // White view is always available via an explicit toggle. No permissions are bypassed.
-  let preferWhiteMetro=false;
+  // COSMOS v2.9.4.6: ONE cycle control: available cameras -> White -> first camera.
+  // A laptop with one webcam cycles Camera -> White. White actually stops all
+  // video tracks. It is not another camera and never starts an upload.
+  let preferWhiteMetro=false, cameraCycleBusy=false;
   function updateMetroCameraState(){
-    const live=Boolean(cameraStream?.active && cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
+    const live=Boolean(!preferWhiteMetro && cameraStream?.active &&
+      cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
       !cameraVideo.hidden && cameraVideo.readyState>=2 && cameraVideo.srcObject===cameraStream);
     app.classList.toggle('cosmos-camera-live',live);
     app.classList.toggle('cosmos-white-mode',preferWhiteMetro);
-    const btn=$('cosmosViewToggle');
-    if(!btn)return;
-    const showWhite=live && !preferWhiteMetro;
-    $('cosmosViewText').textContent=showWhite?'White':'Camera';
-    $('cosmosViewIcon').textContent=showWhite?'✧':'📷';
-    btn.title=showWhite?'Switch to white Cosmos background':'Show live camera behind the Metro';
+    const btn=$('cameraFlip');
+    btn.dataset.view=preferWhiteMetro?'white':'camera';
+    btn.title=preferWhiteMetro?'White view (camera off) — switch to camera':'Switch camera; White is the last view';
     btn.setAttribute('aria-label',btn.title);
-    btn.setAttribute('aria-pressed',String(showWhite));
   }
   function stopAmbientCameraForWhite(){
-    cameraSeq++;
+    preferWhiteMetro=true;
+    cameraSeq++; // Cancel any outstanding getUserMedia operation, including on iOS.
     releaseCameraStream(cameraStream);
     cameraStream=null;
-    cameraVideo.pause();
-    cameraVideo.srcObject=null;
-    cameraVideo.hidden=true;
-    cameraFallback.hidden=false;
+    cameraVideo.pause();cameraVideo.srcObject=null;cameraVideo.hidden=true;
+    cameraFallback.hidden=true;
     updateMetroCameraState();
   }
-  $('cosmosViewToggle').addEventListener('click',async()=>{
-    if(preferWhiteMetro || !app.classList.contains('cosmos-camera-live')){
-      preferWhiteMetro=false;
-      updateMetroCameraState();
-      // This call originates from a click, so the browser may prompt for camera access.
-      await startCamera(true);
-      if(!app.classList.contains('cosmos-camera-live')){
-        // Show the white background instead of a dark/empty area if permissions fail.
+  // Use one outward-facing and one inward-facing device where available. Do not
+  // cycle every physical ultrawide/telephoto sensor on an iPhone as an extra tab.
+  async function availableCameraChoices(){
+    if(!navigator.mediaDevices?.enumerateDevices)return [];
+    const all=(await navigator.mediaDevices.enumerateDevices())
+      .filter(d=>d.kind==='videoinput'&&d.deviceId);
+    const front=all.find(d=>/front|selfie|facetime|user/i.test(d.label||''));
+    const rear=all.find(d=>/back|rear|environment|world/i.test(d.label||''));
+    if(front && rear && front.deviceId!==rear.deviceId)return [rear,front];
+    return all; // Unknown camera labels: preserve access to all real devices.
+  }
+  async function cycleMetroCamera(){
+    if(cameraCycleBusy)return;
+    cameraCycleBusy=true;
+    const btn=$('cameraFlip');btn.disabled=true;
+    try{
+      let choices=[];
+      try{choices=await availableCameraChoices();}catch(e){/* Browser may block enumeration before permission. */}
+      if(preferWhiteMetro || !cameraStream?.active){
+        // White -> first camera. An uninitialized camera can also start here.
+        preferWhiteMetro=false;
+        selectedCameraDeviceId=choices[0]?.deviceId||null;
+        preferredCameraFacing=/front|selfie|facetime|user/i.test(choices[0]?.label||'')?'user':'environment';
         updateMetroCameraState();
+        await startCamera(true);
+        if(!cameraStream?.active){stopAmbientCameraForWhite();toastMsg('Camera unavailable. Showing White view.',3500);}
+      }else{
+        const activeId=cameraStream.getVideoTracks()[0]?.getSettings()?.deviceId||selectedCameraDeviceId;
+        const index=choices.findIndex(d=>d.deviceId===activeId);
+        // Last physical camera -> White; White -> first physical camera.
+        if(!choices.length || index<0 || index===choices.length-1){
+          stopAmbientCameraForWhite();
+          toastMsg('White view · Camera off',2200);
+        }else{
+          const next=choices[index+1];
+          // iOS Safari often cannot open a second lens until the first stops.
+          // Release before requesting the next camera to avoid simultaneous streams.
+          cameraSeq++;
+          releaseCameraStream(cameraStream);
+          cameraStream=null;cameraVideo.pause();cameraVideo.srcObject=null;
+          cameraVideo.hidden=true;cameraFallback.hidden=true;
+          selectedCameraDeviceId=next.deviceId;
+          preferredCameraFacing=/front|selfie|facetime|user/i.test(next.label||'')?'user':'environment';
+          updateMetroCameraState();
+          await startCamera(true);
+          if(!cameraStream?.active)stopAmbientCameraForWhite();
+        }
       }
-    }else{
-      preferWhiteMetro=true;
+    }catch(e){
       stopAmbientCameraForWhite();
+      toastMsg('Could not switch camera. White view is available.',3500);
+    }finally{
+      btn.disabled=false;updateMetroCameraState();cameraCycleBusy=false;
     }
-  });
+  }
   cameraVideo.addEventListener('playing',updateMetroCameraState);
   cameraVideo.addEventListener('emptied',updateMetroCameraState);
   updateMetroCameraState();
@@ -2086,17 +2133,7 @@
       updateMetroCameraState();
     }
   }
-  $('cameraFlip').addEventListener('click',async()=>{
-    try{
-      const devices=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.deviceId);
-      if(devices.length<2){toastMsg('This device has only one camera. Use ↻ to rotate its view.',3500);return;}
-      const activeId=cameraStream?.getVideoTracks()?.[0]?.getSettings()?.deviceId||selectedCameraDeviceId;
-      const current=Math.max(0,devices.findIndex(d=>d.deviceId===activeId));
-      selectedCameraDeviceId=devices[(current+1)%devices.length].deviceId;
-      preferredCameraFacing=preferredCameraFacing==='environment'?'user':'environment';
-      await startCamera(true);
-    }catch(e){toastMsg('Camera switch unavailable: '+e.message,4500);}
-  });
+  $('cameraFlip').addEventListener('click',cycleMetroCamera);
   $('cameraRotate').addEventListener('click',()=>{cameraRotation=(cameraRotation+90)%360;orientCamera();});
   window.addEventListener('resize',orientCamera);
 
