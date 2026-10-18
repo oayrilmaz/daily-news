@@ -1,4 +1,4 @@
-/* COSMOS push service worker v2.9.3 — resilient direct-to-moment routing. */
+/* COSMOS push service worker v2.9.4 — resilient direct-to-moment routing. */
 /* Stores ONLY an opaque notification ID for a short time after a notification tap.
    No private post content, contact details, or location data is cached. */
 const COSMOS_PAGE='https://ptdtoday.com/cosmos-next.html';
@@ -9,7 +9,7 @@ self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
 
 function validNoticeId(value){const id=String(value||'');return ID_PATTERN.test(id)?id:'';}
-function getTarget(id){return COSMOS_PAGE+'?v=293'+(id?'&notice='+encodeURIComponent(id):'&inbox=1');}
+function getTarget(id){return COSMOS_PAGE+'?v=294'+(id?'&notice='+encodeURIComponent(id):'&inbox=1');}
 function openDb(){return new Promise((resolve,reject)=>{
   if(!self.indexedDB)return reject(new Error('IndexedDB unavailable'));
   const request=indexedDB.open(DB_NAME,1);
