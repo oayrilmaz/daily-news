@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4.3-switch-camera-direction" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.4.4-white-cosmos-metro-background" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1516,6 +1516,36 @@
     .cosmos-photo-camera-stage.is-turned{width:min(100%,390px,30dvh);aspect-ratio:3/4;
       max-height:40dvh}
     @media(max-width:390px){.cosmos-photo-orientation-tools button{padding:8px 10px;font-size:12px}}
+
+    /* COSMOS v2.9.4.4 — trial: white Cosmos artwork as the METRO background only.
+       Keep camera-first functionality and private moment permissions unchanged.
+       The picture is decorative, never clickable or included in a captured photo. */
+    .cosmos-metro-background{
+      position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
+      background-color:#fafcff;
+      background-image:url("/cosmos-metro-white-bg.png");
+      background-position:center center;background-size:cover;background-repeat:no-repeat;
+      transition:opacity .35s ease;
+    }
+    .cosmos-metro-background::after{
+      content:"";position:absolute;inset:0;
+      background:linear-gradient(180deg,rgba(255,255,255,.88) 0%,rgba(255,255,255,.57) 26%,rgba(255,255,255,.67) 63%,rgba(255,255,255,.85) 100%);
+    }
+    .app.metro-live .cosmos-metro-background{opacity:1}
+    /* Distinguish the working Metro lines against white artwork. */
+    .app.metro-live .week-weekdays::before{
+      background:rgba(78,108,151,.44)!important;box-shadow:none!important;
+    }
+    .app.metro-live .metro-week-day .wd-branch::before{background:rgba(76,105,147,.35)!important}
+    .app.metro-live .living-day-chart .living-trunk{background:rgba(63,95,139,.38)!important;box-shadow:none!important}
+    .app.metro-live .living-branch .living-rail::before{background:rgba(67,99,140,.38)!important}
+    .app.metro-live .living-day-chart .living-tick{border-color:rgba(67,99,140,.14)!important}
+    /* Compact screens: show the soft core behind the Metro, not a distracting big logo. */
+    @media(max-width:600px){
+      .cosmos-metro-background{background-position:center center}
+      .cosmos-metro-background::after{background:rgba(255,255,255,.76)}
+    }
+    @media(prefers-reduced-motion:reduce){.cosmos-metro-background{transition:none}}
   </style>
 </head>
 <body>
@@ -1527,6 +1557,7 @@
 
   <div class="time-world" id="timeWorld" aria-hidden="true"></div>
   <div class="dimension-wash" aria-hidden="true"></div>
+  <div class="cosmos-metro-background" aria-hidden="true"></div>
   <div class="journey-controls" aria-label="Cosmos time travel">
     <button id="returnNow" type="button" aria-label="Return to personal Now">◯ NOW</button>
     <div class="journey-label" id="journeyLabel" aria-live="polite">MY · NOW</div>
