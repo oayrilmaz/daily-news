@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4.1-photo-camera-or-files" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.4.3-switch-camera-direction" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1505,6 +1505,9 @@
     .cosmos-photo-orientation-tools button[aria-pressed="true"]{background:#d6e9ff;border-color:#397db9}
     .cosmos-photo-orientation-tools button:focus-visible{outline:3px solid #2674d7;outline-offset:2px}
     .cosmos-photo-orientation-tools output{margin-left:auto;color:#254968;font-size:13px;font-weight:850;white-space:nowrap}
+    .cosmos-photo-orientation-tools .cosmos-switch-lens{background:linear-gradient(135deg,#dceeff,#fff);border-color:#79a5d3;color:#17406f}
+    .cosmos-photo-lens-hint{display:block;color:#4d6680;font-size:12px;line-height:1.4;margin:3px 0 9px;min-height:17px}
+    .cosmos-photo-orientation-tools button:disabled{opacity:.54;cursor:wait}
     .cosmos-photo-camera-stage{margin-inline:auto;transition:width .16s ease,height .16s ease}
     .cosmos-photo-camera-actions{position:sticky;bottom:0;z-index:4;padding:10px 0 5px;
       background:linear-gradient(180deg,rgba(243,249,255,.65),rgba(243,249,255,.98));border-radius:12px}
@@ -1678,17 +1681,36 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  // A photo preview may clone the main camera's live track. Only the preview clone
-  // (or a separately opened preview stream) is stopped, never the Cosmos camera.
+  // v2.9.4.3 — Camera direction is a hardware choice, separate from photo rotation.
+  // Some iPhones cannot open the rear and selfie cameras at the same time.
+  // Temporarily release the ambient Cosmos camera while the photo camera is open.
   let photoCaptureStream=null;
   let photoCaptureGeneration=0;
   let photoCaptureLayoutObserver=null;
+  let photoSuspendedMainCamera=false;
+  function releaseCameraStream(stream){
+    if(stream)stream.getTracks().forEach(t=>{try{t.stop();}catch(_){}});
+  }
+  function suspendAmbientCameraForPhoto(){
+    if(photoSuspendedMainCamera)return;
+    photoSuspendedMainCamera=true;
+    cameraSeq++; // Cancel any pending startCamera acquisition.
+    releaseCameraStream(cameraStream);
+    cameraStream=null;
+    cameraVideo.srcObject=null;
+    cameraVideo.hidden=true;
+  }
   function stopPhotoCapture(){
     photoCaptureGeneration++;
     if(photoCaptureLayoutObserver){photoCaptureLayoutObserver.disconnect();photoCaptureLayoutObserver=null;}
     const stream=photoCaptureStream;
     photoCaptureStream=null;
-    if(stream)stream.getTracks().forEach(t=>{try{t.stop();}catch(_){}});
+    releaseCameraStream(stream);
+    if(photoSuspendedMainCamera){
+      photoSuspendedMainCamera=false;
+      // Return to Cosmos's ordinary camera when the temporary photo screen closes.
+      startCamera(false).catch(()=>{});
+    }
   }
   function closeSheet(){stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
   function openSheet(html){stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
@@ -2193,29 +2215,33 @@
   }
 
   async function openPhotoCamera(onFile,onBack){
-    openSheet(`<h2>Take a photo</h2><p>Rotate the live view until the image is upright. The saved photo uses the same orientation.</p>
-      <div class="cosmos-photo-orientation-tools" role="toolbar" aria-label="Camera orientation">
-        <button type="button" id="cosmosCameraTurn" aria-label="Rotate camera preview and photo 90 degrees clockwise">↻ Rotate 90°</button>
+    openSheet(`<h2>Take a photo</h2><p>Switch between the front and rear cameras when your device supports both. Rotate or mirror the image separately.</p>
+      <div class="cosmos-photo-orientation-tools" role="toolbar" aria-label="Camera controls">
+        <button type="button" class="cosmos-switch-lens" id="cosmosCameraSwitch" aria-label="Switch to the other camera">⟳ Switch camera</button>
+        <button type="button" id="cosmosCameraTurn" aria-label="Rotate photo 90 degrees clockwise">↻ Rotate 90°</button>
         <button type="button" id="cosmosCameraMirror" aria-pressed="false" aria-label="Mirror camera preview and photo">⇋ Mirror</button>
         <output id="cosmosCameraAngle" aria-live="polite">0°</output>
       </div>
+      <div class="cosmos-photo-lens-hint" id="cosmosCameraFacing" aria-live="polite">Finding your camera…</div>
       <div class="cosmos-photo-camera-stage" id="cosmosPhotoFrame">
         <video id="cosmosPhotoPreview" autoplay playsinline muted aria-label="Live camera preview"></video>
         <div class="cosmos-camera-loading" id="cosmosPhotoStatus" role="status">Starting your camera…</div>
       </div>
       <div class="cosmos-photo-camera-actions"><button type="button" id="cosmosCameraBack">← Photo options</button>
         <button type="button" class="primary" id="cosmosCameraSnap" disabled>◉ Capture photo</button></div>
-      <div class="micro">Rotate or mirror the preview before capturing. Your camera stays private until you choose to share.</div>`);
+      <div class="micro">Changing cameras changes what the lens sees. Rotation changes the direction of the picture. A laptop with only one built-in webcam needs an external camera to look behind it.</div>`);
     const video=$('cosmosPhotoPreview'),frame=$('cosmosPhotoFrame'),status=$('cosmosPhotoStatus'),snap=$('cosmosCameraSnap');
     const turn=$('cosmosCameraTurn'),mirror=$('cosmosCameraMirror'),angle=$('cosmosCameraAngle');
+    const switchButton=$('cosmosCameraSwitch'),lensHint=$('cosmosCameraFacing');
     const generation=photoCaptureGeneration;
-    let photoTurn=0,photoMirrored=false;
+    const mobileCamera=/iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    let photoTurn=0,photoMirrored=false,changingCamera=false;
+    let activeFacing='environment',activeDeviceId='';
+    const isCurrent=()=>photoCaptureGeneration===generation&&video.isConnected;
     const updatePhotoOrientation=()=>{
       if(!frame.isConnected)return;
       const sideways=photoTurn===90||photoTurn===270;
       frame.classList.toggle('is-turned',sideways);
-      // Portrait rotation needs the underlying landscape frame swapped so that
-      // the photo is fully visible rather than cropped or squeezed.
       const sw=frame.clientWidth,sh=frame.clientHeight;
       video.style.width=(sideways?sh:sw)+'px';
       video.style.height=(sideways?sw:sh)+'px';
@@ -2233,26 +2259,107 @@
     $('cosmosCameraBack').onclick=onBack;
     if(!navigator.mediaDevices?.getUserMedia){
       status.textContent='Camera unavailable in this browser. Choose from device instead.';
+      switchButton.disabled=true;
       return;
     }
-    try{
-      // Clone the already-active camera where possible; never stop the main
-      // Cosmos background camera by closing this temporary capture window.
-      let stream=null;
-      const liveTrack=cameraStream?.getVideoTracks().find(t=>t.readyState==='live');
-      if(liveTrack && typeof liveTrack.clone==='function'){
-        try{stream=new MediaStream([liveTrack.clone()]);}catch(_){stream=null;}
-      }
-      if(!stream)stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
-      if(photoCaptureGeneration!==generation||!video.isConnected){stream.getTracks().forEach(t=>t.stop());return;}
+    const cameraDescription=(track)=>{
+      const settings=track?.getSettings?.()||{};
+      const facing=settings.facingMode||'';
+      const name=String(track?.label||'');
+      if(facing==='user'||/front|face.?time|selfie/i.test(name))return 'Front / selfie camera';
+      if(facing==='environment'||/back|rear|world/i.test(name))return 'Rear / outward camera';
+      return name?name.slice(0,65):'Camera ready';
+    };
+    const showCamera=async(stream)=>{
+      if(!isCurrent()){releaseCameraStream(stream);return false;}
       photoCaptureStream=stream;
       video.srcObject=stream;
-      await video.play();
-      if(photoCaptureGeneration!==generation||!video.isConnected)return;
+      try{await video.play();}catch(e){
+        if(!isCurrent()){releaseCameraStream(stream);return false;}
+        video.srcObject=null;photoCaptureStream=null;releaseCameraStream(stream);
+        throw e;
+      }
+      if(!isCurrent()){releaseCameraStream(stream);return false;}
+      const track=stream.getVideoTracks()[0];
+      const settings=track?.getSettings?.()||{};
+      activeFacing=settings.facingMode||activeFacing;
+      activeDeviceId=settings.deviceId||activeDeviceId;
+      lensHint.textContent='Using: '+cameraDescription(track);
       status.hidden=true;snap.disabled=false;
       updatePhotoOrientation();
+      return true;
+    };
+    const getDevices=async()=>{
+      try{return (await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput'&&d.deviceId);}catch(_){return [];}
+    };
+    const openFacing=face=>navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:face}},audio:false});
+    const openDevice=id=>navigator.mediaDevices.getUserMedia({video:{deviceId:{exact:id}},audio:false});
+    switchButton.onclick=async()=>{
+      if(!isCurrent()||changingCamera||!photoCaptureStream)return;
+      changingCamera=true;switchButton.disabled=true;snap.disabled=true;
+      const oldFace=activeFacing,oldId=activeDeviceId;
+      try{
+        const devices=await getDevices();
+        if(!mobileCamera && devices.length<2){
+          lensHint.textContent='Only one camera detected. Connect a USB webcam to see another direction.';
+          toastMsg('Your laptop has one camera. Connect a second webcam to switch viewpoints.',4500);
+          snap.disabled=false;return;
+        }
+        const wantFace=oldFace==='user'?'environment':'user';
+        const oldTrack=photoCaptureStream.getVideoTracks()[0];
+        const currentId=oldTrack?.getSettings?.()?.deviceId||oldId;
+        const other=devices.filter(d=>d.deviceId!==currentId);
+        // iOS cameras generally expose facingMode; external laptop cameras are
+        // selected by their device IDs instead.
+        const candidate=other.find(d=>wantFace==='user'?/front|face.?time|selfie/i.test(d.label):/back|rear|world/i.test(d.label))||other[0];
+        if(!mobileCamera&&!candidate){
+          lensHint.textContent='Another camera is not connected.';snap.disabled=false;return;
+        }
+        status.textContent='Switching camera…';status.hidden=false;
+        releaseCameraStream(photoCaptureStream);
+        photoCaptureStream=null;video.srcObject=null;
+        let next=null;
+        try{
+          next=mobileCamera
+            ? await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:wantFace}},audio:false})
+            : await openDevice(candidate.deviceId);
+        }catch(primaryError){
+          // Some browsers do not expose facingMode but do expose device IDs.
+          if(mobileCamera&&candidate){try{next=await openDevice(candidate.deviceId);}catch(_){}}
+          if(!next)throw primaryError;
+        }
+        activeFacing=wantFace;
+        activeDeviceId=candidate?.deviceId||'';
+        await showCamera(next);
+      }catch(e){
+        if(!isCurrent())return;
+        // A switch must not strand the creator on a black screen. Try to reopen
+        // the original camera, but never silently take or upload a photograph.
+        lensHint.textContent='Could not switch cameras. Returning to the previous view…';
+        let restored=null;
+        try{
+          if(oldId)restored=await openDevice(oldId);
+          else restored=await openFacing(oldFace||'environment');
+        }catch(_){
+          try{restored=await openFacing('environment');}catch(__){}
+        }
+        if(restored){activeFacing=oldFace;activeDeviceId=oldId;await showCamera(restored).catch(()=>{});}
+        if(isCurrent()&&!photoCaptureStream){status.hidden=false;status.textContent='Camera unavailable. Go back and choose from device.';}
+        toastMsg('Camera switch unavailable: '+(e?.message||'check camera permissions'),4600);
+      }finally{
+        if(isCurrent()){changingCamera=false;switchButton.disabled=false;
+          if(photoCaptureStream&&status.hidden)snap.disabled=false;}
+      }
+    };
+    try{
+      // Release the ambient Cosmos camera first; iOS Safari often cannot keep
+      // its front and rear sensors active in parallel.
+      suspendAmbientCameraForPhoto();
+      const stream=await openFacing('environment');
+      if(!isCurrent()){releaseCameraStream(stream);return;}
+      await showCamera(stream);
       snap.onclick=async()=>{
-        if(snap.disabled)return;
+        if(snap.disabled||changingCamera||!isCurrent())return;
         snap.disabled=true;snap.textContent='Preparing photo…';
         try{
           const iw=video.videoWidth,ih=video.videoHeight;
@@ -2261,33 +2368,31 @@
           const sideways=photoTurn===90||photoTurn===270;
           const dw=Math.max(1,Math.round(iw*scale)),dh=Math.max(1,Math.round(ih*scale));
           const canvas=document.createElement('canvas');
-          canvas.width=sideways?dh:dw;
-          canvas.height=sideways?dw:dh;
+          canvas.width=sideways?dh:dw;canvas.height=sideways?dw:dh;
           const ctx=canvas.getContext('2d');
           if(!ctx)throw new Error('Camera capture is not available.');
-          // Match the visible transform exactly. Mirroring applies in the
-          // photo's original coordinates, then the result rotates clockwise.
           ctx.translate(canvas.width/2,canvas.height/2);
           ctx.rotate(photoTurn*Math.PI/180);
           if(photoMirrored)ctx.scale(-1,1);
           ctx.drawImage(video,-dw/2,-dh/2,dw,dh);
           const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.88));
           if(!blob)throw new Error('Could not capture this photo.');
-          if(photoCaptureGeneration!==generation)return;
+          if(!isCurrent())return;
           const file=new File([blob],`cosmos-camera-${Date.now()}.jpg`,{type:'image/jpeg'});
           stopPhotoCapture();
           await onFile(file);
         }catch(e){
           toastMsg(e.message||'Camera capture failed.',4900);
-          if(video.isConnected){snap.disabled=false;snap.textContent='◉ Capture photo';}
+          if(isCurrent()){snap.disabled=false;snap.textContent='◉ Capture photo';}
         }
       };
     }catch(e){
-      if(photoCaptureGeneration!==generation||!video.isConnected)return;
+      if(!isCurrent())return;
       const denied=['NotAllowedError','PermissionDeniedError','SecurityError'].includes(e?.name);
+      status.hidden=false;
       status.textContent=denied?'Camera permission denied. Allow access in browser settings, or choose from device.':
         'Camera could not start. Choose from device, or check whether another app is using it.';
-      snap.disabled=true;
+      switchButton.disabled=true;snap.disabled=true;
     }
   }
 
