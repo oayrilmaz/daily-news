@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4-shared-additions-invites" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.4.1-photo-camera-or-files" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1468,6 +1468,32 @@
         max-height:min(66dvh,340px)!important;
       }
     }
+
+    /* COSMOS v2.9.4.1 — explicit camera or device photo source */
+    .cosmos-photo-source-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0 10px}
+    .cosmos-photo-source-card{min-width:0;min-height:168px;padding:17px 12px;border-radius:22px;
+      background:linear-gradient(140deg,rgba(255,255,255,.94),rgba(219,239,255,.82));
+      border:1px solid rgba(166,200,232,.68);box-shadow:0 10px 25px rgba(28,73,125,.10);
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+      text-align:center;color:#173c67;cursor:pointer}
+    .cosmos-photo-source-card .cosmos-photo-source-icon{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;
+      background:radial-gradient(circle at 28% 19%,#e5f7ff,#accff1);color:#143f75;font-size:25px;box-shadow:0 5px 19px rgba(35,88,153,.16)}
+    .cosmos-photo-source-card strong{font-size:15px;line-height:1.3}
+    .cosmos-photo-source-card small{color:#4d6680;font-size:11px;line-height:1.45;max-width:185px}
+    .cosmos-photo-source-card:focus-visible,.cosmos-photo-camera-stage button:focus-visible{outline:3px solid #2674d7;outline-offset:3px}
+    .cosmos-photo-camera-stage{position:relative;margin-top:16px;overflow:hidden;border-radius:21px;background:#102033;
+      aspect-ratio:4/3;max-height:min(45dvh,420px);border:1px solid rgba(255,255,255,.65)}
+    .cosmos-photo-camera-stage video{display:block;width:100%;height:100%;object-fit:contain;background:#102033}
+    .cosmos-photo-camera-stage .cosmos-camera-loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;
+      padding:20px;color:#e9f6ff;background:rgba(16,32,51,.86);font-size:13px;line-height:1.5}
+    .cosmos-photo-camera-stage .cosmos-camera-loading[hidden]{display:none}
+    .cosmos-photo-camera-actions{display:flex;gap:10px;align-items:center;margin-top:14px}
+    .cosmos-photo-camera-actions button{min-height:48px;flex:1;padding:10px 14px;border-radius:15px;
+      border:1px solid rgba(122,166,207,.35);background:rgba(255,255,255,.88);font-weight:700;color:#1d4166}
+    .cosmos-photo-camera-actions button.primary{background:#174e88;color:#fff;border-color:#174e88}
+    .cosmos-photo-camera-actions button:disabled{opacity:.45}
+    @media(max-width:355px){.cosmos-photo-source-card{min-height:145px;padding:10px 6px}.cosmos-photo-source-card strong{font-size:13px}
+      .cosmos-photo-source-card .cosmos-photo-source-icon{width:46px;height:46px;font-size:23px}}
   </style>
 </head>
 <body>
@@ -1633,8 +1659,18 @@
     const back=$("cameraEscape");
     if(back)back.hidden=true; // NOW in the header and Back to camera in sheets are sufficient.
   }
-  function closeSheet(){sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
+  // A photo preview may clone the main camera's live track. Only the preview clone
+  // (or a separately opened preview stream) is stopped, never the Cosmos camera.
+  let photoCaptureStream=null;
+  let photoCaptureGeneration=0;
+  function stopPhotoCapture(){
+    photoCaptureGeneration++;
+    const stream=photoCaptureStream;
+    photoCaptureStream=null;
+    if(stream)stream.getTracks().forEach(t=>{try{t.stop();}catch(_){}});
+  }
+  function closeSheet(){stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -2093,15 +2129,111 @@
   }
 
   function selectMediaForCompose(kind){
-    if(kind==="photo"||kind==="video"){
-      fileInput.accept=kind==="photo"?"image/*":"video/*";if(kind==="photo")fileInput.removeAttribute("capture");else fileInput.setAttribute("capture","environment");fileInput.value="";fileInput.onchange=async()=>{
-        const file=fileInput.files?.[0]; if(!file) return showContentStep();
-        if(kind==='photo')return photoMomentEditor(file);
-        try{toastMsg("Securing media…");const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();}catch(e){toastMsg(e.message);showContentStep();}
+    if(kind==='photo')return choosePhotoSource(file=>photoMomentEditor(file),showContentStep);
+    if(kind==='video'){
+      fileInput.accept='video/*';fileInput.setAttribute('capture','environment');fileInput.value='';fileInput.onchange=async()=>{
+        const file=fileInput.files?.[0]; if(!file)return showContentStep();
+        try{toastMsg('Securing media…');const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();}
+        catch(e){toastMsg(e.message);showContentStep();}
       };fileInput.click();
     }
   }
 
+  // Two clearly separate actions, on laptop AND phone. Browsers cannot be relied
+  // upon to offer a camera button in a regular <input type=file> dialog.
+  function choosePhotoSource(onFile,onBack){
+    openSheet(`<h2>Add a photo</h2><p>How would you like to add your photo?</p>
+      <div class="cosmos-photo-source-grid" role="group" aria-label="Photo source">
+        <button type="button" class="cosmos-photo-source-card" id="cosmosPhotoDevice">
+          <span class="cosmos-photo-source-icon" aria-hidden="true">▧</span>
+          <strong>Choose from device</strong><small>Photos or saved files on your laptop or phone</small>
+        </button>
+        <button type="button" class="cosmos-photo-source-card" id="cosmosPhotoLive">
+          <span class="cosmos-photo-source-icon" aria-hidden="true">◉</span>
+          <strong>Take a photo</strong><small>Use your camera with a live preview</small>
+        </button>
+      </div>
+      <div class="micro">Your camera preview is local. Only the photo you confirm is uploaded.</div>
+      <div class="actions"><button type="button" id="cosmosPhotoSourceBack">← Back</button></div>`);
+    $('cosmosPhotoSourceBack').onclick=onBack;
+    $('cosmosPhotoDevice').onclick=()=>{
+      fileInput.accept='image/*,.jpg,.jpeg,.png,.webp,.heic,.heif';
+      fileInput.removeAttribute('capture');
+      fileInput.value='';
+      fileInput.onchange=async()=>{
+        const file=fileInput.files?.[0];fileInput.onchange=null;
+        // A cancelled file selection leaves the source chooser available.
+        if(!file)return;
+        try{await onFile(file);}catch(e){toastMsg(e.message||'Could not open that photo.',4800);choosePhotoSource(onFile,onBack);}
+      };
+      fileInput.click();
+    };
+    $('cosmosPhotoLive').onclick=()=>openPhotoCamera(onFile,()=>choosePhotoSource(onFile,onBack));
+  }
+
+  async function openPhotoCamera(onFile,onBack){
+    openSheet(`<h2>Take a photo</h2><p>Frame your moment, then tap Capture photo.</p>
+      <div class="cosmos-photo-camera-stage">
+        <video id="cosmosPhotoPreview" autoplay playsinline muted aria-label="Live camera preview"></video>
+        <div class="cosmos-camera-loading" id="cosmosPhotoStatus" role="status">Starting your camera…</div>
+      </div>
+      <div class="cosmos-photo-camera-actions"><button type="button" id="cosmosCameraBack">← Photo options</button>
+        <button type="button" class="primary" id="cosmosCameraSnap" disabled>◉ Capture photo</button></div>
+      <div class="micro">Allow camera access when your browser asks. If unavailable, choose an existing image instead.</div>`);
+    const video=$('cosmosPhotoPreview'),status=$('cosmosPhotoStatus'),snap=$('cosmosCameraSnap');
+    const generation=photoCaptureGeneration;
+    $('cosmosCameraBack').onclick=onBack;
+    if(!navigator.mediaDevices?.getUserMedia){
+      status.textContent='Camera unavailable in this browser. Choose from device instead.';
+      return;
+    }
+    try{
+      // Reuse a clone when Cosmos is already displaying this device's camera.
+      // This avoids fighting over a single laptop webcam, and stopping the clone
+      // does not turn off the original camera behind the Metro.
+      let stream=null;
+      const liveTrack=cameraStream?.getVideoTracks().find(t=>t.readyState==='live');
+      if(liveTrack && typeof liveTrack.clone==='function'){
+        try{stream=new MediaStream([liveTrack.clone()]);}catch(_){stream=null;}
+      }
+      if(!stream)stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+      if(photoCaptureGeneration!==generation||!video.isConnected){stream.getTracks().forEach(t=>t.stop());return;}
+      photoCaptureStream=stream;
+      video.srcObject=stream;
+      await video.play();
+      if(photoCaptureGeneration!==generation||!video.isConnected)return;
+      status.hidden=true;snap.disabled=false;
+      snap.onclick=async()=>{
+        if(snap.disabled)return;
+        snap.disabled=true;snap.textContent='Preparing photo…';
+        try{
+          const iw=video.videoWidth,ih=video.videoHeight;
+          if(!iw||!ih)throw new Error('Camera image is not ready yet.');
+          const scale=Math.min(1,1920/Math.max(iw,ih));
+          const canvas=document.createElement('canvas');
+          canvas.width=Math.round(iw*scale);canvas.height=Math.round(ih*scale);
+          const ctx=canvas.getContext('2d');
+          if(!ctx)throw new Error('Camera capture is not available.');
+          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.88));
+          if(!blob)throw new Error('Could not capture this photo.');
+          if(photoCaptureGeneration!==generation)return;
+          const file=new File([blob],`cosmos-camera-${Date.now()}.jpg`,{type:'image/jpeg'});
+          stopPhotoCapture();
+          await onFile(file);
+        }catch(e){
+          toastMsg(e.message||'Camera capture failed.',4900);
+          if(video.isConnected){snap.disabled=false;snap.textContent='◉ Capture photo';}
+        }
+      };
+    }catch(e){
+      if(photoCaptureGeneration!==generation||!video.isConnected)return;
+      const denied=['NotAllowedError','PermissionDeniedError','SecurityError'].includes(e?.name);
+      status.textContent=denied?'Camera permission denied. Allow access in browser settings, or choose from device.':
+        'Camera could not start. Choose from device, or check whether another app is using it.';
+      snap.disabled=true;
+    }
+  }
 
   // COSMOS v2.9.1: mobile-first photo studio. Source editing remains local until the user confirms.
   async function photoMomentEditor(file){
@@ -3212,25 +3344,29 @@
         }catch(e){toastMsg('Microphone permission was not granted.');}
       };return;
     }
-    if(kind==='photo'||kind==='video'){
-      const select=()=>{
-        fileInput.accept=kind==='photo'?'image/*':'video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
-        fileInput.removeAttribute('capture');fileInput.value='';fileInput.onchange=async()=>{
-          const file=fileInput.files?.[0];if(!file)return openAddToMoment(item);
-          try{
-            if(kind==='video'){
-              const policy=await api('/api/video/policy');if(policy.remaining<1)throw new Error('Monthly video allowance exhausted.');
-              if(file.size>policy.max_bytes)throw new Error('Video file is over the allowed size.');
-              const duration=await durationFromFile(file);
-              if(!Number.isFinite(duration)||duration>policy.max_seconds+.05)throw new Error('Trim video to '+policy.max_seconds+' seconds.');
-            }
-            openSheet('<h2>Saving attachment…</h2><p>Protecting your media.</p>');
-            const upload=await uploadFile(file);
-            showAdditionCommentStep(item,{kind,media_id:upload.id});
-          }catch(e){toastMsg(e.message,4200);openAddToMoment(item);}
-        };fileInput.click();
-      };
-      select();
+    if(kind==='photo'){
+      return choosePhotoSource(async file=>{
+        try{
+          openSheet('<h2>Saving photo…</h2><p>Protecting your attachment.</p>');
+          const upload=await uploadFile(file);
+          showAdditionCommentStep(item,{kind:'photo',media_id:upload.id});
+        }catch(e){toastMsg(e.message,4500);openAddToMoment(item);}
+      },()=>openAddToMoment(item));
+    }
+    if(kind==='video'){
+      fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
+      fileInput.removeAttribute('capture');fileInput.value='';fileInput.onchange=async()=>{
+        const file=fileInput.files?.[0];if(!file)return openAddToMoment(item);
+        try{
+          const policy=await api('/api/video/policy');if(policy.remaining<1)throw new Error('Monthly video allowance exhausted.');
+          if(file.size>policy.max_bytes)throw new Error('Video file is over the allowed size.');
+          const duration=await durationFromFile(file);
+          if(!Number.isFinite(duration)||duration>policy.max_seconds+.05)throw new Error('Trim video to '+policy.max_seconds+' seconds.');
+          openSheet('<h2>Saving attachment…</h2><p>Protecting your media.</p>');
+          const upload=await uploadFile(file);
+          showAdditionCommentStep(item,{kind,media_id:upload.id});
+        }catch(e){toastMsg(e.message,4200);openAddToMoment(item);}
+      };fileInput.click();
     }
   }
 
@@ -4193,6 +4329,7 @@
     else if(e.key==='ArrowUp'){e.preventDefault();setDimension(dimension==='connections'?'mine':'public');}
     else if(e.key==='ArrowDown'){e.preventDefault();setDimension(dimension==='public'?'mine':'connections');}
   });
+  window.addEventListener('pagehide',stopPhotoCapture);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)periodicNearby();});
   setInterval(periodicNearby,90000);
   setInterval(()=>{if(!document.hidden&&token&&me&&auth.hidden)refreshNoticeBadge();},30000);
