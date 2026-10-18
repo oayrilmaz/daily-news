@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4.4-white-cosmos-metro-background" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.4.5-white-or-live-camera" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1531,7 +1531,17 @@
       content:"";position:absolute;inset:0;
       background:linear-gradient(180deg,rgba(255,255,255,.88) 0%,rgba(255,255,255,.57) 26%,rgba(255,255,255,.67) 63%,rgba(255,255,255,.85) 100%);
     }
+    /* Default to the white COSMOS art until a REAL camera stream starts playing.
+       No privacy or media data is simulated or sent by this decorative layer. */
     .app.metro-live .cosmos-metro-background{opacity:1}
+    /* v2.9.4.5: live preview takes priority; white is fallback or explicit choice. */
+    .app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) .cosmos-metro-background{opacity:0}
+    .app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) .camera::after{
+      background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.05) 24%,rgba(255,255,255,.04) 72%,rgba(255,255,255,.34));
+    }
+    .cosmos-view-toggle{display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;min-width:79px;padding-inline:9px}
+    .cosmos-view-toggle[aria-pressed="true"]{border-color:rgba(38,96,165,.48);background:rgba(226,242,255,.95);color:#164a86}
+    @media(max-width:600px){.cosmos-view-toggle{min-width:34px;width:35px;padding:4px 6px}.cosmos-view-toggle .cosmos-view-text{display:none}}
     /* Distinguish the working Metro lines against white artwork. */
     .app.metro-live .week-weekdays::before{
       background:rgba(78,108,151,.44)!important;box-shadow:none!important;
@@ -1569,7 +1579,7 @@
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
-    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Switch between front and back camera" title="Switch camera">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
+    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool cosmos-view-toggle" id="cosmosViewToggle" aria-label="Show live camera" aria-pressed="false" title="Show live camera"><span id="cosmosViewIcon" aria-hidden="true">📷</span><span class="cosmos-view-text" id="cosmosViewText">Camera</span></button><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Switch between front and back camera" title="Switch camera">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
   </div>
 
   <div class="ambient" id="ambient">
@@ -1730,6 +1740,7 @@
     cameraStream=null;
     cameraVideo.srcObject=null;
     cameraVideo.hidden=true;
+    updateMetroCameraState();
   }
   function stopPhotoCapture(){
     photoCaptureGeneration++;
@@ -1998,6 +2009,51 @@
   setEmailAuthMode('login');
 
   let preferredCameraFacing='environment',cameraRotation=0,cameraStream=null,cameraSeq=0,selectedCameraDeviceId=null;
+  // The Metro is CAMERA-FIRST when the user has granted access, and clean white otherwise.
+  // White view is always available via an explicit toggle. No permissions are bypassed.
+  let preferWhiteMetro=false;
+  function updateMetroCameraState(){
+    const live=Boolean(cameraStream?.active && cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
+      !cameraVideo.hidden && cameraVideo.readyState>=2 && cameraVideo.srcObject===cameraStream);
+    app.classList.toggle('cosmos-camera-live',live);
+    app.classList.toggle('cosmos-white-mode',preferWhiteMetro);
+    const btn=$('cosmosViewToggle');
+    if(!btn)return;
+    const showWhite=live && !preferWhiteMetro;
+    $('cosmosViewText').textContent=showWhite?'White':'Camera';
+    $('cosmosViewIcon').textContent=showWhite?'✧':'📷';
+    btn.title=showWhite?'Switch to white Cosmos background':'Show live camera behind the Metro';
+    btn.setAttribute('aria-label',btn.title);
+    btn.setAttribute('aria-pressed',String(showWhite));
+  }
+  function stopAmbientCameraForWhite(){
+    cameraSeq++;
+    releaseCameraStream(cameraStream);
+    cameraStream=null;
+    cameraVideo.pause();
+    cameraVideo.srcObject=null;
+    cameraVideo.hidden=true;
+    cameraFallback.hidden=false;
+    updateMetroCameraState();
+  }
+  $('cosmosViewToggle').addEventListener('click',async()=>{
+    if(preferWhiteMetro || !app.classList.contains('cosmos-camera-live')){
+      preferWhiteMetro=false;
+      updateMetroCameraState();
+      // This call originates from a click, so the browser may prompt for camera access.
+      await startCamera(true);
+      if(!app.classList.contains('cosmos-camera-live')){
+        // Show the white background instead of a dark/empty area if permissions fail.
+        updateMetroCameraState();
+      }
+    }else{
+      preferWhiteMetro=true;
+      stopAmbientCameraForWhite();
+    }
+  });
+  cameraVideo.addEventListener('playing',updateMetroCameraState);
+  cameraVideo.addEventListener('emptied',updateMetroCameraState);
+  updateMetroCameraState();
   function orientCamera(){
     const turn=cameraRotation%180!==0;
     const frame=cameraVideo.parentElement;
@@ -2006,7 +2062,11 @@
     $('cameraRotate').textContent='↻ '+cameraRotation+'°';
   }
   async function startCamera(showError=true){
-    if(!navigator.mediaDevices?.getUserMedia){cameraFallback.textContent="Camera unavailable. You can still browse Cosmos moments.";return;}
+    if(preferWhiteMetro){updateMetroCameraState();return;}
+    if(!navigator.mediaDevices?.getUserMedia){
+      cameraFallback.textContent="Camera unavailable. The white Cosmos Metro remains available.";
+      updateMetroCameraState();return;
+    }
     const seq=++cameraSeq;
     try{
       const stream=await navigator.mediaDevices.getUserMedia({video:selectedCameraDeviceId?{deviceId:{exact:selectedCameraDeviceId}}:{facingMode:{ideal:preferredCameraFacing}},audio:false});
@@ -2014,10 +2074,16 @@
       const previous=cameraStream;cameraStream=stream;cameraVideo.srcObject=stream;
       cameraVideo.hidden=false;cameraFallback.hidden=true;orientCamera();
       previous?.getTracks().forEach(t=>t.stop());
-      cameraVideo.play().catch(()=>{});
+      // Remove the white artwork only after this camera is actually showing frames.
+      cameraVideo.play().then(()=>{
+        if(seq===cameraSeq)updateMetroCameraState();
+      }).catch(()=>{
+        if(seq===cameraSeq){cameraFallback.hidden=false;cameraFallback.textContent='Camera preview is unavailable. Try Camera again.';updateMetroCameraState();}
+      });
     }catch(e){
       if(showError)toastMsg('Unable to switch camera: '+(e.name==='NotAllowedError'?'permission needed':e.message),4100);
       if(!cameraStream){cameraVideo.hidden=true;cameraFallback.hidden=false;cameraFallback.textContent="Camera stays private until permission is granted.";}
+      updateMetroCameraState();
     }
   }
   $('cameraFlip').addEventListener('click',async()=>{
