@@ -1494,6 +1494,25 @@
     .cosmos-photo-camera-actions button:disabled{opacity:.45}
     @media(max-width:355px){.cosmos-photo-source-card{min-height:145px;padding:10px 6px}.cosmos-photo-source-card strong{font-size:13px}
       .cosmos-photo-source-card .cosmos-photo-source-icon{width:46px;height:46px;font-size:23px}}
+
+    /* COSMOS v2.9.4.2 — Rotate/mirror actual camera capture, not only the background */
+    .cosmos-photo-orientation-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0 5px}
+    .cosmos-photo-orientation-tools button{
+      border:1px solid rgba(115,164,215,.45);background:rgba(255,255,255,.86);
+      color:#17446f;border-radius:14px;min-height:43px;padding:9px 14px;
+      font-size:13px;font-weight:800;cursor:pointer
+    }
+    .cosmos-photo-orientation-tools button[aria-pressed="true"]{background:#d6e9ff;border-color:#397db9}
+    .cosmos-photo-orientation-tools button:focus-visible{outline:3px solid #2674d7;outline-offset:2px}
+    .cosmos-photo-orientation-tools output{margin-left:auto;color:#254968;font-size:13px;font-weight:850;white-space:nowrap}
+    .cosmos-photo-camera-stage{margin-inline:auto;transition:width .16s ease,height .16s ease}
+    .cosmos-photo-camera-actions{position:sticky;bottom:0;z-index:4;padding:10px 0 5px;
+      background:linear-gradient(180deg,rgba(243,249,255,.65),rgba(243,249,255,.98));border-radius:12px}
+    .cosmos-photo-camera-stage video{position:absolute;left:50%;top:50%;width:100%;height:100%;
+      transform-origin:center center;will-change:transform}
+    .cosmos-photo-camera-stage.is-turned{width:min(100%,390px,30dvh);aspect-ratio:3/4;
+      max-height:40dvh}
+    @media(max-width:390px){.cosmos-photo-orientation-tools button{padding:8px 10px;font-size:12px}}
   </style>
 </head>
 <body>
@@ -1663,8 +1682,10 @@
   // (or a separately opened preview stream) is stopped, never the Cosmos camera.
   let photoCaptureStream=null;
   let photoCaptureGeneration=0;
+  let photoCaptureLayoutObserver=null;
   function stopPhotoCapture(){
     photoCaptureGeneration++;
+    if(photoCaptureLayoutObserver){photoCaptureLayoutObserver.disconnect();photoCaptureLayoutObserver=null;}
     const stream=photoCaptureStream;
     photoCaptureStream=null;
     if(stream)stream.getTracks().forEach(t=>{try{t.stop();}catch(_){}});
@@ -2172,25 +2193,51 @@
   }
 
   async function openPhotoCamera(onFile,onBack){
-    openSheet(`<h2>Take a photo</h2><p>Frame your moment, then tap Capture photo.</p>
-      <div class="cosmos-photo-camera-stage">
+    openSheet(`<h2>Take a photo</h2><p>Rotate the live view until the image is upright. The saved photo uses the same orientation.</p>
+      <div class="cosmos-photo-orientation-tools" role="toolbar" aria-label="Camera orientation">
+        <button type="button" id="cosmosCameraTurn" aria-label="Rotate camera preview and photo 90 degrees clockwise">↻ Rotate 90°</button>
+        <button type="button" id="cosmosCameraMirror" aria-pressed="false" aria-label="Mirror camera preview and photo">⇋ Mirror</button>
+        <output id="cosmosCameraAngle" aria-live="polite">0°</output>
+      </div>
+      <div class="cosmos-photo-camera-stage" id="cosmosPhotoFrame">
         <video id="cosmosPhotoPreview" autoplay playsinline muted aria-label="Live camera preview"></video>
         <div class="cosmos-camera-loading" id="cosmosPhotoStatus" role="status">Starting your camera…</div>
       </div>
       <div class="cosmos-photo-camera-actions"><button type="button" id="cosmosCameraBack">← Photo options</button>
         <button type="button" class="primary" id="cosmosCameraSnap" disabled>◉ Capture photo</button></div>
-      <div class="micro">Allow camera access when your browser asks. If unavailable, choose an existing image instead.</div>`);
-    const video=$('cosmosPhotoPreview'),status=$('cosmosPhotoStatus'),snap=$('cosmosCameraSnap');
+      <div class="micro">Rotate or mirror the preview before capturing. Your camera stays private until you choose to share.</div>`);
+    const video=$('cosmosPhotoPreview'),frame=$('cosmosPhotoFrame'),status=$('cosmosPhotoStatus'),snap=$('cosmosCameraSnap');
+    const turn=$('cosmosCameraTurn'),mirror=$('cosmosCameraMirror'),angle=$('cosmosCameraAngle');
     const generation=photoCaptureGeneration;
+    let photoTurn=0,photoMirrored=false;
+    const updatePhotoOrientation=()=>{
+      if(!frame.isConnected)return;
+      const sideways=photoTurn===90||photoTurn===270;
+      frame.classList.toggle('is-turned',sideways);
+      // Portrait rotation needs the underlying landscape frame swapped so that
+      // the photo is fully visible rather than cropped or squeezed.
+      const sw=frame.clientWidth,sh=frame.clientHeight;
+      video.style.width=(sideways?sh:sw)+'px';
+      video.style.height=(sideways?sw:sh)+'px';
+      video.style.transform=`translate(-50%, -50%) rotate(${photoTurn}deg) scaleX(${photoMirrored?-1:1})`;
+      angle.value=photoTurn+'°';angle.textContent=photoTurn+'°';
+      mirror.setAttribute('aria-pressed',String(photoMirrored));
+    };
+    turn.onclick=()=>{photoTurn=(photoTurn+90)%360;updatePhotoOrientation();};
+    mirror.onclick=()=>{photoMirrored=!photoMirrored;updatePhotoOrientation();};
+    updatePhotoOrientation();
+    if(typeof ResizeObserver!=='undefined'){
+      photoCaptureLayoutObserver=new ResizeObserver(()=>updatePhotoOrientation());
+      photoCaptureLayoutObserver.observe(frame);
+    }
     $('cosmosCameraBack').onclick=onBack;
     if(!navigator.mediaDevices?.getUserMedia){
       status.textContent='Camera unavailable in this browser. Choose from device instead.';
       return;
     }
     try{
-      // Reuse a clone when Cosmos is already displaying this device's camera.
-      // This avoids fighting over a single laptop webcam, and stopping the clone
-      // does not turn off the original camera behind the Metro.
+      // Clone the already-active camera where possible; never stop the main
+      // Cosmos background camera by closing this temporary capture window.
       let stream=null;
       const liveTrack=cameraStream?.getVideoTracks().find(t=>t.readyState==='live');
       if(liveTrack && typeof liveTrack.clone==='function'){
@@ -2203,6 +2250,7 @@
       await video.play();
       if(photoCaptureGeneration!==generation||!video.isConnected)return;
       status.hidden=true;snap.disabled=false;
+      updatePhotoOrientation();
       snap.onclick=async()=>{
         if(snap.disabled)return;
         snap.disabled=true;snap.textContent='Preparing photo…';
@@ -2210,11 +2258,19 @@
           const iw=video.videoWidth,ih=video.videoHeight;
           if(!iw||!ih)throw new Error('Camera image is not ready yet.');
           const scale=Math.min(1,1920/Math.max(iw,ih));
+          const sideways=photoTurn===90||photoTurn===270;
+          const dw=Math.max(1,Math.round(iw*scale)),dh=Math.max(1,Math.round(ih*scale));
           const canvas=document.createElement('canvas');
-          canvas.width=Math.round(iw*scale);canvas.height=Math.round(ih*scale);
+          canvas.width=sideways?dh:dw;
+          canvas.height=sideways?dw:dh;
           const ctx=canvas.getContext('2d');
           if(!ctx)throw new Error('Camera capture is not available.');
-          ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          // Match the visible transform exactly. Mirroring applies in the
+          // photo's original coordinates, then the result rotates clockwise.
+          ctx.translate(canvas.width/2,canvas.height/2);
+          ctx.rotate(photoTurn*Math.PI/180);
+          if(photoMirrored)ctx.scale(-1,1);
+          ctx.drawImage(video,-dw/2,-dh/2,dw,dh);
           const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.88));
           if(!blob)throw new Error('Could not capture this photo.');
           if(photoCaptureGeneration!==generation)return;
