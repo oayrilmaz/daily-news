@@ -1572,6 +1572,104 @@
       .cosmos-metro-background::after{background:rgba(255,255,255,.76)}
     }
     @media(prefers-reduced-motion:reduce){.cosmos-metro-background{transition:none}}
+
+
+    /* ===============================================================
+       COSMOS NEXT v2.9.4.8 — Thumb-friendly, vertical, compact Metro
+       Both halves of the day rail scroll up/down on iPhone Safari.
+       Each clock hour is one row of small media/icon tiles; rows wrap.
+       No excerpts or sender text appear until a moment is opened.
+       =============================================================== */
+    .app.metro-live .metro-day-scroll{
+      overflow-x:hidden!important;overflow-y:auto!important;
+      touch-action:pan-y!important;-webkit-overflow-scrolling:touch;
+      overscroll-behavior-y:contain;scrollbar-width:thin;
+      padding-bottom:24px!important;
+    }
+    .app.metro-live .metro-day-scroll .living-day-chart{
+      display:block!important;position:relative;
+      min-height:100%!important;height:auto!important;
+      padding:10px 0 94px!important;
+      --trunk:clamp(18px,5%,32px)!important;
+      --selected-day-trunk:clamp(18px,5%,32px)!important;
+    }
+    .app.metro-live .living-branch{
+      position:relative!important;top:auto!important;bottom:auto!important;
+      height:auto!important;min-height:92px!important;
+      width:100%!important;margin:0 0 6px!important;
+      display:block!important;pointer-events:none;
+    }
+    .app.metro-live .living-branch::before{
+      content:'';position:absolute;left:var(--trunk);right:3px;top:50px;
+      height:1px;background:rgba(87,125,178,.32);pointer-events:none;
+    }
+    .app.metro-live .living-branch .living-junction{
+      top:50px!important;pointer-events:none;
+    }
+    .app.metro-live .living-branch .living-time-label,
+    .app.metro-live .living-day-chart.branch-left .living-time-label{
+      top:1px!important;left:auto!important;right:7px!important;
+      width:auto!important;text-align:right!important;
+      transform:none!important;font-size:10px!important;
+      font-weight:800;white-space:nowrap;color:#2a4a70!important;
+    }
+    .app.metro-live .living-branch .living-rail,
+    .app.metro-live .living-day-chart.branch-left .living-rail{
+      position:relative!important;top:auto!important;bottom:auto!important;
+      left:var(--trunk)!important;right:auto!important;
+      width:calc(100% - var(--trunk))!important;max-width:none!important;
+      display:grid!important;grid-template-columns:repeat(auto-fill,minmax(52px,1fr))!important;
+      grid-auto-rows:56px!important;justify-content:stretch!important;
+      align-items:stretch!important;flex-direction:initial!important;
+      gap:7px!important;min-height:90px;
+      padding:24px 5px 9px 15px!important;
+      overflow:visible!important;overscroll-behavior:auto!important;
+      scroll-snap-type:none!important;touch-action:pan-y!important;
+      pointer-events:auto!important;
+    }
+    .app.metro-live .living-branch .living-rail::before{display:none!important}
+    .app.metro-live .living-entry{
+      position:relative!important;display:grid!important;place-items:center!important;
+      width:100%!important;min-width:0!important;max-width:none!important;
+      height:56px!important;min-height:56px!important;
+      flex:none!important;margin:0!important;padding:4px!important;
+      border-radius:14px!important;overflow:hidden!important;
+      text-align:center;touch-action:pan-y!important;
+      box-shadow:inset 0 1px 0 #fff,0 3px 10px rgba(40,91,153,.13)!important;
+    }
+    .app.metro-live .living-entry .living-entry-orb{
+      display:grid!important;place-items:center!important;
+      flex:none!important;width:100%!important;height:100%!important;
+      border-radius:11px!important;border:1px solid rgba(255,255,255,.9)!important;
+      font-size:22px!important;overflow:hidden!important;
+    }
+    .app.metro-live .living-entry .living-entry-symbol{line-height:1!important}
+    .app.metro-live .living-entry .living-thumb{
+      width:100%!important;height:100%!important;object-fit:cover!important;
+    }
+    .app.metro-live .living-entry .living-entry-copy,
+    .app.metro-live .living-entry .living-entry-more{display:none!important}
+    .app.metro-live .living-entry[data-metro-source="connections"]::after{
+      content:'';position:absolute;top:4px;right:4px;width:7px;height:7px;
+      border-radius:50%;background:#9e85d1;border:1px solid white;
+      box-shadow:0 1px 3px rgba(38,44,68,.18);pointer-events:none;
+    }
+    .app.metro-live .living-entry:focus-visible{
+      outline:3px solid #176dc4!important;outline-offset:2px!important;
+    }
+    /* The bottom action orb remains functional but never steals swipes in
+       the day scroller; only its actual controls accept pointer events. */
+    .app.metro-live .bottom{pointer-events:none!important}
+    .app.metro-live .bottom button,
+    .app.metro-live .bottom .dim-nav{pointer-events:auto!important}
+    @media(max-width:390px){
+      .app.metro-live .living-branch .living-rail,
+      .app.metro-live .living-day-chart.branch-left .living-rail{
+        grid-template-columns:repeat(auto-fill,minmax(49px,1fr))!important;
+        gap:6px!important;padding-left:13px!important;
+      }
+      .app.metro-live .living-entry{height:54px!important;min-height:54px!important}
+    }
   </style>
 </head>
 <body>
@@ -4243,6 +4341,10 @@
     let main=metroRenderDay(countFor(weekMetroDay));
     if(dimension==='public')main=`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(weekMetroDay.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}</h2><p>Public Cosmos</p></div></div>
       <div class="metro-zero"><strong>Public Cosmos is preparing.</strong><br>Only moderated, opt-in public stories will appear here once enabled.<br>Future surprises will remain sealed until reveal.</div>`;
+    const prevDayScroller=$('metroDayScroll');
+    const prevScrollKey=prevDayScroller?.dataset.scrollKey||'';
+    const prevScrollTop=prevDayScroller?.scrollTop||0;
+    const nextScrollKey=chosen+'|'+metroViewFilter+'|'+dimension;
     journeyStage.innerHTML=`<div class="week-metro" aria-label="Permanent weekly Cosmos Metro"><div class="week-navigation">
       <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button>
       <span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button></div>
@@ -4262,10 +4364,10 @@
     populateMetroMedia();
     const scroller=$('metroDayScroll');
     if(scroller){
-      // Live day: show nearby hours. Historic day: show first real moment.
-      const first=scroller.querySelector('.living-branch');
-      if(first){const y=parseFloat(first.style.top||'0');scroller.scrollTop=Math.max(0,y-80);}
-      else if(chosen===today){const now=new Date();scroller.scrollTop=Math.max(0,(now.getHours()*60+now.getMinutes())*.73-130);}
+      scroller.dataset.scrollKey=nextScrollKey;
+      // Background refreshes must NOT yank the timeline back to its start.
+      // New day / new filter begins at the earliest moment, ready to swipe.
+      scroller.scrollTop=prevScrollKey===nextScrollKey?prevScrollTop:0;
     }
     if(!weekMetroBusy && !weekMetroError)fetchMetroWeek();
   }
@@ -4324,42 +4426,39 @@
     const grouped=new Map();
     for(const x of rows){
       const d=new Date(x.date);if(!Number.isFinite(d.getTime()))continue;
-      const bucket=Math.floor((d.getHours()*60+d.getMinutes())/30);
+      const bucket=d.getHours(); // Same-hour moments share one wrapping row.
       if(!grouped.has(bucket))grouped.set(bucket,[]);
       grouped.get(bucket).push(x);
     }
-    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]).flatMap(([bucket,items])=>items.map(item=>[bucket,[item]]));
+    // v2.9.4.8: Group all real moments in the same CLOCK HOUR, not one huge
+    // text card per moment. Auto-wrapping icon tiles can show many at 10 AM.
+    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]);
     const branches=[];
-    const compactTop=6;
-    const compactStep=72;
-    const compactMinHeight=260;
-    branchEntries.forEach(([bucket,items],idx)=>{
-      const y=compactTop+idx*compactStep;
-      const minute=bucket*30;
-      const hh=Math.floor(minute/60), mm=minute%60;
-      const firstStamp=new Date(weekMetroDay.getFullYear(),weekMetroDay.getMonth(),weekMetroDay.getDate(),hh,mm).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    branchEntries.forEach(([hour,items])=>{
+      const firstStamp=new Date(weekMetroDay.getFullYear(),weekMetroDay.getMonth(),weekMetroDay.getDate(),hour,0).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
       const cards=items.map(item=>{
         const d=new Date(item.date),stamp=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-        const title=metroCardTitle(item),type=metroCardType(item);
-        const kind=String(item.kind||'text');
+        const title=metroCardTitle(item);
+        const kind=String(item.kind||'text').toLowerCase();
+        // Only request thumbnails already authorized for the owner. Never
+        // load a recipient's sealed/unrevealed private media into the grid.
         const img=!item.locked&&item.is_author&&kind==='photo'&&item.media_id
           ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden>`:'';
+        const icon=item.locked?'🔒':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯';
+        const a11y=stamp+', '+(item.locked?'Sealed future moment':title)+', '+(item.locked?'sealed':metroCardType(item))+(item.is_author?', my moment':', shared moment');
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
-            aria-label="${escapeHtml(stamp+', '+title+(item.locked?', sealed until reveal':''))}">
-          <span class="living-entry-orb kind-${escapeHtml(kind)}" aria-hidden="true">${img}<span class="living-entry-symbol">${metroIcon(item)}</span></span>
-          <span class="living-entry-copy"><span class="metro-source-badge ${escapeHtml(item.scope||'mine')}">${escapeHtml(metroBadge(item))}</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(item.locked?'🔒 Sealed · '+stamp:type+' · '+stamp)}</small></span>
-          <span class="living-entry-more" aria-hidden="true">›</span></button>`;
+          data-metro-source="${item.is_author?'mine':'connections'}" title="${escapeHtml(a11y)}" aria-label="${escapeHtml(a11y)}">
+          <span class="living-entry-orb kind-${escapeHtml(kind)}" aria-hidden="true">${img}<span class="living-entry-symbol">${icon}</span></span></button>`;
       }).join('');
-      branches.push(`<div class="living-branch" style="top:${Math.round(y)}px" aria-label="${items.length} real Cosmos moment${items.length===1?'':'s'}">
+      branches.push(`<div class="living-branch" aria-label="${items.length} real Cosmos moment${items.length===1?'':'s'} at ${escapeHtml(firstStamp)}">
         <span class="living-junction" aria-hidden="true"></span>
-        <span class="living-time-label" aria-hidden="true">${escapeHtml(firstStamp)}</span>
-        <div class="living-rail" aria-label="${items.length>1?'Swipe sideways for more moments':'Moment at '+firstStamp}">${cards}</div></div>`);
+        <span class="living-time-label" aria-hidden="true">${escapeHtml(firstStamp)}${items.length>1?' · '+items.length:''}</span>
+        <div class="living-rail" role="group" aria-label="${items.length} moments at ${escapeHtml(firstStamp)}. Scroll up or down anywhere on this row.">${cards}</div></div>`);
     });
-    const height=Math.max(260,compactTop+Math.max(1,branchEntries.length)*compactStep+28);
     const empty=rows.length?'':`<div class="living-empty">${metroViewFilter==='public'?'Public sharing is not activated yet. No public posts are shown.':metroViewFilter==='all'?'No saved moments for this day. Hold the Cosmos circle to create one.':'No '+metroViewFilter+' moments for this day. Choose All to see everything together.'}</div>`;
-    return heading(`${events.length} real moment${events.length===1?'':'s'} · tap a circle or card`)+
-      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Scroll vertically through moments.">
-        <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="height:${Math.round(height)}px;--selected-day-trunk:${trunkPct}%">
+    return heading(`${events.length} real moment${events.length===1?'':'s'} · swipe up or down anywhere · tap a tile`)+
+      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Swipe up or down anywhere, on either side, to scroll through moments.">
+        <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="--selected-day-trunk:${trunkPct}%">
           <div class="living-trunk" aria-hidden="true"></div>${branches.join('')}${empty}</div></div>`;
   }
   function metroPeekHtml(item,record,extraCount=0,thumbnail=''){
@@ -4739,4 +4838,3 @@
 </script>
 </body>
 </html>
-
