@@ -1540,11 +1540,17 @@
       background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.05) 24%,rgba(255,255,255,.04) 72%,rgba(255,255,255,.34));
     }
 
-    /* COSMOS v2.9.4.6: White is the LAST step on the camera-cycle button.
+    /* COSMOS v2.9.4.7: White is the LAST step on the camera-cycle button.
        It replaces the dark/blue camera view, not an overlay on a running camera. */
     .app.metro-live.cosmos-white-mode{background:#fff!important}
-    .app.metro-live.cosmos-white-mode .camera,
-    .app.metro-live:not(.cosmos-camera-live) .camera{visibility:hidden!important;opacity:0!important}
+    /* v2.9.4.7: iOS Safari must NEVER have the camera ancestor hidden while
+       awaiting a first video frame. Hiding it can stall WebKit playback. */
+    .app.metro-live.cosmos-white-mode .camera{visibility:hidden!important;opacity:0!important}
+    .app.metro-live.cosmos-camera-starting .camera,
+    .app.metro-live.cosmos-camera-live .camera{visibility:visible!important;opacity:1!important}
+    .app.metro-live.cosmos-camera-starting:not(.cosmos-white-mode) .cosmos-metro-background{
+      opacity:.78!important; /* gentle loading wash; camera video stays renderable */
+    }
     .app.metro-live.cosmos-white-mode .time-world,
     .app.metro-live.cosmos-white-mode .dimension-wash{opacity:0!important}
     .app.metro-live.cosmos-white-mode .cosmos-metro-background{opacity:1!important}
@@ -2019,120 +2025,217 @@
   setEmailAuthMode('login');
 
   let preferredCameraFacing='environment',cameraRotation=0,cameraStream=null,cameraSeq=0,selectedCameraDeviceId=null;
-  // COSMOS v2.9.4.6: ONE cycle control: available cameras -> White -> first camera.
-  // A laptop with one webcam cycles Camera -> White. White actually stops all
-  // video tracks. It is not another camera and never starts an upload.
-  let preferWhiteMetro=false, cameraCycleBusy=false;
+  // COSMOS v2.9.4.7 — iPhone preview repair. Camera choices stay on ONE ⟳ control:
+  // rear -> front -> White -> rear (on a one-camera laptop: camera -> White).
+  // iOS/WebKit must use facingMode rather than unstable enumerated device IDs.
+  const mobileFacingCamera=/(iPhone|iPad|iPod|Android)/i.test(navigator.userAgent) ||
+    (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  let preferWhiteMetro=false,cameraCycleBusy=false,cameraPreviewReady=false,cameraStarting=false;
   function updateMetroCameraState(){
-    const live=Boolean(!preferWhiteMetro && cameraStream?.active &&
+    const live=Boolean(!preferWhiteMetro && cameraPreviewReady && cameraStream?.active &&
       cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
-      !cameraVideo.hidden && cameraVideo.readyState>=2 && cameraVideo.srcObject===cameraStream);
+      !cameraVideo.hidden && cameraVideo.srcObject===cameraStream);
     app.classList.toggle('cosmos-camera-live',live);
+    app.classList.toggle('cosmos-camera-starting',Boolean(!preferWhiteMetro&&cameraStarting&&!live));
     app.classList.toggle('cosmos-white-mode',preferWhiteMetro);
     const btn=$('cameraFlip');
-    btn.dataset.view=preferWhiteMetro?'white':'camera';
-    btn.title=preferWhiteMetro?'White view (camera off) — switch to camera':'Switch camera; White is the last view';
+    btn.dataset.view=preferWhiteMetro?'white':live?(mobileFacingCamera?preferredCameraFacing:'camera'):'starting';
+    btn.title=preferWhiteMetro?'White view · Camera off · Tap for rear camera':
+      cameraStarting?'Opening camera…':
+      !live?'Camera unavailable · Tap to try again':
+      mobileFacingCamera?(preferredCameraFacing==='environment'?'Rear camera · Tap for front camera':'Front camera · Tap for White view'):
+      'Next camera · White is the last view';
     btn.setAttribute('aria-label',btn.title);
+  }
+  function clearAmbientCamera(){
+    cameraSeq++; // Invalidates a delayed getUserMedia or frame callback.
+    cameraPreviewReady=false;cameraStarting=false;
+    const old=cameraStream;cameraStream=null;
+    try{cameraVideo.pause();}catch(_){}
+    cameraVideo.srcObject=null;cameraVideo.hidden=true;
+    releaseCameraStream(old);
+    updateMetroCameraState();
   }
   function stopAmbientCameraForWhite(){
     preferWhiteMetro=true;
-    cameraSeq++; // Cancel any outstanding getUserMedia operation, including on iOS.
-    releaseCameraStream(cameraStream);
-    cameraStream=null;
-    cameraVideo.pause();cameraVideo.srcObject=null;cameraVideo.hidden=true;
+    clearAmbientCamera(); // ALL tracks stopped, not merely CSS-hidden.
     cameraFallback.hidden=true;
     updateMetroCameraState();
   }
-  // Use one outward-facing and one inward-facing device where available. Do not
-  // cycle every physical ultrawide/telephoto sensor on an iPhone as an extra tab.
   async function availableCameraChoices(){
     if(!navigator.mediaDevices?.enumerateDevices)return [];
-    const all=(await navigator.mediaDevices.enumerateDevices())
-      .filter(d=>d.kind==='videoinput'&&d.deviceId);
-    const front=all.find(d=>/front|selfie|facetime|user/i.test(d.label||''));
-    const rear=all.find(d=>/back|rear|environment|world/i.test(d.label||''));
-    if(front && rear && front.deviceId!==rear.deviceId)return [rear,front];
-    return all; // Unknown camera labels: preserve access to all real devices.
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    return devices.filter(d=>d.kind==='videoinput'&&d.deviceId);
+  }
+  // Wait for WebKit to render an actual video frame instead of assuming
+  // getUserMedia/playing means the user can see a camera image.
+  function waitForCameraFrame(video,seq,timeoutMs=5600){
+    return new Promise(resolve=>{
+      let done=false,frameId=null,early=null;
+      const finish=ok=>{
+        if(done)return;done=true;
+        clearTimeout(timer);clearTimeout(early);
+        if(frameId!==null&&video.cancelVideoFrameCallback){try{video.cancelVideoFrameCallback(frameId);}catch(_){}}
+        resolve(Boolean(ok&&seq===cameraSeq&&!preferWhiteMetro));
+      };
+      const valid=()=>video.readyState>=2&&video.videoWidth>0&&video.videoHeight>0&&
+        !video.paused&&Boolean(video.srcObject);
+      const timer=setTimeout(()=>finish(valid()),timeoutMs);
+      if(typeof video.requestVideoFrameCallback==='function'){
+        try{frameId=video.requestVideoFrameCallback(()=>finish(valid()));}
+        catch(_){early=setTimeout(()=>finish(valid()),800);}
+        // WebKit occasionally skips a frame callback after tab/app resumption.
+        // A decoded frame in a playing video is still a valid fallback.
+        early=setTimeout(()=>finish(valid()),1900);
+      }else{
+        early=setTimeout(()=>finish(valid()),500);
+      }
+    });
+  }
+  function currentCameraFacing(){
+    const facing=cameraStream?.getVideoTracks()?.[0]?.getSettings?.()?.facingMode;
+    return facing==='user'||facing==='environment'?facing:preferredCameraFacing;
   }
   async function cycleMetroCamera(){
     if(cameraCycleBusy)return;
     cameraCycleBusy=true;
     const btn=$('cameraFlip');btn.disabled=true;
     try{
-      let choices=[];
-      try{choices=await availableCameraChoices();}catch(e){/* Browser may block enumeration before permission. */}
-      if(preferWhiteMetro || !cameraStream?.active){
-        // White -> first camera. An uninitialized camera can also start here.
-        preferWhiteMetro=false;
-        selectedCameraDeviceId=choices[0]?.deviceId||null;
-        preferredCameraFacing=/front|selfie|facetime|user/i.test(choices[0]?.label||'')?'user':'environment';
-        updateMetroCameraState();
-        await startCamera(true);
-        if(!cameraStream?.active){stopAmbientCameraForWhite();toastMsg('Camera unavailable. Showing White view.',3500);}
+      if(preferWhiteMetro){
+        // Starting from White always returns to the outward camera.
+        preferWhiteMetro=false;preferredCameraFacing='environment';selectedCameraDeviceId=null;
+        const ok=await startCamera(true,true);
+        if(ok)toastMsg('Rear camera',1300);
+      }else if(!cameraPreviewReady){
+        // An interrupted/stalled iPhone preview should be restartable with ONE tap,
+        // not mistakenly counted as the next physical camera.
+        await startCamera(true,true);
+      }else if(mobileFacingCamera){
+        if(currentCameraFacing()==='environment'){
+          preferredCameraFacing='user';selectedCameraDeviceId=null;
+          if(await startCamera(true,true))toastMsg('Front camera',1300);
+        }else{
+          stopAmbientCameraForWhite();
+          toastMsg('White view · Camera off',2200);
+        }
       }else{
-        const activeId=cameraStream.getVideoTracks()[0]?.getSettings()?.deviceId||selectedCameraDeviceId;
-        const index=choices.findIndex(d=>d.deviceId===activeId);
-        // Last physical camera -> White; White -> first physical camera.
-        if(!choices.length || index<0 || index===choices.length-1){
+        let devices=[];
+        try{devices=await availableCameraChoices();}catch(_){}
+        const activeId=cameraStream?.getVideoTracks()?.[0]?.getSettings?.()?.deviceId||selectedCameraDeviceId;
+        const ix=devices.findIndex(d=>d.deviceId===activeId);
+        if(devices.length<2||ix<0||ix===devices.length-1){
           stopAmbientCameraForWhite();
           toastMsg('White view · Camera off',2200);
         }else{
-          const next=choices[index+1];
-          // iOS Safari often cannot open a second lens until the first stops.
-          // Release before requesting the next camera to avoid simultaneous streams.
-          cameraSeq++;
-          releaseCameraStream(cameraStream);
-          cameraStream=null;cameraVideo.pause();cameraVideo.srcObject=null;
-          cameraVideo.hidden=true;cameraFallback.hidden=true;
-          selectedCameraDeviceId=next.deviceId;
-          preferredCameraFacing=/front|selfie|facetime|user/i.test(next.label||'')?'user':'environment';
-          updateMetroCameraState();
-          await startCamera(true);
-          if(!cameraStream?.active)stopAmbientCameraForWhite();
+          selectedCameraDeviceId=devices[ix+1].deviceId;
+          await startCamera(true,true);
         }
       }
     }catch(e){
       stopAmbientCameraForWhite();
-      toastMsg('Could not switch camera. White view is available.',3500);
+      toastMsg('Camera could not start. White view is available.',3800);
     }finally{
-      btn.disabled=false;updateMetroCameraState();cameraCycleBusy=false;
+      cameraCycleBusy=false;btn.disabled=false;updateMetroCameraState();
     }
   }
-  cameraVideo.addEventListener('playing',updateMetroCameraState);
+  cameraVideo.addEventListener('playing',()=>{
+    // An iPhone can emit 'playing' before producing a real frame.
+    updateMetroCameraState();
+  });
   cameraVideo.addEventListener('emptied',updateMetroCameraState);
   updateMetroCameraState();
   function orientCamera(){
     const turn=cameraRotation%180!==0;
     const frame=cameraVideo.parentElement;
-    const ratio=frame?.clientWidth && frame?.clientHeight?Math.max(frame.clientWidth/frame.clientHeight,frame.clientHeight/frame.clientWidth):1;
+    const ratio=frame?.clientWidth&&frame?.clientHeight?Math.max(frame.clientWidth/frame.clientHeight,frame.clientHeight/frame.clientWidth):1;
     cameraVideo.style.transform=`rotate(${cameraRotation}deg) scale(${turn?ratio:1})`;
     $('cameraRotate').textContent='↻ '+cameraRotation+'°';
   }
-  async function startCamera(showError=true){
-    if(preferWhiteMetro){updateMetroCameraState();return;}
+  async function startCamera(showError=true,forceRestart=false){
+    if(preferWhiteMetro||photoSuspendedMainCamera){updateMetroCameraState();return false;}
     if(!navigator.mediaDevices?.getUserMedia){
-      cameraFallback.textContent="Camera unavailable. The white Cosmos Metro remains available.";
-      updateMetroCameraState();return;
+      if(showError)toastMsg('This browser cannot open the camera.',3600);
+      stopAmbientCameraForWhite();return false;
     }
+    // Start visibly: never wait for video.play() with a visibility:hidden parent.
     const seq=++cameraSeq;
+    cameraStarting=true;cameraPreviewReady=false;
+    updateMetroCameraState();
+    let fresh=null;
     try{
-      const stream=await navigator.mediaDevices.getUserMedia({video:selectedCameraDeviceId?{deviceId:{exact:selectedCameraDeviceId}}:{facingMode:{ideal:preferredCameraFacing}},audio:false});
-      if(seq!==cameraSeq){stream.getTracks().forEach(t=>t.stop());return;}
-      const previous=cameraStream;cameraStream=stream;cameraVideo.srcObject=stream;
-      cameraVideo.hidden=false;cameraFallback.hidden=true;orientCamera();
-      previous?.getTracks().forEach(t=>t.stop());
-      // Remove the white artwork only after this camera is actually showing frames.
-      cameraVideo.play().then(()=>{
-        if(seq===cameraSeq)updateMetroCameraState();
-      }).catch(()=>{
-        if(seq===cameraSeq){cameraFallback.hidden=false;cameraFallback.textContent='Camera preview is unavailable. Try Camera again.';updateMetroCameraState();}
-      });
-    }catch(e){
-      if(showError)toastMsg('Unable to switch camera: '+(e.name==='NotAllowedError'?'permission needed':e.message),4100);
-      if(!cameraStream){cameraVideo.hidden=true;cameraFallback.hidden=false;cameraFallback.textContent="Camera stays private until permission is granted.";}
+      if(forceRestart||mobileFacingCamera){
+        // Safari may return a black feed if a previous lens still owns the sensor.
+        const prior=cameraStream;cameraStream=null;
+        try{cameraVideo.pause();}catch(_){}
+        cameraVideo.srcObject=null;cameraVideo.hidden=true;
+        releaseCameraStream(prior);
+        await new Promise(r=>setTimeout(r,200)); // give iPhone hardware time to release
+        if(seq!==cameraSeq||preferWhiteMetro||photoSuspendedMainCamera)return false;
+      }
+      const base={audio:false};
+      if(mobileFacingCamera){
+        try{
+          fresh=await navigator.mediaDevices.getUserMedia({...base,video:{facingMode:{exact:preferredCameraFacing}}});
+        }catch(e){
+          // Some WebKit camera stacks do not support exact facingMode.
+          if(e.name==='OverconstrainedError'||e.name==='NotFoundError'||e.name==='TypeError'){
+            fresh=await navigator.mediaDevices.getUserMedia({...base,video:{facingMode:{ideal:preferredCameraFacing}}});
+          }else throw e;
+        }
+      }else{
+        fresh=await navigator.mediaDevices.getUserMedia({...base,video:selectedCameraDeviceId?
+          {deviceId:{exact:selectedCameraDeviceId}}:{facingMode:{ideal:preferredCameraFacing}}});
+      }
+      if(seq!==cameraSeq||preferWhiteMetro||photoSuspendedMainCamera){releaseCameraStream(fresh);return false;}
+      const previous=cameraStream;cameraStream=fresh;
+      cameraVideo.autoplay=true;cameraVideo.muted=true;cameraVideo.playsInline=true;
+      cameraVideo.setAttribute('playsinline','');cameraVideo.setAttribute('webkit-playsinline','');
+      cameraVideo.hidden=false;
+      cameraVideo.srcObject=fresh;
+      cameraFallback.hidden=true;
+      orientCamera();
+      releaseCameraStream(previous);
+      await cameraVideo.play();
+      if(seq!==cameraSeq||preferWhiteMetro||photoSuspendedMainCamera){
+        releaseCameraStream(fresh);return false;
+      }
+      const hasFrame=await waitForCameraFrame(cameraVideo,seq);
+      if(seq!==cameraSeq||preferWhiteMetro||photoSuspendedMainCamera)return false;
+      if(!hasFrame)throw new Error('No camera image received from Safari');
+      cameraPreviewReady=true;cameraStarting=false;
+      // Capture the actual facing direction if Safari exposed it.
+      const facing=fresh.getVideoTracks()[0]?.getSettings?.()?.facingMode;
+      if(facing==='user'||facing==='environment')preferredCameraFacing=facing;
       updateMetroCameraState();
+      return true;
+    }catch(e){
+      if(seq!==cameraSeq)return false;
+      if(showError)toastMsg('Camera preview unavailable: '+(
+        e.name==='NotAllowedError'?'allow camera access in Safari':
+        e.name==='NotReadableError'?'close another app using your camera':
+        e.message||'tap ⟳ to try again'),4800);
+      stopAmbientCameraForWhite(); // no black/stuck screen or active camera tracks
+      return false;
+    }finally{
+      if(seq===cameraSeq){cameraStarting=false;updateMetroCameraState();}
     }
   }
+  // iOS suspends camera playback after switching apps or waking the phone.
+  // Recover only an already-selected camera; NEVER restart White mode.
+  function recoverCameraAfterResume(){
+    if(document.hidden||preferWhiteMetro||photoSuspendedMainCamera||!token||!auth.hidden)return;
+    setTimeout(async()=>{
+      if(document.hidden||preferWhiteMetro||photoSuspendedMainCamera||cameraCycleBusy)return;
+      const track=cameraStream?.getVideoTracks()?.[0];
+      if(!track||track.readyState!=='live'||cameraVideo.paused||!cameraVideo.srcObject){
+        await startCamera(false,true);
+      }else{
+        cameraVideo.play().catch(()=>startCamera(false,true));
+      }
+    },220);
+  }
+  window.addEventListener('pageshow',recoverCameraAfterResume);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)recoverCameraAfterResume();});
   $('cameraFlip').addEventListener('click',cycleMetroCamera);
   $('cameraRotate').addEventListener('click',()=>{cameraRotation=(cameraRotation+90)%360;orientCamera();});
   window.addEventListener('resize',orientCamera);
