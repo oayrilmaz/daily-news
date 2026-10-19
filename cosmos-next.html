@@ -1575,7 +1575,7 @@
 
 
     /* ===============================================================
-       COSMOS NEXT v2.9.4.8 — Thumb-friendly, vertical, compact Metro
+       COSMOS NEXT v2.9.4.9 — Tap-to-open, Connections thumbnails, compact Metro
        Both halves of the day rail scroll up/down on iPhone Safari.
        Each clock hour is one row of small media/icon tiles; rows wrap.
        No excerpts or sender text appear until a moment is opened.
@@ -1662,6 +1662,17 @@
     .app.metro-live .bottom{pointer-events:none!important}
     .app.metro-live .bottom button,
     .app.metro-live .bottom .dim-nav{pointer-events:auto!important}
+    /* v2.9.4.9 — instantly recognizable media types in compact tiles. */
+    .app.metro-live .living-entry .living-entry-orb.kind-video .living-entry-symbol{
+      display:grid;place-items:center;width:33px;height:33px;border-radius:50%;
+      background:#24548d;color:white;font-size:19px;font-weight:800;
+      box-shadow:0 2px 9px rgba(22,69,124,.28);padding-left:2px;
+    }
+    .app.metro-live .living-entry .living-entry-orb.kind-music .living-entry-symbol{font-size:26px;color:#473b98}
+    .app.metro-live .living-entry .living-entry-orb.kind-photo .living-entry-symbol{font-size:23px}
+    .app.metro-live .living-entry .living-entry-orb.kind-voice .living-entry-symbol{font-size:24px}
+    .app.metro-live .living-entry.metro-opening{opacity:.75;cursor:wait}
+    .app.metro-live .living-entry:disabled{pointer-events:none}
     @media(max-width:390px){
       .app.metro-live .living-branch .living-rail,
       .app.metro-live .living-day-chart.branch-left .living-rail{
@@ -4014,7 +4025,7 @@
     bar.innerHTML=`<div class="metro-reader-bar"><button type="button" class="metro-reader-back" id="metroReaderBack">← Metro</button>
       <span class="metro-reader-count">${idx>=0?`Moment ${idx+1} of ${available.length}`:'Cosmos moment'}<br>${escapeHtml(weekMetroDay.toLocaleDateString('en-US',{month:'short',day:'numeric'}))}</span>
       <nav class="metro-reader-nav" aria-label="Explore moments on this day"><button id="metroReaderPrev" aria-label="Previous moment" ${idx<=0?'disabled':''}>‹</button><button id="metroReaderNext" aria-label="Next moment" ${idx<0||idx===available.length-1?'disabled':''}>›</button></nav></div>`;
-    const back=()=>{closeSheet();weekMetroPopId=null;const peek=$('metroPopover');if(peek)peek.remove();};
+    const back=()=>{closeSheet();weekMetroPopId=null;const peek=$('metroPopover');if(peek)peek.remove();renderWeekMetro();};
     $('metroReaderBack').onclick=back;
     if($('closeCosmos'))$('closeCosmos').onclick=back;
     const prev=$('metroReaderPrev'),next=$('metroReaderNext');
@@ -4026,14 +4037,20 @@
   }
   async function openMetroExpandedByKey(key,cached=null){
     const record=weekMetroItems.find(i=>i.key===key);if(!record||record.locked)return;
-    if(!cached&&!record.is_author&&record.kind!=='text'){
-      openMomentTeaser(record.id,false);return;
-    }
+    // A deliberate tile tap IS the user's reveal/open action. Never show
+    // a separate teaser or an Expand prompt for available moments.
+    // The Worker still enforces all recipient, future, review and place locks.
     weekMetroPopId=null;$('metroPopover')?.remove();
     try{
       const r=cached||await api('/api/cosmos/'+encodeURIComponent(record.id)+'/open',{
         method:'POST',body:JSON.stringify(lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{})});
       if(!r?.item)return;
+      // Once a private 1:1 photo has explicitly been opened, the Worker
+      // permits its thumbnail. Add only this single verified media ID to the
+      // in-memory Metro model; never initiate background reveal requests.
+      if(r.item.content_kind==='photo' && r.item.media_id){
+        weekMetroItems.filter(i=>i.id===r.item.id&&!i.locked).forEach(i=>{i.media_id=r.item.media_id;});
+      }
       await renderCosmos(r.item,r.thread||[],r.additions||[],true);
       styleMetroFullReader(r.item);
     }catch(e){toastMsg(e.message,4500);}
@@ -4358,8 +4375,12 @@
     journeyStage.querySelectorAll('[data-metro-filter]').forEach(btn=>btn.onclick=()=>{metroViewFilter=btn.dataset.metroFilter;renderWeekMetro();});
     $('metroPeople')?.addEventListener('click',openFriends);
     $('metroRetry')?.addEventListener('click',()=>{weekMetroCacheKey='';fetchMetroWeek();renderWeekMetro();});
-    journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=()=>{
-      if(performance.now()>suppressStationClickUntil){metroClickFeedback(btn);openMetroBubble(btn.dataset.metroOpen,btn);}
+    journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=async()=>{
+      if(performance.now()<=suppressStationClickUntil||btn.disabled)return;
+      metroClickFeedback(btn);
+      btn.disabled=true;btn.classList.add('metro-opening');btn.setAttribute('aria-busy','true');
+      try{await openMetroBubble(btn.dataset.metroOpen,btn);}
+      finally{if(btn.isConnected){btn.disabled=false;btn.classList.remove('metro-opening');btn.removeAttribute('aria-busy');}}
     });
     populateMetroMedia();
     const scroller=$('metroDayScroll');
@@ -4440,10 +4461,13 @@
         const d=new Date(item.date),stamp=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         const title=metroCardTitle(item);
         const kind=String(item.kind||'text').toLowerCase();
-        // Only request thumbnails already authorized for the owner. Never
-        // load a recipient's sealed/unrevealed private media into the grid.
-        const img=!item.locked&&item.is_author&&kind==='photo'&&item.media_id
-          ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden>`:'';
+        // v2.9.4.9: show permissioned photo thumbnails from MY moments AND
+        // approved Connections moments. The Worker only supplies a media_id
+        // when that specific viewer may already access the photo. Direct
+        // personal surprises remain thumb-free until individually opened;
+        // future-sealed moments never contain media IDs.
+        const img=!item.locked&&kind==='photo'&&item.media_id
+          ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden loading="lazy" decoding="async">`:'';
         const icon=item.locked?'🔒':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯';
         const a11y=stamp+', '+(item.locked?'Sealed future moment':title)+', '+(item.locked?'sealed':metroCardType(item))+(item.is_author?', my moment':', shared moment');
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
@@ -4480,31 +4504,25 @@
   }
   async function openMetroBubble(key,button){
     const item=weekMetroItems.find(i=>i.key===key);if(!item)return;
-    if(weekMetroPopId===key){$('metroPopover')?.remove();weekMetroPopId=null;return;}
-    weekMetroPopId=key;
-    const preview=()=>showMetroPopover(`<div class="metro-peek-head"><strong class="metro-peek-name">${escapeHtml(metroTitleShort(item))}</strong>
-      <span class="metro-peek-meta">${escapeHtml(new Date(item.date).toLocaleString())}</span></div>
-      <div class="metro-peek-content"><span class="metro-peek-icon" aria-hidden="true">${item.locked?'🔒':'◯'}</span>
-      <span class="metro-peek-copy"><strong>${item.locked?'A surprise is waiting to reveal':'Opening moment…'}</strong></span></div>`,button);
-    preview();
+    weekMetroPopId=null;$('metroPopover')?.remove();
     if(item.locked){
-      const text=item.reveal_at?'It will reveal '+new Date(item.reveal_at).toLocaleString()+'.':'It will reveal only when its original conditions are met.';
-      showMetroPopover(`<strong class="metro-peek-name">🔒 Something is waiting for you</strong><p class="metro-pop-meta">${escapeHtml(text)}</p>`,button);
+      // Sealed future or location-locked moments stay sealed server-side.
+      // Show their locked state in the FULL reader, not a tiny popover.
+      const text=item.reveal_at
+        ? 'Available after '+new Date(item.reveal_at).toLocaleString()+'.'
+        : 'This moment is not available yet. Its contents remain private.';
+      openSheet(`<div class="cosmos-reveal-teaser cosmos-reveal-sheet">
+        <span class="cosmos-reveal-orb" aria-hidden="true">🔒</span>
+        <h2>A moment is waiting</h2><p>${escapeHtml(text)}</p>
+        <div class="actions"><button type="button" class="primary" id="metroLockedBack">← Back to Metro</button></div>
+      </div>`);
+      sheet.classList.add('metro-expanded');
+      $('metroLockedBack').onclick=()=>{closeSheet();renderWeekMetro();};
       return;
     }
-    // A recipient sees a sealed-style invitation first. No thumbnail is fetched
-    // and the original moment is not marked opened until Reveal is explicitly tapped.
-    if(!item.is_author){
-      showMetroPopover(`<div class="cosmos-reveal-teaser"><span class="cosmos-reveal-orb" aria-hidden="true">✧</span>
-        <strong>Your moment is ready</strong><p>Someone shared something with you. Its contents will appear only when you choose to reveal them.</p>
-        <button type="button" class="cosmos-reveal-action" id="metroRevealNow">✧ Reveal this moment →</button></div>`,button);
-      $('metroRevealNow').onclick=()=>{
-        const reveal=$('metroRevealNow');if(reveal){reveal.disabled=true;reveal.textContent='Opening your moment…';}
-        revealMetroBubble(key,button,true);
-      };
-      return;
-    }
-    await revealMetroBubble(key,button);
+    // One tap = one authorized /open request = full photo/video/music/text.
+    // No intermediate preview, Expand button, or extra reveal question.
+    await openMetroExpandedByKey(key);
   }
   async function revealMetroBubble(key,button,openFully=false){
     const item=weekMetroItems.find(i=>i.key===key);if(!item||item.locked)return;
