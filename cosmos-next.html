@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.5.0-precise-pin-nearby" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.5.1-directional-camera-hints" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1710,6 +1710,37 @@
     .cosmos-nearby-meta small{font-size:11px;color:#55708d}
     @media(max-width:375px){.cosmos-place-map{height:220px}
       #cosmosNearbyCamera{bottom:calc(env(safe-area-inset-bottom) + 103px);right:7px;padding:7px 9px}}
+    /* COSMOS v2.9.5.1 — opt-in COARSE camera direction HUD, not a spatial AR anchor.
+       Only appears on a functioning live camera, after a Nearby scan.
+       Keep the entire rest of the camera/timeline swipe surface available. */
+    .cosmos-direction-hud{position:absolute;z-index:12;top:calc(env(safe-area-inset-top) + 118px);
+      left:50%;transform:translateX(-50%);width:min(322px,calc(100% - 36px));pointer-events:none;
+      display:flex;flex-direction:column;align-items:center;gap:6px}
+    .app:not(.cosmos-camera-live) .cosmos-direction-hud,
+    .app.cosmos-white-mode .cosmos-direction-hud{display:none!important}
+    .cosmos-direction-row{display:flex;align-items:stretch;width:100%;gap:5px;
+      border-radius:20px;padding:5px;background:rgba(250,253,255,.86);
+      border:1px solid rgba(125,158,194,.58);box-shadow:0 6px 22px rgba(6,27,49,.20);
+      backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+    .cosmos-direction-row button{pointer-events:auto;border:0;background:none;color:#173d63;
+      min-height:46px;border-radius:14px;cursor:pointer}
+    .cosmos-direction-focus{flex:1;display:flex;gap:9px;align-items:center;text-align:left;
+      min-width:0;padding:5px 7px}
+    .cosmos-direction-arrow{font-size:28px;line-height:1;width:33px;text-align:center;flex-shrink:0}
+    .cosmos-direction-words{display:grid;min-width:0;gap:2px}
+    .cosmos-direction-words strong{font-size:12px;font-weight:850;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cosmos-direction-words small{font-size:10px;color:#4b6682;line-height:1.25}
+    #cosmosDirectionNext{padding:3px 8px;border-left:1px solid rgba(102,134,175,.25);
+      font-size:12px;min-width:50px;font-weight:800}
+    #cosmosDirectionCompass{pointer-events:auto;min-height:35px;padding:5px 13px;
+      background:rgba(251,253,255,.94);border:1px solid rgba(110,152,195,.55);
+      border-radius:999px;color:#184c78;font-size:11px;font-weight:800;
+      box-shadow:0 4px 14px rgba(6,27,49,.10)}
+    .cosmos-direction-row button:focus-visible,#cosmosDirectionCompass:focus-visible{
+      outline:3px solid #3687db;outline-offset:2px}
+    @media(max-width:380px){.cosmos-direction-hud{top:calc(env(safe-area-inset-top) + 113px);
+      width:calc(100% - 28px)}.cosmos-direction-words strong{font-size:11px}}
+    @media(prefers-reduced-motion:reduce){.cosmos-direction-hud{transition:none}}
   </style>
 </head>
 <body>
@@ -1729,6 +1760,17 @@
   </div>
   <div class="journey-stage" id="journeyStage" hidden></div>
   <button id="cosmosNearbyCamera" type="button" aria-label="Find authorized Cosmos moments near your camera">⌖ Nearby</button>
+  <div class="cosmos-direction-hud" id="cosmosDirectionHud" hidden aria-label="Nearby Cosmos direction guide">
+    <div class="cosmos-direction-row">
+      <button type="button" id="cosmosDirectionOpen" class="cosmos-direction-focus" aria-label="Open nearby Cosmos">
+        <span class="cosmos-direction-arrow" id="cosmosDirectionArrow" aria-hidden="true">⌖</span>
+        <span class="cosmos-direction-words"><strong id="cosmosDirectionTitle">A Cosmos nearby</strong>
+          <small id="cosmosDirectionStatus">Compass direction is approximate</small></span>
+      </button>
+      <button type="button" id="cosmosDirectionNext" aria-label="Next nearby Cosmos">1/1 ❯</button>
+    </div>
+    <button type="button" id="cosmosDirectionCompass" hidden>Enable compass</button>
+  </div>
   <div class="journey-lane" id="journeyGuide" aria-hidden="true"></div>
   <div class="camera-swipe-guide" aria-hidden="true"><div class="guide-edge"><span>→</span>PAST</div><div class="guide-edge"><span>←</span>FUTURE</div></div>
 
@@ -2197,6 +2239,7 @@
   }
   function stopAmbientCameraForWhite(){
     preferWhiteMetro=true;
+    stopCompassTracking(); // White means neither video nor orientation scanning.
     clearAmbientCamera(); // ALL tracks stopped, not merely CSS-hidden.
     cameraFallback.hidden=true;
     updateMetroCameraState();
@@ -2346,6 +2389,7 @@
       const facing=fresh.getVideoTracks()[0]?.getSettings?.()?.facingMode;
       if(facing==='user'||facing==='environment')preferredCameraFacing=facing;
       updateMetroCameraState();
+      startCompassTracking(); // Only if Nearby was previously enabled by the person.
       return true;
     }catch(e){
       if(seq!==cameraSeq)return false;
@@ -4896,7 +4940,127 @@
   // The user must tap Nearby to grant location access; never geolocate on
   // camera start. No public feed, coordinates, sealed content, or GPS tracking.
   let cameraNearbyOptIn=false,cameraNearbyLoading=false,cameraNearbyUpdated=0,cameraNearbyItems=[];
+  let cameraNearbyAccuracy=null;
+  let directionalSelectedId='',compassHeading=null,compassLastAt=0,compassAttached=false;
+  let compassPermission='prompt',lastHudPaint=0;
   const nearbyButton=$('cosmosNearbyCamera');
+  const directionHud=$('cosmosDirectionHud');
+  // Bearing supplied by Worker is deliberately limited to 8 sectors, or null
+  // for a pin very close to the person's approximate position.
+  const normalizeAngle=n=>(n%360+360)%360;
+  const sectorNames=['N','NE','E','SE','S','SW','W','NW'];
+  function bearingHint(value){
+    if(typeof value!=='number'||!Number.isInteger(value)||value<0||value>=360||value%45!==0)return null;
+    return value;
+  }
+  function relativeDirection(bearing,heading){
+    const delta=normalizeAngle(bearing-heading+180)-180;
+    if(Math.abs(delta)<=26)return {glyph:'◎',cue:'Ahead · point your camera here'};
+    if(Math.abs(delta)>=152)return {glyph:'↶',cue:'Behind you · turn around'};
+    if(delta>0)return {glyph:'↗',cue:delta>85?'Turn right':'Slightly right'};
+    return {glyph:'↖',cue:delta< -85?'Turn left':'Slightly left'};
+  }
+  function updateDirectionalHud(){
+    const ready=cameraNearbyOptIn&&cameraNearbyItems.length&&
+      app.classList.contains('cosmos-camera-live')&&!preferWhiteMetro&&
+      !document.hidden&&auth.hidden;
+    directionHud.hidden=!ready;
+    if(!ready)return;
+    let idx=cameraNearbyItems.findIndex(x=>x.id===directionalSelectedId);
+    if(idx<0)idx=0;
+    const item=cameraNearbyItems[idx];directionalSelectedId=item.id;
+    const bearing=bearingHint(item.bearing_deg);
+    const validHeading=Number.isFinite(compassHeading)&&Date.now()-compassLastAt<9000;
+    let glyph='⌖',cue='Nearby · tap to open';
+    if(Number.isFinite(cameraNearbyAccuracy)&&cameraNearbyAccuracy>120){
+      glyph='⌖';cue='Location ±'+Math.round(cameraNearbyAccuracy)+' m · direction uncertain';
+    }else if(item.at_place){glyph='◎';cue='Very close to the selected pin';}
+    else if(bearing!==null){
+      if(validHeading){const r=relativeDirection(bearing,compassHeading);glyph=r.glyph;cue=r.cue;}
+      else{glyph='◇';cue='Toward '+sectorNames[bearing/45]+' · approximate';}
+    }
+    $('cosmosDirectionArrow').textContent=glyph;
+    $('cosmosDirectionTitle').textContent=item.label||'Nearby Cosmos';
+    $('cosmosDirectionStatus').textContent=cue+(validHeading?' · compass estimate':'');
+    $('cosmosDirectionOpen').setAttribute('aria-label','Open '+(item.label||'nearby Cosmos')+'. '+cue);
+    $('cosmosDirectionNext').textContent=(idx+1)+'/'+cameraNearbyItems.length+' ❯';
+    $('cosmosDirectionNext').hidden=cameraNearbyItems.length<2;
+    // iOS requires a direct user tap to request motion permission.
+    $('cosmosDirectionCompass').hidden=validHeading||
+      !('DeviceOrientationEvent' in window)||compassPermission==='denied';
+    $('cosmosDirectionCompass').textContent=compassPermission==='granted'?'Waiting for compass…':'Enable compass';
+    $('cosmosDirectionCompass').disabled=compassPermission==='granted';
+  }
+  function onCosmosOrientation(e){
+    if(!cameraNearbyOptIn||preferWhiteMetro||document.hidden||!app.classList.contains('cosmos-camera-live'))return;
+    let heading=null;
+    // iOS WebKit gives a magnetic/true-ish top-of-device heading directly.
+    if(Number.isFinite(e.webkitCompassHeading) &&
+        (!Number.isFinite(e.webkitCompassAccuracy)||e.webkitCompassAccuracy<=60)){
+      heading=normalizeAngle(e.webkitCompassHeading);
+    }else if(e.absolute===true&&Number.isFinite(e.alpha)){
+      // Absolute orientation fallback; not guaranteed on every Android/browser.
+      heading=normalizeAngle(360-e.alpha);
+    }
+    if(heading===null)return;
+    const old=compassHeading;
+    compassHeading=old===null?heading:normalizeAngle(old+(
+      normalizeAngle(heading-old+180)-180)*.24);
+    compassLastAt=Date.now();
+    if(compassLastAt-lastHudPaint>160){lastHudPaint=compassLastAt;updateDirectionalHud();}
+  }
+  function stopCompassTracking(){
+    if(compassAttached){
+      window.removeEventListener('deviceorientation',onCosmosOrientation);
+      window.removeEventListener('deviceorientationabsolute',onCosmosOrientation);
+      compassAttached=false;
+    }
+    compassHeading=null;compassLastAt=0;
+    updateDirectionalHud();
+  }
+  function startCompassTracking(){
+    if(!cameraNearbyOptIn||preferWhiteMetro||document.hidden||
+       !app.classList.contains('cosmos-camera-live')||!('DeviceOrientationEvent' in window))return;
+    // No implicit permission prompt: iOS needs the separate Enable compass tap.
+    if(typeof DeviceOrientationEvent.requestPermission==='function'&&compassPermission!=='granted')return;
+    if(!compassAttached){
+      window.addEventListener('deviceorientation',onCosmosOrientation,{passive:true});
+      window.addEventListener('deviceorientationabsolute',onCosmosOrientation,{passive:true});
+      compassAttached=true;
+    }
+    updateDirectionalHud();
+  }
+  async function enableCosmosCompass(){
+    // Called directly from a tap. requestPermission happens BEFORE any await.
+    try{
+      if(!('DeviceOrientationEvent' in window))throw new Error('This device has no web compass.');
+      const permission=typeof DeviceOrientationEvent.requestPermission==='function'?
+        await DeviceOrientationEvent.requestPermission():'granted';
+      compassPermission=permission==='granted'?'granted':'denied';
+      if(compassPermission!=='granted')throw new Error('Motion & Orientation permission was not granted.');
+      startCompassTracking();updateDirectionalHud();
+      toastMsg('Move your phone slowly to calibrate its compass.',3500);
+    }catch(e){
+      if(compassPermission==='denied')toastMsg('Compass permission is off. Nearby still works without it.',4200);
+      else toastMsg(e.message||'Compass unavailable on this device.',4200);
+      updateDirectionalHud();
+    }
+  }
+  $('cosmosDirectionCompass').onclick=enableCosmosCompass;
+  $('cosmosDirectionNext').onclick=()=>{
+    if(!cameraNearbyItems.length)return;
+    const idx=cameraNearbyItems.findIndex(x=>x.id===directionalSelectedId);
+    directionalSelectedId=cameraNearbyItems[(idx+1)%cameraNearbyItems.length].id;
+    updateDirectionalHud();
+  };
+  $('cosmosDirectionOpen').onclick=async()=>{
+    const item=cameraNearbyItems.find(x=>x.id===directionalSelectedId);
+    if(item)await openCosmos(item.id); // Server independently checks membership and place lock.
+  };
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)stopCompassTracking();else startCompassTracking();
+  });
+  window.addEventListener('pagehide',stopCompassTracking);
   function updateNearbyCameraBadge(){
     const count=cameraNearbyItems.length;
     nearbyButton.textContent=cameraNearbyOptIn?(count?`⌖ ${count} nearby`:'⌖ Nearby · 0'):'⌖ Nearby';
@@ -4910,28 +5074,35 @@
       const loc=await getLocation(); // GPS/OS estimate, never a precise AR anchor
       if(!cameraNearbyOptIn||preferWhiteMetro||document.hidden)return;
       lastScanLoc=loc;
+      cameraNearbyAccuracy=Number.isFinite(loc.accuracy)?Math.max(0,Math.min(10000,loc.accuracy)):null;
       const params=new URLSearchParams({lat:String(loc.lat),lng:String(loc.lng)});
       const r=await api('/api/cosmos/connections?'+params.toString());
       if(!cameraNearbyOptIn||preferWhiteMetro)return;
-      const all=[...(r.nearby||[]).map(x=>({id:x.id,kind:x.content_kind||'text',label:x.sender_name?'From '+x.sender_name:'Private Cosmos',type:'private'})),
-        ...(r.memories||[]).map(x=>({id:x.id,kind:x.kind||'text',label:'Your Cosmos',type:'mine'})),
-        ...(r.nearby_circle||[]).map(x=>({id:x.id,kind:x.kind||'text',label:x.label||'Connections Cosmos',type:'connections'}))];
+      const all=[...(r.nearby||[]).map(x=>({id:x.id,kind:x.content_kind||'text',label:x.sender_name?'From '+x.sender_name:'Private Cosmos',type:'private',bearing_deg:x.bearing_deg,at_place:x.at_place===true})),
+        ...(r.memories||[]).map(x=>({id:x.id,kind:x.kind||'text',label:'Your Cosmos',type:'mine',bearing_deg:x.bearing_deg,at_place:x.at_place===true})),
+        ...(r.nearby_circle||[]).map(x=>({id:x.id,kind:x.kind||'text',label:x.label||'Connections Cosmos',type:'connections',bearing_deg:x.bearing_deg,at_place:x.at_place===true}))];
       cameraNearbyItems=[...new Map(all.filter(x=>/^[\w-]{1,80}$/.test(String(x.id))).map(x=>[x.id,x])).values()].slice(0,25);
       cameraNearbyUpdated=Date.now();updateNearbyCameraBadge();
+      startCompassTracking();updateDirectionalHud();
     }catch(e){cameraNearbyUpdated=0;throw e;}
     finally{cameraNearbyLoading=false;}
   }
   function showCameraNearby(){
     const icons={photo:'▧',video:'▶',voice:'🎙',music:'♫',text:'▤',link:'↗',location:'⌖'};
-    openSheet(`<h2>Cosmoses near this place</h2><p>Only moments you are allowed to see within approximately 180 meters appear here. They are location discoveries, not yet AR-anchored writing.</p>
+    openSheet(`<h2>Cosmoses near this place</h2><p>These are authorized moments within approximately 180 meters. When your compass is enabled, a guide in the live camera can suggest which way to turn. This is not exact AR anchoring.</p>
       <div class="cosmos-nearby-list">${cameraNearbyItems.length?cameraNearbyItems.map(x=>
-        `<button class="cosmos-nearby-item" type="button" data-nearby-open="${escapeHtml(x.id)}"><span class="cosmos-nearby-icon">${icons[x.kind]||'◯'}</span><span class="cosmos-nearby-meta"><strong>${escapeHtml(x.label)}</strong><small>${escapeHtml(x.type)} · ${escapeHtml(x.kind)} · Tap to open</small></span><span aria-hidden="true">→</span></button>`).join(''):
+        `<button class="cosmos-nearby-item" type="button" data-nearby-open="${escapeHtml(x.id)}"><span class="cosmos-nearby-icon">${icons[x.kind]||'◯'}</span><span class="cosmos-nearby-meta"><strong>${escapeHtml(x.label)}</strong><small>${escapeHtml(x.type)} · ${escapeHtml(x.kind)} · ${x.at_place?'At this place':bearingHint(x.bearing_deg)!==null?'Toward '+sectorNames[x.bearing_deg/45]:'Direction unknown'} · Tap to open</small></span><span aria-hidden="true">→</span></button>`).join(''):
         '<div class="moment-status">No eligible Cosmos moments were found nearby. Your location may be approximate.</div>'}</div>
       <div class="actions"><button type="button" id="cameraNearbyClose">Close</button><button class="primary" type="button" id="cameraNearbyRefresh">Refresh here</button></div>
+      <div class="actions"><button type="button" id="cameraNearbyCompass">Enable camera compass</button></div>
       <div class="actions"><button type="button" id="cameraNearbyOff">Turn nearby scanning off</button></div>
-      <div class="micro">Public discovery is disabled during the private beta. Nearby checks run only while Camera is live, COSMOS is open, and you've turned this feature on. Location accuracy and browser-reported position are not tamper-proof.</div>`);
+      <div class="micro">Compass guidance is approximate and may drift. Location estimates and directions do not guarantee the moment is in the camera frame. Public discovery is disabled during the private beta. Nearby checks run only while Camera is live, COSMOS is open, and you've turned this feature on. Location accuracy and browser-reported position are not tamper-proof.</div>`);
     $('cameraNearbyClose').onclick=closeSheet;
-    $('cameraNearbyOff').onclick=()=>{cameraNearbyOptIn=false;cameraNearbyItems=[];cameraNearbyUpdated=0;updateNearbyCameraBadge();closeSheet();toastMsg('Nearby scanning off.');};
+    $('cameraNearbyCompass').onclick=enableCosmosCompass;
+    $('cameraNearbyOff').onclick=()=>{
+      cameraNearbyOptIn=false;cameraNearbyItems=[];directionalSelectedId='';cameraNearbyUpdated=0;cameraNearbyAccuracy=null;
+      stopCompassTracking();updateNearbyCameraBadge();closeSheet();toastMsg('Nearby scanning off.');
+    };
     $('cameraNearbyRefresh').onclick=async()=>{
       $('cameraNearbyRefresh').disabled=true;
       // Let explicit refresh work while the nearby sheet is shown.
@@ -4954,6 +5125,7 @@
     }else{showCameraNearby();}
   };
   updateNearbyCameraBadge();
+  updateDirectionalHud();
   setInterval(()=>{
     if(cameraNearbyOptIn && !document.hidden && sheet.hidden && panel.hidden && auth.hidden && !preferWhiteMetro){
       fetchCameraNearby(false).catch(()=>{});
