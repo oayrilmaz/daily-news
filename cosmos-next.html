@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.4.6-camera-cycle-white" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.5.0-precise-pin-nearby" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1681,6 +1681,35 @@
       }
       .app.metro-live .living-entry{height:54px!important;min-height:54px!important}
     }
+
+    /* COSMOS v2.9.5.0 — pin confirmation and opt-in camera nearby discovery. */
+    .cosmos-place-map{position:relative;z-index:0;height:260px;width:100%;margin:11px 0;
+      border-radius:17px;overflow:hidden;border:1px solid rgba(72,105,154,.35);background:#e8f0f6}
+    .cosmos-place-map .leaflet-container{font:inherit}
+    .cosmos-place-location{font-size:12px;line-height:1.5;color:#435d7b}
+    .cosmos-place-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:10px 0}
+    .cosmos-place-grid label{font-size:11px;color:#3c587c;font-weight:700}
+    .cosmos-place-grid input{display:block;width:100%;font-size:14px;padding:10px 8px;margin-top:4px;
+      border:1px solid #b5c9e0;border-radius:11px;background:#fff;color:#123451}
+    .cosmos-place-hint{font-size:11px;color:#506885;line-height:1.45;margin:7px 0}
+    .cosmos-place-map-fallback{height:100%;display:grid;place-content:center;text-align:center;
+      padding:12px;color:#4b6888;font-size:13px}
+    #cosmosNearbyCamera{position:absolute;z-index:11;right:12px;bottom:calc(env(safe-area-inset-bottom) + 112px);
+      min-height:39px;max-width:155px;padding:8px 12px;border-radius:999px;border:1px solid #b9cde2;
+      color:#173f69;background:rgba(250,253,255,.92);box-shadow:0 5px 18px rgba(20,47,77,.18);
+      font-size:11px;font-weight:800;backdrop-filter:blur(16px);display:none;pointer-events:auto}
+    .app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) #cosmosNearbyCamera{display:block}
+    #cosmosNearbyCamera:focus-visible{outline:3px solid #277cc3;outline-offset:2px}
+    .cosmos-nearby-list{display:grid;gap:8px;margin:14px 0}
+    .cosmos-nearby-item{display:flex;align-items:center;gap:12px;text-align:left;padding:12px;
+      width:100%;min-height:58px;border:1px solid #cbd9e8;border-radius:13px;
+      background:rgba(248,251,255,.96);color:#12395d}
+    .cosmos-nearby-icon{font-size:20px;width:27px;flex-shrink:0}
+    .cosmos-nearby-meta{display:grid;gap:3px;flex:1;min-width:0}
+    .cosmos-nearby-meta strong{font-size:13px}
+    .cosmos-nearby-meta small{font-size:11px;color:#55708d}
+    @media(max-width:375px){.cosmos-place-map{height:220px}
+      #cosmosNearbyCamera{bottom:calc(env(safe-area-inset-bottom) + 103px);right:7px;padding:7px 9px}}
   </style>
 </head>
 <body>
@@ -1699,6 +1728,7 @@
     <button class="jump" id="jumpDate" type="button" aria-label="Jump to a date">▦</button>
   </div>
   <div class="journey-stage" id="journeyStage" hidden></div>
+  <button id="cosmosNearbyCamera" type="button" aria-label="Find authorized Cosmos moments near your camera">⌖ Nearby</button>
   <div class="journey-lane" id="journeyGuide" aria-hidden="true"></div>
   <div class="camera-swipe-guide" aria-hidden="true"><div class="guide-edge"><span>→</span>PAST</div><div class="guide-edge"><span>←</span>FUTURE</div></div>
 
@@ -1879,8 +1909,8 @@
       startCamera(false).catch(()=>{});
     }
   }
-  function closeSheet(){stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
+  function closeSheet(){disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){disposePlaceMap();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -2350,10 +2380,19 @@
   window.addEventListener('resize',orientCamera);
 
   function getLocation(){
-    return new Promise((resolve,reject)=>{
-      if(!navigator.geolocation) return reject(new Error("Location is unavailable in this browser."));
-      navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy}),e=>reject(new Error("Location permission is needed for a Cosmos that belongs here.")),{enableHighAccuracy:true,timeout:10000,maximumAge:15000});
-    });
+    if(!navigator.geolocation)return Promise.reject(new Error('Location is not available in this browser.'));
+    const attempt=opts=>new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(
+      p=>resolve({lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy}),reject,opts));
+    const errorMessage=e=>e?.code===1?'Allow Location in your browser and device settings.':
+      e?.code===2?'Your device cannot determine its location right now.':
+      e?.code===3?'Location detection timed out. Try again or move the pin manually.':
+      'Location unavailable. Choose the location manually.';
+    return attempt({enableHighAccuracy:true,timeout:14000,maximumAge:10000})
+      .catch(async e=>{
+        if(e?.code===1)throw new Error(errorMessage(e));
+        try{return await attempt({enableHighAccuracy:false,timeout:16000,maximumAge:30000});}
+        catch(second){throw new Error(errorMessage(second));}
+      });
   }
 
   async function scanHere(showErrors=true){
@@ -3605,29 +3644,97 @@
   }
 
 
+  // Maps load only after the author opens a place flow. No location or map
+  // traffic is requested while the user is simply browsing Cosmos.
+  let placeMap=null,placeMarker=null,placeMapLoad=null,placeMapGeneration=0;
+  function disposePlaceMap(){
+    placeMapGeneration++;
+    if(placeMap){try{placeMap.remove();}catch(_){}}
+    placeMap=null;placeMarker=null;
+  }
+  function loadPlaceMapLibrary(){
+    if(window.L)return Promise.resolve(window.L);
+    if(placeMapLoad)return placeMapLoad;
+    placeMapLoad=new Promise((resolve,reject)=>{
+      if(!document.getElementById('cosmosLeafletCss')){
+        const css=document.createElement('link');css.id='cosmosLeafletCss';css.rel='stylesheet';
+        css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+      }
+      const js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      js.async=true;js.referrerPolicy='no-referrer';js.onload=()=>window.L?resolve(window.L):reject(new Error('Map library did not start.'));
+      js.onerror=()=>reject(new Error('Map did not load. Check your connection; coordinates can still be entered manually.'));
+      document.head.appendChild(js);
+    }).catch(e=>{placeMapLoad=null;throw e;});
+    return placeMapLoad;
+  }
   function showPlaceStep(){
     if(!compose)return;
-    openSheet(`<h2>Leave this at a place</h2><p>Use your phone's current location to anchor your moment here. The recipient will only discover it within approximately 180 meters of this spot.</p>
+    // Preserve existing author-confirmed choice when navigating Back/Forward.
+    const valid=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180;
+    let candidate=valid(compose.lat,compose.lng)?{lat:compose.lat,lng:compose.lng}:null;
+    let accuracy=null;
+    openSheet(`<h2>Drop a Cosmos at a place</h2><p>Detect your approximate location, then drag the pin or tap the map to choose the exact drop point. The recipient can discover this moment within approximately 180 meters.</p>
       <div class="moment-status"><b>For:</b> ${escapeHtml(compose.recipient_label||'Your Cosmos')}<br><button type="button" id="placeChangePerson">Change recipient</button></div>
-      <div id="placeFeedback" class="moment-status" role="status">Location has not been selected. Tap below to request permission.</div>
-      <div class="actions"><button type="button" id="placeBack">Back</button><button type="button" class="primary" id="placeCheck">Find this place</button></div>
-      <div class="actions"><button type="button" id="placeConfirm" class="primary" disabled>Use this location →</button></div>
-      <div class="micro">Requires location permission in Safari. Your exact coordinates are not displayed to other connections. The current web version finds nearby messages only when opened.</div>`);
+      <div id="placeFeedback" class="moment-status" role="status">${candidate?'Previously selected point. Adjust or confirm below.':'No location selected yet. Location access is optional.'}</div>
+      <div class="actions"><button type="button" id="placeBack">Back</button><button type="button" class="primary" id="placeCheck">⌖ Detect my location</button></div>
+      <div class="cosmos-place-map" id="cosmosPinMap" role="region" aria-label="Interactive location map">
+        <div class="cosmos-place-map-fallback">${candidate?'Loading the map…':'Detect your location or enter coordinates to begin.'}</div></div>
+      <div class="cosmos-place-grid"><label>Latitude<input type="number" id="cosmosPinLat" step="any" min="-90" max="90" inputmode="decimal" placeholder="Latitude" value="${candidate?candidate.lat.toFixed(6):''}"></label>
+      <label>Longitude<input type="number" id="cosmosPinLng" step="any" min="-180" max="180" inputmode="decimal" placeholder="Longitude" value="${candidate?candidate.lng.toFixed(6):''}"></label></div>
+      <div class="actions"><button id="cosmosPinApply" type="button">Show these coordinates on map</button></div>
+      <div class="cosmos-place-hint" id="cosmosPinHint">Drag the marker or tap the map to adjust it. A laptop's Wi-Fi location may be approximate. Map tiles are supplied by OpenStreetMap contributors.</div>
+      <div class="actions"><button type="button" id="placeConfirm" class="primary" ${candidate?'':'disabled'}>Confirm this pin →</button></div>
+      <div class="micro">COSMOS shares no place until you confirm and post. The selected coordinates are stored with your moment, but the precise pin is not shown to other connections. Place access uses approximate device location, which is not a secure proof of physical presence.</div>`);
+    const setCandidate=(lat,lng,accuracyM=null,fromMap=false)=>{
+      if(!valid(lat,lng))return;
+      candidate={lat,lng};accuracy=accuracyM;
+      $('cosmosPinLat').value=lat.toFixed(6);$('cosmosPinLng').value=lng.toFixed(6);
+      $('placeConfirm').disabled=false;
+      $('placeFeedback').textContent=accuracyM==null?'Pin selected · verify the location before sharing.':
+        `Estimated location · accuracy about ${Math.round(accuracyM)} m. Move the pin for better placement.`;
+      if(placeMap && !fromMap){placeMarker.setLatLng([lat,lng]);placeMap.setView([lat,lng],Math.max(placeMap.getZoom(),16));}
+    };
+    const drawMap=async(lat,lng)=>{
+      const host=$('cosmosPinMap');if(!host)return;
+      const g=placeMapGeneration;
+      try{
+        const L=await loadPlaceMapLibrary();
+        if(g!==placeMapGeneration || host!==$('cosmosPinMap') || sheet.hidden)return;
+        if(placeMap){placeMarker.setLatLng([lat,lng]);placeMap.setView([lat,lng],Math.max(placeMap.getZoom(),16));return;}
+        host.innerHTML='';
+        placeMap=L.map(host,{zoomControl:true,scrollWheelZoom:false}).setView([lat,lng],17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+          attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>',maxZoom:19
+        }).addTo(placeMap);
+        placeMarker=L.marker([lat,lng],{draggable:true,autoPan:true,title:'Drag to position your Cosmos'}).addTo(placeMap);
+        placeMarker.on('dragend',()=>{const p=placeMarker.getLatLng();setCandidate(p.lat,p.lng,null,true);});
+        placeMap.on('click',event=>{placeMarker.setLatLng(event.latlng);setCandidate(event.latlng.lat,event.latlng.lng,null,true);});
+        setTimeout(()=>{if(g===placeMapGeneration)placeMap?.invalidateSize();},150);
+      }catch(e){if(g!==placeMapGeneration)return;
+        host.innerHTML=`<div class="cosmos-place-map-fallback">Map unavailable. You can still enter or paste coordinates below.</div>`;
+        $('cosmosPinHint').textContent=e.message;
+      }
+    };
     $('placeBack').onclick=showWhenStep;
     $('placeChangePerson').onclick=showRecipientStep;
     $('placeCheck').onclick=async()=>{
-      const button=$('placeCheck'),feedback=$('placeFeedback');button.disabled=true;feedback.textContent='Finding your current location… Please allow location access if Safari asks.';
-      try{
-        const loc=await getLocation();
-        compose.lat=loc.lat;compose.lng=loc.lng;
-        feedback.textContent=`Location ready · Accuracy about ${Math.round(loc.accuracy||0)} m. You can leave this moment here.`;
-        $('placeConfirm').disabled=false;
-      }catch(e){feedback.innerHTML=`Could not obtain your location. Check Safari → Website Settings → Location → Allow, then retry. <br>${escapeHtml(e.message)}`;}
+      const button=$('placeCheck'),feedback=$('placeFeedback');button.disabled=true;feedback.textContent='Finding your approximate location…';
+      try{const loc=await getLocation();if(!$('cosmosPinLat'))return;
+        setCandidate(loc.lat,loc.lng,loc.accuracy);drawMap(loc.lat,loc.lng);
+      }catch(e){if($('placeFeedback'))$('placeFeedback').textContent=e.message+' You can also place a pin with coordinates.';}
       finally{if($('placeCheck'))$('placeCheck').disabled=false;}
     };
-    $('placeConfirm').onclick=()=>{
-      if(!Number.isFinite(compose.lat)||!Number.isFinite(compose.lng))return toastMsg('Find the location first.');showFinalStep();
+    $('cosmosPinApply').onclick=()=>{
+      const lat=Number($('cosmosPinLat').value),lng=Number($('cosmosPinLng').value);
+      if(!$('cosmosPinLat').value.trim()||!$('cosmosPinLng').value.trim()||!valid(lat,lng))return toastMsg('Enter a valid latitude and longitude.');
+      setCandidate(lat,lng);drawMap(lat,lng);
     };
+    $('placeConfirm').onclick=()=>{
+      if(!candidate)return toastMsg('Place the pin first.');
+      compose.lat=Number(candidate.lat.toFixed(6));compose.lng=Number(candidate.lng.toFixed(6));
+      showFinalStep();
+    };
+    if(candidate)drawMap(candidate.lat,candidate.lng);
   }
 
   function showDateStep(){
@@ -3702,7 +3809,7 @@
     const who=compose.circle_audience==='connections' && compose.recipient_mode==='self'?'My Connections':compose.recipient_mode==='self'?'Future you':compose.recipient_label||'Someone';
     const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString()+" · sealed until reveal":"Now · opens when tapped";
     const sharing=compose.circle_audience==='connections'?'Connections (owner-controlled)':compose.circle_audience==='between_us'?'Only us':'Private';
-    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} Your location is not shared with others by this action.</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} ${compose.unlock_mode==='here'?'This Cosmos is anchored to the selected pin. The exact coordinates stay hidden from recipients, who can discover the moment when nearby.':'No location is attached to this moment.'}</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
     sheet.classList.add('liquid-compact-step');
     $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
   }
@@ -4785,6 +4892,73 @@
       }
     }catch(e){if(showErrors)toastMsg(e.message,3500);}
   }
+  // v2.9.5.0 — Nearby Cosmos, PRIVATE FAMILY BETA ONLY.
+  // The user must tap Nearby to grant location access; never geolocate on
+  // camera start. No public feed, coordinates, sealed content, or GPS tracking.
+  let cameraNearbyOptIn=false,cameraNearbyLoading=false,cameraNearbyUpdated=0,cameraNearbyItems=[];
+  const nearbyButton=$('cosmosNearbyCamera');
+  function updateNearbyCameraBadge(){
+    const count=cameraNearbyItems.length;
+    nearbyButton.textContent=cameraNearbyOptIn?(count?`⌖ ${count} nearby`:'⌖ Nearby · 0'):'⌖ Nearby';
+    nearbyButton.setAttribute('aria-label',cameraNearbyOptIn?`${count} authorized moments nearby. View or refresh.`:'Check for private or Connections Cosmos moments nearby');
+  }
+  async function fetchCameraNearby(force=false){
+    if(!cameraNearbyOptIn||!token||!me||document.hidden||!app.classList.contains('cosmos-camera-live')||preferWhiteMetro||cameraNearbyLoading)return;
+    if(!force && Date.now()-cameraNearbyUpdated<60000)return;
+    cameraNearbyLoading=true;
+    try{
+      const loc=await getLocation(); // GPS/OS estimate, never a precise AR anchor
+      if(!cameraNearbyOptIn||preferWhiteMetro||document.hidden)return;
+      lastScanLoc=loc;
+      const params=new URLSearchParams({lat:String(loc.lat),lng:String(loc.lng)});
+      const r=await api('/api/cosmos/connections?'+params.toString());
+      if(!cameraNearbyOptIn||preferWhiteMetro)return;
+      const all=[...(r.nearby||[]).map(x=>({id:x.id,kind:x.content_kind||'text',label:x.sender_name?'From '+x.sender_name:'Private Cosmos',type:'private'})),
+        ...(r.memories||[]).map(x=>({id:x.id,kind:x.kind||'text',label:'Your Cosmos',type:'mine'})),
+        ...(r.nearby_circle||[]).map(x=>({id:x.id,kind:x.kind||'text',label:x.label||'Connections Cosmos',type:'connections'}))];
+      cameraNearbyItems=[...new Map(all.filter(x=>/^[\w-]{1,80}$/.test(String(x.id))).map(x=>[x.id,x])).values()].slice(0,25);
+      cameraNearbyUpdated=Date.now();updateNearbyCameraBadge();
+    }catch(e){cameraNearbyUpdated=0;throw e;}
+    finally{cameraNearbyLoading=false;}
+  }
+  function showCameraNearby(){
+    const icons={photo:'▧',video:'▶',voice:'🎙',music:'♫',text:'▤',link:'↗',location:'⌖'};
+    openSheet(`<h2>Cosmoses near this place</h2><p>Only moments you are allowed to see within approximately 180 meters appear here. They are location discoveries, not yet AR-anchored writing.</p>
+      <div class="cosmos-nearby-list">${cameraNearbyItems.length?cameraNearbyItems.map(x=>
+        `<button class="cosmos-nearby-item" type="button" data-nearby-open="${escapeHtml(x.id)}"><span class="cosmos-nearby-icon">${icons[x.kind]||'◯'}</span><span class="cosmos-nearby-meta"><strong>${escapeHtml(x.label)}</strong><small>${escapeHtml(x.type)} · ${escapeHtml(x.kind)} · Tap to open</small></span><span aria-hidden="true">→</span></button>`).join(''):
+        '<div class="moment-status">No eligible Cosmos moments were found nearby. Your location may be approximate.</div>'}</div>
+      <div class="actions"><button type="button" id="cameraNearbyClose">Close</button><button class="primary" type="button" id="cameraNearbyRefresh">Refresh here</button></div>
+      <div class="actions"><button type="button" id="cameraNearbyOff">Turn nearby scanning off</button></div>
+      <div class="micro">Public discovery is disabled during the private beta. Nearby checks run only while Camera is live, COSMOS is open, and you've turned this feature on. Location accuracy and browser-reported position are not tamper-proof.</div>`);
+    $('cameraNearbyClose').onclick=closeSheet;
+    $('cameraNearbyOff').onclick=()=>{cameraNearbyOptIn=false;cameraNearbyItems=[];cameraNearbyUpdated=0;updateNearbyCameraBadge();closeSheet();toastMsg('Nearby scanning off.');};
+    $('cameraNearbyRefresh').onclick=async()=>{
+      $('cameraNearbyRefresh').disabled=true;
+      // Let explicit refresh work while the nearby sheet is shown.
+      closeSheet();
+      try{await fetchCameraNearby(true);showCameraNearby();}catch(e){toastMsg(e.message,4500);showCameraNearby();}
+    };
+    sheet.querySelectorAll('[data-nearby-open]').forEach(b=>b.onclick=async()=>{
+      const id=b.dataset.nearbyOpen;
+      // /open checks ownership, accepted connections, review, blocking and
+      // actual position before returning any moment contents.
+      await openCosmos(id);
+    });
+  }
+  nearbyButton.onclick=async()=>{
+    if(!cameraNearbyOptIn){
+      cameraNearbyOptIn=true;
+      nearbyButton.textContent='⌖ Checking…';
+      try{await fetchCameraNearby(true);showCameraNearby();}
+      catch(e){cameraNearbyOptIn=false;cameraNearbyItems=[];updateNearbyCameraBadge();toastMsg(e.message,5500);}
+    }else{showCameraNearby();}
+  };
+  updateNearbyCameraBadge();
+  setInterval(()=>{
+    if(cameraNearbyOptIn && !document.hidden && sheet.hidden && panel.hidden && auth.hidden && !preferWhiteMetro){
+      fetchCameraNearby(false).catch(()=>{});
+    }
+  },90000);
   async function periodicNearby(){
     if(!noticesEnabled||!token||document.hidden||!sheet.hidden||!panel.hidden||!auth.hidden)return;
     if(Date.now()-lastConnectionPoll<85000)return;
