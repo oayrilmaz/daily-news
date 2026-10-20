@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow,noarchive">
-<meta name="referrer" content="same-origin">
+<!-- YouTube IFrame API requires HTTP Referer / client identification.
+     same-origin suppresses cross-origin referrers and can cause error 153.
+     Share only the site origin with YouTube; do not disclose room IDs/tokens. -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>COSMOS — Together Lab (Private)</title>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:#f7faff;color:#18324e;--blue:#2566ac;--edge:#dce6f0;--muted:#5d7087}
@@ -29,7 +32,7 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 .participants{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.person{padding:10px 13px;border-radius:999px;border:1px solid #d0e0ef;background:#fff;font-size:13px}
 .dot{width:8px;height:8px;background:#9aafbe;border-radius:50%;display:inline-block;margin-right:6px}.dot.on{background:#24a778}
 
-/* v0.4 — official, visible YouTube IFrame Player; not an audio-only stream. */
+/* v0.4.1 — official, visible YouTube IFrame Player; not an audio-only stream. */
 .watch-card{margin-top:24px;padding-top:24px;border-top:1px solid #e4edf5}
 .watch-player{width:100%;height:clamp(220px,54vw,408px);border:1px solid #d5e2ef;border-radius:13px;overflow:hidden;background:#eaf2fa;margin:15px 0}
 .watch-player iframe{display:block;width:100%;height:100%;border:0}
@@ -44,7 +47,7 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 </style>
 </head>
 <body><main>
-<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.4</span></nav>
+<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.4.1</span></nav>
 <header><div class="kicker" style="margin-top:28px">One shared moment, wherever you are</div><h1>COSMOS Together</h1><p>Two accepted Connections. One synchronized experience. A private experiment—not yet a concert, cinema, or public Space.</p></header>
 <div id="message" class="notice" role="status">Checking your COSMOS session…</div>
 <section id="start" class="panel" hidden>
@@ -73,9 +76,10 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
   <div id="hostWatchTools" hidden>
     <label for="youtubeUrl">Host: YouTube / YouTube Music watch link</label>
     <input id="youtubeUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" maxlength="550" aria-describedby="watchPolicy">
-    <div class="buttons"><button id="setYouTube" type="button">Set YouTube video for this Space</button></div>
+    <div class="buttons"><button id="setYouTube" type="button">Set YouTube video for this Space</button><button id="setSampleYouTube" type="button" title="Test the YouTube embed with the public IFrame API sample video">Try YouTube test video</button></div>
   </div>
   <div id="watchPolicy" class="small">YouTube Music itself cannot be controlled by COSMOS. A Music watch link can be tried through the official YouTube video player, but not every track permits embedding. The YouTube player stays visible with its original controls, attribution and ads.</div>
+  <p class="small">If a video says unavailable, it may be removed, restricted, or embedding may be disabled. Try the official YouTube sample video first to test whether the player works on this device.</p>
   <div id="watchNotSelected" class="notice">No YouTube video selected yet. The original COSMOS sound demo above is still available.</div>
   <div id="watchSelected" hidden>
     <div id="watchGuestPrompt" class="watch-guest">Tap “Load YouTube player” yourself to join. Videos are not loaded automatically.</div>
@@ -274,7 +278,7 @@ $('loadYouTube').onclick=async()=>{
   if(ytJoined){closeYtPlayer();return;}
   ytJoined=true;ytAutoplayBlocked=false;$('watchFrame').hidden=false;
   $('loadYouTube').textContent='Close YouTube player';
-  setWatchMessage('Loading official YouTube player…');
+  setWatchMessage('Loading official YouTube player… (the host website now sends its origin to YouTube)');
   try{
     await loadYouTubeAPI();
     if(!ytJoined)return;
@@ -292,7 +296,17 @@ $('loadYouTube').onclick=async()=>{
           ytAutoplayBlocked=true;
           setWatchMessage('iPhone blocked remote play. Tap ▶ on the visible YouTube video, then Sync / Play.');
         },
-        onError:e=>setWatchMessage('YouTube cannot embed this video (code '+e.data+'). Select an embeddable video or open in YouTube.')
+        onError:e=>{
+          const codes={
+            2:'Invalid YouTube video identifier.',
+            5:'This video could not play in the HTML5 browser player.',
+            100:'Video not found, removed, or private.',
+            101:'Video owner does not allow embedding on another website.',
+            150:'Video owner does not allow embedding on another website.',
+            153:'YouTube did not receive the site identity (HTTP Referer). Open in Safari/Edge and check referrer policy.'
+          };
+          setWatchMessage('YouTube error '+e.data+': '+(codes[e.data]||'Video unavailable.')+' Try another embeddable video or open it on YouTube.');
+        }
       }
     });
   }catch(e){closeYtPlayer();setWatchMessage(e.message||String(e));}
@@ -315,14 +329,13 @@ async function watchHostAction(action,position){
     updateRoom(d.room);
   }catch(e){setWatchMessage(e.message||String(e));}
 }
-$('setYouTube').onclick=async()=>{
-  const id=parseYouTubeId($('youtubeUrl').value);
+async function setYouTubeById(id){
   if(!id){
     setWatchMessage('Paste an HTTPS YouTube watch / YouTube Music watch link.');
     $('watchNotSelected').textContent='Invalid video link. Use youtube.com/watch?v=… or music.youtube.com/watch?v=…';
     return;
   }
-  $('setYouTube').disabled=true;
+  $('setYouTube').disabled=true;$('setSampleYouTube').disabled=true;
   try{
     const d=await api('/api/together/rooms/'+roomId+'/watch',{
       method:'POST',body:JSON.stringify({action:'set',video_id:id})
@@ -330,7 +343,14 @@ $('setYouTube').onclick=async()=>{
     updateRoom(d.room);
     setWatchMessage('Video selected. Each person taps Load YouTube player. Some music tracks do not allow embedding.');
   }catch(e){$('watchNotSelected').textContent=e.message;}
-  finally{$('setYouTube').disabled=false;}
+  finally{$('setYouTube').disabled=false;$('setSampleYouTube').disabled=false;}
+}
+$('setYouTube').onclick=()=>setYouTubeById(parseYouTubeId($('youtubeUrl').value));
+$('setSampleYouTube').onclick=()=>{
+  // Sample video used in Google's official YouTube IFrame API documentation.
+  const id='M7lc1UVf-VE';
+  $('youtubeUrl').value='https://www.youtube.com/watch?v='+id;
+  setYouTubeById(id);
 };
 $('watchPlay').onclick=()=>{
   if(ytReady)try{ytPlayer.playVideo();}catch{}
