@@ -28,13 +28,23 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 @keyframes pulse{0%,100%{box-shadow:0 0 18px #b4dcff,inset 0 0 35px #ddecff;transform:scale(1)}50%{box-shadow:0 0 52px #70abef,inset 0 0 50px #afdcff;transform:scale(1.025)}}
 .participants{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.person{padding:10px 13px;border-radius:999px;border:1px solid #d0e0ef;background:#fff;font-size:13px}
 .dot{width:8px;height:8px;background:#9aafbe;border-radius:50%;display:inline-block;margin-right:6px}.dot.on{background:#24a778}
+
+/* v0.4 — official, visible YouTube IFrame Player; not an audio-only stream. */
+.watch-card{margin-top:24px;padding-top:24px;border-top:1px solid #e4edf5}
+.watch-player{width:100%;height:clamp(220px,54vw,408px);border:1px solid #d5e2ef;border-radius:13px;overflow:hidden;background:#eaf2fa;margin:15px 0}
+.watch-player iframe{display:block;width:100%;height:100%;border:0}
+.watch-status{margin-top:10px;min-height:22px;font-size:13px;color:#355f84;line-height:1.5}
+.watch-source{display:flex;gap:14px;flex-wrap:wrap;margin-top:13px;font-size:13px}
+.watch-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.watch-tools button{flex:1 1 130px}
+.watch-guest{padding:10px 12px;border-radius:12px;background:#f3f8fd;color:#385e80;font-size:13px}
+
 [hidden]{display:none!important} .subtle{margin-top:20px;font-size:12px;color:#718aa2}
 @media(max-width:500px){main{padding-left:13px;padding-right:13px}.panel{padding:19px;border-radius:19px}nav{font-size:13px}.room{align-items:flex-start}}
 @media(prefers-reduced-motion:reduce){.circle.playing{animation:none;outline:4px solid #a0d3ff}}
 </style>
 </head>
 <body><main>
-<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.3</span></nav>
+<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.4</span></nav>
 <header><div class="kicker" style="margin-top:28px">One shared moment, wherever you are</div><h1>COSMOS Together</h1><p>Two accepted Connections. One synchronized experience. A private experiment—not yet a concert, cinema, or public Space.</p></header>
 <div id="message" class="notice" role="status">Checking your COSMOS session…</div>
 <section id="start" class="panel" hidden>
@@ -55,6 +65,29 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 <div class="notice" id="roomNote" role="status">Each person: tap Enable sound and listen for three test notes. If you hear them, the host can press Play together.</div>
 <div class="buttons"><button id="audio" type="button">♫ Enable sound</button><button id="testAudio" type="button">🔊 Test sound</button><button id="mediaAudio" type="button">▶ Test iPhone media</button><button id="play" class="primary" type="button" hidden>▶ Play together</button></div>
 <div class="audio-check" id="audioDiag" aria-live="polite">Audio status: not enabled. A green presence dot only confirms connection, not audible sound.</div><div class="audio-check" id="mediaDiag" aria-live="polite">If Test sound is silent, try Test iPhone media. If the media test works, the issue is Web Audio routing rather than the speaker.</div>
+
+<div class="watch-card" id="watchSection">
+  <div class="kicker">NEW · YOUTUBE WATCH TOGETHER</div>
+  <h2 style="margin-top:9px">Play a music video together</h2>
+  <p>Choose an embeddable YouTube video, then each person activates their own visible YouTube player. COSMOS shares the play/pause position; it does not stream or extract music. iPhone may require tapping ▶ inside YouTube.</p>
+  <div id="hostWatchTools" hidden>
+    <label for="youtubeUrl">Host: YouTube / YouTube Music watch link</label>
+    <input id="youtubeUrl" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" maxlength="550" aria-describedby="watchPolicy">
+    <div class="buttons"><button id="setYouTube" type="button">Set YouTube video for this Space</button></div>
+  </div>
+  <div id="watchPolicy" class="small">YouTube Music itself cannot be controlled by COSMOS. A Music watch link can be tried through the official YouTube video player, but not every track permits embedding. The YouTube player stays visible with its original controls, attribution and ads.</div>
+  <div id="watchNotSelected" class="notice">No YouTube video selected yet. The original COSMOS sound demo above is still available.</div>
+  <div id="watchSelected" hidden>
+    <div id="watchGuestPrompt" class="watch-guest">Tap “Load YouTube player” yourself to join. Videos are not loaded automatically.</div>
+    <div id="watchFrame" class="watch-player" hidden><div id="ytPlayer"></div></div>
+    <div class="watch-tools"><button id="loadYouTube" type="button">▶ Load YouTube player</button><button id="syncYouTube" type="button" disabled>↻ Sync / Play on this device</button></div>
+    <div id="hostPlayback" class="watch-tools" hidden><button id="watchPlay" class="primary" type="button" disabled>▶ Play together</button><button id="watchPause" type="button" disabled>Ⅱ Pause together</button><button id="watchStart" type="button" disabled>↺ From beginning</button></div>
+    <div class="watch-source"><a id="watchYouTubeLink" href="https://www.youtube.com" target="_blank" rel="noopener">Open on YouTube ↗</a><a id="watchMusicLink" href="https://music.youtube.com" target="_blank" rel="noopener">Open in YouTube Music ↗</a></div>
+    <div id="watchStatus" class="watch-status" aria-live="polite">Load your player to join.</div>
+  </div>
+  <p class="subtle">Each listener accesses YouTube on their own device. Video availability, ads, buffering and browser autoplay restrictions can prevent exact synchronization. Keep the player visible and the page open during the test.</p>
+</div>
+
 <div class="buttons"><button id="copyLink" type="button">Copy private room link</button><button id="back" type="button">← All Spaces</button><button id="end" type="button" hidden>End Space</button></div>
 <p class="subtle">The short sound is generated locally in each browser—no copyrighted audio or microphone streaming. On iPhone, leave Safari in the foreground, turn up media volume, and check Bluetooth output. Silent Mode can mute Web Audio unless iOS supports and accepts the media playback audio session. Timing depends on both devices.</p>
 </section>
@@ -66,7 +99,9 @@ const API='https://ptdtoday-cosmos-life.ptdtoday.workers.dev';
 const TOKEN_KEY='cosmos_life_token_v1';
 const $=id=>document.getElementById(id);
 let token=localStorage.getItem(TOKEN_KEY)||'',me=null,friends=[],roomId='',room=null,audioCtx=null,
-    clockOffset=0,clockSynced=false,playedGeneration=0,pollTimer=null,lastPresence=0;
+    clockOffset=0,clockSynced=false,playedGeneration=0,pollTimer=null,lastPresence=0,
+    watch=null,ytPlayer=null,ytReady=false,ytJoined=false,ytVideo='',ytLastApplied=0,
+    ytLastCorrection=0,ytAutoplayBlocked=false,ytApiPromise=null;
 const msg=(text,isError=false)=>{const el=$('message');el.textContent=text;el.classList.toggle('error',isError);};
 const notice=(text)=>{$('roomNote').textContent=text;};
 async function api(path,options={}){
@@ -119,6 +154,7 @@ async function openRoom(id){
   const r=await api('/api/together/rooms/'+encodeURIComponent(id));roomId=id;
   $('start').hidden=true;$('stage').hidden=false;
   $('end').hidden=r.room.role!=='host';$('play').hidden=r.room.role!=='host';
+  ytVideo='';ytLastApplied=0;closeYtPlayer();
   const u=new URL(location.href);u.searchParams.set('room',id);history.replaceState(null,'',u.pathname+u.search);
   room=null;playedGeneration=0;lastPresence=0;
   await heartbeat();
@@ -129,9 +165,191 @@ async function poll(){if(!roomId)return;
   if(Date.now()-lastPresence>5000){await heartbeat();return;}
   const d=await api('/api/together/rooms/'+roomId);updateRoom(d.room);
 }
+
+// v0.4: private coordination of official visible YouTube players.
+// Each participant streams from YouTube independently; nothing is downloaded or rebroadcast.
+const safeYouTubeId=id=>/^[A-Za-z0-9_-]{11}$/.test(String(id||''));
+function parseYouTubeId(value){
+  const s=String(value||'').trim();
+  if(safeYouTubeId(s))return s;
+  try{
+    const u=new URL(s);
+    if(u.protocol!=='https:')return '';
+    const host=u.hostname.toLowerCase();let id='';
+    if(host==='youtu.be')id=u.pathname.split('/')[1];
+    else if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(host)){
+      if(u.pathname==='/watch')id=u.searchParams.get('v');
+      else if(/^\/(shorts|live|embed)\//.test(u.pathname))id=u.pathname.split('/')[2];
+    }
+    return safeYouTubeId(id)?id:'';
+  }catch{return '';}
+}
+function setWatchMessage(message){$('watchStatus').textContent=message;}
+function closeYtPlayer(){
+  try{ytPlayer?.destroy();}catch{}
+  ytPlayer=null;ytReady=false;ytJoined=false;ytLastApplied=0;
+  const frame=$('watchFrame');frame.hidden=true;
+  frame.replaceChildren();
+  const holder=document.createElement('div');holder.id='ytPlayer';frame.appendChild(holder);
+  $('loadYouTube').textContent='▶ Load YouTube player';
+  for(const id of ['syncYouTube','watchPlay','watchPause','watchStart'])$(id).disabled=true;
+}
+function showWatch(w,role){
+  watch=w||null;
+  $('hostWatchTools').hidden=role!=='host';
+  $('hostPlayback').hidden=role!=='host';
+  const id=w?.video_id||'';
+  $('watchNotSelected').hidden=Boolean(id);
+  $('watchSelected').hidden=!id;
+  if(!id){
+    if(ytJoined)closeYtPlayer();
+    return;
+  }
+  $('watchYouTubeLink').href='https://www.youtube.com/watch?v='+encodeURIComponent(id);
+  $('watchMusicLink').href='https://music.youtube.com/watch?v='+encodeURIComponent(id);
+  const isNew=id!==ytVideo;ytVideo=id;
+  if(isNew){
+    ytLastApplied=0;ytAutoplayBlocked=false;
+    if(ytJoined&&ytReady)try{ytPlayer.cueVideoById(id);}catch{}
+  }
+  const label=w.state==='playing'?'Playing together':'Paused';
+  $('watchGuestPrompt').textContent='YouTube video selected · '+label+'. Load the player; if Safari blocks playback, tap ▶ inside YouTube.';
+  if(ytJoined&&ytReady){
+    for(const el of ['syncYouTube','watchPlay','watchPause','watchStart'])$(el).disabled=false;
+    if(Number(w.generation)>ytLastApplied){
+      ytLastApplied=Number(w.generation);applyWatch(w,true);
+    }else if(w.state==='playing'&&!ytAutoplayBlocked&&Date.now()-ytLastCorrection>7000){
+      ytLastCorrection=Date.now();applyWatch(w,false);
+    }
+  }
+  if(!ytJoined&&!ytAutoplayBlocked)setWatchMessage('A video is ready. Each person must load the visible YouTube player.');
+}
+function loadYouTubeAPI(){
+  if(window.YT?.Player)return Promise.resolve();
+  if(ytApiPromise)return ytApiPromise;
+  ytApiPromise=new Promise((resolve,reject)=>{
+    const previous=window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady=()=>{try{previous?.();}catch{}resolve();};
+    const script=document.createElement('script');
+    script.src='https://www.youtube.com/iframe_api';
+    script.onerror=()=>reject(new Error('YouTube player could not load. Check browser content blocking.'));
+    document.head.appendChild(script);
+    setTimeout(()=>{if(!window.YT?.Player)reject(new Error('YouTube did not respond.'));},20000);
+  }).catch(e=>{ytApiPromise=null;throw e;});
+  return ytApiPromise;
+}
+function watchPosition(w){
+  if(!w)return 0;
+  const now=Date.now()+clockOffset;
+  return Math.max(0,Number(w.position_sec||0)+(w.state==='playing'?Math.max(0,now-Number(w.started_at_ms||now))/1000:0));
+}
+function watchPlayerVisible(){
+  const frame=$('watchFrame'),rect=frame.getBoundingClientRect();
+  if(document.hidden||frame.hidden||rect.height<=0)return false;
+  const seen=Math.max(0,Math.min(rect.bottom,innerHeight)-Math.max(rect.top,0));
+  return seen/rect.height>=.5;
+}
+function applyWatch(w,force){
+  if(!ytJoined||!ytReady||!w||!safeYouTubeId(w.video_id))return;
+  try{
+    const desired=watchPosition(w);
+    const current=Number(ytPlayer.getCurrentTime()||0);
+    const diff=Math.abs(desired-current);
+    if((force||diff>2.7)&&diff>.8)ytPlayer.seekTo(desired,true);
+    if(w.state==='paused'){
+      if(ytPlayer.getPlayerState()===1)ytPlayer.pauseVideo();
+      setWatchMessage('Paused for everyone · '+Math.floor(desired)+'s');
+    }else{
+      if(!watchPlayerVisible()){
+        setWatchMessage('Scroll to the YouTube player to start. COSMOS does not play it off-screen.');
+        return;
+      }
+      if(!ytAutoplayBlocked && ytPlayer.getPlayerState()!==1)ytPlayer.playVideo();
+      if(!ytAutoplayBlocked)setWatchMessage('Playing · about '+Math.floor(desired)+'s · approximate synchronization.');
+    }
+  }catch(e){setWatchMessage('Player not ready: '+(e.message||String(e)));}
+}
+$('loadYouTube').onclick=async()=>{
+  if(!safeYouTubeId(watch?.video_id))return;
+  if(ytJoined){closeYtPlayer();return;}
+  ytJoined=true;ytAutoplayBlocked=false;$('watchFrame').hidden=false;
+  $('loadYouTube').textContent='Close YouTube player';
+  setWatchMessage('Loading official YouTube player…');
+  try{
+    await loadYouTubeAPI();
+    if(!ytJoined)return;
+    ytPlayer=new YT.Player('ytPlayer',{
+      width:'100%',height:'100%',videoId:watch.video_id,
+      playerVars:{playsinline:1,controls:1,origin:location.origin,autoplay:0},
+      events:{
+        onReady:()=>{
+          ytReady=true;
+          for(const id of ['syncYouTube','watchPlay','watchPause','watchStart'])$(id).disabled=false;
+          setWatchMessage('Player ready. Tap ▶ inside YouTube or Sync / Play on this device.');
+          if(watch?.state==='paused')applyWatch(watch,true);
+        },
+        onAutoplayBlocked:()=>{
+          ytAutoplayBlocked=true;
+          setWatchMessage('iPhone blocked remote play. Tap ▶ on the visible YouTube video, then Sync / Play.');
+        },
+        onError:e=>setWatchMessage('YouTube cannot embed this video (code '+e.data+'). Select an embeddable video or open in YouTube.')
+      }
+    });
+  }catch(e){closeYtPlayer();setWatchMessage(e.message||String(e));}
+};
+$('syncYouTube').onclick=()=>{
+  if(!ytReady||!watch)return;
+  ytAutoplayBlocked=false;
+  try{
+    ytPlayer.seekTo(watchPosition(watch),true);
+    ytPlayer.playVideo();
+    setWatchMessage('Synchronization requested. If iPhone remains paused, tap ▶ in the visible YouTube player.');
+  }catch(e){setWatchMessage(e.message||String(e));}
+};
+async function watchHostAction(action,position){
+  if(!roomId||room?.role!=='host')return;
+  try{
+    const d=await api('/api/together/rooms/'+roomId+'/watch',{
+      method:'POST',body:JSON.stringify({action,position_sec:position})
+    });
+    updateRoom(d.room);
+  }catch(e){setWatchMessage(e.message||String(e));}
+}
+$('setYouTube').onclick=async()=>{
+  const id=parseYouTubeId($('youtubeUrl').value);
+  if(!id){
+    setWatchMessage('Paste an HTTPS YouTube watch / YouTube Music watch link.');
+    $('watchNotSelected').textContent='Invalid video link. Use youtube.com/watch?v=… or music.youtube.com/watch?v=…';
+    return;
+  }
+  $('setYouTube').disabled=true;
+  try{
+    const d=await api('/api/together/rooms/'+roomId+'/watch',{
+      method:'POST',body:JSON.stringify({action:'set',video_id:id})
+    });
+    updateRoom(d.room);
+    setWatchMessage('Video selected. Each person taps Load YouTube player. Some music tracks do not allow embedding.');
+  }catch(e){$('watchNotSelected').textContent=e.message;}
+  finally{$('setYouTube').disabled=false;}
+};
+$('watchPlay').onclick=()=>{
+  if(ytReady)try{ytPlayer.playVideo();}catch{}
+  watchHostAction('play',ytReady?Number(ytPlayer.getCurrentTime()||0):watchPosition(watch));
+};
+$('watchPause').onclick=()=>{
+  const pos=ytReady?Number(ytPlayer.getCurrentTime()||0):watchPosition(watch);
+  if(ytReady)try{ytPlayer.pauseVideo();}catch{}
+  watchHostAction('pause',pos);
+};
+$('watchStart').onclick=()=>{
+  if(ytReady)try{ytPlayer.seekTo(0,true);ytPlayer.playVideo();}catch{}
+  watchHostAction('play',0);
+};
+
 function updateRoom(r){
   if(!roomId||r.id!==roomId)return;
   room=r;
+  showWatch(r.watch,r.role);
   $('roomTitle').textContent=r.title;
   $('hostName').textContent=r.host_name;
   $('guestName').textContent=r.guest_name;
@@ -293,7 +511,7 @@ $('create').onclick=async()=>{
 };
 $('refreshRooms').onclick=()=>loadRooms().catch(e=>msg(e.message,true));
 $('back').onclick=async()=>{
-  clearPoll();roomId='';room=null;$('stage').hidden=true;$('start').hidden=false;
+  clearPoll();closeYtPlayer();watch=null;ytVideo='';roomId='';room=null;$('stage').hidden=true;$('start').hidden=false;
   const u=new URL(location.href);u.searchParams.delete('room');history.replaceState(null,'',u.pathname+u.search);
   await loadRooms().catch(e=>msg(e.message,true));
 };
