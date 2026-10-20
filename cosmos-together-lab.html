@@ -20,6 +20,7 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 .buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.buttons button{flex:1 1 165px}
 .notice{font-size:13px;padding:12px 14px;border:1px solid #d6e4f1;border-radius:12px;background:#f4f9ff;margin-top:16px;color:#395a7b}
 .notice.error{background:#fff7f7;border-color:#f1c2c2;color:#9b3131}
+.audio-check{font-size:12px;color:#4a647f;margin-top:9px;line-height:1.5}.audio-check strong{color:#204979}
 .room{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid #e7eef5}
 .room:last-child{border-bottom:0}.room strong{display:block;font-size:15px}.room button{min-width:80px}
 .circle{width:min(60vw,250px);aspect-ratio:1;border-radius:50%;margin:28px auto 25px;display:grid;place-items:center;text-align:center;position:relative;background:radial-gradient(circle at 45% 38%,#fff 0%,#dcedff 47%,#e7f0ff 70%,#f7fbff 100%);border:1px solid #c7dbea;box-shadow:inset 0 0 70px rgba(101,166,225,.18),0 0 50px rgba(39,103,163,.08)}
@@ -33,7 +34,7 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 </style>
 </head>
 <body><main>
-<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.1</span></nav>
+<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.3</span></nav>
 <header><div class="kicker" style="margin-top:28px">One shared moment, wherever you are</div><h1>COSMOS Together</h1><p>Two accepted Connections. One synchronized experience. A private experiment—not yet a concert, cinema, or public Space.</p></header>
 <div id="message" class="notice" role="status">Checking your COSMOS session…</div>
 <section id="start" class="panel" hidden>
@@ -51,10 +52,11 @@ button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disable
 <div class="kicker">COSMOS SHARED TIME</div><h2 id="roomTitle" style="margin-top:8px">Together</h2>
 <div class="participants"><span class="person"><i id="hostDot" class="dot"></i><span id="hostName">Host</span></span><span class="person"><i id="guestDot" class="dot"></i><span id="guestName">Guest</span></span></div>
 <div id="orb" class="circle"><div class="inside"><div style="font-size:29px">✧</div><b id="orbStatus">Waiting together</b><span id="orbSub">Your own Cosmos, shared in time</span></div></div>
-<div class="notice" id="roomNote">Enable sound on both devices. The host then starts a synchronized 12-second demo.</div>
-<div class="buttons"><button id="audio" type="button">♫ Enable sound</button><button id="play" class="primary" type="button" hidden>▶ Play together</button></div>
+<div class="notice" id="roomNote" role="status">Each person: tap Enable sound and listen for three test notes. If you hear them, the host can press Play together.</div>
+<div class="buttons"><button id="audio" type="button">♫ Enable sound</button><button id="testAudio" type="button">🔊 Test sound</button><button id="mediaAudio" type="button">▶ Test iPhone media</button><button id="play" class="primary" type="button" hidden>▶ Play together</button></div>
+<div class="audio-check" id="audioDiag" aria-live="polite">Audio status: not enabled. A green presence dot only confirms connection, not audible sound.</div><div class="audio-check" id="mediaDiag" aria-live="polite">If Test sound is silent, try Test iPhone media. If the media test works, the issue is Web Audio routing rather than the speaker.</div>
 <div class="buttons"><button id="copyLink" type="button">Copy private room link</button><button id="back" type="button">← All Spaces</button><button id="end" type="button" hidden>End Space</button></div>
-<p class="subtle">The demo produces its own short instrumental tones in your browser. No copyrighted audio is uploaded, streamed, or shared. Timing is approximate and depends on the network and device.</p>
+<p class="subtle">The short sound is generated locally in each browser—no copyrighted audio or microphone streaming. On iPhone, leave Safari in the foreground, turn up media volume, and check Bluetooth output. Silent Mode can mute Web Audio unless iOS supports and accepts the media playback audio session. Timing depends on both devices.</p>
 </section>
 <footer class="subtle">COSMOS Together Lab does not change your moments, location pins, camera, White view, notifications, or Metro timeline. Rooms automatically expire after 24 hours.</footer>
 </main>
@@ -143,26 +145,87 @@ function updateRoom(r){
   $('orb').classList.toggle('playing',started);
   $('orbStatus').textContent=started?'Together now':waiting?'Starting soon':r.other_online?'Both connected':'Waiting for Connection';
   $('orbSub').textContent=started?'Synchronized audio experiment':waiting?'About '+Math.ceil(remain/1000)+' seconds':r.other_online?'Ready when you are':'The other person needs to open this Space';
-  if(Number(r.play_generation)>playedGeneration && audioCtx){
-    scheduleDemo(r);
-  }else if(Number(r.play_generation)>0 && !audioCtx && waiting){
-    notice('The shared demo starts soon. Tap Enable sound to hear it.');
+  if(Number(r.play_generation)>playedGeneration){
+    if(audioCtx?.state==='running')scheduleDemo(r);
+    else if(waiting || started)notice("A shared demo was scheduled, but this device’s audio is not running. Tap Enable / resume sound now.");
   }
 }
-function note(frequency,when,length){
+function audioStatus(){
+  const state=audioCtx?.state||'not enabled';
+  const session=navigator.audioSession?.type || 'not exposed by this browser';
+  $('audioDiag').textContent='Audio status: '+state+' · iPhone audio session: '+session+'. '+(state==='running'
+    ?'This means the browser audio engine is active, but it does not prove the speaker is audible. Tap Test my speaker.'
+    :'Tap Enable sound or Test my speaker to unlock audio on this device.');
+  $('audio').textContent=state==='running'?'♫ Sound enabled · tap to retry':'♫ Enable / resume sound';
+}
+function requestMediaPlaybackSession(){
+  // iOS WebKit's default Web Audio session is often 'ambient', which follows
+  // the hardware silent switch. 'playback' gives an intentional listening
+  // experience the same routing behavior as media playback (iOS 17+).
+  try{
+    if(navigator.audioSession && navigator.audioSession.type!=='playback'){
+      navigator.audioSession.type='playback';
+    }
+    return navigator.audioSession?.type||'unsupported';
+  }catch(e){return 'unavailable: '+(e?.message||String(e));}
+}
+function getAudioContext(){
+  if(audioCtx && audioCtx.state!=='closed')return audioCtx;
+  const AudioClass=window.AudioContext||window.webkitAudioContext;
+  if(!AudioClass)throw new Error('Web Audio is not supported in this browser.');
+  audioCtx=new AudioClass();
+  audioCtx.onstatechange=()=>{
+    audioStatus();
+    if(audioCtx?.state!=='running' && roomId){
+      notice('Safari paused the audio engine. Tap Enable / resume sound, then Test my speaker.');
+    }
+    if(audioCtx?.state==='running' && room){
+      // Catch a currently scheduled playback that could not play while suspended.
+      updateRoom(room);
+    }
+  };
+  audioStatus();
+  return audioCtx;
+}
+function note(frequency,when,length,volume=.14){
   if(!audioCtx)return;
   const os=audioCtx.createOscillator(),gain=audioCtx.createGain();
   os.type='sine';os.frequency.setValueAtTime(frequency,when);
   gain.gain.setValueAtTime(0.0001,when);
-  gain.gain.exponentialRampToValueAtTime(0.075,when+0.045);
+  gain.gain.exponentialRampToValueAtTime(volume,when+0.035);
   gain.gain.exponentialRampToValueAtTime(0.0001,when+length);
   os.connect(gain);gain.connect(audioCtx.destination);
   os.start(when);os.stop(when+length+.03);
 }
+function testSpeakerNotes(){
+  if(!audioCtx)return;
+  // Schedule directly in the click handler for Safari's user-gesture audio policy.
+  const at=audioCtx.currentTime+.05;
+  note(523.25,at,.28,.18);
+  note(659.25,at+.34,.28,.18);
+  note(783.99,at+.68,.38,.18);
+}
+async function enableAndTestAudio(){
+  try{
+    requestMediaPlaybackSession();
+    const ctx=getAudioContext();
+    // Safari needs the resume call and oscillator scheduling in a real tap handler.
+    const resume=ctx.resume();
+    testSpeakerNotes();
+    await resume;
+    audioStatus();
+    if(ctx.state!=='running'){
+      notice('Audio is '+ctx.state+'. Keep this page open, then tap Enable sound again.');
+      return;
+    }
+    notice('The Web Audio speaker test was scheduled. If silent, use Test iPhone media to check audio routing, and check the media volume and Bluetooth output.');
+    if(room)updateRoom(room);
+  }catch(e){audioStatus();notice('Cannot start sound: '+(e?.message||String(e)));}
+}
 function scheduleDemo(r){
   if(!audioCtx || audioCtx.state!=='running')return;
   const elapsed=(Date.now()+clockOffset-r.play_at_ms)/1000;
-  if(elapsed>11.8 || r.play_at_ms===0){playedGeneration=r.play_generation;return;}
+  if(elapsed>11.8 || r.play_at_ms===0){playedGeneration=r.play_generation;notice('That demo already finished. The host can tap Play together for another test.');return;}
   // Exactly the same original, generative tone sequence on each client.
   const notes=[261.63,329.63,392,523.25,392,329.63,293.66,440,349.23,392,523.25,659.25,523.25,440,392,261.63];
   for(let i=0;i<notes.length;i++){
@@ -172,16 +235,51 @@ function scheduleDemo(r){
     note(notes[i],when,.53);
   }
   playedGeneration=r.play_generation;
-  notice('Shared demo scheduled. The same tones will play on both devices.');
+  notice('Shared demo scheduled on this device. If you cannot hear it, tap Test my speaker and confirm iPhone audio output.');
 }
-$('audio').onclick=async()=>{
+// A short original PCM WAV generated locally; no remote sound or copyrighted
+// recording. A native HTML media element can be audible on iOS in cases where
+// Web Audio oscillators are silenced by the iPhone's ringer setting.
+let nativeTestAudio=null,nativeTestUrl='';
+function makeMediaTestUrl(){
+  const rate=22050,seconds=1.4,count=Math.round(rate*seconds);
+  const array=new ArrayBuffer(44+count*2),view=new DataView(array);
+  const write=(at,str)=>{for(let i=0;i<str.length;i++)view.setUint8(at+i,str.charCodeAt(i));};
+  write(0,'RIFF');view.setUint32(4,36+count*2,true);write(8,'WAVE');
+  write(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);
+  view.setUint16(22,1,true);view.setUint32(24,rate,true);
+  view.setUint32(28,rate*2,true);view.setUint16(32,2,true);
+  view.setUint16(34,16,true);write(36,'data');view.setUint32(40,count*2,true);
+  const notes=[523.25,659.25,783.99];
+  for(let i=0;i<count;i++){
+    const t=i/rate,n=Math.floor(t/.46),p=t-n*.46;
+    const freq=notes[Math.min(notes.length-1,n)];
+    const envelope=n>=3?0:Math.min(1,p/.025,Math.max(0,(.38-p)/.06));
+    const sample=Math.round(Math.sin(2*Math.PI*freq*p)*envelope*.42*32767);
+    view.setInt16(44+i*2,sample,true);
+  }
+  return URL.createObjectURL(new Blob([array],{type:'audio/wav'}));
+}
+function testNativeMedia(){
   try{
-    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
-    $('audio').textContent='♫ Sound enabled';$('audio').disabled=true;
-    notice('Sound enabled. The host can now start the shared 12-second demo.');
-    if(room)updateRoom(room);
-  }catch(e){notice('Sound unavailable: '+e.message);}
-};
+    requestMediaPlaybackSession();
+    if(nativeTestAudio){nativeTestAudio.pause();nativeTestAudio.currentTime=0;}
+    if(!nativeTestUrl)nativeTestUrl=makeMediaTestUrl();
+    if(!nativeTestAudio){nativeTestAudio=new Audio();nativeTestAudio.preload='auto';}
+    nativeTestAudio.src=nativeTestUrl;
+    nativeTestAudio.volume=1;
+    const pending=nativeTestAudio.play(); // Must be called in this click handler.
+    $('mediaDiag').textContent='Native media test requested. Listen for three notes.';
+    if(pending?.then)pending.then(()=>{
+      $('mediaDiag').textContent='Native media player started. If this is audible but Test sound is not, Web Audio routing is the issue.';
+    }).catch(e=>{
+      $('mediaDiag').textContent='Native audio blocked: '+(e?.name||'Error')+' — '+(e?.message||'Tap again in Safari.');
+    });
+  }catch(e){$('mediaDiag').textContent='Media test unavailable: '+(e?.message||String(e));}
+}
+$('audio').onclick=enableAndTestAudio;
+$('testAudio').onclick=enableAndTestAudio;
+$('mediaAudio').onclick=testNativeMedia;
 $('play').onclick=async()=>{
   try{$('play').disabled=true;const d=await api('/api/together/rooms/'+roomId+'/play',{method:'POST'});updateRoom(d.room);}
   catch(e){notice(e.message);}finally{if(room)$('play').disabled=!room.other_online;}
@@ -209,8 +307,16 @@ $('copyLink').onclick=async()=>{
   try{await navigator.clipboard.writeText(u.href);notice('Link copied. Only the invited, signed-in Connection can enter.');}
   catch{notice('Copy this room address from your browser: '+u.href);}
 };
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&roomId)heartbeat().catch(e=>notice(e.message));});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    audioStatus();
+    if(roomId)heartbeat().catch(e=>notice(e.message));
+    if(audioCtx && audioCtx.state!=='running' && roomId)
+      notice('Audio may have paused while the app was in the background. Tap Enable / resume sound.');
+  }
+});
 window.addEventListener('pagehide',clearPoll);
+audioStatus();
 init();
 })();
 </script>
