@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="same-origin">
+<title>COSMOS — Together Lab (Private)</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:#f7faff;color:#18324e;--blue:#2566ac;--edge:#dce6f0;--muted:#5d7087}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse 70% 35% at 50% 0%,#e9f4ff 0%,#fff 76%);min-height:100svh}
+main{max-width:790px;margin:0 auto;padding:max(25px,env(safe-area-inset-top)) 18px max(55px,env(safe-area-inset-bottom))}
+nav{display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:40px}a{color:#265e9a}h1{font-size:clamp(34px,7vw,56px);letter-spacing:-.055em;margin:28px 0 3px;line-height:1.05;font-weight:550}
+h2{font-size:19px;margin:0 0 8px;font-weight:680}p{color:var(--muted);line-height:1.55;margin:8px 0}small,.small{color:var(--muted);font-size:12px;line-height:1.45}
+.chip{font-size:11px;border:1px solid #c8d9e8;border-radius:999px;padding:6px 10px;color:#4c6b8d;font-weight:700;background:white}
+.kicker{text-transform:uppercase;letter-spacing:.19em;font-size:10px;color:#768da7;font-weight:800}
+.panel{background:rgba(255,255,255,.91);border:1px solid var(--edge);box-shadow:0 14px 50px rgba(33,77,121,.075);border-radius:23px;padding:24px;margin-top:20px}
+label{display:block;color:#435a70;font-size:12px;font-weight:750;margin:15px 0 7px}input,select{width:100%;font:inherit;border:1px solid #c6d9ea;border-radius:14px;min-height:48px;padding:10px 13px;background:#fff;color:#223b55}
+input:focus,select:focus,button:focus-visible{outline:3px solid #84bdff;outline-offset:2px}button{border:1px solid #bfd2e8;border-radius:14px;font:700 14px inherit;font-size:14px;font-weight:700;padding:12px 16px;min-height:47px;background:#fff;color:#235187;cursor:pointer}
+button.primary{background:#2468ad;border-color:#2468ad;color:#fff}button:disabled{opacity:.5;cursor:not-allowed}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}.buttons button{flex:1 1 165px}
+.notice{font-size:13px;padding:12px 14px;border:1px solid #d6e4f1;border-radius:12px;background:#f4f9ff;margin-top:16px;color:#395a7b}
+.notice.error{background:#fff7f7;border-color:#f1c2c2;color:#9b3131}
+.room{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 0;border-bottom:1px solid #e7eef5}
+.room:last-child{border-bottom:0}.room strong{display:block;font-size:15px}.room button{min-width:80px}
+.circle{width:min(60vw,250px);aspect-ratio:1;border-radius:50%;margin:28px auto 25px;display:grid;place-items:center;text-align:center;position:relative;background:radial-gradient(circle at 45% 38%,#fff 0%,#dcedff 47%,#e7f0ff 70%,#f7fbff 100%);border:1px solid #c7dbea;box-shadow:inset 0 0 70px rgba(101,166,225,.18),0 0 50px rgba(39,103,163,.08)}
+.circle.playing{animation:pulse 1.25s ease-in-out infinite;border-color:#78b6fa}.circle .inside{padding:24px}.circle b{display:block;font-size:17px;margin-top:9px}.circle span{font-size:11px;color:#617b99}
+@keyframes pulse{0%,100%{box-shadow:0 0 18px #b4dcff,inset 0 0 35px #ddecff;transform:scale(1)}50%{box-shadow:0 0 52px #70abef,inset 0 0 50px #afdcff;transform:scale(1.025)}}
+.participants{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}.person{padding:10px 13px;border-radius:999px;border:1px solid #d0e0ef;background:#fff;font-size:13px}
+.dot{width:8px;height:8px;background:#9aafbe;border-radius:50%;display:inline-block;margin-right:6px}.dot.on{background:#24a778}
+[hidden]{display:none!important} .subtle{margin-top:20px;font-size:12px;color:#718aa2}
+@media(max-width:500px){main{padding-left:13px;padding-right:13px}.panel{padding:19px;border-radius:19px}nav{font-size:13px}.room{align-items:flex-start}}
+@media(prefers-reduced-motion:reduce){.circle.playing{animation:none;outline:4px solid #a0d3ff}}
+</style>
+</head>
+<body><main>
+<nav><a href="/cosmos-next.html">← COSMOS Next</a><span class="chip">PRIVATE FAMILY LAB · v0.1</span></nav>
+<header><div class="kicker" style="margin-top:28px">One shared moment, wherever you are</div><h1>COSMOS Together</h1><p>Two accepted Connections. One synchronized experience. A private experiment—not yet a concert, cinema, or public Space.</p></header>
+<div id="message" class="notice" role="status">Checking your COSMOS session…</div>
+<section id="start" class="panel" hidden>
+<h2>Your private Spaces</h2><p>Only your accepted Connections can join. No public access or location sharing.</p>
+<div id="rooms"><p>Loading spaces…</p></div>
+<button id="refreshRooms" type="button">↻ Refresh Spaces</button>
+<hr style="border:0;border-top:1px solid #e6eef4;margin:24px 0">
+<h2>Create a Space</h2>
+<label for="friend">Who will join?</label><select id="friend"><option value="">Loading Connections…</option></select>
+<label for="title">Space title</label><input id="title" maxlength="70" value="Our shared Cosmos" autocomplete="off">
+<div class="buttons"><button class="primary" id="create" type="button">Create private Space</button></div>
+<p class="subtle">Your Connection can open this page on their device to find the Space. Each person signs in using their existing COSMOS account.</p>
+</section>
+<section id="stage" class="panel" hidden>
+<div class="kicker">COSMOS SHARED TIME</div><h2 id="roomTitle" style="margin-top:8px">Together</h2>
+<div class="participants"><span class="person"><i id="hostDot" class="dot"></i><span id="hostName">Host</span></span><span class="person"><i id="guestDot" class="dot"></i><span id="guestName">Guest</span></span></div>
+<div id="orb" class="circle"><div class="inside"><div style="font-size:29px">✧</div><b id="orbStatus">Waiting together</b><span id="orbSub">Your own Cosmos, shared in time</span></div></div>
+<div class="notice" id="roomNote">Enable sound on both devices. The host then starts a synchronized 12-second demo.</div>
+<div class="buttons"><button id="audio" type="button">♫ Enable sound</button><button id="play" class="primary" type="button" hidden>▶ Play together</button></div>
+<div class="buttons"><button id="copyLink" type="button">Copy private room link</button><button id="back" type="button">← All Spaces</button><button id="end" type="button" hidden>End Space</button></div>
+<p class="subtle">The demo produces its own short instrumental tones in your browser. No copyrighted audio is uploaded, streamed, or shared. Timing is approximate and depends on the network and device.</p>
+</section>
+<footer class="subtle">COSMOS Together Lab does not change your moments, location pins, camera, White view, notifications, or Metro timeline. Rooms automatically expire after 24 hours.</footer>
+</main>
+<script>
+(()=>{'use strict';
+const API='https://ptdtoday-cosmos-life.ptdtoday.workers.dev';
+const TOKEN_KEY='cosmos_life_token_v1';
+const $=id=>document.getElementById(id);
+let token=localStorage.getItem(TOKEN_KEY)||'',me=null,friends=[],roomId='',room=null,audioCtx=null,
+    clockOffset=0,clockSynced=false,playedGeneration=0,pollTimer=null,lastPresence=0;
+const msg=(text,isError=false)=>{const el=$('message');el.textContent=text;el.classList.toggle('error',isError);};
+const notice=(text)=>{$('roomNote').textContent=text;};
+async function api(path,options={}){
+  const started=Date.now();
+  const headers=new Headers(options.headers||{});
+  headers.set('Authorization','Bearer '+token);
+  if(options.body)headers.set('Content-Type','application/json');
+  const res=await fetch(API+path,{...options,headers,cache:'no-store'});
+  const data=await res.json().catch(()=>({error:'Unexpected server response.'}));
+  if(!res.ok)throw new Error(data.error||'Request failed.');
+  if(data?.room?.server_now_ms){
+    const offset=data.room.server_now_ms-(started+Date.now())/2;
+    // A very large time change can occur after a phone resumes from sleep.
+    if(!clockSynced || Math.abs(offset-clockOffset)>1500){clockOffset=offset;clockSynced=true;}
+    else clockOffset=clockOffset*.7+offset*.3;
+  }
+  return data;
+}
+async function init(){
+  if(!token){msg('Please sign in at COSMOS Next first, then return to this private lab.',true);return;}
+  try{
+    me=await api('/api/me');
+    msg('Signed in as '+(me.display_name||'COSMOS member')+'. Private lab ready.');
+    $('start').hidden=false;
+    const f=await api('/api/friends');friends=f.accepted||[];
+    const picker=$('friend');picker.replaceChildren();
+    const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Select an accepted Connection';picker.append(placeholder);
+    for(const friend of friends){const opt=document.createElement('option');opt.value=friend.user_id;opt.textContent=friend.name||'COSMOS Connection';picker.append(opt);}
+    if(!friends.length)msg('You need at least one accepted Connection to use Together Lab.');
+    await loadRooms();
+    const requested=new URLSearchParams(location.search).get('room');
+    if(/^[0-9a-f-]{36}$/i.test(requested||''))await openRoom(requested);
+  }catch(e){msg('Lab unavailable: '+e.message,true);}
+}
+async function loadRooms(){
+  const result=await api('/api/together/rooms');const wrap=$('rooms');wrap.replaceChildren();
+  if(!result.rooms?.length){const p=document.createElement('p');p.textContent='No active private Spaces yet.';wrap.append(p);return;}
+  for(const r of result.rooms){
+    const line=document.createElement('div');line.className='room';
+    const info=document.createElement('div');const title=document.createElement('strong');title.textContent=r.title;
+    const sub=document.createElement('small');sub.textContent=(r.role==='host'?'Created for ':'Invitation from ')+r.with_name;
+    info.append(title,sub);
+    const go=document.createElement('button');go.type='button';go.textContent='Enter';go.onclick=()=>openRoom(r.id).catch(e=>msg(e.message,true));
+    line.append(info,go);wrap.append(line);
+  }
+}
+function clearPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+async function openRoom(id){
+  clearPoll();
+  const r=await api('/api/together/rooms/'+encodeURIComponent(id));roomId=id;
+  $('start').hidden=true;$('stage').hidden=false;
+  $('end').hidden=r.room.role!=='host';$('play').hidden=r.room.role!=='host';
+  const u=new URL(location.href);u.searchParams.set('room',id);history.replaceState(null,'',u.pathname+u.search);
+  room=null;playedGeneration=0;lastPresence=0;
+  await heartbeat();
+  pollTimer=setInterval(()=>{if(!document.hidden)poll().catch(e=>{notice('Connection interrupted: '+e.message);});},1400);
+}
+async function heartbeat(){if(!roomId)return;const d=await api('/api/together/rooms/'+roomId+'/heartbeat',{method:'POST'});lastPresence=Date.now();updateRoom(d.room);}
+async function poll(){if(!roomId)return;
+  if(Date.now()-lastPresence>5000){await heartbeat();return;}
+  const d=await api('/api/together/rooms/'+roomId);updateRoom(d.room);
+}
+function updateRoom(r){
+  if(!roomId||r.id!==roomId)return;
+  room=r;
+  $('roomTitle').textContent=r.title;
+  $('hostName').textContent=r.host_name;
+  $('guestName').textContent=r.guest_name;
+  $('hostDot').classList.toggle('on',r.role==='host'?r.my_present:r.other_online);
+  $('guestDot').classList.toggle('on',r.role==='guest'?r.my_present:r.other_online);
+  $('play').disabled=!r.other_online;
+  const now=Date.now()+clockOffset;
+  const remain=(r.play_at_ms||0)-now;
+  const started=Number(r.play_generation)>0 && now>=r.play_at_ms && now<r.play_at_ms+r.demo_duration_ms;
+  const waiting=Number(r.play_generation)>0 && remain>0;
+  $('orb').classList.toggle('playing',started);
+  $('orbStatus').textContent=started?'Together now':waiting?'Starting soon':r.other_online?'Both connected':'Waiting for Connection';
+  $('orbSub').textContent=started?'Synchronized audio experiment':waiting?'About '+Math.ceil(remain/1000)+' seconds':r.other_online?'Ready when you are':'The other person needs to open this Space';
+  if(Number(r.play_generation)>playedGeneration && audioCtx){
+    scheduleDemo(r);
+  }else if(Number(r.play_generation)>0 && !audioCtx && waiting){
+    notice('The shared demo starts soon. Tap Enable sound to hear it.');
+  }
+}
+function note(frequency,when,length){
+  if(!audioCtx)return;
+  const os=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  os.type='sine';os.frequency.setValueAtTime(frequency,when);
+  gain.gain.setValueAtTime(0.0001,when);
+  gain.gain.exponentialRampToValueAtTime(0.075,when+0.045);
+  gain.gain.exponentialRampToValueAtTime(0.0001,when+length);
+  os.connect(gain);gain.connect(audioCtx.destination);
+  os.start(when);os.stop(when+length+.03);
+}
+function scheduleDemo(r){
+  if(!audioCtx || audioCtx.state!=='running')return;
+  const elapsed=(Date.now()+clockOffset-r.play_at_ms)/1000;
+  if(elapsed>11.8 || r.play_at_ms===0){playedGeneration=r.play_generation;return;}
+  // Exactly the same original, generative tone sequence on each client.
+  const notes=[261.63,329.63,392,523.25,392,329.63,293.66,440,349.23,392,523.25,659.25,523.25,440,392,261.63];
+  for(let i=0;i<notes.length;i++){
+    const start=i*.72;
+    if(start+.56<elapsed)continue;
+    const when=audioCtx.currentTime+Math.max(.04,start-elapsed);
+    note(notes[i],when,.53);
+  }
+  playedGeneration=r.play_generation;
+  notice('Shared demo scheduled. The same tones will play on both devices.');
+}
+$('audio').onclick=async()=>{
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
+    $('audio').textContent='♫ Sound enabled';$('audio').disabled=true;
+    notice('Sound enabled. The host can now start the shared 12-second demo.');
+    if(room)updateRoom(room);
+  }catch(e){notice('Sound unavailable: '+e.message);}
+};
+$('play').onclick=async()=>{
+  try{$('play').disabled=true;const d=await api('/api/together/rooms/'+roomId+'/play',{method:'POST'});updateRoom(d.room);}
+  catch(e){notice(e.message);}finally{if(room)$('play').disabled=!room.other_online;}
+};
+$('create').onclick=async()=>{
+  const guest_user_id=$('friend').value,title=$('title').value.trim();
+  if(!guest_user_id||!title){msg('Choose an accepted Connection and a title.',true);return;}
+  try{$('create').disabled=true;const d=await api('/api/together/rooms',{method:'POST',body:JSON.stringify({guest_user_id,title})});
+    msg('Private Space created. The Connection can join from their own device.');await openRoom(d.id);
+  }catch(e){msg(e.message,true);}finally{$('create').disabled=false;}
+};
+$('refreshRooms').onclick=()=>loadRooms().catch(e=>msg(e.message,true));
+$('back').onclick=async()=>{
+  clearPoll();roomId='';room=null;$('stage').hidden=true;$('start').hidden=false;
+  const u=new URL(location.href);u.searchParams.delete('room');history.replaceState(null,'',u.pathname+u.search);
+  await loadRooms().catch(e=>msg(e.message,true));
+};
+$('end').onclick=async()=>{
+  if(!confirm('End this private test Space for both people?'))return;
+  try{await api('/api/together/rooms/'+roomId+'/end',{method:'POST'});$('back').click();}
+  catch(e){notice(e.message);}
+};
+$('copyLink').onclick=async()=>{
+  const u=new URL(location.href);u.searchParams.set('room',roomId);
+  try{await navigator.clipboard.writeText(u.href);notice('Link copied. Only the invited, signed-in Connection can enter.');}
+  catch{notice('Copy this room address from your browser: '+u.href);}
+};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&roomId)heartbeat().catch(e=>notice(e.message));});
+window.addEventListener('pagehide',clearPoll);
+init();
+})();
+</script>
+</body></html>
