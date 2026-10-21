@@ -1794,7 +1794,14 @@
       .app.metro-live .metro-day-heading{flex-wrap:wrap;row-gap:3px}
       .app.metro-live .metro-day-heading .cosmos-together-head-actions{margin-left:auto}
     }
-  </style>
+      /* v2.9.5.8: private participation tags, not public discovery */
+    .tag-choices{display:flex;flex-wrap:wrap;gap:9px;margin:10px 0 13px}
+    .tag-choice{display:flex;align-items:center;gap:10px;min-height:48px;max-width:100%;border:1px solid #b9cde4;
+      background:rgba(255,255,255,.75);border-radius:15px;padding:10px 13px;color:#17406d;font-size:13px;font-weight:600}
+    .tag-choice input{width:19px;height:19px;flex:0 0 auto;accent-color:#17457c}
+    .tag-choice span{overflow-wrap:anywhere}.tag-choice b{color:#385f98}
+    .tag-request{border:1px solid #c1d6ee;border-radius:17px;padding:14px;margin:9px 0;background:rgba(255,255,255,.73)}
+</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -2662,7 +2669,7 @@
 
   function beginCompose(){
     pendingCircleReturn=null;
-    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null,location_title:"",comment_ready:false};
+    compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null,location_title:"",tagged_user_ids:[],comment_ready:false};
     showContentStep();
   }
 
@@ -4008,11 +4015,37 @@
     updateReveal();
   }
 
+  async function loadComposeTagChoices(){
+    const root=$('cosmosTagChoices');if(!root || !compose)return;
+    const current=compose;
+    try{
+      const friends=await api('/api/friends');
+      if(!root.isConnected||compose!==current)return;
+      const eligible=(friends.accepted||[]).filter(person=>(
+        current.recipient_mode==='self'||person.user_id===current.recipient_user_id));
+      if(!eligible.length){root.innerHTML='<p class="micro">No Connections eligible for a tag in this audience.</p>';return;}
+      root.innerHTML=eligible.slice(0,30).map(person=>`<label class="tag-choice">
+        <input type="checkbox" data-tag-user="${escapeHtml(person.user_id)}" ${current.tagged_user_ids?.includes(person.user_id)?'checked':''}>
+        <span>${escapeHtml(person.name||'Connection')} <b>@${escapeHtml(person.username||'member')}</b></span></label>`).join('');
+      root.querySelectorAll('[data-tag-user]').forEach(input=>input.onchange=()=>{
+        const selected=[...root.querySelectorAll('[data-tag-user]:checked')].map(e=>e.dataset.tagUser);
+        if(selected.length>8){input.checked=false;toastMsg('Tag up to eight Connections.');return;}
+        current.tagged_user_ids=selected;
+      });
+    }catch(e){if(root.isConnected)root.innerHTML=`<span class="micro">Could not load Connections: ${escapeHtml(e.message)}</span>`;}
+  }
   function showFinalStep(){
     const who=compose.circle_audience==='connections' && compose.recipient_mode==='self'?'My Connections':compose.recipient_mode==='self'?'Future you':compose.recipient_label||'Someone';
     const when=compose.unlock_mode==="here"?"When here":compose.unlock_mode==="date"?new Date(compose.unlock_at).toLocaleString()+" · sealed until reveal":"Now · opens when tapped";
     const sharing=compose.circle_audience==='connections'?'Connections (owner-controlled)':compose.circle_audience==='between_us'?'Only us':'Private';
-    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} ${compose.unlock_mode==='here'?'This Cosmos is anchored to the selected pin. The exact coordinates stay hidden from recipients, who can discover the moment when nearby.':'No location is attached to this moment.'}</div><div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    const canTag=compose.unlock_mode!=='here' && (
+      (compose.recipient_mode==='self'&&compose.circle_audience==='connections') ||
+      (compose.recipient_mode==='person'&&compose.circle_audience==='between_us'));
+    const tagSection=canTag?`<div class="field" id="cosmosTagField"><label>Tag people · @username (optional)</label>
+      <div id="cosmosTagChoices" class="tag-choices"><span class="micro">Finding eligible Connections…</span></div>
+      <div class="micro">A tag is a request. They can accept or decline it in Profile. Tagging never grants access to a private moment, or unlocks a sealed one.</div></div>`:'';
+    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} ${compose.unlock_mode==='here'?'This Cosmos is anchored to the selected pin. The exact coordinates stay hidden from recipients, who can discover the moment when nearby.':'No location is attached to this moment.'}</div>${tagSection}<div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    if(canTag)loadComposeTagChoices();
     sheet.classList.add('liquid-compact-step');
     $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
   }
@@ -4379,10 +4412,30 @@
   }
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
+  async function showMomentTagRequests(){
+    openSheet('<h2>@ Tag requests</h2><p>Decide which moments you want included under My. A tag never gives someone permission to see private content.</p><div id="momentTagList" class="look-loading">Checking your tags…</div><div class="actions"><button id="tagClose" type="button">Close</button></div>');
+    $('tagClose').onclick=closeSheet;
+    const root=$('momentTagList');
+    try{
+      const response=await api('/api/cosmos/tags');
+      if(!root.isConnected)return;
+      const items=response.items||[];
+      root.classList.remove('look-loading');
+      root.innerHTML=items.length?items.map(item=>`<div class="tag-request"><strong>${escapeHtml(item.by||'Connection')}</strong> ${item.username?`<span>@${escapeHtml(item.username)}</span>`:''}<div class="micro">${item.status==='pending'?'Wants to tag you in a moment. Accept to include it under My.':'Tagged in My · You can remove yourself.'}</div><div class="actions">${item.status==='pending'?`<button class="primary" data-tag-id="${escapeHtml(item.id)}" data-tag-action="accept">Accept tag</button>`:''}<button data-tag-id="${escapeHtml(item.id)}" data-tag-action="decline">${item.status==='pending'?'Decline':'Remove tag'}</button></div></div>`).join(''):'<p>No tag requests. When a Connection tags you, it will appear here.</p>';
+      root.querySelectorAll('[data-tag-action]').forEach(btn=>btn.onclick=async()=>{
+        btn.disabled=true;
+        try{
+          await api('/api/cosmos/tags/'+encodeURIComponent(btn.dataset.tagId)+'/'+btn.dataset.tagAction,{method:'POST',body:'{}'});
+          weekMetroCacheKey='';renderJourney();await showMomentTagRequests();
+        }catch(e){toastMsg(e.message,4200);btn.disabled=false;}
+      });
+    }catch(e){if(root.isConnected){root.classList.remove('look-loading');root.textContent='Tags unavailable: '+e.message;}}
+  }
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
+    $("openMyTags").onclick=showMomentTagRequests;
     $("openConnections").onclick=openFriends;
     $("openTogetherSpaces").onclick=openTogetherSpaces;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
@@ -4571,12 +4624,12 @@
   function metroFilterMatches(i){
     if(metroViewFilter==='all')return true;
     if(metroViewFilter==='public')return i.scope==='public';
-    if(metroViewFilter==='mine')return Boolean(i.in_my||i.is_author);
-    return Boolean(i.in_connections||i.scope==='connections'||i.source==='received');
+    if(metroViewFilter==='mine')return Boolean(i.in_my||i.is_author||i.tagged_me);
+    return !Boolean(i.in_my||i.is_author||i.tagged_me);
   }
   function metroBadge(i){
     if(i.scope==='public')return 'PUBLIC';
-    if(i.scope==='connections')return i.is_author?'MY · CONNECTIONS':'CONNECTIONS';
+    if(i.tagged_me&&!i.is_author)return 'TAGGED · ME';
     return i.is_author?'MY':'CONNECTIONS';
   }
   function metroKeyLocal(date){const d=new Date(date);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -4620,17 +4673,23 @@
         const category=item.event==='family-circle'?'connections':
           (item.source==='received'||item.event==='arrival'?'connections':
           (item.recipient_mode==='person'?'connections':(k===1?'connections':'mine')));
-        const candidate={...item,scope:category,is_author:Boolean(item.is_author ?? (item.source==='mine')),
-          in_my:Boolean(item.is_author ?? (item.source==='mine')),
-          in_connections:category==='connections'||(k===1&&item.event!=='scheduled')};
+        const authored=Boolean(item.is_author ?? (item.source==='mine'));
+        const mine=authored||Boolean(item.tagged_me);
+        const candidate={...item,scope:category,is_author:authored,
+          in_my:mine,in_connections:!mine};
         if(prior){candidate.in_my=candidate.in_my||prior.in_my;
-          candidate.in_connections=candidate.in_connections||prior.in_connections;
+          candidate.in_connections=!(candidate.in_my);
+          candidate.tagged_me=Boolean(candidate.tagged_me||prior.tagged_me);
           // A Connections row accurately reflects visibility and approval, while Mine provides private owner details.
           if(item.event!=='family-circle'&&prior.event==='family-circle'){merged.set(item.id,{...prior,in_my:candidate.in_my,in_connections:candidate.in_connections});continue;}
         }
         merged.set(item.id,candidate);
       }
-      weekMetroItems=[...merged.values()].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+      weekMetroItems=[...merged.values()].map(item=>{
+        item.in_my=Boolean(item.in_my||item.is_author||item.tagged_me);
+        item.in_connections=!item.in_my;
+        return item;
+      }).sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
       weekMetroLimited=responses.some(data=>Boolean(data.limited));
       weekMetroBusy=false;renderWeekMetro();
     }catch(e){if(requestId!==weekMetroRequestId)return;weekMetroBusy=false;weekMetroError=e.message;
