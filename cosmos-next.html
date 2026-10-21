@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.5.1-directional-camera-hints" />
+  <meta name="cosmos-build" content="cosmos-next-v2.9.5.4-together-spaces-entry" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1741,6 +1741,33 @@
     @media(max-width:380px){.cosmos-direction-hud{top:calc(env(safe-area-inset-top) + 113px);
       width:calc(100% - 28px)}.cosmos-direction-words strong{font-size:11px}}
     @media(prefers-reduced-motion:reduce){.cosmos-direction-hud{transition:none}}
+
+    /* v2.9.5.4 — COSMOS Together launch from the main Metro, minimal header impact. */
+    .cosmos-together-head-actions{display:flex;align-items:center;gap:5px;flex:none}
+    .app.metro-live .metro-day-heading .cosmos-together-shortcut{
+      min-width:42px;height:42px;border:1px solid rgba(174,200,229,.84);
+      color:#174677;background:rgba(245,251,255,.9);border-radius:999px;
+      font-size:21px;line-height:1;display:grid;place-items:center;cursor:pointer;
+      box-shadow:0 2px 14px rgba(25,65,110,.08)
+    }
+    .cosmos-together-shortcut:focus-visible,.cosmos-space-row button:focus-visible{
+      outline:3px solid #2869a9;outline-offset:2px
+    }
+    .cosmos-space-row{display:flex;align-items:center;gap:12px;justify-content:space-between;
+      padding:13px 12px;margin:8px 0;border:1px solid rgba(150,180,213,.48);
+      border-radius:17px;background:rgba(255,255,255,.78)}
+    .cosmos-space-row div{min-width:0;flex:1;display:grid;gap:3px}
+    .cosmos-space-row strong{font-size:14px;color:#173b61;overflow-wrap:anywhere}
+    .cosmos-space-row small{font-size:11px;color:#54708a;overflow-wrap:anywhere}
+    .cosmos-space-row button{flex:none;min-height:42px;padding:7px 14px;border-radius:13px;
+      background:#1b4c83;border:1px solid #1b4c83;color:#fff;font-weight:800;cursor:pointer}
+    .cosmos-together-sheet label{display:block;font-size:12px;font-weight:800;color:#385673;margin:10px 0 5px}
+    .cosmos-together-sheet select,.cosmos-together-sheet input{box-sizing:border-box;width:100%;height:47px;
+      border-radius:13px;border:1px solid rgba(142,176,210,.6);padding:9px 12px;
+      background:rgba(255,255,255,.96);color:#153859;font-size:16px}
+    .cosmos-together-sheet .cosmos-together-note{font-size:12px;line-height:1.5;color:#516b84;margin:10px 0}
+    @media(max-width:390px){.app.metro-live .metro-day-heading .cosmos-together-shortcut{width:38px;min-width:38px;height:38px}
+      .cosmos-together-head-actions{gap:3px}}
   </style>
 </head>
 <body>
@@ -3364,6 +3391,69 @@
     }catch(e){toastMsg(e.message,4200);}
   }
 
+  // v2.9.5.4 — bridge the existing private Together Lab into camera-first COSMOS.
+  // The Worker remains the authorization boundary: friends must be accepted,
+  // rooms are private and temporary, and links do not grant access.
+  const TOGETHER_LAB_PAGE='/cosmos-together-lab.html?v=041';
+  const TOGETHER_ROOM_ID=/^[0-9a-f-]{36}$/i;
+  function enterTogetherRoom(id){
+    if(!TOGETHER_ROOM_ID.test(String(id||''))){toastMsg('Invalid private Space link.');return;}
+    location.assign(TOGETHER_LAB_PAGE+'&room='+encodeURIComponent(id));
+  }
+  async function openTogetherSpaces(){
+    if(!token||!me||!auth.hidden){toastMsg('Sign in to use private Together Spaces.');return;}
+    openSheet('<div class="cosmos-together-sheet"><h2>♫ COSMOS Together</h2><p>Private shared experiences with accepted Connections.</p><div class="look-loading" role="status">Finding your Spaces…</div></div>');
+    const thisSheet=sheet;
+    try{
+      const [list,connectionData]=await Promise.all([
+        api('/api/together/rooms'),api('/api/friends')
+      ]);
+      if(thisSheet.hidden || !thisSheet.querySelector('.cosmos-together-sheet'))return;
+      const rooms=(Array.isArray(list?.rooms)?list.rooms:[]).slice(0,20);
+      const people=(Array.isArray(connectionData?.accepted)?connectionData.accepted:[]).slice(0,100);
+      const validRooms=rooms.filter(r=>TOGETHER_ROOM_ID.test(String(r.id||'')));
+      openSheet(`<div class="cosmos-together-sheet">
+        <h2>♫ Together Spaces</h2>
+        <p>Watch an embeddable video or listen to a shared experience with an accepted Connection.</p>
+        <div class="cosmos-together-note">Private family beta · Each Space expires after 24 hours · No public access</div>
+        <h3>Your active Spaces (${validRooms.length})</h3>
+        ${validRooms.length?validRooms.map(r=>`<div class="cosmos-space-row"><div>
+          <strong>${escapeHtml(r.title||'Our shared Cosmos')}</strong>
+          <small>${escapeHtml(r.role==='host'?'You invited '+(r.with_name||'a Connection'):'Invited by '+(r.with_name||'a Connection'))}</small>
+          </div><button type="button" data-together-room="${escapeHtml(r.id)}">Enter →</button></div>`).join(''):
+          '<div class="cosmos-together-note">No active Spaces yet. Start one below.</div>'}
+        <h3>Start a private Space</h3>
+        ${people.length?`<label for="cosmosSpacePerson">Accepted Connection</label><select id="cosmosSpacePerson"><option value="">Choose a person</option>
+          ${people.filter(p=>p.user_id).map(p=>`<option value="${escapeHtml(p.user_id)}">${escapeHtml(p.name||'Connection')}</option>`).join('')}</select>
+          <label for="cosmosSpaceTitle">Space name</label><input id="cosmosSpaceTitle" maxlength="70" value="Our shared Cosmos" autocomplete="off">
+          <div class="actions"><button id="cosmosSpaceCreate" class="primary" type="button">+ Create and enter Space</button></div>`:
+          '<p class="cosmos-together-note">Accept a Connection invitation before creating a private Space.</p>'}
+        <div class="actions"><button id="cosmosSpaceRefresh" type="button">↻ Refresh Spaces</button><button id="cosmosSpaceLab" type="button">Open Together Lab</button></div>
+        <div class="cosmos-together-note">The original sound demo and YouTube Watch Together remain in the Lab. Room access is checked on every request. Public Spaces, live concerts, and persistent Spaces are not enabled yet.</div>
+        </div>`);
+      sheet.querySelectorAll('[data-together-room]').forEach(b=>b.onclick=()=>enterTogetherRoom(b.dataset.togetherRoom));
+      $('cosmosSpaceRefresh').onclick=openTogetherSpaces;
+      $('cosmosSpaceLab').onclick=()=>location.assign(TOGETHER_LAB_PAGE);
+      if($('cosmosSpaceCreate'))$('cosmosSpaceCreate').onclick=async()=>{
+        const person=$('cosmosSpacePerson').value,title=$('cosmosSpaceTitle').value.trim();
+        if(!person||!title){toastMsg('Choose a Connection and a Space name.');return;}
+        const button=$('cosmosSpaceCreate');button.disabled=true;button.textContent='Creating private Space…';
+        try{
+          const result=await api('/api/together/rooms',{method:'POST',body:JSON.stringify({guest_user_id:person,title})});
+          if(!TOGETHER_ROOM_ID.test(String(result?.id||'')))throw new Error('Room creation did not return a valid ID.');
+          enterTogetherRoom(result.id);
+        }catch(e){button.disabled=false;button.textContent='+ Create and enter Space';toastMsg(e.message,5200);}
+      };
+    }catch(e){
+      if(thisSheet.hidden)return;
+      openSheet(`<div class="cosmos-together-sheet"><h2>Together Spaces unavailable</h2>
+        <p>${escapeHtml(e.message)}</p><div class="cosmos-together-note">Confirm that the Together Lab Worker is deployed and TOGETHER_LAB_ENABLED is true. No existing COSMOS data was changed.</div>
+        <div class="actions"><button type="button" id="cosmosSpaceRetry" class="primary">Try again</button><button type="button" id="cosmosSpaceBack">Back to camera</button></div></div>`);
+      $('cosmosSpaceRetry').onclick=openTogetherSpaces;
+      $('cosmosSpaceBack').onclick=returnToCamera;
+    }
+  }
+
   async function openFriends(){
     // Selecting Connections from the live camera ALWAYS opens this sheet.
     // It does not replace the camera with a separate full-screen page.
@@ -3378,6 +3468,7 @@
       const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name to open their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
       openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
         <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Back to camera</button></div>
+        <button class="connections-timeline" type="button" id="friendsTogether">♫ Together · Create or join a private Space →</button>
         <button class="connections-timeline" type="button" id="mySharedTimeline">◯ My shared timeline & contributions →</button>
         <button class="connections-timeline" type="button" id="circlePrivacy">⚙️ Who can add to my circle?</button>
         <div class="friend-group-title">Requests received ${data.incoming?.length?`<span class="friend-badge">${data.incoming.length}</span>`:''}</div>
@@ -3388,6 +3479,7 @@
         ${data.outgoing?.length?data.outgoing.map(x=>entry(x,'outgoing')).join(''):'<div class="friend-empty">No invitations waiting.</div>'}
         <div class="micro">Messages previously left for someone are only made available to that person after connection acceptance, subject to the original time and place rules.</div>`);
       $('inviteContact').onclick=openInvite;
+      $('friendsTogether').onclick=openTogetherSpaces;
       $('mySharedTimeline').onclick=()=>openFriendTimeline(me.id,me.display_name||'My');
       $('circlePrivacy').onclick=openCirclePreferences;
       $('closeFriends').onclick=returnToCamera;
@@ -4221,10 +4313,11 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openConnections").onclick=openFriends;
+    $("openTogetherSpaces").onclick=openTogetherSpaces;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
@@ -4525,6 +4618,7 @@
     journeyStage.querySelectorAll('[data-week-shift]').forEach(btn=>btn.onclick=()=>shiftWeekMetro(Number(btn.dataset.weekShift)));
     journeyStage.querySelectorAll('[data-metro-filter]').forEach(btn=>btn.onclick=()=>{metroViewFilter=btn.dataset.metroFilter;renderWeekMetro();});
     $('metroPeople')?.addEventListener('click',openFriends);
+    $('metroTogether')?.addEventListener('click',openTogetherSpaces);
     $('metroRetry')?.addEventListener('click',()=>{weekMetroCacheKey='';fetchMetroWeek();renderWeekMetro();});
     journeyStage.querySelectorAll('[data-metro-open]').forEach(btn=>btn.onclick=async()=>{
       if(performance.now()<=suppressStationClickUntil||btn.disabled)return;
@@ -4589,7 +4683,7 @@
   function metroRenderDay(events){
     const label=weekMetroDay.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});
     const heading=(sub='')=>`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(label)}</h2><p>${escapeHtml(sub)}</p></div>
-      ${['all','connections'].includes(dimension)?'<button type="button" class="metro-people-pill" id="metroPeople">People →</button>':''}</div>`;
+      ${['all','connections'].includes(dimension)?'<div class="cosmos-together-head-actions"><button type="button" class="cosmos-together-shortcut" id="metroTogether" aria-label="Together private Spaces" title="Together">♫</button><button type="button" class="metro-people-pill" id="metroPeople">People →</button></div>':''}</div>`;
     if(weekMetroBusy)return heading('Finding your real Cosmoses…')+'<div class="metro-zero">Loading moments…</div>';
     if(weekMetroError)return heading('Unable to load')+`<div class="metro-day-error" role="alert">Could not load your moments: ${escapeHtml(weekMetroError)}<br>Nothing has been deleted.<br><button type="button" id="metroRetry">Try again</button></div>`;
     const sunday=weekMetroDay.getDay(),left=sunday>=4;
