@@ -1829,6 +1829,22 @@
     @media(max-width:375px){.cosmos-time-pair{grid-template-columns:minmax(0,1fr)}
       .cosmos-time-pair .cosmos-time-field{padding:8px 10px}}
 
+
+    /* COSMOS v2.9.6.1 — honest sharing audience within the moment viewer. */
+    .cosmos-sharing-summary{margin:14px 0 18px;padding:15px 16px;border-radius:19px;
+      border:1px solid rgba(165,193,222,.66);background:rgba(247,251,255,.90);
+      box-shadow:0 6px 20px rgba(27,65,108,.05);color:#19395f}
+    .cosmos-sharing-head{display:flex;align-items:center;gap:9px;justify-content:space-between;flex-wrap:wrap}
+    .cosmos-sharing-head strong{font-size:14px}
+    .cosmos-sharing-label{margin:7px 0 2px;font-weight:850;font-size:16px;line-height:1.3}
+    .cosmos-sharing-detail{font-size:12px;line-height:1.55;color:#536983;margin-top:6px}
+    .cosmos-sharing-names{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+    .cosmos-sharing-person{display:inline-flex;gap:5px;align-items:center;min-height:34px;
+      padding:6px 10px;border-radius:13px;background:#fff;border:1px solid #d7e4f2;
+      font-size:12px;line-height:1.3;color:#17416e;overflow-wrap:anywhere}
+    .cosmos-sharing-person small{font-size:11px;font-weight:600;color:#66809a}
+    .cosmos-sharing-summary .cosmos-sharing-note{margin:10px 0 0;font-size:11px;
+      line-height:1.55;color:#60758e}
 </style>
 </head>
 <body>
@@ -4417,6 +4433,28 @@
       ${rows||'<p class="cosmos-no-comments">No comments yet. Add your thoughts to this moment.</p>'}
     </section>`;
   }
+  function momentAudienceHtml(audience){
+    // This metadata is returned by the authenticated Worker only after its
+    // existing moment access and time-lock checks. Never derive access from tags.
+    if(!audience||!audience.type) return `<section class="cosmos-sharing-summary" aria-label="Moment sharing">
+      <div class="cosmos-sharing-head"><strong>◉ Shared with</strong></div>
+      <div class="cosmos-sharing-detail">Sharing information is unavailable. It has not been verified for this moment.</div></section>`;
+    const raw=Array.isArray(audience.members)?audience.members:[];
+    const people=audience.members_visible===true ? raw.map(p=>{
+      const n=escapeHtml(String(p.name||'Connection'));
+      const handle=p.username&&('@'+p.username)!==p.name?`<small>@${escapeHtml(String(p.username))}</small>`:'';
+      return `<span class="cosmos-sharing-person">${n} ${handle}</span>`;
+    }).join('') : '';
+    const count=audience.type==='connections'&&audience.members_visible===true?
+      ` <span class="micro">(${Number(audience.member_count||0)} eligible)</span>`:'';
+    return `<section class="cosmos-sharing-summary" aria-label="Moment sharing audience">
+      <div class="cosmos-sharing-head"><strong>◉ Shared with</strong></div>
+      <div class="cosmos-sharing-label">${escapeHtml(audience.label||'Sharing unknown')}${count}</div>
+      ${people?`<div class="cosmos-sharing-names">${people}</div>`:''}
+      <div class="cosmos-sharing-detail">${escapeHtml(audience.detail||'')}</div>
+      ${audience.type==='connections'&&audience.members_visible===true?'<p class="cosmos-sharing-note">These are currently eligible Connections, not proof that anyone opened the post. Adding or removing Connections may change who can see it.</p>':''}
+    </section>`;
+  }
   async function renderCosmos(item,thread,additions=[],fromMetro=false){
     const content=await contentHtml(item);
     const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),false,item.id);
@@ -4426,7 +4464,7 @@
     const chain=(thread||[]).filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
     const originalDate=`<div class="cosmos-original-date"><b>Original moment</b><div>Posted on ${escapeHtml(cosmosLocalStamp(item.created_at))}</div>${item.unlock_at?`<small>${Date.parse(item.unlock_at)>Date.now()?'Scheduled to reveal':'Revealed'} on ${escapeHtml(cosmosLocalStamp(item.unlock_at))}</small>`:''}</div>`;
     const receipt=additionReceiptMarkup(item,additions);
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2>${originalDate}${receipt}${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2>${originalDate}${momentAudienceHtml(item.audience)}${receipt}${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
       <div class="liquid-share-context"><button type="button" class="cosmos-share-pill" data-share-part="main">↗ Share this section</button></div></section>
       ${commentsHtml}
       ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button></div>
