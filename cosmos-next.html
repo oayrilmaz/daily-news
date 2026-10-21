@@ -1,4 +1,4 @@
-a<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -1865,6 +1865,7 @@ a<!doctype html>
       <div id="authStart">
         <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
         <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
+        <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · cannot be changed after claiming</div></div>
         <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>Private family beta. Younger family members can explore with a parent.</p></div>
         <button type="button" id="sendCodesButton">Sign in</button>
         <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
@@ -1924,6 +1925,7 @@ a<!doctype html>
     $('authModeLogin').setAttribute('aria-pressed',String(mode==='login'));
     $('authModeRegister').setAttribute('aria-pressed',String(mode==='register'));
     $('authRegisterConsent').hidden=mode!=='register';
+    $('authUsernameField').hidden=mode!=='register';
     $('authPasswordField').hidden=mode==='reset';
     $('authPasswordInput').autocomplete=mode==='register'?'new-password':'current-password';
     $('authForgotButton').hidden=mode!=='login';
@@ -1933,6 +1935,7 @@ a<!doctype html>
   let token = localStorage.getItem(TOKEN_KEY) || "";
 
   let me = null;
+  let usernameRequired=false;
   let challengeId = "";
   let currentFound = null;
   let holdTimer = null;
@@ -2004,7 +2007,7 @@ a<!doctype html>
       startCamera(false).catch(()=>{});
     }
   }
-  function closeSheet(){disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
   function openSheet(html){disposePlaceMap();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
@@ -2012,7 +2015,7 @@ a<!doctype html>
     updateCameraEscape();
   }
   function closePanel(){panel.hidden=true;panel.innerHTML="";document.querySelectorAll('[data-space]').forEach(b=>b.classList.toggle('active',b.dataset.space==='here'));updateCameraEscape();}
-  function returnToCamera(){closeSheet();closePanel();goNow();}
+  function returnToCamera(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}closeSheet();closePanel();goNow();}
   $("cameraEscape").addEventListener("click",returnToCamera);
 
   async function api(path, options={}){
@@ -2180,16 +2183,48 @@ a<!doctype html>
     }finally{directNoticeOpening=false;}
   }
 
+  const cosmosHandleRule=/^[a-z][a-z0-9_]{2,19}$/;
+  function normalizeCosmosHandle(raw){return String(raw||'').trim().replace(/^@/,'').toLowerCase();}
+  function showRequiredUsername(){
+    if(me?.username)return;
+    usernameRequired=true;
+    openSheet(`<h2>Choose your COSMOS @username</h2><p>Every COSMOS member needs one unique username. This is different from your display name, and you'll use it for future @mentions.</p>
+      <div class="field"><label for="cosmosClaimUsername">Your username</label><input id="cosmosClaimUsername" placeholder="e.g. cosmos_explorer" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21"/></div>
+      <div class="micro">3–20 characters · starts with a letter · letters, numbers, underscore only. Once claimed, your username cannot be changed in this beta. Your profile remains private.</div>
+      <div class="auth-error" id="cosmosClaimError" hidden></div>
+      <div class="actions"><button class="primary" id="cosmosClaimSave">Claim @username</button></div>`);
+    $('sheetBackCamera').hidden=true;
+    const input=$('cosmosClaimUsername'),btn=$('cosmosClaimSave'),error=$('cosmosClaimError');
+    btn.onclick=async()=>{
+      error.hidden=true;
+      const username=normalizeCosmosHandle(input.value);
+      if(!cosmosHandleRule.test(username)){error.textContent='Use 3–20 characters, starting with a letter, using letters/numbers/underscore.';error.hidden=false;return;}
+      btn.disabled=true;btn.textContent='Claiming…';
+      try{
+        me=await api('/api/me/username',{method:'POST',body:JSON.stringify({username})});
+        usernameRequired=false;closeSheet();accountButton.textContent=me.display_name||'@'+me.username;
+        toastMsg('Welcome, @'+me.username+'!');
+        startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();refreshNoticeBadge();
+        if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
+        else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
+      }catch(e){error.textContent=e.message||'That username could not be claimed.';error.hidden=false;}
+      finally{btn.disabled=false;btn.textContent='Claim @username';}
+    };
+    setTimeout(()=>input?.focus(),100);
+  }
+
   async function bootstrap(){
     if(!token){auth.hidden=false;return;}
     try{
       me = await api("/api/me");
       auth.hidden=true;showAuthError('');
+      accountButton.textContent=me.display_name|| (me.username?'@'+me.username:'You');
+      if(!me.username){showRequiredUsername();return;}
       refreshNoticeBadge();
       if(pendingNoticeId&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,220);
       else if(pendingSharedMoment&&!FAMILY_INVITE_CODE)setTimeout(openSharedMomentFromLink,360);
       else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,550);
-      accountButton.textContent = me.display_name || "You";
+      accountButton.textContent = me.display_name || (me.username?'@'+me.username:'You');
       startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
       renewSessionIfDue();
       // Update the existing service worker for already-installed iPhone Home Screen apps.
@@ -2209,7 +2244,9 @@ a<!doctype html>
 
   function completeEmailSignIn(r){
     token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;
-    auth.hidden=true;accountButton.textContent=me.display_name||"You";refreshNoticeBadge();startCamera(false);scanHere(false);
+    auth.hidden=true;accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');
+    if(!me.username){showRequiredUsername();return;}
+    refreshNoticeBadge();startCamera(false);scanHere(false);
     refreshFriendsSummary();renderJourney();
     if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
@@ -2224,13 +2261,17 @@ a<!doctype html>
     if(!email){showAuthError('Enter your email address.');return;}
     if(authMode!=='reset' && !password){showAuthError('Enter your password.');return;}
     if(authMode==='register' && !$('authAgeConfirm').checked){showAuthError('An independent account requires the user to be at least 13.');return;}
+    const username=normalizeCosmosHandle($('authUsernameInput').value);
+    if(authMode==='register' && !cosmosHandleRule.test(username)){
+      showAuthError('Choose a unique username: 3–20 characters, starting with a letter; letters, numbers or underscore.');return;
+    }
     sendCodesButton.disabled=true;sendCodesButton.textContent='Please wait…';
     try{
       if(authMode==='login'){
         const r=await api('/api/auth/email/login',{method:'POST',body:JSON.stringify({email,password})});completeEmailSignIn(r);return;
       }
       const url=authMode==='register'?'/api/auth/email/register/start':'/api/auth/email/reset/start';
-      const body=authMode==='register'?{email,password,age_13_or_older:true,invite_code:FAMILY_INVITE_CODE}:{email};
+      const body=authMode==='register'?{email,password,username,age_13_or_older:true,invite_code:FAMILY_INVITE_CODE}:{email};
       const r=await api(url,{method:'POST',body:JSON.stringify(body)});
       authChallengeId=r.challenge_id;authStart.hidden=true;authVerify.hidden=false;
       $('authResetPasswordBlock').hidden=authMode!=='reset';
@@ -3491,7 +3532,7 @@ a<!doctype html>
       // If the person returned to the camera while fetching, never reopen the old sheet.
       if(requestGeneration!==friendsViewGeneration||sheet.hidden)return;
       friendsCache={accepted:data.accepted||[],incoming:data.incoming||[],outgoing:data.outgoing||[]};
-      const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name to open their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
+      const entry=(person,type)=>`<div class="friend-row"><div>${type==='accepted'?`<button type="button" class="friend-person" data-friend-timeline="${escapeHtml(person.user_id)}">◯ ${escapeHtml(person.name)} →</button>`:`<div class="person">${escapeHtml(person.name)}</div>`}<div class="sub">${person.username?'@'+escapeHtml(person.username)+' · ':''}${type==='incoming'?'Wants to connect':type==='outgoing'?'Awaiting acceptance':'Tap name to open their shared timeline'}</div></div><div class="friend-actions">${type==='incoming'?`<button class="accept" data-friend-accept="${escapeHtml(person.id)}">Accept</button><button data-friend-decline="${escapeHtml(person.id)}">Decline</button>`:type==='accepted'?`<button class="remove" data-friend-remove="${escapeHtml(person.id)}">Remove</button>`:'<span class="sub">Pending</span>'}</div></div>`;
       openSheet(`<h2>Your Connections</h2><p>Only mutually accepted connections can send private Cosmoses. Your contact details stay hidden.</p>
         <div class="actions"><button class="primary" id="inviteContact">+ Invite someone</button><button id="closeFriends">Back to camera</button></div>
         <button class="connections-timeline" type="button" id="friendsTogether">♫ Together · Create or join a private Space →</button>
@@ -4339,14 +4380,14 @@ a<!doctype html>
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||"You")}</h2><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Cannot be changed in this beta.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openConnections").onclick=openFriends;
     $("openTogetherSpaces").onclick=openTogetherSpaces;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
-    $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||"You";closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
+    $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
     $("logout").onclick=async()=>{await turnOffCosmosPush().catch(()=>{});localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);location.reload();};
   });
 
