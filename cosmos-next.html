@@ -1865,7 +1865,7 @@
       <div id="authStart">
         <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
         <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
-        <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · cannot be changed after claiming</div></div>
+        <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · can be changed later in Profile</div></div>
         <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>Private family beta. Younger family members can explore with a parent.</p></div>
         <button type="button" id="sendCodesButton">Sign in</button>
         <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
@@ -2190,7 +2190,7 @@
     usernameRequired=true;
     openSheet(`<h2>Choose your COSMOS @username</h2><p>Every COSMOS member needs one unique username. This is different from your display name, and you'll use it for future @mentions.</p>
       <div class="field"><label for="cosmosClaimUsername">Your username</label><input id="cosmosClaimUsername" placeholder="e.g. cosmos_explorer" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21"/></div>
-      <div class="micro">3–20 characters · starts with a letter · letters, numbers, underscore only. Once claimed, your username cannot be changed in this beta. Your profile remains private.</div>
+      <div class="micro">3–20 characters · starts with a letter · letters, numbers, underscore only. You can change it later in Profile. Previous usernames stay reserved to you, with a 24-hour interval between changes. Your profile remains private.</div>
       <div class="auth-error" id="cosmosClaimError" hidden></div>
       <div class="actions"><button class="primary" id="cosmosClaimSave">Claim @username</button></div>`);
     $('sheetBackCamera').hidden=true;
@@ -4380,13 +4380,29 @@
 
   document.querySelectorAll('[data-space]').forEach(b=>b.addEventListener("click",()=>showSpace(b.dataset.space)));
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Cannot be changed in this beta.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openConnections").onclick=openFriends;
     $("openTogetherSpaces").onclick=openTogetherSpaces;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
+    $("saveUsername").onclick=async()=>{
+      const btn=$("saveUsername"),error=$("profileUsernameError");
+      const username=normalizeCosmosHandle($("profileUsername").value);
+      error.hidden=true;
+      if(!cosmosHandleRule.test(username)){
+        error.textContent='Use 3–20 characters, starting with a letter, using letters, numbers or underscores.';error.hidden=false;return;
+      }
+      if(username===(me?.username||'')){toastMsg('Your @username is already '+username+'.');return;}
+      btn.disabled=true;btn.textContent='Checking username…';
+      try{
+        me=await api('/api/me/username',{method:'PATCH',body:JSON.stringify({username})});
+        accountButton.textContent=me.display_name||'@'+me.username;
+        closeSheet();toastMsg('Your new username is @'+me.username+'.');
+      }catch(e){error.textContent=e.message||'Could not update username.';error.hidden=false;}
+      finally{btn.disabled=false;btn.textContent='Change @username';}
+    };
     $("saveName").onclick=async()=>{try{me=await api("/api/me",{method:"PATCH",body:JSON.stringify({display_name:$("displayName").value.trim()})});accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');closeSheet();toastMsg("Saved.");}catch(e){toastMsg(e.message);}};
     $("logout").onclick=async()=>{await turnOffCosmosPush().catch(()=>{});localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);location.reload();};
   });
