@@ -1,4 +1,4 @@
-<!doctype html>
+a<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -1768,6 +1768,32 @@
     .cosmos-together-sheet .cosmos-together-note{font-size:12px;line-height:1.5;color:#516b84;margin:10px 0}
     @media(max-width:390px){.app.metro-live .metro-day-heading .cosmos-together-shortcut{width:38px;min-width:38px;height:38px}
       .cosmos-together-head-actions{gap:3px}}
+
+    /* v2.9.5.5: an explicit, always-visible Together control beside People.
+       The existing v2.9.5.4 shortcut was conditional/ambiguous and easy to miss. */
+    .app.metro-live .metro-day-heading .cosmos-together-shortcut{
+      display:inline-flex!important;align-items:center;justify-content:center;
+      width:auto!important;min-width:108px!important;height:42px!important;
+      padding:7px 14px!important;white-space:nowrap;
+      color:#fff!important;background:#17457c!important;border-color:#17457c!important;
+      box-shadow:0 3px 12px rgba(23,69,124,.18);font-size:12px!important;
+      font-weight:820!important;line-height:1.1!important;letter-spacing:.015em;
+    }
+    .app.metro-live .metro-day-heading .cosmos-together-head-actions{
+      display:flex!important;align-items:center;gap:7px;flex:none;
+    }
+    .app.metro-live .metro-day-heading .metro-people-pill{white-space:nowrap}
+    @media(max-width:560px){
+      .app.metro-live .metro-day-heading{gap:5px!important}
+      .app.metro-live .metro-day-heading .cosmos-together-head-actions{gap:4px}
+      .app.metro-live .metro-day-heading .cosmos-together-shortcut{
+        min-width:84px!important;height:38px!important;padding:5px 9px!important;font-size:11px!important}
+      .app.metro-live .metro-day-heading .metro-people-pill{min-width:70px;padding:5px 8px!important}
+    }
+    @media(max-width:375px){
+      .app.metro-live .metro-day-heading{flex-wrap:wrap;row-gap:3px}
+      .app.metro-live .metro-day-heading .cosmos-together-head-actions{margin-left:auto}
+    }
   </style>
 </head>
 <body>
@@ -4683,7 +4709,7 @@
   function metroRenderDay(events){
     const label=weekMetroDay.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric',year:'numeric'});
     const heading=(sub='')=>`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(label)}</h2><p>${escapeHtml(sub)}</p></div>
-      ${['all','connections'].includes(dimension)?'<div class="cosmos-together-head-actions"><button type="button" class="cosmos-together-shortcut" id="metroTogether" aria-label="Together private Spaces" title="Together">♫</button><button type="button" class="metro-people-pill" id="metroPeople">People →</button></div>':''}</div>`;
+      <div class="cosmos-together-head-actions"><button type="button" class="cosmos-together-shortcut" id="metroTogether" aria-label="Open Together private Spaces" title="Together Spaces · v2.9.5.5">♫ Together</button><button type="button" class="metro-people-pill" id="metroPeople">People →</button></div></div>`;
     if(weekMetroBusy)return heading('Finding your real Cosmoses…')+'<div class="metro-zero">Loading moments…</div>';
     if(weekMetroError)return heading('Unable to load')+`<div class="metro-day-error" role="alert">Could not load your moments: ${escapeHtml(weekMetroError)}<br>Nothing has been deleted.<br><button type="button" id="metroRetry">Try again</button></div>`;
     const sunday=weekMetroDay.getDay(),left=sunday>=4;
