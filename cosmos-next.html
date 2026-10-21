@@ -1801,6 +1801,34 @@
     .tag-choice input{width:19px;height:19px;flex:0 0 auto;accent-color:#17457c}
     .tag-choice span{overflow-wrap:anywhere}.tag-choice b{color:#385f98}
     .tag-request{border:1px solid #c1d6ee;border-radius:17px;padding:14px;margin:9px 0;background:rgba(255,255,255,.73)}
+
+    /* COSMOS v2.9.6.0 — make creation time distinct from release time. */
+    .cosmos-original-date{margin:8px 0 14px;padding:10px 13px;border-radius:15px;
+      border:1px solid rgba(154,184,217,.40);background:rgba(255,255,255,.64);color:#324e70;
+      font-size:12px;line-height:1.5}
+    .cosmos-original-date b{color:#153962;font-weight:800}
+    .cosmos-original-date small{display:block;margin-top:3px;color:#526f92;font-size:11px}
+    .cosmos-time-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0;
+      border-radius:15px;overflow-wrap:anywhere}
+    .cosmos-time-pair .cosmos-time-field{border:1px solid rgba(140,173,209,.42);border-radius:13px;
+      background:rgba(255,255,255,.78);padding:10px 11px;min-width:0}
+    .cosmos-time-field small{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+      font-weight:850;color:#5d7591;margin-bottom:4px}
+    .cosmos-time-field strong{font-size:12px;color:#1b385d;font-weight:750;line-height:1.45;display:block}
+    .cosmos-time-field.is-future{background:rgba(228,239,255,.87);border-color:rgba(59,113,182,.40)}
+    .cosmos-time-note{margin:7px 0 10px;font-size:12px;font-weight:700;line-height:1.5;color:#275386}
+    .cosmos-time-note.now{color:#49637b}
+    .cosmos-schedule-receipt{margin:12px 0 16px;border:1px solid rgba(57,119,176,.38);
+      border-radius:18px;padding:13px;background:rgba(237,247,255,.93);color:#1a436d}
+    .cosmos-schedule-receipt h3{font-size:15px;margin:0 0 5px;color:#173a63}
+    .cosmos-schedule-receipt p{font-size:12px;line-height:1.5;margin:4px 0;color:#36597e}
+    .cosmos-addition-context{margin:9px 0;padding:10px 12px;background:rgba(236,244,255,.82);
+      border:1px solid rgba(161,190,222,.45);border-radius:13px;color:#21486f;font-size:12px;line-height:1.5}
+    .cosmos-comment-row .cosmos-time-pair{margin:8px 0 10px}
+    .cosmos-comment-row .cosmos-time-note{margin:0 0 8px}
+    @media(max-width:375px){.cosmos-time-pair{grid-template-columns:minmax(0,1fr)}
+      .cosmos-time-pair .cosmos-time-field{padding:8px 10px}}
+
 </style>
 </head>
 <body>
@@ -4092,8 +4120,9 @@
   }
   async function momentAttachmentHtml(a,ownerCanRemove=false,cosmosId=''){
     const removable=(a.can_remove||ownerCanRemove) ? `<button class="post-delete" type="button" data-remove-extra="${escapeHtml(a.id)}" data-cosmos="${escapeHtml(cosmosId)}" style="margin:10px 0 0;min-height:44px">Remove addition</button>`:'';
-    if(a.sealed){return `<div class="attachment-row"><b>🔒 A future contribution is sealed</b><p class="micro">Reveals ${escapeHtml(new Date(a.unlock_at).toLocaleString())}</p>${removable}</div>`;}
-    const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</b>${a.pending?'<p class="micro">🔒 Older pending approval — not visible to other Connections.</p>':''}`;
+    if(a.sealed){return `<div class="attachment-row"><b>🔒 Sealed future addition</b>${additionTimeFields(a)}
+      <p class="cosmos-time-note">The content stays hidden until the reveal date. The original moment owner can remove this addition without opening it.</p>${removable}</div>`;}
+    const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)}</b>${additionTimeFields(a)}${additionTimeNote(a)}${a.pending?'<p class="micro">🔒 Older pending approval — not visible to other Connections.</p>':''}`;
     const review=a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:'';
     const loc=a.url&&validMapLink(a.url)?locationTextParts(a.text):null;
     const comment=loc?loc.comment:a.text;
@@ -4113,11 +4142,57 @@
       const content=await momentAttachmentHtml(a,ownerCanRemove,cosmosId);
       return `<section class="cosmos-part" data-part-id="${escapeHtml(a.id)}">${content}
         ${a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:''}
-        ${!a.pending&&!a.sealed?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this section</button>`:''}</section>`;
+        ${!a.pending&&!a.sealed&&!(a.unlock_at&&Date.parse(a.unlock_at)>Date.now())?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this section</button>`:''}</section>`;
     }));return parts.join('');
   }
   // A date is stored as ISO UTC; the browser's datetime-local input uses the person's local time.
   let additionSchedule={mode:'now',unlock_at:null};
+  let recentAdditionReceipt=null;
+  // Every addition has a created-at date. Only scheduled additions have unlock_at.
+  // These fields come from the authenticated Worker response—not from the parent's date.
+  function cosmosLocalStamp(raw){
+    const ms=Date.parse(String(raw||''));
+    if(!Number.isFinite(ms))return 'Unavailable';
+    return new Date(ms).toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+  }
+  function additionTimeFields(a){
+    const added=cosmosLocalStamp(a.created_at);
+    const hasReveal=Number.isFinite(Date.parse(String(a.unlock_at||'')));
+    const future=hasReveal && Date.parse(a.unlock_at)>Date.now();
+    const key=hasReveal?(future?'Reveals on':'Revealed on'):'Visible since';
+    const when=hasReveal?cosmosLocalStamp(a.unlock_at):'Immediately after posting';
+    return `<div class="cosmos-time-pair" aria-label="Contribution posting and reveal dates">
+      <div class="cosmos-time-field"><small>Posted on</small><strong>${escapeHtml(added)}</strong></div>
+      <div class="cosmos-time-field ${future?'is-future':''}"><small>${key}</small><strong>${escapeHtml(when)}</strong></div>
+    </div>`;
+  }
+  function additionTimeNote(a){
+    if(!a.unlock_at)return '<p class="cosmos-time-note now">✓ Posted and visible now to permitted people.</p>';
+    const future=Date.parse(a.unlock_at)>Date.now();
+    if(!future)return '<p class="cosmos-time-note now">✓ The scheduled reveal time has passed.</p>';
+    return `<p class="cosmos-time-note">🔒 Scheduled surprise · Contents are hidden from recipients until ${escapeHtml(cosmosLocalStamp(a.unlock_at))}.</p>`;
+  }
+  function additionComposeSummary(){
+    const isFuture=additionSchedule.mode==='future'&&additionSchedule.unlock_at;
+    return `<div class="cosmos-addition-context"><b>${isFuture?'🔒 Sealed future surprise':'✓ Post now'}</b>
+      <div>${isFuture?'The moment will be posted now, but recipients cannot reveal it until <b>'+escapeHtml(cosmosLocalStamp(additionSchedule.unlock_at))+'</b>.':'This addition becomes visible immediately to authorized people.'}</div>
+      <div>The original moment keeps its own date. Your addition gets its own posting and reveal dates.</div></div>`;
+  }
+  function recordAdditionReceipt(out,item){
+    recentAdditionReceipt={cosmosId:item.id,additionId:out?.id||'',created_at:new Date().toISOString(),unlock_at:additionSchedule.mode==='future'?additionSchedule.unlock_at:null};
+  }
+  function additionReceiptMarkup(item,additions){
+    const receipt=recentAdditionReceipt;
+    if(!receipt||receipt.cosmosId!==item.id)return '';
+    recentAdditionReceipt=null;
+    const saved=(additions||[]).find(a=>String(a.id)===String(receipt.additionId))||receipt;
+    const upcoming=Boolean(saved.unlock_at&&Date.parse(saved.unlock_at)>Date.now());
+    return `<section class="cosmos-schedule-receipt" role="status">
+      <h3>${upcoming?'🔒 Future addition scheduled':'✓ Addition posted'}</h3>
+      <p>${upcoming?'Posted now; your recipient sees only a sealed indicator until the reveal date.':'Your addition is available now to authorized people.'}</p>
+      ${additionTimeFields(saved)}
+    </section>`;
+  }
   function additionSchedulePayload(){return additionSchedule.mode==='future'?{unlock_at:additionSchedule.unlock_at}:{};}
   function saveAdditionSchedule(){
     const mode=$('additionWhen')?.value||additionSchedule.mode;
@@ -4135,6 +4210,7 @@
     const location=Boolean(payload.locationTitle);
     const kind=location?'location':payload.kind;
     openSheet(`<h2>Comment on your ${escapeHtml(kind)}</h2><p>These words will appear underneath this ${escapeHtml(kind)} section, visible only to people who can open the moment.</p>
+      ${additionComposeSummary()}
       <div class="cosmos-comment-compose"><label for="additionComment">YOUR COMMENT · OPTIONAL</label>
         <textarea id="additionComment" maxlength="1200" placeholder="Add a little context…"></textarea>
       </div><div class="actions"><button type="button" id="additionCommentBack">← Back</button>
@@ -4147,7 +4223,9 @@
       data.text=location?'⌖ '+payload.locationTitle+(note?'\n\n'+note:''):note;
       button.disabled=true;button.textContent='Adding…';
       try{const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify(data)});
-        await openCosmos(item.id);toastMsg(out.needs_review?'Sent to the timeline owner for approval.':'Added to this moment.');}
+        recordAdditionReceipt(out,item);
+        await openCosmos(item.id);
+        toastMsg(out.needs_review?'Sent for approval.':additionSchedule.mode==='future'?'Posted now · sealed until '+cosmosLocalStamp(additionSchedule.unlock_at):'Posted and visible now.',5200);}
       catch(e){toastMsg(e.message,4500);if($('additionCommentSave')){$('additionCommentSave').disabled=false;$('additionCommentSave').textContent='Add to moment →';}}
     };
   }
@@ -4160,6 +4238,7 @@
       <div class="field" id="additionRevealWrap" ${additionSchedule.mode==='future'?'':'hidden'}><label for="additionRevealAt">Reveal date and time (your local time)</label>
         <input type="datetime-local" id="additionRevealAt" value="${additionSchedule.localValue||localDefault}">
         <p class="micro">Only a sealed indicator is visible before the reveal; no content or thumbnails.</p></div>
+      <div class="cosmos-addition-context" id="additionTimingExplainer" aria-live="polite">Choose Now to share immediately, or Future to post now but keep the contents sealed until the selected reveal date. The original moment's date does not change.</div>
       <div class="choices"><button class="choice" data-extra="text"><strong>Comment</strong><span>Leave words here.</span></button>
       <button class="choice" data-extra="voice"><strong>Voice</strong><span>Record an audio note.</span></button>
       <button class="choice" data-extra="link"><strong>Link</strong><span>Secure web address.</span></button>
@@ -4169,7 +4248,13 @@
       <button class="choice" data-extra="location"><strong>⌖ Location</strong><span>Google Maps or Apple Maps.</span></button></div>
       <div class="actions"><button id="extraBack">Back to moment</button></div>`);
     $('extraBack').onclick=()=>openCosmos(item.id);
-    $('additionWhen').onchange=()=>{$('additionRevealWrap').hidden=$('additionWhen').value!=='future';};
+    $('additionWhen').onchange=()=>{
+      const future=$('additionWhen').value==='future';
+      $('additionRevealWrap').hidden=!future;
+      $('additionTimingExplainer').textContent=future
+        ? '🔒 Posted today, sealed until the reveal date below. People can see that a surprise is waiting, not its contents.'
+        : '✓ Posted today and visible immediately to everyone authorized to see this moment.';
+    };
     sheet.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>{if(saveAdditionSchedule())chooseMomentAddition(item,b.dataset.extra);});
   }
   function chooseMomentAddition(item,kind){
@@ -4177,7 +4262,7 @@
       showAdditionCommentStep(item,{kind:'link',url,locationTitle:title||'Shared location'});
     },()=>openAddToMoment(item));
     if(['text','music','link'].includes(kind)){
-      openSheet(`<h2>${kind==='text'?'Comment':kind==='music'?'Music link':'Link'}</h2><div class="field"><label>${kind==='text'?'Message':'https:// address'}</label><textarea id="additionValue" maxlength="${kind==='text'?1200:1600}" placeholder="${kind==='text'?'Leave a meaningful comment…':'https://…'}"></textarea></div><div class="actions"><button id="extraCancel">Back</button><button class="primary" id="extraSubmit">Add →</button></div>`);
+      openSheet(`<h2>${kind==='text'?'Comment':kind==='music'?'Music link':'Link'}</h2>${additionComposeSummary()}<div class="field"><label>${kind==='text'?'Message':'https:// address'}</label><textarea id="additionValue" maxlength="${kind==='text'?1200:1600}" placeholder="${kind==='text'?'Leave a meaningful comment…':'https://…'}"></textarea></div><div class="actions"><button id="extraCancel">Back</button><button class="primary" id="extraSubmit">Add →</button></div>`);
       $('extraCancel').onclick=()=>openAddToMoment(item);
       $('extraSubmit').onclick=async()=>{
         const value=$('additionValue').value.trim();if(!value)return toastMsg('Add something first.');
@@ -4186,7 +4271,9 @@
           catch{return toastMsg('Use a secure https:// link.');}
           return showAdditionCommentStep(item,{kind,url:value});
         }
-        try{$('extraSubmit').disabled=true;const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'text',text:value,...additionSchedulePayload()})});await openCosmos(item.id);toastMsg(out.needs_review?'Comment sent for approval.':'Comment added.');}
+        try{$('extraSubmit').disabled=true;const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'text',text:value,...additionSchedulePayload()})});
+          recordAdditionReceipt(out,item);await openCosmos(item.id);
+          toastMsg(out.needs_review?'Sent for approval.':additionSchedule.mode==='future'?'Posted now · sealed until '+cosmosLocalStamp(additionSchedule.unlock_at):'Comment posted and visible now.',5200);}
         catch(e){toastMsg(e.message,4500);if($('extraSubmit'))$('extraSubmit').disabled=false;}
       };return;
     }
@@ -4315,11 +4402,13 @@
     if(item.content_kind==='text')return '';
     const comments=additions.filter(a=>a.kind==='text');
     const rows=comments.map(a=>`<article class="cosmos-comment-row" data-part-id="${escapeHtml(a.id)}">
-      <div class="cosmos-comment-meta">${escapeHtml(a.author||'Someone')} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</div>
-      <div class="cosmos-comment-message">${a.sealed?'🔒 Sealed until '+escapeHtml(new Date(a.unlock_at).toLocaleString()):escapeHtml(a.text||'')}</div>
+      <div class="cosmos-comment-meta">${escapeHtml(a.author||'Someone')}${a.sealed?' · Sealed contribution':''}</div>
+      ${additionTimeFields(a)}
+      ${additionTimeNote(a)}
+      <div class="cosmos-comment-message">${a.sealed?'🔒 The message will be available on the reveal date.':escapeHtml(a.text||'')}</div>
       ${a.pending?'<p class="micro">🔒 Older pending approval — others cannot see this.</p>':''}
       ${a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:''}
-      <div class="liquid-share-context">${!a.pending&&!a.sealed?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this comment</button>`:''}
+      <div class="liquid-share-context">${!a.pending&&!a.sealed&&!(a.unlock_at&&Date.parse(a.unlock_at)>Date.now())?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this comment</button>`:''}
         ${a.can_remove?`<button type="button" class="post-delete" data-remove-extra="${escapeHtml(a.id)}">Remove</button>`:''}
       </div></article>`).join('');
     return `<section class="cosmos-comments" aria-label="Comments on this moment">
@@ -4332,8 +4421,12 @@
     const content=await contentHtml(item);
     const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),false,item.id);
     const commentsHtml=momentCommentsHtml(item,additions);
-    const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
-    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
+    // Circle additions also appear in the legacy thread; never display their content twice.
+    const shownAdditionIds=new Set((additions||[]).map(a=>String(a.id)));
+    const chain=(thread||[]).filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
+    const originalDate=`<div class="cosmos-original-date"><b>Original moment</b><div>Posted on ${escapeHtml(cosmosLocalStamp(item.created_at))}</div>${item.unlock_at?`<small>${Date.parse(item.unlock_at)>Date.now()?'Scheduled to reveal':'Revealed'} on ${escapeHtml(cosmosLocalStamp(item.unlock_at))}</small>`:''}</div>`;
+    const receipt=additionReceiptMarkup(item,additions);
+    openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2>${originalDate}${receipt}${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
       <div class="liquid-share-context"><button type="button" class="cosmos-share-pill" data-share-part="main">↗ Share this section</button></div></section>
       ${commentsHtml}
       ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button></div>
