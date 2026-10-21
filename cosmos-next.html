@@ -1794,7 +1794,7 @@
       .app.metro-live .metro-day-heading{flex-wrap:wrap;row-gap:3px}
       .app.metro-live .metro-day-heading .cosmos-together-head-actions{margin-left:auto}
     }
-      /* v2.9.5.8: private participation tags, not public discovery */
+      /* v2.9.5.9: private participation tags, not public discovery */
     .tag-choices{display:flex;flex-wrap:wrap;gap:9px;margin:10px 0 13px}
     .tag-choice{display:flex;align-items:center;gap:10px;min-height:48px;max-width:100%;border:1px solid #b9cde4;
       background:rgba(255,255,255,.75);border-radius:15px;padding:10px 13px;color:#17406d;font-size:13px;font-weight:600}
@@ -3578,22 +3578,12 @@
     }
   }
   async function openCirclePreferences(){
-    openSheet('<h2>My Connections circle</h2><p>Checking who may add written moments to your timeline…</p>');
-    try{
-      const settings=await api('/api/circles/settings');
-      openSheet(`<h2>My Connections circle</h2>
-        <p>All public Cosmos content is still disabled. This setting affects only your accepted connections.</p>
-        <div class="circle-info"><b>Timeline approval</b><br>By default, someone else’s contribution waits for your approval before your accepted connections can see it. Photos, audio, video, music and links always require your approval.</div>
-        <div class="field"><label style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:700"><input id="autoCircleApprove" type="checkbox" style="width:auto;margin-right:10px" ${settings.auto_approve_text?'checked':''} ${settings.auto_approval_available?'':'disabled'}> Automatically approve TEXT contributions from people I've accepted.</label></div>
-        <div class="micro">Automatic approval of text requires a moderation service. Media contributions always require manual approval. You can reject someone’s previously approved contribution from your timeline. Public sharing remains disabled.</div>
-        <div class="actions"><button id="circlePrivacyBack">Back</button><button class="primary" id="saveCirclePrivacy">Save</button></div>`);
-      $('circlePrivacyBack').onclick=openFriends;
-      $('saveCirclePrivacy').onclick=async()=>{const v=$('autoCircleApprove').checked;
-        $('saveCirclePrivacy').disabled=true;
-        try{await api('/api/circles/settings',{method:'PATCH',body:JSON.stringify({auto_approve_text:v})});toastMsg('Circle preferences saved.');openFriends();}
-        catch(e){toastMsg(e.message,3800);$('saveCirclePrivacy').disabled=false;}
-      };
-    }catch(e){openSheet(`<h2>Circle preferences unavailable</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="circlePrivacyBack">Connections</button></div>`);$('circlePrivacyBack').onclick=openFriends;}
+    openSheet(`<h2>My Connections circle</h2>
+      <p>Your accepted Connections can contribute without individual approval. Public posts remain disabled.</p>
+      <div class="circle-info"><b>You remain in control</b><br>You may remove any contribution from your own moment. Older contributions awaiting approval remain in review until you decide.</div>
+      <p class="micro">A future contribution remains sealed to everyone except its creator until the scheduled time. You can remove it without opening it.</p>
+      <div class="actions"><button id="circlePrivacyBack">Back to Connections</button></div>`);
+    $('circlePrivacyBack').onclick=openFriends;
   }
 
   function pickContactWeb(){
@@ -3720,11 +3710,11 @@
     if(!compose?.recipient_user_id)return showRecipientStep();
     const name=escapeHtml(compose.recipient_label||'your connection');
     // Every supported moment type may be shared inside an approved private circle.
-    // Owner approval is mandatory for media contributed to someone else's timeline.
+    // Accepted Connections may contribute to one another's timeline without per-post owner approval.
     const groupAllowed=true;
     openSheet(`<h2>Share on ${name}'s timeline</h2><p>Who can discover this Cosmos?</p>
       <div class="circle-audience">
-        ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Family beta</b><span>Share with their accepted connections only after they approve your contribution. Never public. Media requires verified sign-in.</span></button>`:''}
+        ${groupAllowed?`<button type="button" class="recommended" id="audienceGroup"><b>◯ Their Connections · Family beta</b><span>Share immediately with their accepted Connections. The timeline owner can remove it. Never public. Media requires verified sign-in.</span></button>`:''}
         <button type="button" id="audiencePair"><b>♡ Only us · Notify ${name}</b><span>A private moment between you and ${name}; their other connections cannot see it. Cosmos adds a notification when the moment becomes available.</span></button>
       </div><div class="actions"><button id="audienceBack">Back</button></div>`);
     if($('audienceGroup'))$('audienceGroup').onclick=async()=>{
@@ -3799,7 +3789,7 @@
         <p>${count?`Share this <b>Cosmos</b> moment with your ${count} accepted connection${count===1?'':'s'}.`:'You have no accepted connections yet.'}</p>
         <div class="circle-info"><b>${count?`◯ Your circle · ${count} connected`:'◯ Your circle is waiting'}</b>
           <div class="circle-member-names">${count?names+(count>5?` · +${count-5} more`:''):'Invite someone and accept their request to start sharing.'}</div>
-          ${count?'<small>Your own posts appear in your accepted circle; contributions made to someone else’s circle wait for their approval. Never public.</small>':''}</div>
+          ${count?'<small>Your own posts and trusted Connections contributions appear immediately. Owners can remove contributions. Never public.</small>':''}</div>
         <div class="actions"><button type="button" id="circleBack">Back</button>
           <button type="button" class="primary" id="circleContinue">${count?'Continue →':'Invite someone →'}</button></div>`);
       sheet.classList.add('liquid-compact-step');
@@ -4044,7 +4034,7 @@
     const tagSection=canTag?`<div class="field" id="cosmosTagField"><label>Tag people · @username (optional)</label>
       <div id="cosmosTagChoices" class="tag-choices"><span class="micro">Finding eligible Connections…</span></div>
       <div class="micro">A tag is a request. They can accept or decline it in Profile. Tagging never grants access to a private moment, or unlocks a sealed one.</div></div>`:'';
-    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Their timeline owner may need to approve this before the wider circle sees it.':'Private by default.'} ${compose.unlock_mode==='here'?'This Cosmos is anchored to the selected pin. The exact coordinates stay hidden from recipients, who can discover the moment when nearby.':'No location is attached to this moment.'}</div>${tagSection}<div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
+    openSheet(`<h2>Leave this Cosmos?</h2><p>${escapeHtml(who)} · ${escapeHtml(when)} · ${sharing}</p><div class="micro good">${sharing==='Connections (owner-controlled)'?'Accepted Connections can view it immediately; its timeline owner can remove it.':'Private by default.'} ${compose.unlock_mode==='here'?'This Cosmos is anchored to the selected pin. The exact coordinates stay hidden from recipients, who can discover the moment when nearby.':'No location is attached to this moment.'}</div>${tagSection}<div class="actions"><button id="backFinal">Back</button><button class="primary" id="leaveFinal">Leave ◯</button></div>`);
     if(canTag)loadComposeTagChoices();
     sheet.classList.add('liquid-compact-step');
     $("backFinal").onclick=showWhenStep;$("leaveFinal").onclick=createCosmos;
@@ -4102,7 +4092,8 @@
   }
   async function momentAttachmentHtml(a,ownerCanRemove=false,cosmosId=''){
     const removable=(a.can_remove||ownerCanRemove) ? `<button class="post-delete" type="button" data-remove-extra="${escapeHtml(a.id)}" data-cosmos="${escapeHtml(cosmosId)}" style="margin:10px 0 0;min-height:44px">Remove addition</button>`:'';
-    const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</b>${a.pending?'<p class="micro">🔒 Pending timeline owner approval — not visible to other Connections.</p>':''}`;
+    if(a.sealed){return `<div class="attachment-row"><b>🔒 A future contribution is sealed</b><p class="micro">Reveals ${escapeHtml(new Date(a.unlock_at).toLocaleString())}</p>${removable}</div>`;}
+    const title=`<b>${escapeHtml(a.author||'Someone')} · ${escapeHtml(a.kind)} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</b>${a.pending?'<p class="micro">🔒 Older pending approval — not visible to other Connections.</p>':''}`;
     const review=a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:'';
     const loc=a.url&&validMapLink(a.url)?locationTextParts(a.text):null;
     const comment=loc?loc.comment:a.text;
@@ -4122,8 +4113,23 @@
       const content=await momentAttachmentHtml(a,ownerCanRemove,cosmosId);
       return `<section class="cosmos-part" data-part-id="${escapeHtml(a.id)}">${content}
         ${a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:''}
-        ${!a.pending?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this section</button>`:''}</section>`;
+        ${!a.pending&&!a.sealed?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this section</button>`:''}</section>`;
     }));return parts.join('');
+  }
+  // A date is stored as ISO UTC; the browser's datetime-local input uses the person's local time.
+  let additionSchedule={mode:'now',unlock_at:null};
+  function additionSchedulePayload(){return additionSchedule.mode==='future'?{unlock_at:additionSchedule.unlock_at}:{};}
+  function saveAdditionSchedule(){
+    const mode=$('additionWhen')?.value||additionSchedule.mode;
+    if(mode==='future'){
+      const field=$('additionRevealAt');
+      const raw=field?.value||additionSchedule.localValue;
+      const ms=Date.parse(raw||'');
+      if(!Number.isFinite(ms)||ms<=Date.now()+60000){toastMsg('Choose a valid future date and time.');return false;}
+      if(ms>Date.now()+10*365*86400000){toastMsg('Choose a date within ten years.');return false;}
+      additionSchedule={mode:'future',unlock_at:new Date(ms).toISOString(),localValue:raw};
+    }else additionSchedule={mode:'now',unlock_at:null};
+    return true;
   }
   function showAdditionCommentStep(item,payload,onBack=()=>openAddToMoment(item)){
     const location=Boolean(payload.locationTitle);
@@ -4137,7 +4143,7 @@
     $('additionCommentBack').onclick=onBack;
     $('additionCommentSave').onclick=async()=>{
       const button=$('additionCommentSave'),note=$('additionComment').value.trim();
-      const data={...payload};delete data.locationTitle;
+      const data={...payload,...additionSchedulePayload()};delete data.locationTitle;
       data.text=location?'⌖ '+payload.locationTitle+(note?'\n\n'+note:''):note;
       button.disabled=true;button.textContent='Adding…';
       try{const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify(data)});
@@ -4146,7 +4152,14 @@
     };
   }
   function openAddToMoment(item){
-    openSheet(`<h2>Add a moment</h2><p>Write a comment, record your voice, share media, or attach a link. Additions to a Connections moment are private and require the circle owner's approval before other Connections can see them.</p>
+    const tomorrow=new Date(Date.now()+86400000);
+    const localDefault=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T09:00`)(tomorrow);
+    openSheet(`<h2>Add a moment</h2><p>Accepted Connections can add immediately. The original owner may remove contributions. Future surprises stay sealed until reveal.</p>
+      <div class="field"><label for="additionWhen">WHEN SHOULD THIS ADDITION APPEAR?</label>
+        <select id="additionWhen"><option value="now" ${additionSchedule.mode==='now'?'selected':''}>Now</option><option value="future" ${additionSchedule.mode==='future'?'selected':''}>Sealed future surprise</option></select></div>
+      <div class="field" id="additionRevealWrap" ${additionSchedule.mode==='future'?'':'hidden'}><label for="additionRevealAt">Reveal date and time (your local time)</label>
+        <input type="datetime-local" id="additionRevealAt" value="${additionSchedule.localValue||localDefault}">
+        <p class="micro">Only a sealed indicator is visible before the reveal; no content or thumbnails.</p></div>
       <div class="choices"><button class="choice" data-extra="text"><strong>Comment</strong><span>Leave words here.</span></button>
       <button class="choice" data-extra="voice"><strong>Voice</strong><span>Record an audio note.</span></button>
       <button class="choice" data-extra="link"><strong>Link</strong><span>Secure web address.</span></button>
@@ -4156,7 +4169,8 @@
       <button class="choice" data-extra="location"><strong>⌖ Location</strong><span>Google Maps or Apple Maps.</span></button></div>
       <div class="actions"><button id="extraBack">Back to moment</button></div>`);
     $('extraBack').onclick=()=>openCosmos(item.id);
-    sheet.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>chooseMomentAddition(item,b.dataset.extra));
+    $('additionWhen').onchange=()=>{$('additionRevealWrap').hidden=$('additionWhen').value!=='future';};
+    sheet.querySelectorAll('[data-extra]').forEach(b=>b.onclick=()=>{if(saveAdditionSchedule())chooseMomentAddition(item,b.dataset.extra);});
   }
   function chooseMomentAddition(item,kind){
     if(kind==='location')return locationEntry((url,title)=>{
@@ -4172,7 +4186,7 @@
           catch{return toastMsg('Use a secure https:// link.');}
           return showAdditionCommentStep(item,{kind,url:value});
         }
-        try{$('extraSubmit').disabled=true;const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'text',text:value})});await openCosmos(item.id);toastMsg(out.needs_review?'Comment sent for approval.':'Comment added.');}
+        try{$('extraSubmit').disabled=true;const out=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/additions',{method:'POST',body:JSON.stringify({kind:'text',text:value,...additionSchedulePayload()})});await openCosmos(item.id);toastMsg(out.needs_review?'Comment sent for approval.':'Comment added.');}
         catch(e){toastMsg(e.message,4500);if($('extraSubmit'))$('extraSubmit').disabled=false;}
       };return;
     }
@@ -4302,11 +4316,11 @@
     const comments=additions.filter(a=>a.kind==='text');
     const rows=comments.map(a=>`<article class="cosmos-comment-row" data-part-id="${escapeHtml(a.id)}">
       <div class="cosmos-comment-meta">${escapeHtml(a.author||'Someone')} · ${escapeHtml(new Date(a.created_at).toLocaleString())}</div>
-      <div class="cosmos-comment-message">${escapeHtml(a.text||'')}</div>
-      ${a.pending?'<p class="micro">🔒 Pending approval — others cannot see this.</p>':''}
+      <div class="cosmos-comment-message">${a.sealed?'🔒 Sealed until '+escapeHtml(new Date(a.unlock_at).toLocaleString()):escapeHtml(a.text||'')}</div>
+      ${a.pending?'<p class="micro">🔒 Older pending approval — others cannot see this.</p>':''}
       ${a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:''}
-      <div class="liquid-share-context">${!a.pending?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this comment</button>`:''}
-        ${a.can_remove||item.creator_user_id===me?.id?`<button type="button" class="post-delete" data-remove-extra="${escapeHtml(a.id)}">Remove</button>`:''}
+      <div class="liquid-share-context">${!a.pending&&!a.sealed?`<button type="button" class="cosmos-share-pill" data-share-part="${escapeHtml(a.id)}">↗ Share this comment</button>`:''}
+        ${a.can_remove?`<button type="button" class="post-delete" data-remove-extra="${escapeHtml(a.id)}">Remove</button>`:''}
       </div></article>`).join('');
     return `<section class="cosmos-comments" aria-label="Comments on this moment">
       <div class="cosmos-comments-header"><strong>◯ Comments ${comments.length?'· '+comments.length:''}</strong>
@@ -4316,7 +4330,7 @@
   }
   async function renderCosmos(item,thread,additions=[],fromMetro=false){
     const content=await contentHtml(item);
-    const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),item.creator_user_id===me?.id,item.id);
+    const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),false,item.id);
     const commentsHtml=momentCommentsHtml(item,additions);
     const chain=(thread||[]).filter(x=>x.id!==item.id).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">${new Date(x.created_at).toLocaleString()}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
     openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2><p>${item.created_at?`Left ${new Date(item.created_at).toLocaleString()}`:""}</p>${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
@@ -4343,8 +4357,8 @@
         await openCosmos(item.id);toastMsg(choice==='approve'?'Contribution approved.':'Contribution rejected.');}
       catch(e){toastMsg(e.message,4400);button.disabled=false;}
     });
-    if($('addToMoment'))$('addToMoment').onclick=()=>openAddToMoment(item);
-    if($('commentOnMoment'))$('commentOnMoment').onclick=()=>chooseMomentAddition(item,'text');
+    if($('addToMoment'))$('addToMoment').onclick=()=>{additionSchedule={mode:'now',unlock_at:null};openAddToMoment(item);};
+    if($('commentOnMoment'))$('commentOnMoment').onclick=()=>{additionSchedule={mode:'now',unlock_at:null};openAddToMoment(item);};
     if($('hideReceived'))$('hideReceived').onclick=async()=>{
       if(!confirm('Hide this moment only from your Cosmos? It will not delete the sender’s post.'))return;
       try{await api('/api/cosmos/'+encodeURIComponent(item.id)+'/hide',{method:'POST'});returnToCamera();toastMsg('Hidden from your Cosmos.');scanHere(false);refreshConnections();}
@@ -4385,7 +4399,7 @@
     // The Worker still enforces all recipient, future, review and place locks.
     weekMetroPopId=null;$('metroPopover')?.remove();
     try{
-      const r=cached||await api('/api/cosmos/'+encodeURIComponent(record.id)+'/open',{
+      const r=cached||await api('/api/cosmos/'+encodeURIComponent(record.open_id||record.id)+'/open',{
         method:'POST',body:JSON.stringify(lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{})});
       if(!r?.item)return;
       // Once a private 1:1 photo has explicitly been opened, the Worker
@@ -4915,7 +4929,7 @@
     const item=weekMetroItems.find(i=>i.key===key);if(!item||item.locked)return;
     try{
       const body=lastScanLoc?{lat:lastScanLoc.lat,lng:lastScanLoc.lng}:{};
-      const r=await api('/api/cosmos/'+encodeURIComponent(item.id)+'/open',{method:'POST',body:JSON.stringify(body)});
+      const r=await api('/api/cosmos/'+encodeURIComponent(item.open_id||item.id)+'/open',{method:'POST',body:JSON.stringify(body)});
       if(weekMetroPopId!==key)return;
       // One explicit Reveal tap opens the full scrollable moment. Keep the
       // old small peek for normal quick previews and creator-owned entries.
