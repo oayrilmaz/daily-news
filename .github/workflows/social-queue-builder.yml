@@ -67,15 +67,16 @@ jobs:
             });
             // Rebuild previously generated hashtag-free queues immediately.
             const retryReady=q.policy?.discovery_retry_policy==='v5_3_focused_research_topup';
-            if(v4 && tagsReady && retryReady && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
+            const audienceReady=q.policy?.audience_strategy==='v5_4_entertainment_first_2playful_1optional_research';
+            if(v4 && tagsReady && retryReady && audienceReady && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
               build=false;reason=`fresh v5.3 verified research queue: ${age.toFixed(1)}h`;
-            } else reason=`queue v4=${v4}, tagsReady=${tagsReady}, retryReady=${retryReady}, size=${items.length}, age=${age.toFixed(1)}h`;
+            } else reason=`queue v4=${v4}, tagsReady=${tagsReady}, retryReady=${retryReady}, audienceReady=${audienceReady}, size=${items.length}, age=${age.toFixed(1)}h`;
           }catch(e){reason=`queue check: ${e.message}`;}
           console.log(reason);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${build?'true':'false'}\n`);
           NODE
 
-      - name: Build verified public discoveries and one playful post
+      - name: Build two entertaining posts and one optional high-interest discovery
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -104,11 +105,13 @@ jobs:
           const fs=require('fs');
           const queue=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
           const items=queue.items;
-          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png'||queue.policy?.hashtag_policy!=='v5_2_two_topic_tags_x_caption'||queue.policy?.discovery_retry_policy!=='v5_3_focused_research_topup')throw Error('Unexpected publishing mode, research top-up policy, hashtag policy or visual assets missing');
+          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png'||queue.policy?.hashtag_policy!=='v5_2_two_topic_tags_x_caption'||queue.policy?.discovery_retry_policy!=='v5_3_focused_research_topup'||queue.policy?.audience_strategy!=='v5_4_entertainment_first_2playful_1optional_research')throw Error('Unexpected publishing mode, research top-up policy, hashtag policy or visual assets missing');
           if(!Array.isArray(items)||items.length!==3)throw Error('Need exactly three X posts');
           if(new Set(items.map(x=>x.id)).size!==items.length)throw Error('Duplicate post IDs');
           const kinds=items.map(x=>x.content_kind);
-          if(kinds.join(',')!=='discovery,playful,discovery')throw Error('Expected sourced / playful / sourced rhythm');
+          if(!(['playful,discovery,playful','playful,playful,playful'].includes(kinds.join(','))))
+            throw Error('Expected two playful posts and optional sourced discovery');
+          if(kinds.filter(k=>k==='playful').length<2)throw Error('Not entertainment led');
           for(const item of items){
             if(JSON.stringify(item.platforms)!=='["x"]'||!item.enabled)throw Error('Invalid X-only item');
             if(!item.x_text || /\n[A-E]\.\s/.test(item.x_text))throw Error('Multiple choice leaked into X caption');
@@ -143,7 +146,7 @@ jobs:
             'cosmos-discoveries.html','sitemap-cosmos.xml']){
             if(!fs.existsSync(file))throw Error(`Missing ${file}`);
           }
-          console.log('Safe 3-post COSMOS v5 queue with distinct PNG cards validated.');
+          console.log('Safe COSMOS X v5.4 entertainment-led queue with 3 distinct PNG cards validated.');
           NODE
 
       - name: Commit questions and queue
