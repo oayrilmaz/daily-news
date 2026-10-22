@@ -27,6 +27,9 @@ const DISCOVERIES_HTML = process.env.COSMOS_DISCOVERIES_HTML || "cosmos-discover
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
 const TARGET_COUNT = Math.max(3, Math.min(5, positiveInt(process.env.SOCIAL_QUEUE_TARGET, 3)));
+// The daily social queue includes ONE playful item, so only the other slots
+// need independently sourced discoveries. (Three posts = two discoveries + one playful.)
+const DISCOVERY_TARGET = TARGET_COUNT - 1;
 const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 60);
 const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 48);
 const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45);
@@ -550,7 +553,7 @@ function selectDiverse(candidates) {
   // First pass: maximize domain diversity, preferring strict candidates.
   const usedDomains = new Set();
   for (const candidate of ranked) {
-    if (selected.length >= TARGET_COUNT) break;
+    if (selected.length >= DISCOVERY_TARGET) break;
     if (usedDomains.has(candidate.domain)) continue;
     if (!canAdd(candidate)) continue;
     add(candidate);
@@ -559,7 +562,7 @@ function selectDiverse(candidates) {
 
   // Second pass: fill remaining slots without letting one domain/geography dominate.
   for (const candidate of ranked) {
-    if (selected.length >= TARGET_COUNT) break;
+    if (selected.length >= DISCOVERY_TARGET) break;
     if (selected.includes(candidate)) continue;
     if (!canAdd(candidate)) continue;
     add(candidate);
@@ -1180,7 +1183,7 @@ async function main() {
   // The model sometimes cites several URLs from the same publisher. Preserve
   // strict source independence; research alternative corroboration once.
   let repairedCount=0;
-  if (selectDiverse(accepted).length < TARGET_COUNT && repairable.length) {
+  if (selectDiverse(accepted).length < DISCOVERY_TARGET && repairable.length) {
     try {
       const repairs=await requestSourceRepairs(repairable);
       for(const original of repairable) {
@@ -1198,11 +1201,11 @@ async function main() {
   }
 
   const selected=selectDiverse(accepted);
-  if(selected.length<3){
+  if(selected.length<DISCOVERY_TARGET){
     console.log("COSMOS_DISCOVERY_GATE final:",JSON.stringify({
       accepted:accepted.length,selected:selected.length,repaired:repairedCount,reasons:rejectedReasonCounts(rejected)
     }));
-    throw new Error(`Quality/diversity gate produced only ${selected.length} publishable candidates after independent-source research. Current queue preserved; no low-evidence questions will be posted.`);
+    throw new Error(`Quality/diversity gate produced only ${selected.length}/${DISCOVERY_TARGET} required researched discoveries after independent-source research. Current queue preserved; no low-evidence questions will be posted.`);
   }
   console.log(`COSMOS_DISCOVERY_GATE passed: ${selected.length} selected, ${repairedCount} source-repaired.`);
   if(!fs.existsSync(QUESTION_TEMPLATE)) throw new Error(`Missing ${QUESTION_TEMPLATE}. Add the supplied q.html before running discovery.`);
@@ -1215,7 +1218,7 @@ async function main() {
 
   const createdAt=new Date().toISOString();
   const queueItems=[];
-  const researchCandidates = selected.slice(0, TARGET_COUNT - 1);
+  const researchCandidates = selected.slice(0, DISCOVERY_TARGET);
   for(const candidate of researchCandidates){
     const slug=challengeSlug(candidate);
     const pageUrl=`${SITE_ORIGIN}/q/${slug}.html`;
