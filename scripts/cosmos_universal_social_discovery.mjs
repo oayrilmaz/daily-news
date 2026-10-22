@@ -26,7 +26,7 @@ const SITEMAP_COSMOS = process.env.SITEMAP_COSMOS_FILE || "sitemap-cosmos.xml";
 const DISCOVERIES_HTML = process.env.COSMOS_DISCOVERIES_HTML || "cosmos-discoveries.html";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
-const TARGET_COUNT = positiveInt(process.env.SOCIAL_QUEUE_TARGET, 5);
+const TARGET_COUNT = Math.max(3, Math.min(5, positiveInt(process.env.SOCIAL_QUEUE_TARGET, 3)));
 const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 60);
 const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 48);
 const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45);
@@ -60,7 +60,7 @@ const DISCOVERY_SCHEMA = {
           domain: { type: "string", enum: [
             "science","health","technology","ai","space","environment","economics",
             "business","society","culture","education","infrastructure","energy",
-            "public_policy","sports","travel","other"
+            "public_policy","sports","travel","movies_tv","music","food","gaming","finance","other"
           ] },
           geography: { type: "string" },
           title: { type: "string" },
@@ -576,33 +576,127 @@ function compactOptions(candidate, labelMax = 22) {
     .join("\n");
 }
 
-function buildXText(candidate, questionUrl) {
-  // The public X post must always show all five choices. Never fall back to
-  // a generic “A–E” sentence: the choices themselves are the traffic hook.
-  // X shortens URLs through t.co, so reserve 27 characters for the URL that
-  // social_autopublish appends plus a small safety margin.
-  const max = 248;
-  const topicTags = normalizedHashtags(candidate).filter(tag => tag.toLowerCase() !== "#cosmos");
-
-  const attempts = [
-    { q: 92, option: 22, tags: ["#Cosmos", ...topicTags.slice(0, 2)] },
-    { q: 84, option: 20, tags: ["#Cosmos", ...topicTags.slice(0, 1)] },
-    { q: 74, option: 17, tags: ["#Cosmos", ...topicTags.slice(0, 1)] },
-    { q: 66, option: 14, tags: ["#Cosmos"] }
+// COSMOS X v4 — three distinct forms of public-website discovery.
+// The question page retains the five evidence-backed choices; X does not
+// display them. No invented news, fake quotes, or auto-trend-chasing.
+// The current publisher appends item.source_url; never embed it in x_text.
+const X_EMOJIS = Object.freeze({
+  sports:'⚽',movies_tv:'🎬',music:'🎧',food:'🍕',gaming:'🎮',
+  science:'🔬',space:'🚀',technology:'📱',ai:'🤖',travel:'✈️',
+  business:'💼',finance:'💰',environment:'🌿',culture:'🎭',
+  education:'🧠',health:'🧬',energy:'⚡',other:'🌍'
+});
+function xSafe(value, limit = 200) {
+  return truncate(clean(value).replace(/https?:\/\/\S+/gi, '').replace(/\b[A-E]\.\s/g, ''), limit);
+}
+function buildXText(candidate, questionUrl, position = 0) {
+  const hook = xSafe(candidate.social_hook || candidate.title, 94).replace(/[.!?\s]+$/, '');
+  const q = xSafe(candidate.challenge_question || candidate.butterfly_question, 100);
+  const ripple = xSafe(candidate.butterfly_question || q, 105);
+  const symbol = X_EMOJIS[candidate.domain] || X_EMOJIS.other;
+  // Style changes every post without turning a fact into an invented claim.
+  const style = Math.abs(Number(position) || 0) % 4;
+  const variants = [
+    `${symbol} Here's a rabbit hole worth exploring:\n\n${hook}.\n\n${q}`,
+    `🦋 One story. Unexpected consequences.\n\n${hook}.\n\n${ripple}`,
+    `${symbol} Quick curiosity check:\n\n${q}\n\nThe surprising part? ${hook.toLowerCase()}.`,
+    `🌌 Today's COSMOS thought experiment:\n\n${ripple}\n\nIt starts here: ${hook.toLowerCase()}.`
   ];
+  const calls = [
+    'Explore the answer on COSMOS →',
+    'Follow the butterfly effect →',
+    'Make your guess in COSMOS →',
+    'Look deeper in COSMOS →'
+  ];
+  // Publisher appends a t.co URL, so allow 23 characters plus whitespace.
+  const max = 225;
+  const call = calls[style];
+  let body = variants[style];
+  if (body.length + call.length + 2 > max) body = truncate(body, max - call.length - 4);
+  return `${body}\n\n${call}`;
+}
 
-  for (const attempt of attempts) {
-    const q = truncate(candidate.challenge_question, attempt.q);
-    const options = compactOptions(candidate, attempt.option);
-    const tags = attempt.tags.filter(Boolean).join(" ");
-    const text = `${q}\n${options}\nChoose first → Crowd + Cosmos\n${tags}`.trim();
-    if (text.length <= max) return text;
+// Non-news, human-written conversation starters. These are intentionally
+// fictional hypotheticals, never fabricated reports about real events.
+// One rotates into each daily queue, so the account is not all quizzes or ads.
+const COSMOS_PLAYFUL_POSTS = Object.freeze([
+  {key:'dog-review',text:'🐶 If your dog could leave a Google review about you, what would it say?\n\n“Great snacks. Suspicious bath policy. 3 stars.”\n\nYour turn 😂'},
+  {key:'missing-sock',text:'🧦 We can explore space. But where do missing socks actually go?\n\nWhat everyday mystery deserves a billion-dollar research budget?'},
+  {key:'aliens-first',text:'👽 Aliens arrive tomorrow. You have 30 seconds to explain humanity.\n\nDo you show them pizza, football, TikTok… or just apologize? 😂'},
+  {key:'teleport-first',text:'🚀 You get one free teleportation trip, anywhere on Earth.\n\nWhere are you going? No time to Google it.'},
+  {key:'phone-one-percent',text:'🔋 Every phone on Earth drops to 1%. No charging for a day.\n\nWhat breaks first: productivity, romance, or civilization? 😂'},
+  {key:'remove-one',text:'🌍 You may remove ONE thing from the world forever:\n\nMosquitoes. Traffic. Spam calls. Monday mornings.\n\nChoose wisely.'},
+  {key:'animal-talking',text:'🐈 All animals can talk for exactly one hour.\n\nWhich animal do you interview first?\n\nAnd why is the cat already complaining?'},
+  {key:'one-superpower',text:'⚡ You get ONE superpower, but it only works on Tuesdays.\n\nWhat do you pick? 😂'},
+  {key:'childhood-visit',text:'⏳ You can visit your childhood for 10 minutes, but you cannot change anything.\n\nWhat would you want to see again?'},
+  {key:'future-self',text:'📨 Your future self sends you a message containing just FIVE words.\n\nWhat do you hope those words are?'},
+  {key:'free-travel',text:'✈️ Free flights for life—but every destination is a surprise.\n\nAre you taking the deal?'},
+  {key:'global-silence',text:'🔇 The entire world goes completely silent for 60 seconds.\n\nWhat would you notice first?'},
+  {key:'life-search',text:'🔎 Imagine life has a search bar.\n\nWhat is the FIRST thing you would search about your future?'},
+  {key:'everyday-invention',text:'💡 You can invent one device to solve the smallest annoying daily problem.\n\nWhat would it do?'},
+  {key:'world-menu',text:'🍽️ You must eat one cuisine for a whole year.\n\nWhat is your choice? This decision is more serious than it sounds.'},
+  {key:'brain-autocorrect',text:'🧠 Imagine your brain had autocorrect.\n\nWhich thought would it fix most often? 😂'},
+  {key:'movie-life',text:'🎬 Your life becomes a movie.\n\nWhat is the title—and which actor plays you?'},
+  {key:'lost-wifi',text:'📶 No Wi-Fi worldwide for 24 hours.\n\nWhat is the first thing people remember how to do?'},
+  {key:'tree-stories',text:'🌳 Every old tree can tell the story of everything it has seen.\n\nWhich tree would you visit first?'},
+  {key:'music-mood',text:'🎵 Everyone in the room can hear a theme song when you enter.\n\nWhich song follows you around? 😂'},
+  {key:'daily-surprise',text:'🎁 Each morning the universe gives you one harmless surprise.\n\nWhat surprise would make today wonderful?'},
+  {key:'time-freeze',text:'⏸️ You can freeze time for 15 minutes once per week.\n\nWhat would you do with your first 15 minutes?'},
+  {key:'city-rename',text:'🗺️ You get to rename your hometown for one day.\n\nWhat new name will confuse all the tourists?'},
+  {key:'food-debate',text:'🍕 The entire internet must finally agree on one pizza topping.\n\nWhich topping wins—and which one causes chaos?'},
+  {key:'talking-shoes',text:'👟 Your shoes can explain everywhere they went this week.\n\nAre you letting them talk publicly?'},
+  {key:'planet-holiday',text:'🪐 You can spend one afternoon anywhere in the solar system, safely.\n\nWhere are you going first?'},
+  {key:'new-world-holiday',text:'🎉 You can create one new international holiday.\n\nWhat are we all celebrating?'},
+  {key:'delete-memory',text:'🧠 You can erase ONE spoiler from your memory and experience the story again.\n\nWhich movie or book gets a second first watch?'},
+  {key:'one-free-ticket',text:'🎟️ Free front-row ticket to ANY performance in history.\n\nWhich one are you choosing?'},
+  {key:'everybody-dances',text:'💃 At exactly noon, everyone on Earth must dance for 10 seconds.\n\nWhat song would make this least awkward?'},
+  {key:'coffee-chain',text:'☕ Your coffee has traveled farther than some people.\n\nWhat ordinary object would you love to trace across the world?'},
+  {key:'one-robot-task',text:'🤖 A friendly robot offers to handle one boring task forever.\n\nWhat job are you handing over immediately?'},
+  {key:'invisible-hour',text:'🫥 You can turn invisible for one hour—but only in a museum.\n\nWhich museum would you explore?'},
+  {key:'language-day',text:'🗣️ You can understand every language for one day.\n\nWho would you talk with first?'},
+  {key:'dream-postcard',text:'💌 You can send one postcard to someone 100 years in the future.\n\nWhat would you write?'},
+  {key:'weather-control',text:'🌤️ You control tomorrow’s weather in your city.\n\nWhat do you choose—and what are your neighbors going to say?'},
+  {key:'fiction-visit',text:'📚 You may visit one fictional world for a weekend.\n\nWhere do you go, and are you sure you want to?'},
+  {key:'pet-translation',text:'🐕 A translator tells you exactly what your pet thinks of you.\n\nDo you press PLAY? 😂'},
+  {key:'history-interview',text:'🕰️ You get one honest answer from anyone in history.\n\nWhom do you ask, and what is your question?'},
+  {key:'dream-map',text:'🗺️ Your dreams appear on a map when you wake up.\n\nWhich dream location would you explore again?'},
+  {key:'future-newspaper',text:'📰 A newspaper from 2050 lands at your door. You can read ONE headline.\n\nWhich section are you opening?'},
+  {key:'life-rewind',text:'⏪ You can replay one happy day exactly as it happened.\n\nWhich day would you choose?'},
+  {key:'universal-emoji',text:'😂 You may add ONE new emoji to every phone on Earth.\n\nWhat emotion is missing?'},
+  {key:'moon-postcard',text:'🌕 You get a postcard from the Moon. The message is only one sentence.\n\nWhat do you hope it says?'},
+  {key:'food-memory',text:'🍲 What meal instantly takes you back to a particular place or person?\n\nFood might be the best time machine.'},
+  {key:'tiny-butterfly',text:'🦋 What tiny decision ended up changing your life in a huge way?\n\nWrong turn? Missed train? One conversation?'},
+  {key:'age-exchange',text:'🕰️ You can spend one day as your 15-year-old self with everything you know now.\n\nWhat do you do first?'},
+  {key:'gravity-day',text:'🌎 Gravity becomes half as strong for one harmless afternoon.\n\nWhich everyday activity becomes hilarious?'},
+  {key:'free-hobby',text:'🎨 You could become world-class at one hobby overnight.\n\nWhich hobby do you choose?'},
+  {key:'planet-review',text:'⭐ You can leave Earth a five-star review.\n\nWhat would your review say? 😂'},
+  {key:'one-minute-forecast',text:'🔮 You can see exactly one minute into the future.\n\nIs that useful—or the world’s most disappointing superpower?'},
+  {key:'future-photo',text:'📸 You receive one photo from your own future.\n\nDo you open it—or keep the surprise?'},
+  {key:'everyday-hero',text:'🦸 Which ordinary profession deserves its own superhero movie?\n\nBonus: name the superhero.'},
+  {key:'sound-of-world',text:'🎧 You can listen to the sound of any place on Earth right now.\n\nWhere would you tune in?'},
+  {key:'no-alarm',text:'⏰ Alarm clocks are banned for a week.\n\nDoes the world become happier or just very, very late?'},
+  {key:'museum-item',text:'🏛️ You can put one everyday object in a museum 500 years from now.\n\nWhat should future humans discover?'},
+  {key:'lunch-with-future',text:'🥪 You can have lunch with your future self.\n\nWhat question would you ask before ordering?'},
+  {key:'pets-meeting',text:'🐾 All pets hold a secret meeting about humans.\n\nWhat is the first item on their agenda? 😂'},
+  {key:'internet-agree',text:'🌐 The internet agrees on ONE thing for 24 hours.\n\nWhat would be the most surprising agreement?'},
+  {key:'sunset-choice',text:'🌅 You can watch sunset from anywhere in the universe, safely.\n\nWhich view do you choose?'}
+]);
+function dailyPlayfulItem(nowIso, postedIds) {
+  const day = Math.floor(Date.parse(nowIso.slice(0,10) + 'T00:00:00Z') / 86400_000);
+  const start = ((day % COSMOS_PLAYFUL_POSTS.length) + COSMOS_PLAYFUL_POSTS.length) % COSMOS_PLAYFUL_POSTS.length;
+  let entry = COSMOS_PLAYFUL_POSTS[start];
+  let id = `cosmos-playful-${nowIso.slice(0,10)}-${entry.key}`;
+  for (let offset = 0; offset < COSMOS_PLAYFUL_POSTS.length && postedIds.has(id); offset++) {
+    entry = COSMOS_PLAYFUL_POSTS[(start + offset + 1) % COSMOS_PLAYFUL_POSTS.length];
+    id = `cosmos-playful-${nowIso.slice(0,10)}-${entry.key}`;
   }
-
-  // Extremely defensive final form. It still preserves A, B, C, D and E.
-  const q = truncate(candidate.challenge_question, 58);
-  const options = compactOptions(candidate, 11);
-  return truncate(`${q}\n${options}\nVote → Crowd + Cosmos\n#Cosmos`, max);
+  const url = `${SITE_ORIGIN}/?utm_source=x&utm_medium=organic&utm_campaign=cosmos_curiosity_v4&utm_content=${encodeURIComponent(entry.key)}`;
+  return {
+    id, enabled:true, created_at:nowIso, title:`COSMOS curiosity: ${entry.key.replace(/-/g,' ')}`,
+    source_url:url, x_text:truncate(entry.text,220), linkedin_text:'', platforms:['x'],not_before:null,
+    content_kind:'playful', discovery:{domain:'culture',topic_key:entry.key,creative:true,
+      note:'Original hypothetical question; no assertion of a real news event. Public COSMOS homepage.'}
+  };
 }
 
 function buildLinkedInText(candidate) {
@@ -708,7 +802,10 @@ function refreshExistingOfficialQuestionPages(template) {
       ogTitle: existing.match(/<meta property="og:title"[^>]*>/i)?.[0] || "",
       ogDescription: existing.match(/<meta property="og:description"[^>]*>/i)?.[0] || "",
       canonical: existing.match(/<link rel="canonical"[^>]*>/i)?.[0] || "",
-      ogUrl: existing.match(/<meta property="og:url"[^>]*>/i)?.[0] || ""
+      ogUrl: existing.match(/<meta property="og:url"[^>]*>/i)?.[0] || "",
+      // Retain topic-specific X/OG previews created by the next visual step.
+      // Without these, rebuilding question HTML would erase previews for older X posts.
+      originalCards: Array.from(existing.matchAll(/<meta\s+(?:property|name)=["'](?:og:image(?:\:(?:width|height|alt))?|twitter:(?:card|image(?:\:alt)?))["'][^>]*>/ig), m=>m[0])
     };
 
     let html = template;
@@ -718,7 +815,7 @@ function refreshExistingOfficialQuestionPages(template) {
     if (preserved.ogTitle) html = html.replace(/<meta property="og:title"[^>]*>/i, preserved.ogTitle);
     if (preserved.ogDescription) html = html.replace(/<meta property="og:description"[^>]*>/i, preserved.ogDescription);
 
-    const headExtras = [preserved.canonical, preserved.ogUrl].filter(Boolean).join("\n  ");
+    const headExtras = [preserved.canonical, preserved.ogUrl, ...preserved.originalCards].filter(Boolean).join("\n  ");
     if (headExtras) html = html.replace("</head>", `  ${headExtras}\n</head>`);
 
     const bootstrap = JSON.stringify(challenge).replace(/</g, "\\u003c");
@@ -776,7 +873,8 @@ function discoveryPrompt(requestTime) {
     "",
     "MISSION",
     "Find fresh, evidence-backed developments that can become irresistible but responsible Cosmos Questions — short participatory entrances that lead into a butterfly-effect exploration.",
-    "Cosmos is universal. Science, health, technology, AI, space, environment, economics, business, society, culture, education, infrastructure, energy, sports, travel and other domains compete on equal terms.",
+    "Cosmos is universal. Sports, movies and TV, science, space, food, music, culture, travel, business and finance, gaming, health, technology, AI, environment, infrastructure, education and all human interests may compete equally. Do not default to AI, engineering or energy.",
+    "X audience strategy: based on X's broad historical conversation categories, prioritize accessible human interests, surprising cause/effect and relevance to everyday life. This is a content-style direction, NOT a license to auto-post about currently trending X topics.",
     "",
     "DISCOVERY WINDOW",
     `Current UTC time: ${requestTime}`,
@@ -786,8 +884,11 @@ function discoveryPrompt(requestTime) {
     `- Return exactly ${DISCOVERY_CANDIDATE_COUNT} strong candidates so downstream quality/diversity gates can select the strongest 3-5.`,
     "- Keep candidate fields concise: title <= 110 characters; summary <= 45 words; why_it_matters <= 45 words; answer_explanation <= 55 words; source titles <= 90 characters.",
     "- Prefer developments with meaningful second-order consequences and cross-domain paths.",
-    "- attention_score measures whether a normal person would stop, choose and want to see the result — without clickbait.",
+    "- Aim for broad accessibility: when independent evidence permits, include sports, entertainment, science, food, culture, finance or practical everyday discoveries among the candidates. Do not invent a news event to fill a category quota.",
+    "- Score ordinary reader interest, emotional relevance, surprising connections and ease of understanding; avoid specialist jargon, acronyms and vague abstract titles.",
+    "- attention_score measures whether a nonexpert reader would stop, smile or feel curious, and want to explore — without clickbait.",
     "- Avoid generic headline summaries. Turn each development into a question that creates curiosity, comparison or surprise.",
+    "- Make the challenge answerable by an interested non-expert in a few seconds. If it takes background reading to understand the QUESTION, choose a different angle.",
     "- Do not force energy or AI. Topic diversity is a core requirement.",
     "",
     "COSMOS QUESTION CONTRACT",
@@ -804,7 +905,11 @@ function discoveryPrompt(requestTime) {
     "- butterfly_question is the deeper consequence question that becomes the bridge into Cosmos.",
     "",
     "SOCIAL",
-    "- social_hook must be factual, short and curiosity-producing, not sensational.",
+    "- social_hook should sound like an intriguing human observation in everyday English (<=75 characters). Allow gentle warmth or wit, but factual elements must be sourced. No repetitive educational/exam tone.",
+    "- Start from the surprising observation, consequence or daily-life impact, not a generic 'what if' preamble or press-release language.",
+    "- X post variants will turn your hook into a relatable curiosity opener, surprising connection, or mini thought experiment. A/B/C/D/E options stay on the public /q/ page, NEVER on X.",
+    "- Do not pretend to know X real-time engagement rankings; do not auto-generate posts merely because a topic is trending on X.",
+    "- Prefer language humans use in conversation, not repetitive quizzing or multiple-choice intros.",
     "- The social post will hide the crowd result and answer until the person enters Cosmos.",
     "- hashtags: 2-4 genuinely relevant topical tags. Do not include #Cosmos; downstream adds it.",
     "",
@@ -1110,18 +1215,23 @@ async function main() {
 
   const createdAt=new Date().toISOString();
   const queueItems=[];
-  for(const candidate of selected){
+  const researchCandidates = selected.slice(0, TARGET_COUNT - 1);
+  for(const candidate of researchCandidates){
     const slug=challengeSlug(candidate);
     const pageUrl=`${SITE_ORIGIN}/q/${slug}.html`;
+    // Leave the canonical /q/ URL unchanged; UTM parameters identify real
+    // visitors arriving from a specific X post, not impressions or bot traffic.
+    const trackedPageUrl=`${pageUrl}?utm_source=x&utm_medium=organic&utm_campaign=cosmos_discovery_v4&utm_content=${encodeURIComponent(candidate.item_id)}`;
     const challenge=officialChallenge(candidate,pageUrl);
     fs.writeFileSync(path.join(Q_DIR,`${slug}.html`),renderOfficialQuestionPage(template,challenge,candidate,pageUrl),"utf8");
     queueItems.push({
       id:candidate.item_id,
+      content_kind:"discovery",
       enabled:true,
       created_at:createdAt,
-      source_url:pageUrl,
+      source_url:trackedPageUrl,
       title:candidate.challenge_question,
-      x_text:buildXText(candidate,pageUrl),
+      x_text:buildXText(candidate,pageUrl,queueItems.length),
       linkedin_text:buildLinkedInText(candidate),
       platforms:["x"],
       not_before:null,
@@ -1152,25 +1262,30 @@ async function main() {
     });
   }
 
+  const playful = dailyPlayfulItem(createdAt, posted);
+  // Discovery, conversation starter, discovery: no wall of quizzes.
+  queueItems.splice(Math.min(1, queueItems.length), 0, playful);
+  if(queueItems.length > TARGET_COUNT) queueItems.length=TARGET_COUNT;
+
   writeJson(QUEUE_FILE,{
     schema_version:"2.0",
     updated_at:createdAt,
     generated_by:"scripts/cosmos_universal_social_discovery.mjs",
     policy:{
-      mode:"universal_cross_domain_participatory_discovery",
+      mode:"cosmos_x_v4_curiosity_and_discovery",
       target_count:TARGET_COUNT,
       strict_composite_score:STRICT_COMPOSITE,
       fallback_composite_score:FALLBACK_COMPOSITE,
       fallback_butterfly_score:FALLBACK_BUTTERFLY,
       automatic_platforms:["x"],
-      note:"Question-first social entrances. Vote inside Cosmos; reveal Crowd + Cosmos; continue through a Butterfly."
+      note:"One original playful conversation starter daily + evidence-backed discoveries. Public COSMOS only; do not publish private COSMOS Next."
     },
     items:queueItems
   });
 
   const recentCutoff=Date.now()-30*86400_000;
   const retainedHistory=history.items.filter(row=>{const t=new Date(row?.queued_at||"").getTime();return Number.isFinite(t)&&t>=recentCutoff;});
-  for(const candidate of selected){
+  for(const candidate of researchCandidates){
     retainedHistory.push({topic_key:candidate.topic_key,item_id:candidate.item_id,queued_at:createdAt,title:candidate.title,domain:candidate.domain,geography:candidate.geography,primary_source_url:candidate.sources?.[0]?.url||""});
   }
   writeJson(HISTORY_FILE,{schema_version:"1.0",updated_at:createdAt,items:retainedHistory});
@@ -1178,8 +1293,9 @@ async function main() {
     schema_version:"2.0",generated_at:createdAt,request_time_utc:result.request_time_utc,model:MODEL,
     provider_response_id:String(result.raw?.id||""),web_search_citation_count:citationFingerprints.size,
     raw_candidate_count:parsedCandidates.length,accepted_candidate_count:accepted.length,rejected_candidate_count:rejected.length,
-    selected_count:selected.length,
-    selected:selected.map(candidate=>({
+    selected_count:researchCandidates.length,
+    playful_topic:playful.discovery.topic_key,
+    selected:researchCandidates.map(candidate=>({
       item_id:candidate.item_id,topic_key:candidate.topic_key,domain:candidate.domain,geography:candidate.geography,
       title:candidate.title,summary:candidate.summary,why_it_matters:candidate.why_it_matters,
       challenge_question:candidate.challenge_question,challenge_options:candidate.challenge_options,
@@ -1193,7 +1309,7 @@ async function main() {
 
   writeDiscoveriesArchive(queueItems);
   writeCosmosSitemap();
-  console.log(`Cosmos participatory discovery selected ${selected.length} question(s) from ${parsedCandidates.length} candidates.`);
+  console.log(`Cosmos v4 selected ${researchCandidates.length} sourced question(s) plus one playful post from ${parsedCandidates.length} candidates.`);
   for(const item of queueItems){ console.log(`- ${item.title}`); console.log(`  ${item.source_url}`); console.log(`  X: ${item.x_text.replace(/\n/g," | ")}`); }
   console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${DISCOVERIES_HTML}, ${SITEMAP_COSMOS}, and ${Q_DIR}/.`);
 }
