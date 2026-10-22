@@ -1845,6 +1845,23 @@
     .cosmos-sharing-person small{font-size:11px;font-weight:600;color:#66809a}
     .cosmos-sharing-summary .cosmos-sharing-note{margin:10px 0 0;font-size:11px;
       line-height:1.55;color:#60758e}
+
+/* COSMOS v3.0 — unified private Ask moments. Styles are contained to discovery UI. */
+.cosmos-ask-surface{margin:12px 0 20px;padding:18px;border:1px solid rgba(134,168,211,.52);
+  background:linear-gradient(140deg,rgba(255,255,255,.9),rgba(220,237,252,.68));border-radius:23px;color:#193759}
+.cosmos-ask-kicker{font-size:11px;letter-spacing:.15em;text-transform:uppercase;font-weight:800;color:#44678f}
+.cosmos-ask-turn{margin-top:13px;padding:15px;border-radius:19px;background:rgba(255,255,255,.73);border:1px solid rgba(165,191,222,.55)}
+.cosmos-ask-turn h3{font-size:17px;line-height:1.35;margin:8px 0 10px;color:#142e50}
+.cosmos-ask-answer{line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;color:#243f60;max-height:55vh;overflow-y:auto}
+.cosmos-ask-source{display:block;overflow-wrap:anywhere;margin-top:7px;font-size:13px}
+.cosmos-ask-form textarea{width:100%;min-height:112px;padding:13px;border:1px solid #aec6e2;border-radius:14px;box-sizing:border-box;font-size:16px;color:#17365d;background:rgba(255,255,255,.88)}
+.cosmos-ask-timeline{border-left:2px solid #9bb7d8;padding-left:13px;margin-top:12px}
+.cosmos-ask-privacy{margin:9px 0;font-size:13px;color:#4a5f7a;line-height:1.5}
+.cosmos-ask-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.cosmos-ask-suggestions button{border:1px solid #adc7e5;border-radius:999px;background:#f7fbff;font-size:12px;padding:8px 12px;color:#23456d;cursor:pointer}
+.cosmos-ask-inline-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.cosmos-ask-inline-actions button{flex:1;min-width:150px}
+
 </style>
 </head>
 <body>
@@ -2711,6 +2728,88 @@
 
   sheetBackdrop.addEventListener("click",returnToCamera);
 
+
+  // COSMOS v3.0 — Ask intelligence inside the private camera-first timeline.
+  function showUnifiedAskComposer(){
+    openSheet(`<h2>✧ Ask COSMOS</h2><p>Ask anything, explore connections and save your discovery as a moment on today's Metro.</p>
+      <div class="cosmos-ask-form"><label for="unifiedQuestion">Your question</label>
+      <textarea id="unifiedQuestion" maxlength="650" placeholder="What would happen if the Moon disappeared?"></textarea></div>
+      <div class="cosmos-ask-privacy">◯ Private by default: only you can open this discovery in v3.0.
+      Your question is processed by the original COSMOS intelligence service; it is not posted publicly.
+      Saved discoveries stay in your account until you delete the moment.</div>
+      <div class="actions"><button type="button" id="unifiedAskBack">Back</button>
+      <button type="button" class="primary" id="unifiedAskSend">Explore & save privately</button></div>`);
+    $('unifiedAskBack').onclick=showContentStep;
+    $('unifiedAskSend').onclick=async()=>{
+      const question=$('unifiedQuestion').value.trim();
+      if(question.length<4)return toastMsg('Ask a question of at least four characters.');
+      const button=$('unifiedAskSend');button.disabled=true;button.textContent='COSMOS is exploring…';
+      try{
+        const result=await api('/api/unified/ask',{method:'POST',body:JSON.stringify({question})});
+        if(!result.cosmos_id)throw new Error('COSMOS did not return a saved moment ID.');
+        weekMetroCacheKey='';weekMetroPopId=null;closeSheet();
+        renderJourney();refreshConnections();
+        toastMsg('Discovery saved privately to your Metro.');
+        await openCosmos(result.cosmos_id);
+      }catch(e){toastMsg(e.message||'Unable to explore.',6000);button.disabled=false;button.textContent='Explore & save privately';}
+    };
+  }
+  const UNIFIED_MARKER='✧ Ask COSMOS: ';
+  const isUnifiedMoment=item=>String(item?.content_text||'').startsWith(UNIFIED_MARKER);
+  function unifiedSourcesHtml(turn){
+    const parts=(turn.sources||[]).map(s=>{
+      let safe='';try{const u=new URL(s.url);if(['https:','http:'].includes(u.protocol))safe=u.href;}catch{}
+      if(!safe)return '';
+      return `<a class="cosmos-ask-source" target="_blank" rel="noopener noreferrer" href="${escapeHtml(safe)}">↗ ${escapeHtml(s.title||safe)}</a>`;
+    }).filter(Boolean);
+    return parts.length?`<details><summary>Sources · ${parts.length}</summary>${parts.join('')}</details>`:'';
+  }
+  function unifiedTurnsHtml(data){
+    const turns=Array.isArray(data?.turns)?data.turns:[];
+    return `<section class="cosmos-ask-surface" aria-label="COSMOS discovery">
+      <div class="cosmos-ask-kicker">✧ ASK COSMOS · PRIVATE DISCOVERY</div>
+      <p class="cosmos-ask-privacy">Each question and response belongs to this moment. Branches are preserved here, not posted to other people's timelines.</p>
+      <div class="cosmos-ask-timeline">${turns.map((t,i)=>`<article class="cosmos-ask-turn" data-ask-turn="${escapeHtml(t.id)}">
+        <div class="cosmos-ask-kicker">${i===0?'Original question':'Connected question '+i} · ${escapeHtml(cosmosLocalStamp(t.created_at))}</div>
+        <h3>${escapeHtml(t.question)}</h3>
+        <div class="cosmos-ask-answer">${escapeHtml(t.answer)}</div>
+        ${unifiedSourcesHtml(t)}
+        <div class="cosmos-ask-suggestions">${(t.suggestions||[]).slice(0,3).map(s=>`<button type="button" data-unified-suggest="${escapeHtml(s)}" data-unified-parent="${escapeHtml(t.id)}">✧ ${escapeHtml(s)}</button>`).join('')}</div>
+        <div class="cosmos-ask-inline-actions"><button type="button" data-unified-follow="${escapeHtml(t.id)}">↳ Ask from here</button></div>
+      </article>`).join('')}</div>
+      <div class="cosmos-ask-form" id="unifiedFollowForm" hidden>
+        <label for="unifiedFollowQuestion">Follow the ripple · ask another question</label>
+        <textarea id="unifiedFollowQuestion" maxlength="650" placeholder="Where does this connection lead?"></textarea>
+        <input type="hidden" id="unifiedParentTurn" value="${escapeHtml(turns[turns.length-1]?.id||'')}">
+        <div class="cosmos-ask-inline-actions"><button type="button" id="unifiedFollowCancel">Cancel</button><button type="button" id="unifiedFollowSend" class="primary">Explore deeper</button></div>
+      </div>
+    </section>`;
+  }
+  function bindUnifiedFollowups(item,thread,additions,fromMetro){
+    const form=$('unifiedFollowForm');if(!form)return;
+    const ask=(parent,prompt='')=>{
+      $('unifiedParentTurn').value=parent;
+      $('unifiedFollowQuestion').value=prompt;
+      form.hidden=false;
+      form.scrollIntoView({block:'nearest',behavior:'smooth'});
+      $('unifiedFollowQuestion').focus();
+    };
+    sheet.querySelectorAll('[data-unified-follow]').forEach(button=>button.onclick=()=>ask(button.dataset.unifiedFollow));
+    sheet.querySelectorAll('[data-unified-suggest]').forEach(button=>button.onclick=()=>ask(button.dataset.unifiedParent,button.dataset.unifiedSuggest));
+    $('unifiedFollowCancel').onclick=()=>{form.hidden=true;};
+    $('unifiedFollowSend').onclick=async()=>{
+      const question=$('unifiedFollowQuestion').value.trim();
+      if(question.length<4)return toastMsg('Enter a follow-up question.');
+      const send=$('unifiedFollowSend');send.disabled=true;send.textContent='Exploring…';
+      try{
+        await api('/api/unified/ask/'+encodeURIComponent(item.id)+'/followup',{
+          method:'POST',body:JSON.stringify({question,parent_turn_id:$('unifiedParentTurn').value})});
+        await renderCosmos(item,thread,additions,fromMetro);
+        toastMsg('Connected discovery saved.');
+      }catch(e){toastMsg(e.message||'Follow-up unavailable.',6000);send.disabled=false;send.textContent='Explore deeper';}
+    };
+  }
+
   function beginCompose(){
     pendingCircleReturn=null;
     compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null,location_title:"",tagged_user_ids:[],comment_ready:false};
@@ -2719,6 +2818,7 @@
 
   function showContentStep(){
     openSheet(`<h2>Leave something</h2><p>Choose what you want to add to this moment.</p><div class="choices liquid-choices">
+      <button class="choice" data-kind="ask"><span class="liquid-choice-icon" aria-hidden="true">✧</span><span class="liquid-choice-words"><strong>Ask COSMOS</strong><span>Ask anything · save privately to your Metro</span></span></button>
       <button class="choice" data-kind="text"><span class="liquid-choice-icon" aria-hidden="true">✎</span><span class="liquid-choice-words"><strong>Text</strong><span>Thought or memory</span></span></button>
       <button class="choice" data-kind="voice"><span class="liquid-choice-icon" aria-hidden="true">◉</span><span class="liquid-choice-words"><strong>Voice</strong><span>Record your voice</span></span></button>
       <button class="choice" data-kind="photo"><span class="liquid-choice-icon" aria-hidden="true">▧</span><span class="liquid-choice-words"><strong>Photo</strong><span>Capture or choose</span></span></button>
@@ -2733,6 +2833,7 @@
 
   async function chooseContent(kind){
     compose.content_kind=kind;compose.comment_ready=false;compose.location_title="";compose.content_text="";compose.content_url="";compose.media_id=null;
+    if(kind==="ask") return showUnifiedAskComposer();
     if(kind==="text") return textEntry("What would you leave here?",false);
     if(kind==="music") return textEntry("Paste the music link",true);
     if(kind==="link") return textEntry("Paste a link",true);
@@ -4456,7 +4557,17 @@
     </section>`;
   }
   async function renderCosmos(item,thread,additions=[],fromMetro=false){
-    const content=await contentHtml(item);
+    let content=await contentHtml(item);
+    let unifiedLoaded=false;
+    if(isUnifiedMoment(item)){
+      try{
+        const discovery=await api('/api/unified/ask/'+encodeURIComponent(item.id));
+        content=unifiedTurnsHtml(discovery);
+        unifiedLoaded=true;
+      }catch(e){
+        content='<div class="cosmos-ask-privacy">The saved COSMOS discovery is temporarily unavailable: '+escapeHtml(e.message||'Please retry.')+'</div>'+content;
+      }
+    }
     const additionsHtml=await buildMomentExtras(item.content_kind==='text'?additions:additions.filter(a=>a.kind!=='text'),false,item.id);
     const commentsHtml=momentCommentsHtml(item,additions);
     // Circle additions also appear in the legacy thread; never display their content twice.
@@ -4469,6 +4580,7 @@
       ${commentsHtml}
       ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button></div>
       <div class="actions"><button type="button" id="shareEntireMoment" class="cosmos-share-pill">↗ Share moment link</button></div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
+    if(unifiedLoaded)bindUnifiedFollowups(item,thread,additions,fromMetro);
     $("closeCosmos").onclick=()=>{closeSheet();if(!fromMetro)scanHere(false);};
     $('shareEntireMoment').onclick=()=>shareMomentPart(item);
     sheet.querySelectorAll('[data-share-part]').forEach(b=>b.onclick=()=>shareMomentPart(item,b.dataset.sharePart));
@@ -5000,7 +5112,7 @@
         // future-sealed moments never contain media IDs.
         const img=!item.locked&&kind==='photo'&&item.media_id
           ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden loading="lazy" decoding="async">`:'';
-        const icon=item.locked?'🔒':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯';
+        const icon=item.locked?'🔒':(String(item.content_text||'').startsWith(UNIFIED_MARKER)?'✧':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯');
         const a11y=stamp+', '+(item.locked?'Sealed future moment':title)+', '+(item.locked?'sealed':metroCardType(item))+(item.is_author?', my moment':', shared moment');
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
           data-metro-source="${item.is_author?'mine':'connections'}" title="${escapeHtml(a11y)}" aria-label="${escapeHtml(a11y)}">
