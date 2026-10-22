@@ -164,7 +164,7 @@ def render_card(item, out):
     g.text((66,54),'COSMOS',font=font(22,True),fill=(255,255,255,240),stroke_width=0)
     k='A QUESTION WORTH ASKING' if kind=='playful' else 'ONE STORY. MORE CONNECTIONS.'
     g.text((60,132),k,font=font(20,True),fill=(*rgb(pale),255))
-    title=(item.get('title') if kind=='discovery' else item.get('x_text','').split('\n')[0]) or 'Look deeper.'
+    title=(item.get('x_text','').split('\n')[0] or item.get('title')) or 'Look deeper.'  # Card follows the entertaining X hook, not an exam question.
     title=re.sub(r'^([^\w\d]+)','',str(title))
     size=50
     lines=[]
@@ -229,8 +229,11 @@ def main():
     if queue.get('policy',{}).get('mode')!='cosmos_x_v4_curiosity_and_discovery':
         raise ValueError('Expected v4 content queue; refusing to rewrite a different queue schema')
     items=queue.get('items') or []
-    if len(items)!=3 or [r.get('content_kind') for r in items]!=['discovery','playful','discovery']:
-        raise ValueError('Unexpected queue sequence')
+    if len(items)!=3 or [r.get('content_kind') for r in items] not in (
+        ['playful','discovery','playful'],
+        ['playful','playful','playful']
+    ):
+        raise ValueError('Unexpected v5.4 entertainment-led queue sequence')
     for item in items:
         ident=slug_id(item['id'])
         image=CARDS/(ident+'.png')
