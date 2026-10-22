@@ -31,10 +31,10 @@ const SITEMAP_COSMOS = process.env.SITEMAP_COSMOS_FILE || "sitemap-cosmos.xml";
 const DISCOVERIES_HTML = process.env.COSMOS_DISCOVERIES_HTML || "cosmos-discoveries.html";
 
 const SITE_ORIGIN = String(process.env.SITE_ORIGIN || "https://ptdtoday.com").replace(/\/+$/, "");
-const TARGET_COUNT = Math.max(3, Math.min(5, positiveInt(process.env.SOCIAL_QUEUE_TARGET, 3)));
-// The daily social queue includes ONE playful item, so only the other slots
-// need independently sourced discoveries. (Three posts = two discoveries + one playful.)
-const DISCOVERY_TARGET = TARGET_COUNT - 1;
+const TARGET_COUNT = 3; // One creative-led queue per day; aligned with workflow validation.
+// COSMOS X v5.4: entertainment-led daily mix. Two original, playful posts
+// and up to ONE independently verified discovery. No forced dry research.
+const DISCOVERY_TARGET = Math.max(0, TARGET_COUNT - 2);
 const STRICT_COMPOSITE = positiveInt(process.env.COSMOS_STRICT_COMPOSITE, 60);
 const FALLBACK_COMPOSITE = positiveInt(process.env.COSMOS_FALLBACK_COMPOSITE, 48);
 const FALLBACK_BUTTERFLY = positiveInt(process.env.COSMOS_FALLBACK_BUTTERFLY, 45);
@@ -642,27 +642,34 @@ function xTextWithHashtags(body, hashtags, cta = '') {
   return `${content}${suffix}`;
 }
 
+// Keep the on-site A/B/C/D/E research challenge for people who choose to
+// explore. X itself is never a quiz: use a human observation and a ripple.
+function isEngagingDiscovery(candidate) {
+  if (normalizedScore(candidate.attention_score) < 76) return false;
+  const hook = clean(candidate.social_hook || '');
+  const ripple = clean(candidate.butterfly_question || '');
+  if (hook.length < 20 || hook.length > 110 || ripple.length < 18 || ripple.length > 118) return false;
+  const text = [hook, ripple, candidate.challenge_question, candidate.title].join(' ').toLowerCase();
+  // Reject school-exam questions, obscure measurements and abstract finance or
+  // research jargon. These may still be valid subjects for the PUBLIC website.
+  const quiz = /\b(?:how many|how much|how high|how large|which two|what percentage|what share|according to|what does .{5,55} mean for|what is the measured|what proportion)\b/i;
+  const jargon = /\b(?:plateau in emissions|emissions growth|percentage points|basis points|quarterly results|fiscal quarter|market cap(?:italization)?|account reach|accounts reached|statistical significance|response rate|p-value|regression analysis|growth rate|monetary policy|survey respondents)\b/i;
+  const poorHook = /^(?:the (?:latest|recent)|new (?:figures|report|research)|a study (?:finds|shows)|here is|quick curiosity|did you know|the data shows)/i;
+  return !quiz.test(text) && !jargon.test(text) && !poorHook.test(hook);
+}
+
 function buildXText(candidate, questionUrl, position = 0) {
-  const hook = xSafe(candidate.social_hook || candidate.title, 94).replace(/[.!?\s]+$/, '');
-  const q = xSafe(candidate.challenge_question || candidate.butterfly_question, 100);
-  const ripple = xSafe(candidate.butterfly_question || q, 105);
+  const hook = xSafe(candidate.social_hook || candidate.title, 95).replace(/[.!?\s]+$/, '');
+  const ripple = xSafe(candidate.butterfly_question, 105);
   const symbol = X_EMOJIS[candidate.domain] || X_EMOJIS.other;
-  // Style changes every post without turning a fact into an invented claim.
-  const style = Math.abs(Number(position) || 0) % 4;
-  const variants = [
-    `${symbol} Here's a rabbit hole worth exploring:\n\n${hook}.\n\n${q}`,
-    `🦋 One story. Unexpected consequences.\n\n${hook}.\n\n${ripple}`,
-    `${symbol} Quick curiosity check:\n\n${q}\n\nThe surprising part? ${hook.toLowerCase()}.`,
-    `🌌 Today's COSMOS thought experiment:\n\n${ripple}\n\nIt starts here: ${hook.toLowerCase()}.`
+  // Avoid branded template openers. Open with the actual subject instead.
+  const openers = [
+    `${symbol} ${hook}.`,
+    `🦋 ${hook}.`,
+    `${symbol} ${hook}.`
   ];
-  const calls = [
-    'Explore the answer on COSMOS →',
-    'Follow the butterfly effect →',
-    'Make your guess in COSMOS →',
-    'Look deeper in COSMOS →'
-  ];
-  // The publisher appends item.source_url. Reserve space for it.
-  return xTextWithHashtags(variants[style], xTopicalHashtags(candidate), calls[style]);
+  const body = `${openers[Math.abs(Number(position)||0)%openers.length]}\n\n${ripple}`;
+  return xTextWithHashtags(body, xTopicalHashtags(candidate), 'Explore in COSMOS →');
 }
 
 // Non-news, human-written conversation starters. These are intentionally
@@ -794,16 +801,19 @@ const PLAYFUL_X_HASHTAGS = Object.freeze({
   'sunset-choice':['#Sunset','#Space']
 });
 
-function dailyPlayfulItem(nowIso, postedIds) {
+function dailyPlayfulItem(nowIso, postedIds, slot=0, excludedKeys=[]) {
   const day = Math.floor(Date.parse(nowIso.slice(0,10) + 'T00:00:00Z') / 86400_000);
-  const start = ((day % COSMOS_PLAYFUL_POSTS.length) + COSMOS_PLAYFUL_POSTS.length) % COSMOS_PLAYFUL_POSTS.length;
-  let entry = COSMOS_PLAYFUL_POSTS[start];
-  let id = `cosmos-playful-${nowIso.slice(0,10)}-${entry.key}`;
-  for (let offset = 0; offset < COSMOS_PLAYFUL_POSTS.length && postedIds.has(id); offset++) {
-    entry = COSMOS_PLAYFUL_POSTS[(start + offset + 1) % COSMOS_PLAYFUL_POSTS.length];
-    id = `cosmos-playful-${nowIso.slice(0,10)}-${entry.key}`;
+  // Different index per slot, so multiple creative posts share neither topic nor art.
+  const start = ((day + (slot*17)) % COSMOS_PLAYFUL_POSTS.length + COSMOS_PLAYFUL_POSTS.length) % COSMOS_PLAYFUL_POSTS.length;
+  let entry=null,id='';
+  for (let offset=0; offset<COSMOS_PLAYFUL_POSTS.length; offset++) {
+    const choice=COSMOS_PLAYFUL_POSTS[(start + offset) % COSMOS_PLAYFUL_POSTS.length];
+    const candidateId=`cosmos-playful-${nowIso.slice(0,10)}-${choice.key}`;
+    if (postedIds.has(candidateId) || excludedKeys.includes(choice.key)) continue;
+    entry=choice; id=candidateId;break;
   }
-  const url = `${SITE_ORIGIN}/?utm_source=x&utm_medium=organic&utm_campaign=cosmos_curiosity_v4&utm_content=${encodeURIComponent(entry.key)}`;
+  if (!entry) throw new Error('Creative prompt pool exhausted; prior queue preserved.');
+  const url = `${SITE_ORIGIN}/?utm_source=x&utm_medium=organic&utm_campaign=cosmos_curiosity_v54&utm_content=${encodeURIComponent(entry.key)}`;
   return {
     id, enabled:true, created_at:nowIso, title:`COSMOS curiosity: ${entry.key.replace(/-/g,' ')}`,
     source_url:url, x_text:xTextWithHashtags(entry.text, PLAYFUL_X_HASHTAGS[entry.key] || ['#Curiosity','#WhatIf']), linkedin_text:'', platforms:['x'],not_before:null,
@@ -971,7 +981,12 @@ function writeCosmosSitemap() {
 }
 
 function writeDiscoveriesArchive(queueItems) {
-  const cards = queueItems.map(item => {
+  // An all-playful day must not blank out yesterday's public discovery archive.
+  if (!queueItems.some(item => item.content_kind==='discovery') && fs.existsSync(DISCOVERIES_HTML)) {
+    console.log('COSMOS_X_ARCHIVE_PRESERVED: no editorially approved researched post today.');
+    return;
+  }
+  const cards = queueItems.filter(item=>item.content_kind==='discovery').map(item => {
     const c = item.discovery?.challenge || {};
     const options = (c.options || []).map(o => `<li><strong>${escapeHtml(o.key)}.</strong> ${escapeHtml(o.label)}</li>`).join("");
     return `<article><h2><a href="${escapeHtml(item.source_url)}">${escapeHtml(c.question || item.title)}</a></h2><p>${escapeHtml(item.discovery?.summary || "")}</p><ol>${options}</ol><p><a href="${escapeHtml(item.source_url)}">Answer before seeing the result →</a></p></article>`;
@@ -1000,6 +1015,8 @@ function discoveryPrompt(requestTime, candidateCount=DISCOVERY_CANDIDATE_COUNT) 
     "- Aim for broad accessibility: when independent evidence permits, include sports, entertainment, science, food, culture, finance or practical everyday discoveries among the candidates. Do not invent a news event to fill a category quota.",
     "- Score ordinary reader interest, emotional relevance, surprising connections and ease of understanding; avoid specialist jargon, acronyms and vague abstract titles.",
     "- attention_score measures whether a nonexpert reader would stop, smile or feel curious, and want to explore — without clickbait.",
+    "- X social suitability requires a light, conversational, concrete human hook and an accessible butterfly question; do not propose obscure counts, percentage changes, finance ratios, climate jargon or 'what does X mean for Y?' explainers.",
+    "- Do NOT use any stock intro like 'rabbit hole worth exploring' or 'quick curiosity check' in social_hook.",
     "- Avoid generic headline summaries. Turn each development into a question that creates curiosity, comparison or surprise.",
     "- Make the challenge answerable by an interested non-expert in a few seconds. If it takes background reading to understand the QUESTION, choose a different angle.",
     "- Do not force energy or AI. Topic diversity is a core requirement.",
@@ -1400,14 +1417,16 @@ async function main() {
     }
   }
 
-  const selected=selectDiverse(accepted);
-  if(selected.length<DISCOVERY_TARGET){
-    console.log("COSMOS_DISCOVERY_GATE final:",JSON.stringify({
-      accepted:accepted.length,selected:selected.length,repaired:repairedCount,reasons:rejectedReasonCounts(rejected)
-    }));
-    throw new Error(`Quality/diversity gate produced only ${selected.length}/${DISCOVERY_TARGET} required researched discoveries after independent-source research. Current queue preserved; no low-evidence questions will be posted.`);
+  const editorialCandidates = accepted.filter(isEngagingDiscovery);
+  const selected=selectDiverse(editorialCandidates);
+  console.log('COSMOS_X_EDITORIAL_GATE', JSON.stringify({
+    sourced_accepted:accepted.length, general_audience_selected:selected.length,
+    rejected_as_too_exam_like:accepted.length-editorialCandidates.length
+  }));
+  if (selected.length < DISCOVERY_TARGET) {
+    console.log('COSMOS_X_NO_FORCED_DISCOVERY: no research passed both evidence AND general-audience editorial gates. Use a third original playful post instead.');
   }
-  console.log(`COSMOS_DISCOVERY_GATE passed: ${selected.length} selected, ${repairedCount} source-repaired.`);
+  console.log(`COSMOS_DISCOVERY_GATE usable_for_X=${selected.length}; safety checks unchanged.`);
   if(!fs.existsSync(QUESTION_TEMPLATE)) throw new Error(`Missing ${QUESTION_TEMPLATE}. Add the supplied q.html before running discovery.`);
   const template=fs.readFileSync(QUESTION_TEMPLATE,"utf8");
   fs.mkdirSync(Q_DIR,{recursive:true});
@@ -1465,10 +1484,17 @@ async function main() {
     });
   }
 
-  const playful = dailyPlayfulItem(createdAt, posted);
-  // Discovery, conversation starter, discovery: no wall of quizzes.
-  queueItems.splice(Math.min(1, queueItems.length), 0, playful);
-  if(queueItems.length > TARGET_COUNT) queueItems.length=TARGET_COUNT;
+  // Main feed: 2 playful posts plus 1 genuinely engaging, independently sourced
+  // discovery; if no source qualifies, all 3 are original fictional prompts.
+  const playful = dailyPlayfulItem(createdAt, posted, 0);
+  const secondPlayful = dailyPlayfulItem(createdAt, posted, 1, [playful.discovery.topic_key]);
+  queueItems.unshift(playful);
+  queueItems.push(secondPlayful);
+  if (!researchCandidates.length) {
+    queueItems.splice(1, 0, dailyPlayfulItem(createdAt, posted, 2,
+      [playful.discovery.topic_key, secondPlayful.discovery.topic_key]));
+  }
+  if (queueItems.length !== TARGET_COUNT) throw new Error(`Expected ${TARGET_COUNT} posts, got ${queueItems.length}`);
 
   writeJson(QUEUE_FILE,{
     schema_version:"2.0",
@@ -1478,12 +1504,13 @@ async function main() {
       mode:"cosmos_x_v4_curiosity_and_discovery",
       hashtag_policy:"v5_2_two_topic_tags_x_caption",
       discovery_retry_policy:"v5_3_focused_research_topup",
+      audience_strategy:"v5_4_entertainment_first_2playful_1optional_research",
       target_count:TARGET_COUNT,
       strict_composite_score:STRICT_COMPOSITE,
       fallback_composite_score:FALLBACK_COMPOSITE,
       fallback_butterfly_score:FALLBACK_BUTTERFLY,
       automatic_platforms:["x"],
-      note:"One original playful conversation starter daily + evidence-backed discoveries. Public COSMOS only; do not publish private COSMOS Next."
+      note:"Two original playful posts and up to one general-audience evidence-backed discovery. Research can never be forced merely to fill a quota. Public COSMOS only."
     },
     items:queueItems
   });
@@ -1502,7 +1529,7 @@ async function main() {
     extra_research_eligible_count:extraAccepted,
     accepted_candidate_count:accepted.length,rejected_candidate_count:rejected.length,
     selected_count:researchCandidates.length,
-    playful_topic:playful.discovery.topic_key,
+    playful_topics:queueItems.filter(item=>item.content_kind==='playful').map(item=>item.discovery.topic_key),
     selected:researchCandidates.map(candidate=>({
       item_id:candidate.item_id,topic_key:candidate.topic_key,domain:candidate.domain,geography:candidate.geography,
       title:candidate.title,summary:candidate.summary,why_it_matters:candidate.why_it_matters,
@@ -1517,7 +1544,7 @@ async function main() {
 
   writeDiscoveriesArchive(queueItems);
   writeCosmosSitemap();
-  console.log(`Cosmos v5.3 selected ${researchCandidates.length} sourced question(s) plus one playful post from ${parsedCandidates.length} primary candidates; extra research eligible=${extraAccepted}.`);
+  console.log(`Cosmos X v5.4: ${queueItems.filter(x=>x.content_kind==='playful').length} original conversation starters + ${researchCandidates.length} audience-approved verified discoveries; raw primary candidates=${parsedCandidates.length}.`);
   for(const item of queueItems){ console.log(`- ${item.title}`); console.log(`  ${item.source_url}`); console.log(`  X: ${item.x_text.replace(/\n/g," | ")}`); }
   console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${DISCOVERIES_HTML}, ${SITEMAP_COSMOS}, and ${Q_DIR}/.`);
 }
