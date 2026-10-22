@@ -592,6 +592,51 @@ const X_EMOJIS = Object.freeze({
 function xSafe(value, limit = 200) {
   return truncate(clean(value).replace(/https?:\/\/\S+/gi, '').replace(/\b[A-E]\.\s/g, ''), limit);
 }
+// COSMOS X v5.2 — X itself needs relevant hashtags. Previously only LinkedIn
+// and queue metadata received them. Keep two subject-related tags + optional
+// branded tag, while reserving space for the publisher's appended URL.
+const X_COPY_LIMIT = 225;
+function xTopicalHashtags(candidate) {
+  const pool = normalizedHashtags(candidate)
+    .filter(tag => tag.toLowerCase() !== '#cosmos')
+    .filter(tag => !['#news', '#viral', '#trending', '#innovation'].includes(tag.toLowerCase()));
+  const fallback = hashtag(candidate.domain === 'ai' ? 'AI' : candidate.domain === 'space' ? 'Space' : candidate.domain === 'technology' ? 'Technology' : candidate.domain === 'health' ? 'Health' : candidate.domain === 'environment' ? 'Environment' : candidate.domain === 'energy' ? 'Energy' : candidate.domain === 'sports' ? 'Sports' : candidate.domain === 'travel' ? 'Travel' : candidate.domain === 'science' ? 'Science' : candidate.domain === 'economics' ? 'Economy' : candidate.domain === 'music' ? 'Music' : candidate.domain === 'movies_tv' ? 'Movies' : 'Curiosity');
+  if (pool.length < 2 && !pool.some(t => t.toLowerCase() === fallback.toLowerCase())) pool.push(fallback);
+  if (pool.length < 2 && !pool.some(t => t.toLowerCase() === '#curiosity')) pool.push('#Curiosity');
+  if (pool.length < 2) pool.push('#ExploreMore');
+  return pool.slice(0, 2);
+}
+function xTextWithHashtags(body, hashtags, cta = '') {
+  const cleanTags = [];
+  for (const raw of hashtags) {
+    const tag = hashtag(raw);
+    if (tag && !cleanTags.some(t => t.toLowerCase() === tag.toLowerCase())) cleanTags.push(tag);
+  }
+  // Topic-related tags take priority; the branded tag is optional, not filler.
+  const topical = cleanTags.filter(t => t.toLowerCase() !== '#cosmos').slice(0, 2);
+  if (topical.length < 2) throw new Error('X post requires at least two topical hashtags.');
+  let tags = topical.concat('#COSMOS');
+  let tagLine = tags.join(' ');
+  const ending = cta ? `\n\n${cta}\n\n${tagLine}` : `\n\n${tagLine}`;
+  // Do not cut off a meaningful ending merely to fit a branded hashtag.
+  if (String(body).trim().length + ending.length > X_COPY_LIMIT) {
+    tags = topical;
+    tagLine = tags.join(' ');
+  }
+  const suffix = cta ? `\n\n${cta}\n\n${tagLine}` : `\n\n${tagLine}`;
+  // Preserve the deliberate line breaks and blank-line rhythm of X copy.
+  // The generic truncate() helper normalizes whitespace, so don't use it here.
+  const rawBody = String(body || '').trim();
+  const budget = X_COPY_LIMIT - suffix.length;
+  let content = rawBody;
+  if (content.length > budget) {
+    const initial = content.slice(0, budget - 1);
+    const lastWord = initial.lastIndexOf(' ');
+    content = (lastWord > budget * 0.65 ? initial.slice(0, lastWord) : initial).trimEnd() + '…';
+  }
+  return `${content}${suffix}`;
+}
+
 function buildXText(candidate, questionUrl, position = 0) {
   const hook = xSafe(candidate.social_hook || candidate.title, 94).replace(/[.!?\s]+$/, '');
   const q = xSafe(candidate.challenge_question || candidate.butterfly_question, 100);
@@ -611,12 +656,8 @@ function buildXText(candidate, questionUrl, position = 0) {
     'Make your guess in COSMOS →',
     'Look deeper in COSMOS →'
   ];
-  // Publisher appends a t.co URL, so allow 23 characters plus whitespace.
-  const max = 225;
-  const call = calls[style];
-  let body = variants[style];
-  if (body.length + call.length + 2 > max) body = truncate(body, max - call.length - 4);
-  return `${body}\n\n${call}`;
+  // The publisher appends item.source_url. Reserve space for it.
+  return xTextWithHashtags(variants[style], xTopicalHashtags(candidate), calls[style]);
 }
 
 // Non-news, human-written conversation starters. These are intentionally
@@ -684,6 +725,70 @@ const COSMOS_PLAYFUL_POSTS = Object.freeze([
   {key:'internet-agree',text:'🌐 The internet agrees on ONE thing for 24 hours.\n\nWhat would be the most surprising agreement?'},
   {key:'sunset-choice',text:'🌅 You can watch sunset from anywhere in the universe, safely.\n\nWhich view do you choose?'}
 ]);
+// All playful ideas have meaningful subject tags, not generic viral hashtags.
+const PLAYFUL_X_HASHTAGS = Object.freeze({
+  'dog-review':['#Dogs','#PetHumor'],
+  'missing-sock':['#Laundry','#EverydayMysteries'],
+  'aliens-first':['#Aliens','#Humanity'],
+  'teleport-first':['#Travel','#Teleportation'],
+  'phone-one-percent':['#Smartphones','#DigitalLife'],
+  'remove-one':['#WhatIf','#EverydayLife'],
+  'animal-talking':['#Animals','#PetHumor'],
+  'one-superpower':['#Superpowers','#WhatIf'],
+  'childhood-visit':['#Childhood','#Memories'],
+  'future-self':['#FutureSelf','#LifeQuestions'],
+  'free-travel':['#Travel','#Adventure'],
+  'global-silence':['#Mindfulness','#WhatIf'],
+  'life-search':['#Future','#Curiosity'],
+  'everyday-invention':['#Inventions','#EverydayLife'],
+  'world-menu':['#Food','#FoodDebate'],
+  'brain-autocorrect':['#Humor','#Mind'],
+  'movie-life':['#Movies','#PopCulture'],
+  'lost-wifi':['#WiFi','#DigitalLife'],
+  'tree-stories':['#Nature','#History'],
+  'music-mood':['#Music','#Mood'],
+  'daily-surprise':['#Joy','#Surprises'],
+  'time-freeze':['#TimeTravel','#WhatIf'],
+  'city-rename':['#Hometown','#Travel'],
+  'food-debate':['#Pizza','#FoodDebate'],
+  'talking-shoes':['#EverydayLife','#Humor'],
+  'planet-holiday':['#Space','#SolarSystem'],
+  'new-world-holiday':['#Holidays','#Creativity'],
+  'delete-memory':['#Movies','#Memories'],
+  'one-free-ticket':['#LiveMusic','#Performances'],
+  'everybody-dances':['#Dance','#Music'],
+  'coffee-chain':['#Coffee','#GlobalConnections'],
+  'one-robot-task':['#Robots','#EverydayLife'],
+  'invisible-hour':['#Museums','#WhatIf'],
+  'language-day':['#Languages','#Travel'],
+  'dream-postcard':['#Future','#Messages'],
+  'weather-control':['#Weather','#WhatIf'],
+  'fiction-visit':['#Books','#Fiction'],
+  'pet-translation':['#Pets','#PetHumor'],
+  'history-interview':['#History','#Curiosity'],
+  'dream-map':['#Dreams','#Exploration'],
+  'future-newspaper':['#Future','#WhatIf'],
+  'life-rewind':['#Memories','#TimeTravel'],
+  'universal-emoji':['#Emoji','#DigitalLife'],
+  'moon-postcard':['#Moon','#Space'],
+  'food-memory':['#Food','#Memories'],
+  'tiny-butterfly':['#ButterflyEffect','#LifeChoices'],
+  'age-exchange':['#TimeTravel','#WhatIf'],
+  'gravity-day':['#Gravity','#ScienceFun'],
+  'free-hobby':['#Hobbies','#Creativity'],
+  'planet-review':['#Earth','#Humor'],
+  'one-minute-forecast':['#Future','#Superpowers'],
+  'future-photo':['#Future','#Memories'],
+  'everyday-hero':['#EverydayHeroes','#Movies'],
+  'sound-of-world':['#Soundscapes','#Travel'],
+  'no-alarm':['#Sleep','#EverydayLife'],
+  'museum-item':['#Museums','#Future'],
+  'lunch-with-future':['#FutureSelf','#WhatIf'],
+  'pets-meeting':['#Pets','#PetHumor'],
+  'internet-agree':['#Internet','#Humor'],
+  'sunset-choice':['#Sunset','#Space']
+});
+
 function dailyPlayfulItem(nowIso, postedIds) {
   const day = Math.floor(Date.parse(nowIso.slice(0,10) + 'T00:00:00Z') / 86400_000);
   const start = ((day % COSMOS_PLAYFUL_POSTS.length) + COSMOS_PLAYFUL_POSTS.length) % COSMOS_PLAYFUL_POSTS.length;
@@ -696,7 +801,7 @@ function dailyPlayfulItem(nowIso, postedIds) {
   const url = `${SITE_ORIGIN}/?utm_source=x&utm_medium=organic&utm_campaign=cosmos_curiosity_v4&utm_content=${encodeURIComponent(entry.key)}`;
   return {
     id, enabled:true, created_at:nowIso, title:`COSMOS curiosity: ${entry.key.replace(/-/g,' ')}`,
-    source_url:url, x_text:truncate(entry.text,220), linkedin_text:'', platforms:['x'],not_before:null,
+    source_url:url, x_text:xTextWithHashtags(entry.text, PLAYFUL_X_HASHTAGS[entry.key] || ['#Curiosity','#WhatIf']), linkedin_text:'', platforms:['x'],not_before:null,
     content_kind:'playful', discovery:{domain:'culture',topic_key:entry.key,creative:true,
       note:'Original hypothetical question; no assertion of a real news event. Public COSMOS homepage.'}
   };
@@ -1276,6 +1381,7 @@ async function main() {
     generated_by:"scripts/cosmos_universal_social_discovery.mjs",
     policy:{
       mode:"cosmos_x_v4_curiosity_and_discovery",
+      hashtag_policy:"v5_2_two_topic_tags_x_caption",
       target_count:TARGET_COUNT,
       strict_composite_score:STRICT_COMPOSITE,
       fallback_composite_score:FALLBACK_COMPOSITE,
