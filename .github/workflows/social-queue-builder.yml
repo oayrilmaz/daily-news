@@ -66,9 +66,10 @@ jobs:
               return topical.length>=2 && item.x_text.length<=225;
             });
             // Rebuild previously generated hashtag-free queues immediately.
-            if(v4 && tagsReady && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
-              build=false;reason=`fresh v5.2 topical-hashtag queue: ${age.toFixed(1)}h`;
-            } else reason=`queue v4=${v4}, tagsReady=${tagsReady}, size=${items.length}, age=${age.toFixed(1)}h`;
+            const retryReady=q.policy?.discovery_retry_policy==='v5_3_focused_research_topup';
+            if(v4 && tagsReady && retryReady && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
+              build=false;reason=`fresh v5.3 verified research queue: ${age.toFixed(1)}h`;
+            } else reason=`queue v4=${v4}, tagsReady=${tagsReady}, retryReady=${retryReady}, size=${items.length}, age=${age.toFixed(1)}h`;
           }catch(e){reason=`queue check: ${e.message}`;}
           console.log(reason);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${build?'true':'false'}\n`);
@@ -103,7 +104,7 @@ jobs:
           const fs=require('fs');
           const queue=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
           const items=queue.items;
-          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png'||queue.policy?.hashtag_policy!=='v5_2_two_topic_tags_x_caption')throw Error('Unexpected publishing mode, hashtag policy or visual assets missing');
+          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png'||queue.policy?.hashtag_policy!=='v5_2_two_topic_tags_x_caption'||queue.policy?.discovery_retry_policy!=='v5_3_focused_research_topup')throw Error('Unexpected publishing mode, research top-up policy, hashtag policy or visual assets missing');
           if(!Array.isArray(items)||items.length!==3)throw Error('Need exactly three X posts');
           if(new Set(items.map(x=>x.id)).size!==items.length)throw Error('Duplicate post IDs');
           const kinds=items.map(x=>x.content_kind);
