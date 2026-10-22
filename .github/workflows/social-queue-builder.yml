@@ -1,16 +1,13 @@
-name: Build Cosmos Universal Social Queue
+name: Build COSMOS X Curiosity Queue + Distinct Visuals
 
 on:
   workflow_dispatch:
-
-  # Primary + recovery schedules. The freshness guard means only the first
-  # successful trigger builds; later triggers are automatic fallbacks.
+  # Multiple fallbacks; daily freshness guard keeps one build per 18 hours.
   schedule:
     - cron: "47 9 * * *"
     - cron: "37 10 * * *"
     - cron: "27 11 * * *"
     - cron: "7 13 * * *"
-
   workflow_run:
     workflows:
       - "Home AI + Video (PTD Today)"
@@ -28,8 +25,7 @@ jobs:
   build:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    timeout-minutes: 15
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
@@ -40,201 +36,118 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: '24'
 
-      - name: Sync with latest main
+      - name: Sync with main
         run: |
           git fetch origin main
           git checkout main
           git reset --hard origin/main
 
-      - name: Validate Cosmos Question source files
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --check scripts/cosmos_universal_social_discovery.mjs
-          test -f q.html
+      - name: Verify discovery script
+        run: node --check scripts/cosmos_universal_social_discovery.mjs
 
-          # q.html is intentionally self-contained now. Do not require the old
-          # assets/cosmos-question.js or assets/cosmos-question.css files.
-          node - <<'NODE'
-          const fs = require("fs");
-          const html = fs.readFileSync("q.html", "utf8");
-
-          const required = [
-            [/<style[\s>]/i, "embedded Cosmos Question CSS"],
-            [/id=["']cqPlayer["']/i, "Cosmos Question player"],
-            [/id=["']cqShareQuestionInline["']/i, "question sharing controls"],
-            [/COSMOS_CHALLENGE_BOOTSTRAP/, "official-question bootstrap support"]
-          ];
-
-          for (const [pattern, label] of required) {
-            if (!pattern.test(html)) throw new Error(`q.html is missing ${label}`);
-          }
-
-          const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)]
-            .map(match => match[1])
-            .filter(code => code.trim());
-
-          if (!scripts.length) throw new Error("q.html has no embedded JavaScript");
-          for (const code of scripts) new Function(code);
-
-          console.log(`q.html self-contained validation passed (${scripts.length} inline script block(s)).`);
-          NODE
-
-      - name: Check whether the Cosmos X queue is already fresh
+      - name: Check whether daily X queue is already fresh
         id: queue_freshness
         shell: bash
         run: |
           node - <<'NODE'
-          const fs = require("fs");
-
-          let shouldBuild = true;
-          let reason = "queue missing or unreadable";
-
-          // A manual workflow_dispatch is an explicit request to rebuild now,
-          // even when the existing queue is still within the freshness window.
-          if (process.env.GITHUB_EVENT_NAME === "workflow_dispatch") {
-            reason = "manual run: force rebuild requested";
-            console.log(reason);
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, "should_build=true\n");
-            fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason}\n`);
-            process.exit(0);
-          }
-
+          const fs=require('fs');
+          let build=true, reason='queue missing';
           try {
-            const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
-            const updatedAt = Date.parse(String(queue.updated_at || ""));
-            const items = Array.isArray(queue.items) ? queue.items : [];
-            const ageHours = Number.isFinite(updatedAt)
-              ? (Date.now() - updatedAt) / 3600000
-              : Infinity;
-
-            const participatory =
-              String(queue.schema_version || "") === "2.0" &&
-              items.length >= 3 &&
-              items.length <= 5 &&
-              items.every(item => {
-                try {
-                  const url = new URL(item.source_url);
-                  return url.hostname === "ptdtoday.com" && url.pathname.startsWith("/q/");
-                } catch {
-                  return false;
-                }
-              });
-
-            if (participatory && ageHours >= 0 && ageHours < 18) {
-              shouldBuild = false;
-              reason = `fresh participatory queue: ${items.length} items, ${ageHours.toFixed(1)}h old`;
-            } else {
-              reason = `stale/legacy queue: schema=${queue.schema_version || "unknown"}, items=${items.length}, age=${Number.isFinite(ageHours) ? ageHours.toFixed(1) : "unknown"}h`;
-            }
-          } catch (error) {
-            reason = `queue check failed: ${error.message}`;
-          }
-
+            const q=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
+            const age=(Date.now()-Date.parse(String(q.updated_at||'')))/3600000;
+            const items=Array.isArray(q.items)?q.items:[];
+            // Existing queues from older strategies are refreshed even when young.
+            const v4=q.policy?.mode==='cosmos_x_v4_curiosity_and_discovery' && q.policy?.visuals==='original_locally_rendered_per_post_1200x630_png';
+            if(v4 && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
+              build=false;reason=`fresh v5 visual queue: ${age.toFixed(1)}h`;
+            } else reason=`queue v4=${v4}, size=${items.length}, age=${age.toFixed(1)}h`;
+          }catch(e){reason=`queue check: ${e.message}`;}
           console.log(reason);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${shouldBuild ? "true" : "false"}\n`);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `reason=${reason.replace(/\n/g, " ")}\n`);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${build?'true':'false'}\n`);
           NODE
 
-      - name: Skip message when a fresh queue already exists
-        if: ${{ steps.queue_freshness.outputs.should_build != 'true' }}
-        run: echo "Fresh Cosmos Question queue already exists. Recovery trigger exits without rebuilding."
-
-      - name: Discover fresh developments + build participatory Cosmos Questions
+      - name: Build verified public discoveries and one playful post
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          COSMOS_DISCOVERY_MODEL: gpt-6-luna
+          COSMOS_DISCOVERY_MODEL: ${{ vars.COSMOS_DISCOVERY_MODEL || 'gpt-6-luna' }}
           SITE_ORIGIN: https://ptdtoday.com
-          SOCIAL_QUEUE_TARGET: "5"
-          COSMOS_STRICT_COMPOSITE: "60"
-          COSMOS_FALLBACK_COMPOSITE: "48"
-          COSMOS_FALLBACK_BUTTERFLY: "45"
-          COSMOS_HISTORY_DAYS: "7"
+          SOCIAL_QUEUE_TARGET: '3'
+          COSMOS_STRICT_COMPOSITE: '58'
+          COSMOS_FALLBACK_COMPOSITE: '45'
+          COSMOS_FALLBACK_BUTTERFLY: '45'
+          COSMOS_HISTORY_DAYS: '7'
         run: node scripts/cosmos_universal_social_discovery.mjs
 
-      - name: Validate generated Cosmos Question queue
+      - name: Install local visual-card dependency
+        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+        run: python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
+
+      - name: Generate original 1200x630 social preview images
+        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+        run: python scripts/cosmos_x_visual_cards.py
+
+      - name: Validate v5 queue, destination pages and social images
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         shell: bash
         run: |
           node - <<'NODE'
-          const fs = require("fs");
-          const path = require("path");
-
-          const queue = JSON.parse(fs.readFileSync("data/social-queue.json", "utf8"));
-          if (String(queue.schema_version) !== "2.0") {
-            throw new Error(`Expected queue schema 2.0, got ${queue.schema_version}`);
+          const fs=require('fs');
+          const queue=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
+          const items=queue.items;
+          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png')throw Error('Unexpected publishing mode or visual assets missing');
+          if(!Array.isArray(items)||items.length!==3)throw Error('Need exactly three X posts');
+          if(new Set(items.map(x=>x.id)).size!==items.length)throw Error('Duplicate post IDs');
+          const kinds=items.map(x=>x.content_kind);
+          if(kinds.join(',')!=='discovery,playful,discovery')throw Error('Expected sourced / playful / sourced rhythm');
+          for(const item of items){
+            if(JSON.stringify(item.platforms)!=='["x"]'||!item.enabled)throw Error('Invalid X-only item');
+            if(!item.x_text || /\n[A-E]\.\s/.test(item.x_text))throw Error('Multiple choice leaked into X caption');
+            if(item.x_text.length>225)throw Error(`X copy too long: ${item.x_text.length}`);
+            const url=new URL(item.source_url);
+            if(url.hostname!=='ptdtoday.com'||url.protocol!=='https:')throw Error('URL not on public COSMOS');
+            const cardUrl=new URL(item.discovery?.visual_card_url||'');
+            if(cardUrl.hostname!=='ptdtoday.com'||!cardUrl.pathname.startsWith('/assets/cosmos-x-cards/')||!cardUrl.pathname.endsWith('.png'))throw Error('Missing topical image URL');
+            const cardFile=cardUrl.pathname.replace(/^\//,'');
+            if(!fs.existsSync(cardFile))throw Error('Missing actual image '+cardFile);
+            const sig=fs.readFileSync(cardFile).subarray(0,8).toString('hex');
+            if(sig!=='89504e470d0a1a0a')throw Error('Preview is not a valid PNG '+cardFile);
+            if(item.content_kind==='discovery'){
+              if(!url.pathname.startsWith('/q/'))throw Error('Discovery must link to its actual public question');
+              const pathname=url.pathname.replace(/^\//,'');
+              if(!fs.existsSync(pathname))throw Error(`Missing question page ${pathname}`);
+              const markup=fs.readFileSync(pathname,'utf8');
+              if(!markup.includes(item.discovery.visual_card_url)||!markup.includes('summary_large_image'))throw Error('OG/Twitter card tags missing on '+pathname);
+              if(!Array.isArray(item.discovery?.sources)||item.discovery.sources.length<2)throw Error('Missing corroboration');
+            } else {
+              if(!url.pathname.startsWith('/x/')||item.discovery?.creative!==true)throw Error('Invalid playful landing link');
+              const pathname=url.pathname.replace(/^\//,'');
+              if(!fs.existsSync(pathname))throw Error('Missing playful landing page');
+              const markup=fs.readFileSync(pathname,'utf8');
+              if(!markup.includes(item.discovery.visual_card_url)||!markup.includes('summary_large_image'))throw Error('Playful card tags missing');
+            }
           }
-          if (!Array.isArray(queue.items) || queue.items.length < 3 || queue.items.length > 5) {
-            throw new Error(`Expected 3-5 quality-gated X items, got ${queue.items?.length ?? 0}`);
+          for(const file of ['data/cosmos-universal-discovery.json','data/cosmos-universal-discovery-history.json',
+            'cosmos-discoveries.html','sitemap-cosmos.xml']){
+            if(!fs.existsSync(file))throw Error(`Missing ${file}`);
           }
-
-          const domains = new Set();
-          for (const item of queue.items) {
-            if (!Array.isArray(item.platforms) || item.platforms.length !== 1 || item.platforms[0] !== "x") {
-              throw new Error(`Queue item ${item.id} is not X-only`);
-            }
-
-            const url = new URL(item.source_url);
-            if (url.hostname !== "ptdtoday.com" || !url.pathname.startsWith("/q/") || !url.pathname.endsWith(".html")) {
-              throw new Error(`Queue item ${item.id} does not point to a main-domain Cosmos Question page`);
-            }
-
-            const localFile = decodeURIComponent(url.pathname.replace(/^\//, ""));
-            if (!fs.existsSync(localFile)) throw new Error(`Missing generated question page: ${localFile}`);
-
-            const challenge = item.discovery?.challenge;
-            if (!challenge?.challenge_id || !challenge?.question) {
-              throw new Error(`Queue item ${item.id} is missing challenge metadata`);
-            }
-            if (!Array.isArray(challenge.options) || challenge.options.length !== 5 || challenge.options.map(o => o.key).join("") !== "ABCDE") {
-              throw new Error(`Queue item ${item.id} does not have valid A-E options`);
-            }
-            if (!["fact","supported","opinion","prediction"].includes(challenge.answer_mode)) {
-              throw new Error(`Queue item ${item.id} has invalid answer_mode`);
-            }
-            if (!Array.isArray(item.discovery?.sources) || item.discovery.sources.length < 2) {
-              throw new Error(`Queue item ${item.id} lacks two-source provenance`);
-            }
-            domains.add(String(item.discovery.domain || "other"));
-          }
-
-          if (queue.items.length >= 4 && domains.size < 3) {
-            throw new Error(`Universal queue is too concentrated: only ${domains.size} domains`);
-          }
-
-          for (const file of [
-            "data/cosmos-universal-discovery.json",
-            "data/cosmos-universal-discovery-history.json",
-            "cosmos-discoveries.html",
-            "sitemap-cosmos.xml"
-          ]) {
-            if (!fs.existsSync(file)) throw new Error(`Missing generated file: ${file}`);
-          }
-
-          console.log(`Validated ${queue.items.length} participatory Cosmos Question item(s) across ${domains.size} domains.`);
+          console.log('Safe 3-post COSMOS v5 queue with distinct PNG cards validated.');
           NODE
 
-      - name: Commit questions + discovery/search surfaces
+      - name: Commit questions and queue
         if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-
-          git add \
-            data/social-queue.json \
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add data/social-queue.json \
             data/cosmos-universal-discovery.json \
             data/cosmos-universal-discovery-history.json \
-            cosmos-discoveries.html \
-            sitemap-cosmos.xml \
-            q
-
+            cosmos-discoveries.html sitemap-cosmos.xml q/ x/ assets/cosmos-x-cards/
           if git diff --cached --quiet; then
-            echo "No Cosmos Question changes to commit."
+            echo 'No changed discovery files.'
             exit 0
           fi
-
-          git commit -m "Build participatory Cosmos Questions + search feed"
+          git commit -m 'Build COSMOS X curiosity queue with unique preview art'
           git push origin main
