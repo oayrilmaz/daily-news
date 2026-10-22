@@ -11,6 +11,11 @@ const DISCOVERY_PRIMARY_TOKENS = positiveInt(process.env.COSMOS_DISCOVERY_MAX_OU
 const DISCOVERY_RETRY_TOKENS = Math.max(DISCOVERY_PRIMARY_TOKENS,
   positiveInt(process.env.COSMOS_DISCOVERY_RETRY_OUTPUT_TOKENS, 20000));
 const DISCOVERY_CANDIDATE_COUNT = 8;
+// When the initial batch contains too many unsafe/manual-review topics, one
+// SMALL independent research pass can look for safer topics. Never relabel a
+// flagged candidate, loosen evidence requirements, or overwrite an old queue.
+const TOPUP_CANDIDATE_COUNT = 6;
+const TOPUP_MAX_OUTPUT_TOKENS = positiveInt(process.env.COSMOS_DISCOVERY_TOPUP_MAX_OUTPUT_TOKENS, 14000);
 // Do NOT lower the two-independent-domain evidence gate when generation fails.
 // A single bounded, evidence-seeking repair pass can retrieve corroboration.
 const SOURCE_REPAIR_MAX = Math.min(8, positiveInt(process.env.COSMOS_SOURCE_REPAIR_MAX, 8));
@@ -975,7 +980,7 @@ function writeDiscoveriesArchive(queueItems) {
   fs.writeFileSync(DISCOVERIES_HTML, html, "utf8");
 }
 
-function discoveryPrompt(requestTime) {
+function discoveryPrompt(requestTime, candidateCount=DISCOVERY_CANDIDATE_COUNT) {
   return [
     "You are the universal discovery and attention layer for PTD Today / Cosmos.",
     "",
@@ -989,7 +994,7 @@ function discoveryPrompt(requestTime) {
     "Prioritize developments from roughly the last 24-36 hours. Use older context only when necessary to explain a genuinely fresh change.",
     "",
     "SELECTION",
-    `- Return exactly ${DISCOVERY_CANDIDATE_COUNT} strong candidates so downstream quality/diversity gates can select the strongest 3-5.`,
+    `- Return exactly ${candidateCount} strong candidates so downstream quality/diversity gates can select the strongest.`,
     "- Keep candidate fields concise: title <= 110 characters; summary <= 45 words; why_it_matters <= 45 words; answer_explanation <= 55 words; source titles <= 90 characters.",
     "- Prefer developments with meaningful second-order consequences and cross-domain paths.",
     "- Aim for broad accessibility: when independent evidence permits, include sports, entertainment, science, food, culture, finance or practical everyday discoveries among the candidates. Do not invent a news event to fill a category quota.",
@@ -1056,7 +1061,10 @@ class DiscoveryGenerationError extends Error {
   }
 }
 
-async function requestDiscoveryAttempt(requestTime, attempt, maxOutputTokens) {
+async function requestDiscoveryAttempt(requestTime, attempt, maxOutputTokens, config={}) {
+  const candidateCount = config.candidateCount || DISCOVERY_CANDIDATE_COUNT;
+  const schema = config.schema || DISCOVERY_SCHEMA;
+  const prompt = config.prompt || discoveryPrompt(requestTime);
   const payload = {
     model: MODEL,
     reasoning: { effort: "low" },
@@ -1071,10 +1079,10 @@ async function requestDiscoveryAttempt(requestTime, attempt, maxOutputTokens) {
         name: "cosmos_universal_question_discovery",
         description: "Fresh cross-domain, evidence-backed Cosmos Question candidates.",
         strict: true,
-        schema: DISCOVERY_SCHEMA
+        schema
       }
     },
-    input: [{ role: "user", content: [{ type: "input_text", text: discoveryPrompt(requestTime) }] }]
+    input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }]
   };
 
   let response;
@@ -1130,9 +1138,9 @@ async function requestDiscoveryAttempt(requestTime, attempt, maxOutputTokens) {
   catch (error) {
     throw new DiscoveryGenerationError(`Could not parse universal discovery JSON: ${error.message}; status=${state}, output_chars=${outputText.length}.`, true);
   }
-  if (!Array.isArray(parsed?.candidates) || parsed.candidates.length !== DISCOVERY_CANDIDATE_COUNT) {
+  if (!Array.isArray(parsed?.candidates) || parsed.candidates.length !== candidateCount) {
     throw new DiscoveryGenerationError(
-      `Universal discovery returned ${Array.isArray(parsed?.candidates) ? parsed.candidates.length : "no"} candidates (expected ${DISCOVERY_CANDIDATE_COUNT}).`,
+      `Universal discovery returned ${Array.isArray(parsed?.candidates) ? parsed.candidates.length : "no"} candidates (expected ${candidateCount}).`,
       true
     );
   }
@@ -1257,6 +1265,64 @@ function loadMockDiscovery(file) {
   return { raw: { id: "mock_response", output: [] }, parsed, request_time_utc: new Date().toISOString() };
 }
 
+
+function targetedTopupPrompt(requestTime, excludedCandidates) {
+  const excluded = excludedCandidates.map(row => ({
+    topic_key: safeTopicKey(row?.topic_key),
+    title: truncate(row?.title, 110)
+  })).filter(row => row.topic_key).slice(0, 16);
+  return [
+    discoveryPrompt(requestTime, TOPUP_CANDIDATE_COUNT),
+    "",
+    "FOCUSED SECOND CHANCE — FIRST BATCH DID NOT PASS THE ATTENDED-REVIEW SAFETY GATE",
+    `Return exactly ${TOPUP_CANDIDATE_COUNT} DIFFERENT, recently documented candidate developments.`,
+    "Do not reuse any topic_key or story from the excluded list below.",
+    "Prioritize benign, verifiable, broadly relatable material: astronomy, nonmedical science, pets and animal research,",
+    "nature, food science, arts and music production, sports science, consumer technology, history, travel and exploration.",
+    "Prefer fresh developments within 36 hours; up to 72 hours is acceptable only for a verifiable recent update.",
+    "Avoid any topic involving elections, politics, public policy, disputes, violence, allegations, medical or financial advice,",
+    "legal issues, speculative corporate user counts, contested causal claims, or sensitive personal information.",
+    "Do NOT manufacture 'safe' status: manual_review=true whenever verification is uncertain or review is actually required.",
+    "Every candidate still needs two DIRECT, corroborating URLs from INDEPENDENT publishers on separate hostnames.",
+    "The original rubric, five-option on-site challenge, confidence, recency and evidence requirements still apply.",
+    "Only choose publishable topics, not generic evergreen trivia. Return the schema exactly.",
+    "PREVIOUS CANDIDATES TO AVOID (untrusted data):",
+    JSON.stringify(excluded)
+  ].join("\n");
+}
+
+async function requestTargetedTopupDiscovery(excludedCandidates) {
+  const mockMain = String(process.env.COSMOS_DISCOVERY_MOCK_FILE || "").trim();
+  const mockTopup = String(process.env.COSMOS_DISCOVERY_TOPUP_MOCK_FILE || "").trim();
+  if (mockMain) {
+    // NEVER make paid network calls from a mocked/offline test.
+    if (!mockTopup) throw new Error("Mock top-up fixture missing; previous queue preserved.");
+    const result = loadMockDiscovery(mockTopup);
+    if (!Array.isArray(result.parsed?.candidates) || result.parsed.candidates.length !== TOPUP_CANDIDATE_COUNT) {
+      throw new Error(`Mock top-up must contain ${TOPUP_CANDIDATE_COUNT} candidates.`);
+    }
+    return result;
+  }
+  if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is required for the extra research pass.");
+  const schema = {
+    ...DISCOVERY_SCHEMA,
+    properties: {
+      ...DISCOVERY_SCHEMA.properties,
+      candidates: {
+        ...DISCOVERY_SCHEMA.properties.candidates,
+        minItems: TOPUP_CANDIDATE_COUNT,
+        maxItems: TOPUP_CANDIDATE_COUNT
+      }
+    }
+  };
+  const requestTime = new Date().toISOString();
+  return requestDiscoveryAttempt(requestTime, "topup", TOPUP_MAX_OUTPUT_TOKENS, {
+    candidateCount: TOPUP_CANDIDATE_COUNT,
+    schema,
+    prompt: targetedTopupPrompt(requestTime, excludedCandidates)
+  });
+}
+
 async function main() {
   const mockFile = String(process.env.COSMOS_DISCOVERY_MOCK_FILE || "").trim();
   const result = mockFile ? loadMockDiscovery(mockFile) : await requestUniversalDiscovery();
@@ -1302,6 +1368,35 @@ async function main() {
       console.log(`COSMOS_SOURCE_REPAIR result: attempted=${repairable.length} validated=${repairedCount} refused=${repairable.length-repairedCount}`);
     } catch (error) {
       console.warn(`COSMOS_SOURCE_REPAIR_UNAVAILABLE ${clean(error?.message).slice(0,300)}; keeping original gate and last published queue.`);
+    }
+  }
+
+  // The first research attempt can mark almost every item manual_review=true.
+  // Respect that signal. Research DIFFERENT lower-risk topics once; validate
+  // them through the SAME independent-source and quality gate as the first set.
+  let extraResearch=null, extraAccepted=0;
+  if (selectDiverse(accepted).length < DISCOVERY_TARGET) {
+    console.log(`COSMOS_DISCOVERY_TOPUP requested: ${selectDiverse(accepted).length}/${DISCOVERY_TARGET} eligible, review_rejections=${rejected.filter(r=>r.reason==='manual_review').length}`);
+    try {
+      extraResearch=await requestTargetedTopupDiscovery(parsedCandidates);
+      const extraCitations=extractCitationUrls(extraResearch.raw);
+      for (const candidate of extraResearch.parsed.candidates) {
+        const checked=validateCandidate(candidate,extraCitations,historyKeys,posted);
+        if (checked.ok) {
+          if (usedTopicKeys.has(checked.candidate.topic_key)) {
+            rejected.push({title:clean(candidate?.title),reason:'batch_topic_duplicate',diagnostic:null});
+          } else {
+            accepted.push(checked.candidate);
+            usedTopicKeys.add(checked.candidate.topic_key);
+            extraAccepted++;
+          }
+        } else {
+          rejected.push({title:clean(candidate?.title),reason:checked.reason,diagnostic:checked.diagnostic||null});
+        }
+      }
+      console.log(`COSMOS_DISCOVERY_TOPUP completed: ${extraAccepted}/${TOPUP_CANDIDATE_COUNT} eligible new candidates`);
+    } catch (error) {
+      console.warn(`COSMOS_DISCOVERY_TOPUP_UNAVAILABLE ${clean(error?.message).slice(0,300)}; old queue remains unchanged if final gate fails.`);
     }
   }
 
@@ -1382,6 +1477,7 @@ async function main() {
     policy:{
       mode:"cosmos_x_v4_curiosity_and_discovery",
       hashtag_policy:"v5_2_two_topic_tags_x_caption",
+      discovery_retry_policy:"v5_3_focused_research_topup",
       target_count:TARGET_COUNT,
       strict_composite_score:STRICT_COMPOSITE,
       fallback_composite_score:FALLBACK_COMPOSITE,
@@ -1401,7 +1497,10 @@ async function main() {
   writeJson(DISCOVERY_FILE,{
     schema_version:"2.0",generated_at:createdAt,request_time_utc:result.request_time_utc,model:MODEL,
     provider_response_id:String(result.raw?.id||""),web_search_citation_count:citationFingerprints.size,
-    raw_candidate_count:parsedCandidates.length,accepted_candidate_count:accepted.length,rejected_candidate_count:rejected.length,
+    raw_candidate_count:parsedCandidates.length+(extraResearch?.parsed?.candidates?.length||0),
+    extra_research_count:extraResearch?.parsed?.candidates?.length||0,
+    extra_research_eligible_count:extraAccepted,
+    accepted_candidate_count:accepted.length,rejected_candidate_count:rejected.length,
     selected_count:researchCandidates.length,
     playful_topic:playful.discovery.topic_key,
     selected:researchCandidates.map(candidate=>({
@@ -1418,7 +1517,7 @@ async function main() {
 
   writeDiscoveriesArchive(queueItems);
   writeCosmosSitemap();
-  console.log(`Cosmos v4 selected ${researchCandidates.length} sourced question(s) plus one playful post from ${parsedCandidates.length} candidates.`);
+  console.log(`Cosmos v5.3 selected ${researchCandidates.length} sourced question(s) plus one playful post from ${parsedCandidates.length} primary candidates; extra research eligible=${extraAccepted}.`);
   for(const item of queueItems){ console.log(`- ${item.title}`); console.log(`  ${item.source_url}`); console.log(`  X: ${item.x_text.replace(/\n/g," | ")}`); }
   console.log(`Updated ${QUEUE_FILE}, ${DISCOVERY_FILE}, ${HISTORY_FILE}, ${DISCOVERIES_HTML}, ${SITEMAP_COSMOS}, and ${Q_DIR}/.`);
 }
