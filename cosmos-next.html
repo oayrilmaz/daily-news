@@ -530,6 +530,7 @@
     @media(prefers-reduced-motion:reduce){.living-branch .living-orb{transition:none}}
 
 
+    /* v3.1.1: newest-first Metro and discovery ordering; no database/API changes. */
     /* COSMOS v2.5.1: a compact *peek*, not a large card that blocks the Metro. */
     .app.metro-live .metro-popover{
       left:12px!important;right:12px!important;max-height:170px!important;
@@ -2837,12 +2838,19 @@
   }
   function unifiedTurnsHtml(data){
     const turns=Array.isArray(data?.turns)?data.turns:[];
+    // v3.1.1: Keep the original sequence for labels, display newest first.
+    // Chronological order is a presentation choice only; branch IDs, parent IDs,
+    // permissions, and the underlying saved history never change.
+    const chronological=[...turns].sort((a,b)=>
+      (Date.parse(a.created_at)||0)-(Date.parse(b.created_at)||0)||String(a.id||'').localeCompare(String(b.id||'')));
+    const sequenceById=new Map(chronological.map((turn,index)=>[String(turn.id),index]));
+    const newestFirst=[...chronological].reverse();
     const selected=String(data.cosmos_id||'');
     return `<section class="cosmos-ask-surface" aria-label="COSMOS discovery">
       <div class="cosmos-ask-kicker">✧ ASK COSMOS · FULL INTELLIGENCE · PRIVATE METRO</div>
-      <p class="cosmos-ask-privacy">Each explored connection is an independent private Metro moment, linked to this discovery. Earlier discoveries remain intact.</p>
-      <div class="cosmos-ask-timeline">${turns.map((t,i)=>`<article class="cosmos-ask-turn ${String(t.moment_id||'')===selected?'moment-current':''}" data-ask-turn="${escapeHtml(t.id)}">
-        <div class="cosmos-ask-kicker">${i===0?'Original question':'Connected discovery '+i} · ${escapeHtml(cosmosLocalStamp(t.created_at))}</div>
+      <p class="cosmos-ask-privacy">Newest first · earlier discoveries remain below. Every explored connection is a private, linked Metro moment.</p>
+      <div class="cosmos-ask-timeline">${newestFirst.map(t=>`<article class="cosmos-ask-turn ${String(t.moment_id||'')===selected?'moment-current':''}" data-ask-turn="${escapeHtml(t.id)}">
+        <div class="cosmos-ask-kicker">${!t.parent_turn_id?'Original question':'Connected discovery '+(sequenceById.get(String(t.id))??'')} · ${escapeHtml(cosmosLocalStamp(t.created_at))}</div>
         <h3>${escapeHtml(t.question)}</h3>
         <div class="cosmos-ask-answer">${escapeHtml(t.answer)}</div>
         ${unifiedDepthHtml(t)}
@@ -2854,7 +2862,7 @@
       <div class="cosmos-ask-form" id="unifiedFollowForm" hidden>
         <label for="unifiedFollowQuestion">Explore the next dimension · saved as a linked private Metro moment</label>
         <textarea id="unifiedFollowQuestion" maxlength="650" placeholder="Where does this connection lead?"></textarea>
-        <input type="hidden" id="unifiedParentTurn" value="${escapeHtml(turns[turns.length-1]?.id||'')}">
+        <input type="hidden" id="unifiedParentTurn" value="${escapeHtml(newestFirst[0]?.id||'')}">
         <div class="cosmos-ask-inline-actions"><button type="button" id="unifiedFollowCancel">Cancel</button><button type="button" id="unifiedFollowSend" class="primary">Explore & save moment</button></div>
       </div>
     </section>`;
@@ -4338,7 +4346,10 @@
     return `<div class="attachment-row">${title}<div class="card-body">${escapeHtml(a.text||'')}</div>${removable}</div>`;
   }
   async function buildMomentExtras(additions,ownerCanRemove,cosmosId){
-    const parts=await Promise.all((additions||[]).map(async a=>{
+    // Display newest additions first without mutating the server-returned list.
+    const ordered=[...(additions||[])].sort((a,b)=>
+      (Date.parse(b.created_at)||0)-(Date.parse(a.created_at)||0));
+    const parts=await Promise.all(ordered.map(async a=>{
       const content=await momentAttachmentHtml(a,ownerCanRemove,cosmosId);
       return `<section class="cosmos-part" data-part-id="${escapeHtml(a.id)}">${content}
         ${a.can_review?`<div class="actions"><button type="button" class="primary" data-review-child="${escapeHtml(a.id)}" data-review-action="approve">Approve</button><button type="button" data-review-child="${escapeHtml(a.id)}" data-review-action="reject">Reject</button></div>`:''}
@@ -4600,7 +4611,8 @@
 
   function momentCommentsHtml(item,additions=[]){
     if(item.content_kind==='text')return '';
-    const comments=additions.filter(a=>a.kind==='text');
+    const comments=additions.filter(a=>a.kind==='text').sort((a,b)=>
+      (Date.parse(b.created_at)||0)-(Date.parse(a.created_at)||0));
     const rows=comments.map(a=>`<article class="cosmos-comment-row" data-part-id="${escapeHtml(a.id)}">
       <div class="cosmos-comment-meta">${escapeHtml(a.author||'Someone')}${a.sealed?' · Sealed contribution':''}</div>
       ${additionTimeFields(a)}
@@ -4655,13 +4667,19 @@
     const commentsHtml=momentCommentsHtml(item,additions);
     // Circle additions also appear in the legacy thread; never display their content twice.
     const shownAdditionIds=new Set((additions||[]).map(a=>String(a.id)));
-    const chain=(isUnifiedMoment(item)?[]:(thread||[])).filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
+    // Legacy thread entries are retained for ordinary moments, but Ask COSMOS
+    // branches already live in their own Metro moments and unified timeline.
+    // Do not repeat those branches in a second "This Cosmos has depth" list.
+    const chain=(isUnifiedMoment(item)?[]:(thread||[]))
+      .filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))&&!isUnifiedMoment(x))
+      .sort((a,b)=>(Date.parse(b.created_at)||0)-(Date.parse(a.created_at)||0))
+      .map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
     const originalDate=`<div class="cosmos-original-date"><b>Original moment</b><div>Posted on ${escapeHtml(cosmosLocalStamp(item.created_at))}</div>${item.unlock_at?`<small>${Date.parse(item.unlock_at)>Date.now()?'Scheduled to reveal':'Revealed'} on ${escapeHtml(cosmosLocalStamp(item.unlock_at))}</small>`:''}</div>`;
     const receipt=additionReceiptMarkup(item,additions);
     openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2>${originalDate}${momentAudienceHtml(item.audience)}${receipt}${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
       <div class="liquid-share-context"><button type="button" class="cosmos-share-pill" data-share-part="main">↗ Share this section</button></div></section>
       ${commentsHtml}
-      ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">This Cosmos has depth</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button></div>
+      ${additionsHtml?`<div style="margin-top:16px"><h3>Added to this moment</h3>${additionsHtml}</div>`:""}${chain?`<div style="margin-top:18px"><div class="micro">Earlier replies</div><div class="list" style="margin-top:8px">${chain}</div></div>`:""}<div class="actions"><button id="closeCosmos">Close</button></div>
       <div class="actions"><button type="button" id="shareEntireMoment" class="cosmos-share-pill">↗ Share moment link</button></div>${item.can_delete?'<div class="actions"><button class="danger" id="deleteCosmos">Delete my post</button></div>':''}${item.creator_user_id&&item.creator_user_id!==me?.id?`<div class="actions"><button id="hideReceived" class="danger">Hide from my Cosmos</button><button id="blockSender">Block sender</button><button id="reportCosmos">Report</button></div>`:""}`);
     if(unifiedLoaded)bindUnifiedFollowups(item,thread,additions,fromMetro);
     $("closeCosmos").onclick=()=>{closeSheet();if(!fromMetro)scanHere(false);};
@@ -4701,7 +4719,7 @@
   function styleMetroFullReader(item){
     sheet.classList.add('metro-expanded');
     const available=weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(weekMetroDay)&&!i.locked)
-      .sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+      .sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
     const idx=available.findIndex(i=>i.id===item.id);
     const bar=sheet.querySelector('.sheet-quickbar');
     if(!bar)return;
@@ -5114,7 +5132,7 @@
     if(scroller){
       scroller.dataset.scrollKey=nextScrollKey;
       // Background refreshes must NOT yank the timeline back to its start.
-      // New day / new filter begins at the earliest moment, ready to swipe.
+      // New day / new filter begins with the newest moment at the top.
       scroller.scrollTop=prevScrollKey===nextScrollKey?prevScrollTop:0;
     }
     if(!weekMetroBusy && !weekMetroError)fetchMetroWeek();
@@ -5170,7 +5188,7 @@
     if(weekMetroError)return heading('Unable to load')+`<div class="metro-day-error" role="alert">Could not load your moments: ${escapeHtml(weekMetroError)}<br>Nothing has been deleted.<br><button type="button" id="metroRetry">Try again</button></div>`;
     const sunday=weekMetroDay.getDay(),left=sunday>=4;
     const trunkPct=((sunday+.5)*100/7).toFixed(2);
-    const rows=[...events].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+    const rows=[...events].sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
     const grouped=new Map();
     for(const x of rows){
       const d=new Date(x.date);if(!Number.isFinite(d.getTime()))continue;
@@ -5180,7 +5198,7 @@
     }
     // v2.9.4.8: Group all real moments in the same CLOCK HOUR, not one huge
     // text card per moment. Auto-wrapping icon tiles can show many at 10 AM.
-    const branchEntries=[...grouped.entries()].sort((a,b)=>a[0]-b[0]);
+    const branchEntries=[...grouped.entries()].sort((a,b)=>b[0]-a[0]);
     const branches=[];
     branchEntries.forEach(([hour,items])=>{
       const firstStamp=new Date(weekMetroDay.getFullYear(),weekMetroDay.getMonth(),weekMetroDay.getDate(),hour,0).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
