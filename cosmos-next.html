@@ -1846,7 +1846,7 @@
     .cosmos-sharing-summary .cosmos-sharing-note{margin:10px 0 0;font-size:11px;
       line-height:1.55;color:#60758e}
 
-/* COSMOS v3.0 — unified private Ask moments. Styles are contained to discovery UI. */
+/* COSMOS v3.1 — unified multidimensional Ask moments. Styles are contained to discovery UI. */
 .cosmos-ask-surface{margin:12px 0 20px;padding:18px;border:1px solid rgba(134,168,211,.52);
   background:linear-gradient(140deg,rgba(255,255,255,.9),rgba(220,237,252,.68));border-radius:23px;color:#193759}
 .cosmos-ask-kicker{font-size:11px;letter-spacing:.15em;text-transform:uppercase;font-weight:800;color:#44678f}
@@ -1861,6 +1861,24 @@
 .cosmos-ask-suggestions button{border:1px solid #adc7e5;border-radius:999px;background:#f7fbff;font-size:12px;padding:8px 12px;color:#23456d;cursor:pointer}
 .cosmos-ask-inline-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .cosmos-ask-inline-actions button{flex:1;min-width:150px}
+
+
+/* COSMOS v3.1 — full-depth readout stays inside private Metro moment sheets. */
+.cosmos-ask-depth{display:grid;gap:10px;margin-top:12px}
+.cosmos-ask-depth details{padding:12px 14px;border:1px solid #bfd1e9;border-radius:16px;background:rgba(249,252,255,.89)}
+.cosmos-ask-depth details summary{cursor:pointer;color:#173f6d;font-weight:750;font-size:14px;line-height:1.4}
+.cosmos-ask-depth p{white-space:pre-wrap;line-height:1.62;color:#2e4b6d;font-size:14px;overflow-wrap:anywhere}
+.cosmos-ask-depth ul{padding-left:19px;line-height:1.6;max-height:35vh;overflow-y:auto}
+.cosmos-ask-depth li{margin:7px 0;overflow-wrap:anywhere}
+.cosmos-ask-node-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:9px;margin-top:11px;max-height:45vh;overflow-y:auto}
+.cosmos-ask-node{display:flex;flex-direction:column;gap:7px;text-align:left;padding:11px 12px;border:1px solid #b4cee9;border-radius:14px;background:#fff;color:#254568;cursor:pointer;overflow-wrap:anywhere}
+.cosmos-ask-node strong{font-size:14px}.cosmos-ask-node small{font-size:11px;opacity:.8}
+.cosmos-ask-edge{padding:9px 0;border-bottom:1px solid #dbe7f5;font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.cosmos-ask-focus{outline:2px solid #3f77b8;outline-offset:2px}
+.cosmos-ask-turn.moment-current{border-color:#4d87c8;box-shadow:0 0 0 2px rgba(82,143,205,.13)}
+.cosmos-ask-related-moment{border:1px solid #a9c6e8;border-radius:999px;background:#fff;color:#214f81;padding:7px 12px;font-size:12px;cursor:pointer}
+.cosmos-ask-branch-label{font-size:12px;color:#507294;margin:7px 0}
+@media(max-width:540px){.cosmos-ask-surface{padding:12px}.cosmos-ask-turn{padding:12px}.cosmos-ask-node-grid{grid-template-columns:1fr 1fr}}
 
 </style>
 </head>
@@ -2764,24 +2782,80 @@
     }).filter(Boolean);
     return parts.length?`<details><summary>Sources · ${parts.length}</summary>${parts.join('')}</details>`:'';
   }
+  function unifiedLabel(value){return String(value??'').replace(/_/g,' ').replace(/\s+/g,' ').trim();}
+  function unifiedHistoryHtml(series,title){
+    if(!series||series.available===false)return '';
+    const a=Array.isArray(series.horizons)?series.horizons:[];
+    const lines=[series.summary,series.now_state].filter(x=>typeof x==='string'&&x.trim());
+    if(!lines.length&&!a.length)return '';
+    return `<details><summary>${escapeHtml(title)}</summary>
+      ${lines.map(s=>`<p>${escapeHtml(s)}</p>`).join('')}
+      ${a.length?`<ul>${a.slice(0,12).map(h=>{
+        if(typeof h==='string')return `<li>${escapeHtml(h)}</li>`;
+        const when=h.label||h.horizon||h.period||h.time||h.year||'';
+        const detail=h.state||h.summary||h.description||h.outcome||h.impact||h.scenario||'';
+        const butterfly=Array.isArray(h.butterfly_path)?h.butterfly_path.slice(0,6):[];
+        const delta=Array.isArray(h.what_would_change_it)?h.what_would_change_it.slice(0,3):[];
+        return `<li><strong>${escapeHtml(when)}</strong>${detail?': '+escapeHtml(detail):''}
+          ${butterfly.length?`<div><strong>Butterfly path:</strong> ${escapeHtml(butterfly.map(x=>typeof x==='string'?x:JSON.stringify(x)).join(' → '))}</div>`:''}
+          ${delta.length?`<div><strong>Could change if:</strong> ${escapeHtml(delta.map(x=>typeof x==='string'?x:JSON.stringify(x)).join('; '))}</div>`:''}</li>`;
+      }).join('')}</ul>`:''}</details>`;
+  }
+  function unifiedDepthHtml(turn){
+    const x=turn?.intelligence||{};
+    const nodes=Array.isArray(x.projection_nodes)?x.projection_nodes.slice(0,65):[];
+    const edges=Array.isArray(x.projection_relationships)?x.projection_relationships.slice(0,80):[];
+    const gaps=Array.isArray(x.knowledge_gaps)?x.knowledge_gaps.slice(0,12):[];
+    const projections=[unifiedHistoryHtml(x.past_projection,'◷ Past · evidence and history'),
+      unifiedHistoryHtml(x.future_projection,'↗ Future · conditional projections')].filter(Boolean);
+    const preface=x.essence&&x.essence!==turn.short_answer?
+      `<details><summary>What this means</summary><p>${escapeHtml(x.essence)}</p></details>`:'';
+    const nodeRows=nodes.map(n=>{
+      const label=String(n?.label||n?.name||n?.id||'').trim();
+      if(!label)return '';
+      const type=unifiedLabel(n?.type||n?.role||'Connected subject');
+      return `<button type="button" class="cosmos-ask-node" data-unified-node="${escapeHtml(label)}" data-unified-parent="${escapeHtml(turn.id)}"><strong>${escapeHtml(label)}</strong><small>${escapeHtml(type)}</small></button>`;
+    }).filter(Boolean);
+    const nodeLabels=new Map(nodes.filter(n=>n?.id).map(n=>[String(n.id),String(n.label||n.id)]));
+    const edgeRows=edges.map(edge=>{
+      const from=String(edge?.from_id||edge?.from||'');
+      const to=String(edge?.to_id||edge?.to||'');
+      const label=String(edge?.label||edge?.relationship||edge?.type||'connected to');
+      if(!from&&!to)return '';
+      return `<div class="cosmos-ask-edge">${escapeHtml(nodeLabels.get(from)||unifiedLabel(from))} <strong>— ${escapeHtml(label)} →</strong> ${escapeHtml(nodeLabels.get(to)||unifiedLabel(to))}</div>`;
+    });
+    const nodeSection=nodeRows.length?`<details><summary>◎ Connections · ${nodeRows.length} subjects</summary>
+      <p>Explore a connection to create a new private Metro moment.</p>
+      <div class="cosmos-ask-node-grid">${nodeRows.join('')}</div></details>`:'';
+    const edgeSection=edgeRows.length?`<details><summary>↗ Relationships · ${edgeRows.length}</summary>
+      <div style="max-height:36vh;overflow-y:auto">${edgeRows.join('')}</div></details>`:'';
+    const gapSection=gaps.length?`<details><summary>What remains unknown · ${gaps.length}</summary>
+      <ul>${gaps.map(g=>`<li>${escapeHtml(typeof g==='string'?g:JSON.stringify(g))}</li>`).join('')}</ul></details>`:'';
+    const tag=x.epistemic_state||x.confidence?
+      `<div class="cosmos-ask-branch-label">${x.epistemic_state?'Understanding: '+escapeHtml(unifiedLabel(x.epistemic_state)):''}${x.confidence?' · Confidence: '+escapeHtml(unifiedLabel(x.confidence)):''}</div>`:'';
+    return `<div class="cosmos-ask-depth">${tag}${preface}${nodeSection}${edgeSection}${projections.join('')}${gapSection}</div>`;
+  }
   function unifiedTurnsHtml(data){
     const turns=Array.isArray(data?.turns)?data.turns:[];
+    const selected=String(data.cosmos_id||'');
     return `<section class="cosmos-ask-surface" aria-label="COSMOS discovery">
-      <div class="cosmos-ask-kicker">✧ ASK COSMOS · PRIVATE DISCOVERY</div>
-      <p class="cosmos-ask-privacy">Each question and response belongs to this moment. Branches are preserved here, not posted to other people's timelines.</p>
-      <div class="cosmos-ask-timeline">${turns.map((t,i)=>`<article class="cosmos-ask-turn" data-ask-turn="${escapeHtml(t.id)}">
-        <div class="cosmos-ask-kicker">${i===0?'Original question':'Connected question '+i} · ${escapeHtml(cosmosLocalStamp(t.created_at))}</div>
+      <div class="cosmos-ask-kicker">✧ ASK COSMOS · FULL INTELLIGENCE · PRIVATE METRO</div>
+      <p class="cosmos-ask-privacy">Each explored connection is an independent private Metro moment, linked to this discovery. Earlier discoveries remain intact.</p>
+      <div class="cosmos-ask-timeline">${turns.map((t,i)=>`<article class="cosmos-ask-turn ${String(t.moment_id||'')===selected?'moment-current':''}" data-ask-turn="${escapeHtml(t.id)}">
+        <div class="cosmos-ask-kicker">${i===0?'Original question':'Connected discovery '+i} · ${escapeHtml(cosmosLocalStamp(t.created_at))}</div>
         <h3>${escapeHtml(t.question)}</h3>
         <div class="cosmos-ask-answer">${escapeHtml(t.answer)}</div>
+        ${unifiedDepthHtml(t)}
         ${unifiedSourcesHtml(t)}
-        <div class="cosmos-ask-suggestions">${(t.suggestions||[]).slice(0,3).map(s=>`<button type="button" data-unified-suggest="${escapeHtml(s)}" data-unified-parent="${escapeHtml(t.id)}">✧ ${escapeHtml(s)}</button>`).join('')}</div>
-        <div class="cosmos-ask-inline-actions"><button type="button" data-unified-follow="${escapeHtml(t.id)}">↳ Ask from here</button></div>
+        <div class="cosmos-ask-suggestions">${(t.suggestions||[]).slice(0,8).map(s=>`<button type="button" data-unified-suggest="${escapeHtml(s)}" data-unified-parent="${escapeHtml(t.id)}">✧ ${escapeHtml(s)}</button>`).join('')}</div>
+        <div class="cosmos-ask-inline-actions"><button type="button" data-unified-follow="${escapeHtml(t.id)}">↳ Explore from here</button>
+          ${t.moment_id && String(t.moment_id)!==selected?`<button type="button" class="cosmos-ask-related-moment" data-unified-open-moment="${escapeHtml(t.moment_id)}">View Metro moment ↗</button>`:''}</div>
       </article>`).join('')}</div>
       <div class="cosmos-ask-form" id="unifiedFollowForm" hidden>
-        <label for="unifiedFollowQuestion">Follow the ripple · ask another question</label>
+        <label for="unifiedFollowQuestion">Explore the next dimension · saved as a linked private Metro moment</label>
         <textarea id="unifiedFollowQuestion" maxlength="650" placeholder="Where does this connection lead?"></textarea>
         <input type="hidden" id="unifiedParentTurn" value="${escapeHtml(turns[turns.length-1]?.id||'')}">
-        <div class="cosmos-ask-inline-actions"><button type="button" id="unifiedFollowCancel">Cancel</button><button type="button" id="unifiedFollowSend" class="primary">Explore deeper</button></div>
+        <div class="cosmos-ask-inline-actions"><button type="button" id="unifiedFollowCancel">Cancel</button><button type="button" id="unifiedFollowSend" class="primary">Explore & save moment</button></div>
       </div>
     </section>`;
   }
@@ -2796,17 +2870,26 @@
     };
     sheet.querySelectorAll('[data-unified-follow]').forEach(button=>button.onclick=()=>ask(button.dataset.unifiedFollow));
     sheet.querySelectorAll('[data-unified-suggest]').forEach(button=>button.onclick=()=>ask(button.dataset.unifiedParent,button.dataset.unifiedSuggest));
+    sheet.querySelectorAll('[data-unified-node]').forEach(button=>button.onclick=()=>{
+      const selected=button.dataset.unifiedNode;
+      const source=button.closest('[data-ask-turn]')?.querySelector('h3')?.textContent||'';
+      ask(button.dataset.unifiedParent,`Explore ${selected} and its connection to ${source}. What else does this change?`);
+    });
+    sheet.querySelectorAll('[data-unified-open-moment]').forEach(button=>button.onclick=()=>openCosmos(button.dataset.unifiedOpenMoment));
     $('unifiedFollowCancel').onclick=()=>{form.hidden=true;};
     $('unifiedFollowSend').onclick=async()=>{
       const question=$('unifiedFollowQuestion').value.trim();
       if(question.length<4)return toastMsg('Enter a follow-up question.');
       const send=$('unifiedFollowSend');send.disabled=true;send.textContent='Exploring…';
       try{
-        await api('/api/unified/ask/'+encodeURIComponent(item.id)+'/followup',{
+        const result=await api('/api/unified/ask/'+encodeURIComponent(item.id)+'/followup',{
           method:'POST',body:JSON.stringify({question,parent_turn_id:$('unifiedParentTurn').value})});
-        await renderCosmos(item,thread,additions,fromMetro);
-        toastMsg('Connected discovery saved.');
-      }catch(e){toastMsg(e.message||'Follow-up unavailable.',6000);send.disabled=false;send.textContent='Explore deeper';}
+        if(!result.cosmos_id)throw new Error('Saved branch moment ID is missing.');
+        weekMetroCacheKey='';weekMetroPopId=null;
+        renderJourney();refreshConnections();
+        toastMsg('Connected discovery saved as a new private Metro moment.');
+        await openCosmos(result.cosmos_id);
+      }catch(e){toastMsg(e.message||'Follow-up unavailable.',6000);send.disabled=false;send.textContent='Explore & save moment';}
     };
   }
 
@@ -4572,7 +4655,7 @@
     const commentsHtml=momentCommentsHtml(item,additions);
     // Circle additions also appear in the legacy thread; never display their content twice.
     const shownAdditionIds=new Set((additions||[]).map(a=>String(a.id)));
-    const chain=(thread||[]).filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
+    const chain=(isUnifiedMoment(item)?[]:(thread||[])).filter(x=>x.id!==item.id&&!shownAdditionIds.has(String(x.id))).map(x=>`<div class="card"><div class="card-title">${escapeHtml(x.sender_name||"Human Trace")}</div><div class="card-meta">Posted on ${escapeHtml(cosmosLocalStamp(x.created_at))}</div><div class="card-body">${escapeHtml(x.content_text||x.content_url||x.content_kind)}</div></div>`).join("");
     const originalDate=`<div class="cosmos-original-date"><b>Original moment</b><div>Posted on ${escapeHtml(cosmosLocalStamp(item.created_at))}</div>${item.unlock_at?`<small>${Date.parse(item.unlock_at)>Date.now()?'Scheduled to reveal':'Revealed'} on ${escapeHtml(cosmosLocalStamp(item.unlock_at))}</small>`:''}</div>`;
     const receipt=additionReceiptMarkup(item,additions);
     openSheet(`<h2>${escapeHtml(item.sender_name?`From ${item.sender_name}`:"A Cosmos")}</h2>${originalDate}${momentAudienceHtml(item.audience)}${receipt}${item.can_add!==false?'<div class="actions"><button type="button" id="addToMoment" class="primary">＋ Add moment</button></div>':''}<section class="cosmos-part" data-part-id="main">${content}
@@ -5112,7 +5195,7 @@
         // future-sealed moments never contain media IDs.
         const img=!item.locked&&kind==='photo'&&item.media_id
           ? `<img class="living-thumb" data-metro-media="${escapeHtml(item.media_id)}" alt="" hidden loading="lazy" decoding="async">`:'';
-        const icon=item.locked?'🔒':(String(item.content_text||'').startsWith(UNIFIED_MARKER)?'✧':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯');
+        const icon=item.locked?'🔒':(String(item.content_text||item.preview||'').startsWith(UNIFIED_MARKER)?'✧':({text:'▤',photo:'▧',video:'▶',voice:'🎙',music:'♫',link:'↗'})[kind]||'◯');
         const a11y=stamp+', '+(item.locked?'Sealed future moment':title)+', '+(item.locked?'sealed':metroCardType(item))+(item.is_author?', my moment':', shared moment');
         return `<button type="button" class="living-entry ${item.locked?'sealed':''}" data-metro-open="${escapeHtml(item.key)}"
           data-metro-source="${item.is_author?'mine':'connections'}" title="${escapeHtml(a11y)}" aria-label="${escapeHtml(a11y)}">
