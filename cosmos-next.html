@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v2.9.5.4-together-spaces-entry" />
+  <meta name="cosmos-build" content="cosmos-next-v3.1.2-neutral-white-reader" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1881,6 +1881,116 @@
 .cosmos-ask-branch-label{font-size:12px;color:#507294;margin:7px 0}
 @media(max-width:540px){.cosmos-ask-surface{padding:12px}.cosmos-ask-turn{padding:12px}.cosmos-ask-node-grid{grid-template-columns:1fr 1fr}}
 
+
+
+/* ======================================================================
+   COSMOS Next v3.1.2 — NEUTRAL WHITE METRO READER
+   Audit: v3.1.1 changed ordering but inherited translucent BLUE gradients
+   from v2.6.3 / v2.6.4. The unpainted .sheet-inner showed the blue Metro
+   / camera underneath. Restrict this correction to an expanded Metro reader
+   so the main camera/white-toggle and other sheets remain untouched.
+   ====================================================================== */
+.sheet.metro-expanded {
+  background: #ffffff !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border: 1px solid #e2e7ec !important;
+  box-shadow: 0 18px 60px rgba(18,28,40,.14) !important;
+  color: #1c2938;
+}
+.sheet.metro-expanded .sheet-inner {
+  background: #ffffff !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  color: #1c2938;
+}
+.sheet.metro-expanded .sheet-quickbar {
+  background: #ffffff !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-bottom: 1px solid #e5e9ee !important;
+}
+.sheet.metro-expanded .sheet-quickbar button {
+  background: #f9fafb !important;
+  background-image: none !important;
+  border: 1px solid #e4e8ec !important;
+  color: #1e344d !important;
+  box-shadow: none !important;
+}
+.sheet.metro-expanded .metro-reader-bar .metro-reader-count {
+  color: #566473 !important;
+}
+.sheet-backdrop.cosmos-neutral-reader-backdrop {
+  background: rgba(255,255,255,.92) !important;
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+}
+/* One coherent white background for content. Neutral outlines keep sections
+   visually separated without the previous full-width blue/lavender wash. */
+.sheet.metro-expanded .cosmos-ask-surface,
+.sheet.metro-expanded .cosmos-ask-turn,
+.sheet.metro-expanded .cosmos-ask-depth details,
+.sheet.metro-expanded .cosmos-sharing-summary,
+.sheet.metro-expanded .cosmos-original-date,
+.sheet.metro-expanded .cosmos-ask-node,
+.sheet.metro-expanded .cosmos-ask-suggestions button,
+.sheet.metro-expanded .cosmos-ask-related-moment,
+.sheet.metro-expanded .cosmos-ask-form textarea,
+.sheet.metro-expanded .cosmos-ask-source,
+.sheet.metro-expanded .cosmos-comment-row,
+.sheet.metro-expanded .cosmos-comments,
+.sheet.metro-expanded .cosmos-no-comments,
+.sheet.metro-expanded .cosmos-time-field,
+.sheet.metro-expanded .cosmos-schedule-receipt,
+.sheet.metro-expanded .cosmos-addition-context,
+.sheet.metro-expanded .cosmos-part,
+.sheet.metro-expanded .look-card,
+.sheet.metro-expanded .media-preview,
+.sheet.metro-expanded .attachment-row,
+.sheet.metro-expanded .policy-card,
+.sheet.metro-expanded .card {
+  background: #ffffff !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  border-color: #e3e8ee !important;
+}
+.sheet.metro-expanded .cosmos-ask-timeline {
+  border-color: #cbd5e1;
+}
+.sheet.metro-expanded .cosmos-ask-surface {
+  border-radius: 20px;
+}
+.sheet.metro-expanded .cosmos-ask-turn {
+  border-radius: 16px;
+}
+.sheet.metro-expanded .cosmos-ask-turn.moment-current {
+  border-color: #8fb3d9 !important;
+  box-shadow: inset 3px 0 0 #597eaa !important;
+}
+.sheet.metro-expanded .cosmos-ask-depth details[open] {
+  background: #ffffff !important;
+}
+.sheet.metro-expanded .cosmos-ask-answer,
+.sheet.metro-expanded .cosmos-ask-depth p,
+.sheet.metro-expanded .card-body {
+  color: #253648;
+}
+.sheet.metro-expanded .cosmos-ask-kicker,
+.sheet.metro-expanded .cosmos-ask-branch-label {
+  color: #526b86;
+}
+.sheet.metro-expanded .sheet-inner::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+@media (max-width: 600px) {
+  .sheet.metro-expanded {border-left: 0 !important;border-right: 0 !important;}
+}
+
 </style>
 </head>
 <body>
@@ -2094,8 +2204,8 @@
       startCamera(false).catch(()=>{});
     }
   }
-  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){disposePlaceMap();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
+  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');friendsViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){disposePlaceMap();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -4718,6 +4828,7 @@
   // sheets, including notification deep-links, are left unchanged.
   function styleMetroFullReader(item){
     sheet.classList.add('metro-expanded');
+    sheetBackdrop.classList.add('cosmos-neutral-reader-backdrop');
     const available=weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(weekMetroDay)&&!i.locked)
       .sort((a,b)=>Date.parse(b.date)-Date.parse(a.date));
     const idx=available.findIndex(i=>i.id===item.id);
