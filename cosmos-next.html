@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.2.1-real-white-metro" />
+  <meta name="cosmos-build" content="cosmos-next-v3.2.2-neutral-no-blue" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -681,11 +681,11 @@
 
     /* COSMOS Next v2.6.3 — Liquid Universe. Visuals only; real data & permissions unchanged. */
     :root{
-      --liquid-blue:#427dc6;--liquid-blue-soft:#d8ecff;
-      --liquid-ink:#132a4b;--liquid-edge:rgba(255,255,255,.88);
-      --liquid-glass:linear-gradient(137deg,rgba(255,255,255,.91) 2%,rgba(237,245,255,.69) 48%,rgba(255,255,255,.82) 100%);
-      --liquid-shine:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 0 rgba(146,181,222,.25);
-      --liquid-shadow:0 10px 28px rgba(22,58,108,.17),0 2px 8px rgba(38,95,165,.07);
+      --liquid-blue:#31363b;--liquid-blue-soft:#f3f4f6;
+      --liquid-ink:#202327;--liquid-edge:rgba(255,255,255,.88);
+      --liquid-glass:#fff;
+      --liquid-shine:inset 0 1px 0 rgba(255,255,255,.98),inset 0 -1px 0 rgba(0,0,0,.05);
+      --liquid-shadow:0 5px 18px rgba(0,0,0,.075);
     }
     .app{color:var(--liquid-ink)}
     .camera::after{background:linear-gradient(180deg,rgba(230,242,255,.32),rgba(255,255,255,.04) 26%,rgba(255,255,255,.025) 65%,rgba(232,242,252,.40)),radial-gradient(ellipse at 50% 14%,rgba(255,255,255,.16),transparent 65%)}
@@ -2051,6 +2051,170 @@ html, body {background:#fff !important;}
 .app.metro-live.cosmos-white-mode .dimension-wash {opacity:0 !important;}
 @media(max-width:600px){
   .app.metro-live .cosmos-metro-background {background:#fff !important;}
+}
+
+
+
+/* ============================================================================
+   COSMOS Next v3.2.2 — NEUTRAL WHITE, NO LEGACY BLUE UI
+
+   Root cause: the Liquid Universe v2.6 palette kept tinting the home controls,
+   timeline stations, activity cards, sheets and action buttons blue even after
+   the background image was removed in v3.2.1. A white page by itself cannot
+   neutralize children with blue gradients/box-shadow. These styles intentionally
+   replace those COLORS, not click targets, hierarchy, overflow or behavior.
+
+   Camera video is exempt: real live-camera pixels retain their natural colors.
+   Private images, videos and user drawings are also untouched.
+   ============================================================================ */
+:root {
+  --bg:#fff; --panel:#fff; --ink:#202327; --muted:#64686e;
+  --line:#e2e3e5; --liquid-blue:#383d42; --liquid-blue-soft:#f5f5f5;
+  --liquid-ink:#24282c; --liquid-glass:#fff;
+  --liquid-shine:inset 0 1px 0 rgba(255,255,255,.96);
+  --liquid-shadow:0 6px 18px rgba(0,0,0,.075);
+}
+html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c; }
+/* Keep true camera video visible ONLY when the user explicitly enables it. */
+.app.metro-live:not(.cosmos-camera-live),
+.app.metro-live.cosmos-white-mode {background-color:#fff!important;background-image:none!important;}
+.app.metro-live:not(.cosmos-camera-live) .cosmos-metro-background,
+.app.metro-live.cosmos-white-mode .cosmos-metro-background {
+  background:#fff!important;background-image:none!important;opacity:1!important;
+  filter:none!important;box-shadow:none!important;
+}
+.app.metro-live:not(.cosmos-camera-live) .cosmos-metro-background::after,
+.app.metro-live.cosmos-white-mode .cosmos-metro-background::after,
+.app.metro-live:not(.cosmos-camera-live) .cosmos-metro-background::before,
+.app.metro-live.cosmos-white-mode .cosmos-metro-background::before {content:none!important;}
+.app.metro-live.cosmos-white-mode .camera,
+.app.metro-live:not(.cosmos-camera-live):not(.cosmos-camera-starting) .camera {visibility:hidden!important;opacity:0!important;}
+.app.metro-live.cosmos-white-mode .time-world,
+.app.metro-live.cosmos-white-mode .dimension-wash,
+.app.metro-live:not(.cosmos-camera-live) .time-world,
+.app.metro-live:not(.cosmos-camera-live) .dimension-wash {opacity:0!important;visibility:hidden!important;}
+
+/* All core chrome — white instead of frosted blue; dark legible typography. */
+.brand,.tagline,.ambient-title,.ambient-sub {color:#272c31!important;text-shadow:none!important;}
+.account,.cosmos-bell,.cosmos-camera-tool,.journey-controls button,
+.journey-label,.app.metro-live .journey-label,.app.metro-live .week-navigation button,
+.dim-nav button,.nav button,.hint,.found-label,.camera-escape,
+.app.metro-live #cameraFlip[data-view="white"],
+.app.metro-live .metro-filters button,.app.metro-live .metro-day-heading .metro-people-pill,
+.app.metro-live .metro-day-heading .cosmos-together-shortcut {
+  background:#fff!important;background-image:none!important;
+  color:#272c31!important;border-color:#d9dce0!important;
+  box-shadow:0 3px 12px rgba(0,0,0,.055)!important;
+  text-shadow:none!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+.app.metro-live .metro-filters button.active,
+.dim-nav button.active,.nav button.active {
+  background:#34383c!important;color:#fff!important;border-color:#34383c!important;
+  box-shadow:0 2px 8px rgba(0,0,0,.12)!important;
+}
+/* Original liquid orb retained as the single Create control, but no blue halo. */
+.core,.app.metro-live .bottom .core,.found-orb,
+.living-branch .living-junction,.living-entry .living-entry-orb {
+  background:#fff!important;background-image:none!important;
+  color:#30363b!important;border-color:#b5bbc1!important;
+  box-shadow:0 3px 12px rgba(0,0,0,.09)!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+.core::before,.core::after {background:none!important;box-shadow:none!important;border-color:#bec3c8!important;}
+.core:active,.core.holding {box-shadow:0 0 0 3px #d9dddf!important;}
+/* Neutral Metro rail, all seven days, and the time branches. */
+.app.metro-live .week-metro {filter:none!important;}
+.app.metro-live .week-weekdays::before,
+.app.metro-live .metro-week-day .wd-branch::before,
+.app.metro-live .living-day-chart .living-trunk,
+.app.metro-live .living-branch .living-rail::before,
+.metro-day-chart::before,.metro-time-tick::after {
+  background:#bcbfc3!important;box-shadow:none!important;
+}
+.app.metro-live .metro-week-day .wd-stop,
+.app.metro-live .metro-week-day .wd-bubble,
+.living-day-chart .living-tick span,.day-moment .bubble {
+  background:#fff!important;background-image:none!important;
+  border-color:#a5aaaf!important;box-shadow:none!important;
+  color:#30363b!important;
+}
+.app.metro-live .metro-week-day.active .wd-stop {
+  background:#34383c!important;border-color:#fff!important;
+  box-shadow:0 0 0 2px #34383c!important;
+}
+.app.metro-live .metro-week-day .wd-name,
+.app.metro-live .metro-week-day .wd-date,
+.app.metro-live .metro-day-heading h2,
+.app.metro-live .metro-day-heading p,.app.metro-live .metro-week-note,
+.app.metro-live .week-navigation,.living-branch .living-time-label,
+.app.metro-live .living-branch .living-time-label {
+  color:#30363b!important;text-shadow:none!important;
+}
+.app.metro-live .living-entry,.living-entry.sealed,
+.day-moment,.app.metro-live .metro-popover,.metro-zero {
+  background:#fff!important;background-image:none!important;
+  border-color:#e0e2e4!important;color:#2a3035!important;
+  box-shadow:0 3px 13px rgba(0,0,0,.07)!important;
+}
+.app.metro-live .living-entry:active,
+.app.metro-live .living-entry:focus-visible,.app.metro-live .living-entry.metro-touched {
+  box-shadow:0 0 0 2px #a8adb2!important;background:#fff!important;
+}
+.app.metro-live .metro-popover .metro-peek-open,
+.app.metro-live .metro-popover .metro-peek-icon,
+.app.metro-live .metro-popover .metro-close-pop,
+.metro-source-badge,.metro-source-badge.connections,.metro-source-badge.public {
+  background:#f5f5f5!important;color:#30363b!important;border-color:#dedfe1!important;
+  box-shadow:none!important;
+}
+/* Entire expanded reader, question branches and connected moments. */
+.sheet,.sheet-inner,.sheet.metro-expanded,.sheet.metro-expanded .sheet-inner,
+.sheet.metro-expanded .sheet-quickbar,.panel,.card,.policy-card,.look-card,
+.cosmos-ask-surface,.cosmos-ask-turn,.cosmos-ask-depth details,
+.cosmos-ask-node,.cosmos-ask-suggestions button,.cosmos-ask-related-moment,
+.cosmos-original-date,.cosmos-sharing-summary,.cosmos-time-field,
+.cosmos-time-field.is-future,.cosmos-schedule-receipt,.cosmos-addition-context,
+.cosmos-camera-consent,.cosmos-photo-source-card,.cosmos-photo-source-icon,
+.cosmos-photo-camera-actions,.creative-actions {
+  background:#fff!important;background-image:none!important;
+  color:#252b30!important;border-color:#e0e2e4!important;
+}
+.sheet.metro-expanded .cosmos-ask-turn.moment-current,
+.cosmos-ask-turn.moment-current,.cosmos-ask-focus {
+  border-color:#949aa0!important;box-shadow:0 0 0 2px #e8e9ea!important;
+  outline-color:#949aa0!important;
+}
+.cosmos-ask-timeline {border-left-color:#b5b9bc!important;}
+.cosmos-ask-kicker,.cosmos-ask-branch-label,.cosmos-ask-answer,
+.cosmos-ask-depth details summary,.cosmos-ask-depth p,
+.cosmos-ask-node,.cosmos-ask-turn h3,
+.cosmos-original-date b,.cosmos-sharing-label {
+  color:#30363b!important;
+}
+.cosmos-ask-suggestions button,.cosmos-ask-related-moment,
+.cosmos-photo-source-card,.cosmos-photo-camera-actions button,
+.cosmos-photo-orientation-tools button {
+  background:#fff!important;background-image:none!important;
+  border-color:#d4d8db!important;color:#30363b!important;box-shadow:none!important;
+}
+/* Keep primary actions obvious using graphite, not a blue-filled panel. */
+.actions .primary,.creative-actions .creative-next,
+.cosmos-photo-camera-actions button.primary,.cosmos-reveal-action {
+  background:#34383c!important;background-image:none!important;
+  border-color:#34383c!important;color:#fff!important;box-shadow:none!important;
+}
+.sheet-backdrop,.sheet-backdrop.cosmos-neutral-reader-backdrop {
+  background:rgba(60,63,67,.13)!important;
+}
+/* Neutral focus rings for accessibility, still distinct from resting controls. */
+.app :is(button,input,textarea,select):focus-visible {
+  outline-color:#777c82!important;
+}
+/* Media remains authentic: do not filter user's actual photos/videos. */
+@media(max-width:600px){
+  .app.metro-live .cosmos-metro-background {background:#fff!important;}
+  .app.metro-live .metro-popover {background:#fff!important;}
 }
 
 </style>
