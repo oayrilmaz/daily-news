@@ -7,8 +7,8 @@
   <link rel="manifest" href="/cosmos.webmanifest" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
-  <meta name="theme-color" content="#e5effa" />
-  <meta name="cosmos-build" content="cosmos-next-v3.2.0-camera-deep-unified-private" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="cosmos-build" content="cosmos-next-v3.2.1-real-white-metro" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -1524,7 +1524,7 @@
     .cosmos-metro-background{
       position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
       background-color:#fafcff;
-      background-image:url("/cosmos-metro-white-bg.png");
+      background-image:none;
       background-position:center center;background-size:cover;background-repeat:no-repeat;
       transition:opacity .35s ease;
     }
@@ -2002,6 +2002,57 @@
 .cosmos-look-actions{display:flex;flex-wrap:wrap;gap:8px}
 .cosmos-look-actions button{flex:1 1 160px;min-width:0}
 @media(max-width:540px){.cosmos-look-actions button{flex-basis:100%}}
+
+
+/* ============================================================================
+   COSMOS Next v3.2.1 — MAIN METRO PURE WHITE (NOT JUST THE READER)
+   Never fetch the old /cosmos-metro-white-bg.png artwork. Its appearance can be
+   dark/blue or contain a camera-off / OBS graphic. Camera-off means solid white.
+   Only a VERIFIED live physical camera may replace that white background.
+   The white state is independent of signed-in user, time or dimension.
+   ============================================================================ */
+html, body {background:#fff !important;}
+.app.metro-live {background:#fff !important;}
+.app.metro-live .cosmos-metro-background,
+.app.metro-live.cosmos-white-mode .cosmos-metro-background,
+.app.metro-live.cosmos-camera-starting .cosmos-metro-background {
+  background:#fff !important;
+  background-color:#fff !important;
+  background-image:none !important;
+  -webkit-mask-image:none !important;
+  mask-image:none !important;
+  opacity:1;
+}
+.app.metro-live .cosmos-metro-background::before,
+.app.metro-live .cosmos-metro-background::after {
+  content:none !important;
+  background:none !important;
+}
+/* Keep the streaming camera in the DOM while starting; WebKit requires that.
+   Hide its appearance until a real frame is verified, without stalling play(). */
+.app.metro-live:not(.cosmos-camera-live) .camera {
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+.app.metro-live:not(.cosmos-camera-live) .time-world,
+.app.metro-live:not(.cosmos-camera-live) .dimension-wash {opacity:0 !important;}
+.app.metro-live:not(.cosmos-camera-live) .camera-fallback,
+.app.metro-live.cosmos-white-mode .camera-fallback {display:none !important;}
+.app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) .cosmos-metro-background {
+  opacity:0 !important;
+}
+.app.metro-live.cosmos-camera-live:not(.cosmos-white-mode) .camera {
+  opacity:1 !important;
+  visibility:visible !important;
+}
+/* White is absolute even when a browser resumes a stale virtual-camera frame. */
+.app.metro-live.cosmos-white-mode .camera {opacity:0 !important;visibility:hidden !important;}
+.app.metro-live.cosmos-white-mode .time-world,
+.app.metro-live.cosmos-white-mode .dimension-wash {opacity:0 !important;}
+@media(max-width:600px){
+  .app.metro-live .cosmos-metro-background {background:#fff !important;}
+}
+
 </style>
 </head>
 <body>
@@ -2574,7 +2625,10 @@
   // iOS/WebKit must use facingMode rather than unstable enumerated device IDs.
   const mobileFacingCamera=/(iPhone|iPad|iPod|Android)/i.test(navigator.userAgent) ||
     (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  let preferWhiteMetro=false,cameraCycleBusy=false,cameraPreviewReady=false,cameraStarting=false;
+  // On desktop start in true white mode: don't auto-select an OBS/virtual camera.
+  // On iPhone/Android preserve camera-first behavior. Camera can be switched on
+  // explicitly using the existing circle-arrow control on every device.
+  let preferWhiteMetro=!mobileFacingCamera,cameraCycleBusy=false,cameraPreviewReady=false,cameraStarting=false;
   function updateMetroCameraState(){
     const live=Boolean(!preferWhiteMetro && cameraPreviewReady && cameraStream?.active &&
       cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
@@ -2728,8 +2782,24 @@
           }else throw e;
         }
       }else{
+        // Favor a real laptop webcam over OBS Virtual Camera or other software
+        // cameras. A virtual-only setup should not automatically paint a fake
+        // camera-off graphic across the COSMOS Metro.
+        if(!selectedCameraDeviceId){
+          try{
+            const devices=await availableCameraChoices();
+            const physical=devices.find(d=>d.label && !/\bOBS\b.*\bCamera\b|ManyCam|Snap Camera|XSplit VCam|Virtual Camera/i.test(d.label));
+            if(physical)selectedCameraDeviceId=physical.deviceId;
+          }catch(_){}
+        }
         fresh=await navigator.mediaDevices.getUserMedia({...base,video:selectedCameraDeviceId?
           {deviceId:{exact:selectedCameraDeviceId}}:{facingMode:{ideal:preferredCameraFacing}}});
+        const trackLabel=String(fresh.getVideoTracks()[0]?.label||'');
+        if(/\bOBS\b.*\bCamera\b|ManyCam|Snap Camera|XSplit VCam|Virtual Camera/i.test(trackLabel)){
+          releaseCameraStream(fresh);
+          fresh=null;
+          throw new Error('Only a virtual camera is active. COSMOS is using its white view. Select a physical webcam to show live video.');
+        }
       }
       if(seq!==cameraSeq||preferWhiteMetro||photoSuspendedMainCamera){releaseCameraStream(fresh);return false;}
       const previous=cameraStream;cameraStream=fresh;
