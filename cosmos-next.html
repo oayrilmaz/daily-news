@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.4.2-fullscreen-camera-video-recorder" />
+  <meta name="cosmos-build" content="cosmos-next-v3.5.0-business-private-beta" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -2651,6 +2651,42 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   .sheet.cosmos-capture-fullscreen .cosmos-capture-note{display:none}
 }
 
+
+/* COSMOS Business v3.5 — white professional universe, intentionally separate from personal Metro */
+.business-shell{color:#21252b;max-width:1020px;margin:0 auto;padding:4px 0 36px}
+.business-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.business-title-row h2{margin:0;font-size:clamp(25px,4vw,36px);letter-spacing:-.035em}
+.business-eyebrow{font-size:11px!important;font-weight:750;letter-spacing:.17em;text-transform:uppercase;color:#656e77;margin:0 0 7px}
+.business-subtitle{font-size:14px;color:#58616c;line-height:1.5;margin:2px 0 15px}
+.business-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin:15px 0 18px;scrollbar-width:thin}
+.business-tabs button{flex:0 0 auto;padding:10px 15px;border:1px solid #dadde2;background:#fff;color:#353b43;border-radius:100px;font-weight:650;font-size:13px}
+.business-tabs button.selected{background:#2c3238;color:white;border-color:#2c3238}
+.business-surface{border:1px solid #e1e3e6;background:white;border-radius:17px;padding:clamp(15px,3vw,24px);margin:0 0 13px}
+.business-surface h3{font-size:19px;line-height:1.3;margin:0 0 8px;color:#1b222a}
+.business-surface p{font-size:14px;color:#414951;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.business-card-top{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.business-avatar{width:48px;height:48px;flex-shrink:0;border-radius:13px;border:1px solid #e5e6e8;background:#f2f3f5;color:#282d33;font-weight:800;display:grid;place-items:center}
+.business-meta{font-size:12px;color:#6b7279;display:block}
+.business-person{cursor:pointer;text-align:left;width:100%;border:1px solid #e2e5e7;background:#fff;border-radius:16px;padding:16px;display:flex;gap:12px;align-items:center;margin:0 0 10px}
+.business-person:hover,.business-person:focus-visible{border-color:#737b84}
+.business-person-copy{flex:1;min-width:0;display:grid;gap:3px}
+.business-person-copy strong{color:#252a30;font-size:15px}
+.business-person-copy small{color:#626b75;font-size:12px}
+.business-actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.business-actions button,.business-button{border-radius:12px;border:1px solid #cfd5da;background:white;color:#20272e;padding:10px 14px;font-weight:650;font-size:14px}
+.business-actions button.primary,.business-button.primary{color:white;background:#30363b;border-color:#30363b}
+.business-field{display:grid;gap:6px;margin:12px 0}
+.business-field label{color:#303841;font-size:13px;font-weight:700}
+.business-field input,.business-field textarea,.business-field select{border:1px solid #c9cfd5;background:#fff;border-radius:12px;color:#222;padding:11px 12px;width:100%;font-size:15px}
+.business-field textarea{min-height:140px;resize:vertical;line-height:1.6}
+.business-check{display:flex;align-items:start;gap:10px;font-size:14px;line-height:1.45;padding:12px;border:1px solid #e1e4e7;border-radius:12px;margin:12px 0}
+.business-check input{width:18px;height:18px;flex-shrink:0;margin-top:2px}
+.business-label{display:inline-block;font-size:11px;font-weight:720;letter-spacing:.035em;padding:5px 8px;background:#f1f2f4;border-radius:7px;color:#3b454e}
+.business-empty{border:1px dashed #d1d6db;border-radius:16px;padding:24px;font-size:14px;color:#5d6670;text-align:center}
+.business-note{font-size:12px!important;color:#66717a!important;line-height:1.55}
+@media(min-width:900px){.sheet.business-modal{width:min(1080px,96vw)!important;max-width:1080px!important}.sheet.business-modal .sheet-inner{max-width:1080px!important}}
+@media(max-width:600px){.business-actions button{flex:1}.business-tabs button{font-size:12px;padding:9px 13px}}
+
 </style>
 </head>
 <body>
@@ -2896,8 +2932,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(session.stream)releaseCameraStream(session.stream);
     if(session.previewURL){URL.revokeObjectURL(session.previewURL);session.previewURL='';}
   }
-  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen');
+  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -3951,6 +3987,106 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     };
   }
 
+
+  // Business is a private professional dimension, not a public social network.
+  // Never mix Business posts with the existing family/private Metro.
+  let businessFilter='connections';
+  function businessInitials(name){return String(name||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase().slice(0,2);}
+  function businessDate(date){const d=new Date(date);return Number.isNaN(d.getTime())?'':d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
+  function businessFrame(tab,body){
+    openSheet(`<div class="business-shell"><div class="business-title-row"><div><div class="business-eyebrow">COSMOS / BUSINESS</div><h2>Professional Metro</h2></div><button class="business-button" id="businessReturn">← My Cosmos</button></div>
+      <p class="business-subtitle">One identity. A separate work-only space. No private family moments appear here.</p>
+      <nav class="business-tabs" aria-label="Business sections">
+      ${[['feed','Work feed'],['people','Connections'],['profile','My profile'],['visitors','Who viewed me']].map(([id,label])=>`<button type="button" data-business-tab="${id}" class="${tab===id?'selected':''}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('')}
+      </nav><div id="businessBody">${body}</div><p class="business-note">Private beta · Work posts visible only to accepted Connections · Profile visits recorded only with the visitor’s opt-in.</p></div>`);
+    sheet.classList.add('business-modal');
+    $('businessReturn').onclick=closeSheet;
+    sheet.querySelectorAll('[data-business-tab]').forEach(b=>b.onclick=()=>openBusinessHub(b.dataset.businessTab));
+  }
+  async function openBusinessHub(tab='feed',cursor='',append=false){
+    const selected=['feed','people','profile','visitors'].includes(tab)?tab:'feed';
+    if(!append)businessFrame(selected,'<div class="business-empty" role="status">Loading your professional universe…</div>');
+    const root=$('businessBody');if(!root)return;
+    try{
+      if(selected==='feed'){
+        const path='/api/business/feed?filter='+encodeURIComponent(businessFilter)+(cursor?'&before='+encodeURIComponent(cursor):'');
+        const result=await api(path);
+        if(!root.isConnected)return;
+        const posts=result.posts||[];
+        const content=posts.map(p=>`<article class="business-surface"><div class="business-card-top"><span class="business-avatar" aria-hidden="true">${escapeHtml(businessInitials(p.author_name))}</span><div><strong>${escapeHtml(p.author_name||p.author_username||'Connection')}</strong><span class="business-meta">@${escapeHtml(p.author_username||'member')} · ${escapeHtml(businessDate(p.created_at))}</span></div></div>
+          <span class="business-label">${escapeHtml(p.category)}</span><p>${escapeHtml(p.text)}</p>${p.can_delete?`<div class="business-actions"><button type="button" data-business-delete="${escapeHtml(p.id)}">Delete my post</button></div>`:''}</article>`).join('');
+        if(!append){
+          root.innerHTML=`<div class="business-actions"><button class="primary" id="businessNewPost">+ Post work update</button><button id="businessFilterPosts">${businessFilter==='mine'?'My posts · switch to all':'Work feed · show mine'}</button></div>
+            <div id="businessPosts">${content||'<div class="business-empty">No professional posts yet. Share a project update or an insight to start.</div>'}</div><div class="business-actions" id="businessMoreZone"></div>`;
+          $('businessNewPost').onclick=openBusinessCompose;
+          $('businessFilterPosts').onclick=()=>{businessFilter=businessFilter==='mine'?'connections':'mine';openBusinessHub('feed');};
+        } else if(posts.length){$('businessPosts')?.insertAdjacentHTML('beforeend',content);}
+        const more=$('businessMoreZone');if(more){more.innerHTML=result.next_cursor?'<button type="button" id="businessMorePosts">Load earlier posts</button>':'';
+          if(result.next_cursor)$('businessMorePosts').onclick=()=>openBusinessHub('feed',result.next_cursor,true);}
+        root.querySelectorAll('[data-business-delete]').forEach(b=>{b.onclick=async()=>{
+          if(!confirm('Delete your work post?'))return;
+          try{await api('/api/business/posts/'+encodeURIComponent(b.dataset.businessDelete),{method:'DELETE'});toastMsg('Post deleted.');openBusinessHub('feed');}catch(e){toastMsg(e.message);}
+        };});
+      }else if(selected==='people'){
+        const r=await api('/api/business/people');if(!root.isConnected)return;
+        root.innerHTML=r.people?.length?r.people.map(p=>`<button class="business-person" type="button" data-business-person="${escapeHtml(p.user_id)}"><span class="business-avatar">${escapeHtml(businessInitials(p.name))}</span><span class="business-person-copy"><strong>${escapeHtml(p.name||'Connection')}</strong><small>${escapeHtml(p.headline||p.company||'Professional connection')}</small><small>@${escapeHtml(p.username)}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<div class="business-empty">No accepted Connections yet. Connect with people in COSMOS to see their work profiles.</div>';
+        root.querySelectorAll('[data-business-person]').forEach(b=>b.onclick=()=>openBusinessPerson(b.dataset.businessPerson));
+      }else if(selected==='profile'){
+        const r=await api('/api/business/me');if(!root.isConnected)return;
+        const p=r.profile||{};
+        root.innerHTML=`<div class="business-surface"><h3>My professional profile</h3><p class="business-note">Your display name and @handle come from your COSMOS identity. Only accepted Connections can see this profile in the current beta.</p>
+          <div class="business-field"><label for="bHeadline">Headline</label><input id="bHeadline" maxlength="110" value="${escapeHtml(p.headline||'')}" placeholder="e.g. Energy infrastructure project leader"></div>
+          <div class="business-field"><label for="bCompany">Company / organization</label><input id="bCompany" maxlength="100" value="${escapeHtml(p.company||'')}"></div>
+          <div class="business-field"><label for="bIndustry">Industry</label><input id="bIndustry" maxlength="80" value="${escapeHtml(p.industry||'')}"></div>
+          <div class="business-field"><label for="bLocation">Location (optional, publicly readable to accepted Connections)</label><input id="bLocation" maxlength="80" value="${escapeHtml(p.location_public||'')}" placeholder="City or region — not street address"></div>
+          <div class="business-field"><label for="bAbout">About my work</label><textarea id="bAbout" maxlength="1800" rows="5" placeholder="Expertise, projects, what you enjoy working on">${escapeHtml(p.about||'')}</textarea></div>
+          <label class="business-check"><input type="checkbox" id="bOpenToWork" ${p.open_to_work?'checked':''}><span>Open to professional opportunities</span></label>
+          <label class="business-check"><input type="checkbox" id="bVisitorOptIn" ${p.allow_named_visits?'checked':''}><span><strong>Let people know when I visit their professional profile.</strong> Off by default. If enabled, accepted Connections can see your name in their visitor history after you open their profiles. Turning it off deletes your earlier recorded visits.</span></label>
+          <div class="business-actions"><button class="primary" id="businessSaveProfile">Save profile and privacy</button></div></div>`;
+        $('businessSaveProfile').onclick=async()=>{
+          const b=$('businessSaveProfile');b.disabled=true;
+          try{await api('/api/business/me',{method:'PATCH',body:JSON.stringify({headline:$('bHeadline').value,
+            company:$('bCompany').value,industry:$('bIndustry').value,location_public:$('bLocation').value,
+            about:$('bAbout').value,open_to_work:$('bOpenToWork').checked,
+            allow_named_visits:$('bVisitorOptIn').checked})});toastMsg('Professional profile saved.');await openBusinessHub('profile');}
+          catch(e){toastMsg(e.message,5500);b.disabled=false;}
+        };
+      }else if(selected==='visitors'){
+        const r=await api('/api/business/visitors'+(cursor?'?before='+encodeURIComponent(cursor):''));if(!root.isConnected)return;
+        const content=(r.visitors||[]).map(v=>`<div class="business-surface"><div class="business-card-top"><span class="business-avatar">${escapeHtml(businessInitials(v.name))}</span><div><strong>${escapeHtml(v.name||v.username||'Connection')}</strong><span class="business-meta">@${escapeHtml(v.username||'member')} · ${escapeHtml(businessDate(v.last_seen_at))}</span></div></div></div>`).join('');
+        if(!append)root.innerHTML=`<div class="business-surface"><h3>Who viewed my profile</h3><p class="business-note">Free, with no paid unlock. This lists only accepted Connections who explicitly chose named profile visits. Private browsing is never recorded.</p></div><div id="businessVisitors">${content||'<div class="business-empty">No opted-in visitors yet.</div>'}</div><div class="business-actions" id="businessVisitorMore"></div>`;
+        else $('businessVisitors')?.insertAdjacentHTML('beforeend',content);
+        const more=$('businessVisitorMore');if(more){more.innerHTML=r.next_cursor?'<button id="businessVisitorsNext">Earlier visitors</button>':'';
+          if(r.next_cursor)$('businessVisitorsNext').onclick=()=>openBusinessHub('visitors',r.next_cursor,true);}
+      }
+    }catch(e){if(root.isConnected&&!append)root.innerHTML=`<div class="business-empty" role="alert">Business unavailable: ${escapeHtml(e.message)}. Apply the v3.5 D1 migration, deploy the matching Worker and try again.</div>`;
+      else toastMsg(e.message,6000);}
+  }
+  function openBusinessCompose(){
+    businessFrame('feed',`<div class="business-surface"><h3>Share a work moment</h3><p class="business-note">Visible only to accepted Connections. No family moments are copied or mixed into this feed.</p>
+      <div class="business-field"><label for="bCategory">Type</label><select id="bCategory">${['Update','Project','Insight','Opportunity','Hiring','Question'].map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="business-field"><label for="bPostText">Your work update</label><textarea id="bPostText" maxlength="3500" rows="7" placeholder="Share a professional achievement, opportunity, idea or technical insight"></textarea></div>
+      <div class="business-actions"><button id="bCancelPost">Cancel</button><button class="primary" id="bPublishPost">Post to professional Metro</button></div></div>`);
+    $('bCancelPost').onclick=()=>openBusinessHub('feed');
+    $('bPublishPost').onclick=async()=>{
+      const b=$('bPublishPost'),text=$('bPostText').value.trim();if(text.length<5)return toastMsg('Please write a little more.');b.disabled=true;
+      try{await api('/api/business/posts',{method:'POST',body:JSON.stringify({text,category:$('bCategory').value})});toastMsg('Work update shared with accepted Connections.');openBusinessHub('feed');}
+      catch(e){toastMsg(e.message,5200);b.disabled=false;}
+    };
+  }
+  async function openBusinessPerson(id){
+    businessFrame('people','<div class="business-empty">Opening professional profile…</div>');
+    const root=$('businessBody');try{
+      const r=await api('/api/business/profile/'+encodeURIComponent(id));if(!root.isConnected)return;
+      const p=r.profile||{};
+      root.innerHTML=`<div class="business-surface"><div class="business-card-top"><span class="business-avatar">${escapeHtml(businessInitials(p.name))}</span><div><h3>${escapeHtml(p.name||p.username||'Connection')}</h3><span class="business-meta">@${escapeHtml(p.username||'member')}</span></div></div>
+      <h3>${escapeHtml(p.headline||'Professional connection')}</h3><p>${escapeHtml([p.company,p.industry,p.location_public].filter(Boolean).join(' · '))}</p><p>${escapeHtml(p.about||'No professional introduction yet.')}</p>${p.open_to_work?'<span class="business-label">Open to opportunities</span>':''}
+      <div class="business-actions"><button id="bBackToPeople">← My Connections</button></div></div>`;
+      $('bBackToPeople').onclick=()=>openBusinessHub('people');
+    }catch(e){if(root.isConnected)root.innerHTML=`<div class="business-empty">${escapeHtml(e.message)}</div><div class="business-actions"><button id="bBackToPeople">← My Connections</button></div>`;
+      $('bBackToPeople').onclick=()=>openBusinessHub('people');}
+  }
+
   function beginCompose(){
     pendingCircleReturn=null;
     compose={content_kind:null,content_text:"",content_url:"",media_id:null,recipient_user_id:null,recipient_mode:null,recipient_target:"",recipient_label:"",unlock_mode:null,unlock_at:null,lat:null,lng:null,location_title:"",tagged_user_ids:[],comment_ready:false};
@@ -3966,6 +4102,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <button class="choice" data-kind="video"><span class="liquid-choice-icon" aria-hidden="true">▶</span><span class="liquid-choice-words"><strong>Video</strong><span>30s · 5/month free</span></span></button>
       <button class="choice" data-kind="music"><span class="liquid-choice-icon" aria-hidden="true">♫</span><span class="liquid-choice-words"><strong>Music</strong><span>Share a song</span></span></button>
       <button class="choice" data-kind="link"><span class="liquid-choice-icon" aria-hidden="true">↗</span><span class="liquid-choice-words"><strong>Link</strong><span>Share a link</span></span></button>
+      <button class="choice" data-kind="business"><span class="liquid-choice-icon" aria-hidden="true">▣</span><span class="liquid-choice-words"><strong>Business</strong><span>Work-only Metro · people · free profile visitors</span></span></button>
       <button class="choice" data-kind="location"><span class="liquid-choice-icon" aria-hidden="true">⌖</span><span class="liquid-choice-words"><strong>Location</strong><span>Apple Maps · Google Maps</span></span></button>
     </div><div class="micro liquid-privacy"><span aria-hidden="true">◌</span> Private by default. You control who can see it.</div>`);
     sheet.classList.add('liquid-compose-menu');
@@ -3974,6 +4111,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 
   async function chooseContent(kind){
     compose.content_kind=kind;compose.comment_ready=false;compose.location_title="";compose.content_text="";compose.content_url="";compose.media_id=null;
+    if(kind==="business") {compose=null;return openBusinessHub("feed");}
     if(kind==="ask") return showUnifiedAskComposer();
     if(kind==="text") return textEntry("What would you leave here?",false);
     if(kind==="music") return textEntry("Paste the music link",true);
@@ -6068,12 +6206,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }catch(e){if(root.isConnected){root.classList.remove('look-loading');root.textContent='Tags unavailable: '+e.message;}}
   }
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button id="openBusinessFromProfile" class="primary">▣ Business</button><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openMyTags").onclick=showMomentTagRequests;
     $("openConnections").onclick=openFriends;
     $("openTogetherSpaces").onclick=openTogetherSpaces;
+    $("openBusinessFromProfile").onclick=()=>openBusinessHub("feed");
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveUsername").onclick=async()=>{
