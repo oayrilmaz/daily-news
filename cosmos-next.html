@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.4.1-connection-metro" />
+  <meta name="cosmos-build" content="cosmos-next-v3.4.2-fullscreen-camera-video-recorder" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -2553,6 +2553,104 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   .friend-metro .living-entry{min-height:70px!important;}
 }
 
+
+/* v3.4.2 — camera capture is a viewport-filling workspace, not a small modal.
+   Native Safari chrome remains outside the webpage; viewport is as large as it allows. */
+.sheet.cosmos-capture-fullscreen:not(.metro-expanded):not(.future-date-sheet){
+  position:fixed!important;top:0!important;bottom:0!important;left:0!important;right:0!important;
+  width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;
+  margin:0!important;transform:none!important;border-radius:0!important;
+  border:0!important;box-shadow:none!important;background:#fff!important;
+  z-index:100!important;overflow:hidden!important;
+}
+.sheet.cosmos-capture-fullscreen .sheet-quickbar{flex:0 0 auto;min-height:56px!important;padding:calc(env(safe-area-inset-top) + 8px) 16px 9px!important}
+.sheet.cosmos-capture-fullscreen .sheet-inner{
+  display:flex!important;flex-direction:column!important;flex:1 1 auto!important;
+  min-height:0!important;max-height:none!important;width:100%!important;
+  padding:8px 14px calc(env(safe-area-inset-bottom) + 12px)!important;
+  background:#fff!important;overflow:hidden!important;touch-action:manipulation;
+}
+.sheet.cosmos-capture-fullscreen .sheet-inner > .handle,
+.sheet.cosmos-capture-fullscreen .cosmos-capture-intro{display:none!important}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-orientation-tools{
+  flex:0 0 auto;gap:7px;margin:2px 0 5px!important;flex-wrap:nowrap;overflow-x:auto;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-orientation-tools button{
+  min-height:44px!important;white-space:nowrap;padding:8px 11px!important;
+  background:#fff!important;color:#252b32!important;border:1px solid #d4d7da!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-orientation-tools output{font-size:11px!important}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-lens-hint{
+  flex:0 0 auto;margin:2px 0 7px!important;font-size:12px;color:#505762;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-stage,
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-stage{
+  flex:1 1 auto!important;min-height:0!important;max-height:none!important;
+  width:100%!important;height:auto!important;aspect-ratio:auto!important;
+  margin:0 auto!important;border:0!important;border-radius:14px!important;
+  background:#111!important;overflow:hidden!important;position:relative;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-stage.is-turned{
+  max-height:none!important;max-width:none!important;width:100%!important;aspect-ratio:auto!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-stage video,
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-stage video{
+  background:#111!important;object-fit:contain!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions,
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions{
+  display:flex;gap:10px;align-items:center;flex:0 0 auto;
+  position:static!important;padding:10px 0 2px!important;margin:0!important;
+  border-radius:0!important;background:#fff!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions button,
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions button{
+  flex:1;min-width:0;min-height:53px!important;border:1px solid #cfd3d7!important;
+  background:#fff!important;color:#18212a!important;border-radius:14px!important;
+  font-size:15px!important;font-weight:700!important;padding:9px 12px!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions button.primary,
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions button.primary{
+  background:#303439!important;color:#fff!important;border-color:#303439!important;
+}
+.sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions button:disabled,
+.sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions button:disabled{opacity:.5}
+.sheet.cosmos-capture-fullscreen .cosmos-capture-note{
+  flex:0 0 auto;font-size:11px!important;line-height:1.3!important;
+  margin:4px 1px 0!important;color:#626973!important;max-height:2.7em;overflow:hidden;
+}
+.cosmos-video-camera-stage video{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+}
+.cosmos-video-counter{font-variant-numeric:tabular-nums;font-weight:800;font-size:14px}
+.cosmos-video-camera-stage .cosmos-video-overlay{
+  position:absolute;left:10px;top:10px;z-index:2;background:rgba(0,0,0,.7);
+  color:#fff;border-radius:99px;padding:8px 12px;font-size:13px;
+}
+.cosmos-video-camera-stage .cosmos-video-overlay.recording::before{
+  content:'●';color:#ff5858;margin-right:7px;
+}
+.cosmos-video-camera-stage .cosmos-camera-loading{position:absolute;inset:0;display:grid;place-items:center;
+  color:#fff;text-align:center;padding:14px;background:rgba(0,0,0,.65);font-size:14px;z-index:3}
+.cosmos-video-camera-stage .cosmos-camera-loading[hidden]{display:none!important}
+.cosmos-video-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}
+.cosmos-video-choices button{border:1px solid #cfd4d8;border-radius:15px;background:#fff;
+  color:#1d2934;min-height:66px;padding:12px;font-weight:700;text-align:center}
+.cosmos-video-choices button.primary{background:#303439;color:white}
+@media(max-width:390px){
+  .sheet.cosmos-capture-fullscreen .sheet-inner{padding-left:8px!important;padding-right:8px!important}
+  .sheet.cosmos-capture-fullscreen .cosmos-photo-orientation-tools button{font-size:11px!important;padding:7px 9px!important}
+  .sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions button,
+  .sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions button{font-size:13px!important}
+}
+@media(orientation:landscape) and (max-height:560px){
+  .sheet.cosmos-capture-fullscreen .sheet-quickbar{min-height:40px!important;padding:4px 14px!important}
+  .sheet.cosmos-capture-fullscreen .cosmos-photo-orientation-tools button{min-height:36px!important}
+  .sheet.cosmos-capture-fullscreen .cosmos-photo-camera-actions button,
+  .sheet.cosmos-capture-fullscreen .cosmos-video-camera-actions button{min-height:40px!important}
+  .sheet.cosmos-capture-fullscreen .cosmos-capture-note{display:none}
+}
+
 </style>
 </head>
 <body>
@@ -2787,8 +2885,19 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       startCamera(false).catch(()=>{});
     }
   }
-  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){disposePlaceMap();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet');
+  let videoCaptureSession=null;
+  function stopVideoCapture(){
+    const session=videoCaptureSession;videoCaptureSession=null;
+    if(!session)return;
+    session.cancelled=true;
+    if(session.interval)clearInterval(session.interval);
+    if(session.timer)clearTimeout(session.timer);
+    try{if(session.recorder&&session.recorder.state!=='inactive')session.recorder.stop();}catch(_){}
+    if(session.stream)releaseCameraStream(session.stream);
+    if(session.previewURL){URL.revokeObjectURL(session.previewURL);session.previewURL='';}
+  }
+  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -3922,7 +4031,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   }
 
   async function openPhotoCamera(onFile,onBack){
-    openSheet(`<h2>Take a photo</h2><p>Switch between the front and rear cameras when your device supports both. Rotate or mirror the image separately.</p>
+    openSheet(`<h2 class="cosmos-capture-intro">Take a photo</h2><p class="cosmos-capture-intro">Switch between cameras, rotate or mirror.</p>
       <div class="cosmos-photo-orientation-tools" role="toolbar" aria-label="Camera controls">
         <button type="button" class="cosmos-switch-lens" id="cosmosCameraSwitch" aria-label="Switch to the other camera">⟳ Switch camera</button>
         <button type="button" id="cosmosCameraTurn" aria-label="Rotate photo 90 degrees clockwise">↻ Rotate 90°</button>
@@ -3936,7 +4045,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       </div>
       <div class="cosmos-photo-camera-actions"><button type="button" id="cosmosCameraBack">← Photo options</button>
         <button type="button" class="primary" id="cosmosCameraSnap" disabled>◉ Capture photo</button></div>
-      <div class="micro">Changing cameras changes what the lens sees. Rotation changes the direction of the picture. A laptop with only one built-in webcam needs an external camera to look behind it.</div>`);
+      <div class="micro cosmos-capture-note">Photo stays on your device until you confirm it. Camera switching requires a second lens.</div>`);
+    sheet.classList.add('cosmos-capture-fullscreen');
     const video=$('cosmosPhotoPreview'),frame=$('cosmosPhotoFrame'),status=$('cosmosPhotoStatus'),snap=$('cosmosCameraSnap');
     const turn=$('cosmosCameraTurn'),mirror=$('cosmosCameraMirror'),angle=$('cosmosCameraAngle');
     const switchButton=$('cosmosCameraSwitch'),lensHint=$('cosmosCameraFacing');
@@ -4422,34 +4532,177 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }finally{URL.revokeObjectURL(url);}
   }
 
+  // v3.4.2: two explicit video paths. File picker never silently forces a camera.
+  // Live capture uses browser MediaRecorder, checked against existing server policy.
   async function videoRules(){
-    openSheet('<h2>Short video</h2><p>Keep Cosmos meaningful. Clips are short and monthly uploads are limited.</p><div class="look-loading">Checking your video allowance…</div>');
+    openSheet('<h2>Short video</h2><p>Record with your camera or choose an existing clip.</p><div class="look-loading">Checking your allowance…</div>');
     try{
       const policy=await api('/api/video/policy');
-      openSheet(`<h2>Short video</h2><p>Each video should capture a meaningful moment.</p>
-        <div class="policy-card"><strong>${escapeHtml(policy.plan==='plus'?'Plus':'Free')} video allowance</strong>
-          Up to <b>${Number(policy.max_seconds)} seconds</b> per video · <b>${Math.round(Number(policy.max_bytes)/1048576)} MB</b> maximum<br>
+      const seconds=Math.max(1,Number(policy.max_seconds)||30);
+      const bytes=Math.max(1,Number(policy.max_bytes)||12582912);
+      const allowed=Number(policy.remaining)>0;
+      const canRecord=!!(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder);
+      openSheet(`<h2>Short video</h2><p>Create a video moment with your laptop webcam or phone camera.</p>
+        <div class="policy-card"><strong>${escapeHtml(policy.plan==='plus'?'Plus':'Free')} allowance</strong>
+          Up to <b>${seconds} seconds</b> · <b>${Math.round(bytes/1048576)} MB</b> per video<br>
           <b>${Number(policy.remaining)}</b> of ${Number(policy.monthly_uploads)} uploads remaining this month.
-          <small>Monthly uploads reset at the beginning of each UTC month. Removing a post does not reset the usage count.</small></div>
-        <div class="micro">Longer clips and higher monthly allowances will require a verified paid plan. Payments are not available in staging yet.</div>
-        <div class="actions"><button id="videoBack">Back</button><button class="primary" id="pickVideo" ${policy.remaining<=0?'disabled':''}>Choose video</button></div>`);
-      $("videoBack").onclick=showContentStep;
-      $("pickVideo").onclick=()=>{
-        fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';fileInput.setAttribute('capture','environment');fileInput.value='';
+          <small>Server checks duration and size. Deleted posts do not refund the monthly upload count.</small></div>
+        <div class="cosmos-video-choices">
+          <button type="button" class="primary" id="cosmosRecordVideo" ${!allowed||!canRecord?'disabled':''}>● Record video</button>
+          <button type="button" id="cosmosChooseVideo" ${!allowed?'disabled':''}>▤ Choose existing video</button>
+        </div>
+        ${canRecord?'':'<p>Your browser does not provide live video recording. You can still upload an existing clip or use your phone camera.</p>'}
+        <div class="actions"><button id="cosmosVideoBack">← Back</button></div>`);
+      $('cosmosVideoBack').onclick=showContentStep;
+      const pick=(nativeCamera=false)=>{
+        fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
+        if(nativeCamera)fileInput.setAttribute('capture','environment');
+        else fileInput.removeAttribute('capture');
+        fileInput.value='';
         fileInput.onchange=async()=>{
-          const file=fileInput.files?.[0];if(!file)return videoRules();
+          const file=fileInput.files?.[0];fileInput.onchange=null;
+          if(!file)return;
           try{
-            if(file.size>Number(policy.max_bytes))throw new Error(`Maximum size ${Math.round(policy.max_bytes/1048576)} MB. Choose a shorter or smaller video.`);
-            const seconds=await durationFromFile(file);
-            if(!Number.isFinite(seconds)||seconds<=0)throw new Error('Could not verify video length. Try MP4 or MOV.');
-            if(seconds>Number(policy.max_seconds)+.05)throw new Error(`This clip is ${Math.ceil(seconds)} seconds. Maximum is ${policy.max_seconds} seconds. Trim it first.`);
-            openSheet('<h2>Uploading video…</h2><p>Your Cosmos video is being secured.</p><div class="look-progress"></div>');
+            if(file.size>bytes)throw new Error(`Maximum video size is ${Math.round(bytes/1048576)} MB.`);
+            const length=await durationFromFile(file);
+            if(!Number.isFinite(length)||length<=0)throw new Error('Cannot read video duration. Please export as MP4 or MOV.');
+            if(length>seconds+.05)throw new Error(`Video is ${Math.ceil(length)} seconds; the maximum is ${seconds}.`);
+            openSheet('<h2>Uploading video…</h2><p>Securing your video privately.</p><div class="look-progress"></div>');
             const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();
-          }catch(error){toastMsg(error.message,4500);videoRules();}
+          }catch(err){toastMsg(err.message,5400);videoRules();}
         };
         fileInput.click();
       };
-    }catch(error){openSheet(`<h2>Video unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="videoBack">Back</button></div>`);$("videoBack").onclick=showContentStep;}
+      $('cosmosChooseVideo').onclick=()=>pick(false);
+      if(canRecord)$('cosmosRecordVideo').onclick=()=>openVideoRecorder(policy);
+    }catch(error){
+      openSheet(`<h2>Video unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="cosmosVideoBack">Back</button></div>`);
+      $('cosmosVideoBack').onclick=showContentStep;
+    }
+  }
+
+  async function openVideoRecorder(policy){
+    const maxSeconds=Math.max(1,Number(policy.max_seconds)||30);
+    const maxBytes=Math.max(1,Number(policy.max_bytes)||12582912);
+    openSheet(`<h2 class="cosmos-capture-intro">Record video</h2>
+      <div class="cosmos-photo-lens-hint" id="cosmosVideoStatus" aria-live="polite">Starting camera and microphone…</div>
+      <div class="cosmos-video-camera-stage" id="cosmosVideoFrame">
+        <video id="cosmosVideoPreview" autoplay playsinline muted aria-label="Camera video preview"></video>
+        <div class="cosmos-video-overlay" id="cosmosVideoClock" aria-live="off">00:00 / ${Math.ceil(maxSeconds)}s</div>
+        <div class="cosmos-camera-loading" id="cosmosVideoLoading">Starting camera…</div>
+      </div>
+      <div class="cosmos-video-camera-actions">
+        <button type="button" id="cosmosVideoCancel">← Video options</button>
+        <button type="button" class="primary" id="cosmosVideoRecord" disabled>● Record</button>
+        <button type="button" class="primary" id="cosmosVideoUse" hidden>Use this video →</button>
+        <button type="button" id="cosmosVideoRetake" hidden>Retake</button>
+      </div>
+      <div class="micro cosmos-capture-note" id="cosmosVideoNote">Only the clip you choose to use is uploaded. Maximum ${Math.ceil(maxSeconds)} seconds / ${Math.round(maxBytes/1048576)} MB.</div>`);
+    sheet.classList.add('cosmos-capture-fullscreen');
+    const preview=$('cosmosVideoPreview'),loading=$('cosmosVideoLoading'),status=$('cosmosVideoStatus');
+    const button=$('cosmosVideoRecord'),use=$('cosmosVideoUse'),retake=$('cosmosVideoRetake');
+    const back=$('cosmosVideoCancel'),clock=$('cosmosVideoClock');
+    const session={stream:null,recorder:null,chunks:[],cancelled:false,interval:null,timer:null,previewURL:'',file:null,startedAt:0,stopped:false};
+    videoCaptureSession=session;
+    const isCurrent=()=>videoCaptureSession===session&&!session.cancelled&&preview.isConnected;
+    back.onclick=()=>videoRules();
+    retake.onclick=()=>openVideoRecorder(policy);
+    if(!window.MediaRecorder||!navigator.mediaDevices?.getUserMedia){
+      loading.textContent='Live recording is unavailable in this browser. Choose an existing video instead.';
+      return;
+    }
+    // Video content is held locally until the user selects Use this video.
+    // Prefer a finalized MP4 container when supported by this browser.
+    const types=['video/mp4;codecs="avc1.42E01E,mp4a.40.2"','video/mp4',
+      'video/webm;codecs=vp8,opus','video/webm'];
+    const mime=types.find(t=>{try{return MediaRecorder.isTypeSupported(t);}catch{return false;}})||'';
+    try{
+      suspendAmbientCameraForPhoto();
+      let stream;
+      const videoOptions={facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:24}};
+      try{
+        stream=await navigator.mediaDevices.getUserMedia({video:videoOptions,audio:{echoCancellation:true,noiseSuppression:true}});
+      }catch(first){
+        // User may permit camera but deny microphone. Silent video is still useful.
+        stream=await navigator.mediaDevices.getUserMedia({video:videoOptions,audio:false});
+        if(isCurrent())status.textContent='Microphone unavailable — this recording will have no sound.';
+      }
+      if(!isCurrent()){releaseCameraStream(stream);return;}
+      session.stream=stream;
+      photoCaptureStream=stream;
+      preview.srcObject=stream;
+      await preview.play();
+      if(!isCurrent())return;
+      loading.hidden=true;
+      if(stream.getAudioTracks().length)status.textContent='Camera and microphone ready.';
+      button.disabled=false;
+      button.onclick=()=>{
+        if(!isCurrent())return;
+        if(session.recorder?.state==='recording'){
+          session.recorder.stop();button.disabled=true;button.textContent='Finishing…';return;
+        }
+        if(session.recorder||session.stopped)return;
+        try{
+          const opts={videoBitsPerSecond:1800000,audioBitsPerSecond:64000};
+          if(mime)opts.mimeType=mime;
+          const rec=new MediaRecorder(stream,opts);session.recorder=rec;session.chunks=[];
+          rec.ondataavailable=e=>{if(e.data?.size)session.chunks.push(e.data);};
+          rec.onerror=()=>{if(isCurrent())status.textContent='Recording error. Please retake the video.';};
+          rec.onstop=async()=>{
+            if(!isCurrent())return;
+            if(session.interval)clearInterval(session.interval);
+            if(session.timer)clearTimeout(session.timer);
+            session.stopped=true;
+            const measured=Math.max(.1,(performance.now()-session.startedAt)/1000);
+            if(session.stream){releaseCameraStream(session.stream);session.stream=null;photoCaptureStream=null;}
+            const fileMime=(rec.mimeType||mime||'video/webm').split(';')[0];
+            const blob=new Blob(session.chunks,{type:fileMime});
+            if(blob.size<1024||blob.size>maxBytes){
+              status.textContent=blob.size>maxBytes?`Recorded video exceeds ${Math.round(maxBytes/1048576)} MB. Retake a shorter clip.`:'No usable video was recorded. Please retake.';
+              button.hidden=true;retake.hidden=false;return;
+            }
+            const extension=fileMime==='video/mp4'?'mp4':'webm';
+            session.file=new File([blob],`cosmos-recording-${Date.now()}.${extension}`,{type:fileMime});
+            session.previewURL=URL.createObjectURL(blob);
+            preview.srcObject=null;preview.src=session.previewURL;preview.muted=false;preview.controls=true;
+            preview.play().catch(()=>{});
+            clock.classList.remove('recording');
+            clock.textContent=`${Math.min(measured,maxSeconds).toFixed(1)}s recorded`;
+            status.textContent='Review your recording. Nothing has been uploaded yet.';
+            button.hidden=true;use.hidden=false;retake.hidden=false;
+          };
+          session.startedAt=performance.now();
+          rec.start(250);clock.classList.add('recording');
+          button.textContent='■ Stop';status.textContent='Recording locally…';
+          session.interval=setInterval(()=>{
+            if(!isCurrent())return;
+            const elapsed=Math.min(maxSeconds,(performance.now()-session.startedAt)/1000);
+            const secs=Math.floor(elapsed);clock.textContent=`${String(Math.floor(secs/60)).padStart(2,'0')}:${String(secs%60).padStart(2,'0')} / ${Math.ceil(maxSeconds)}s`;
+            if(elapsed>=maxSeconds&&rec.state==='recording')rec.stop();
+          },200);
+          session.timer=setTimeout(()=>{if(isCurrent()&&rec.state==='recording')rec.stop();},maxSeconds*1000);
+        }catch(e){status.textContent='Unable to start recording: '+(e.message||'check permissions');}
+      };
+      use.onclick=async()=>{
+        if(!isCurrent()||!session.file)return;
+        use.disabled=true;use.textContent='Saving…';
+        try{
+          const media=await uploadFile(session.file);
+          if(!compose)throw new Error('Your moment draft is unavailable.');
+          compose.media_id=media.id;afterContentStep();
+        }catch(e){
+          if(!isCurrent())return;
+          status.textContent=e.message||'Video could not be uploaded. Export as MP4 and try again.';
+          use.disabled=false;use.textContent='Use this video →';toastMsg(status.textContent,5000);
+        }
+      };
+    }catch(e){
+      if(!isCurrent())return;
+      loading.textContent=['NotAllowedError','PermissionDeniedError'].includes(e.name)?
+        'Camera access denied. Allow camera access in your browser settings, then try again.':
+        'Camera unavailable. Another application may be using it.';
+      button.disabled=true;status.textContent='Return to Video options to select an existing clip.';
+    }
   }
 
   async function deleteOwnPost(id,after){
@@ -6831,6 +7084,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     else if(e.key==='ArrowUp'){e.preventDefault();setDimension(dimension==='connections'?'mine':'public');}
     else if(e.key==='ArrowDown'){e.preventDefault();setDimension(dimension==='public'?'mine':'connections');}
   });
+  window.addEventListener('pagehide',stopVideoCapture);
   window.addEventListener('pagehide',stopPhotoCapture);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)periodicNearby();});
   setInterval(periodicNearby,90000);
