@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.6a1-two-universes-video-picker-repair" />
+  <meta name="cosmos-build" content="cosmos-next-v3.6a2-business-metro-fullscreen-media" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -2741,6 +2741,76 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   .cosmos-video-select-actions{position:sticky;bottom:0;background:#fff;padding:10px 0 max(10px,env(safe-area-inset-bottom));z-index:4}
   .cosmos-video-select-actions button.primary{order:-1;flex-basis:100%}
 }
+
+/* The legacy desktop modal selector has greater specificity than .sheet.business-modal;
+   force a real full-viewport professional workspace at every screen width. */
+#sheet.business-modal{position:fixed!important;inset:0!important;left:0!important;right:0!important;top:0!important;bottom:0!important;
+ width:100vw!important;max-width:none!important;min-height:100dvh!important;height:100dvh!important;max-height:none!important;
+ margin:0!important;transform:none!important;border-radius:0!important;background:#fff!important;overflow:hidden!important;z-index:80!important}
+#sheet.business-modal .sheet-inner{box-sizing:border-box!important;width:min(1200px,100%)!important;max-width:1200px!important;
+ margin-inline:auto!important;overflow-y:auto!important;min-height:0!important;flex:1 1 auto!important}
+@media(max-width:650px){#sheet.business-modal .sheet-inner{width:100%!important;max-width:none!important}}
+
+/* v3.6a2 Business Metro: professional time navigation, not Private ALL MOMENTS. */
+.business-metro-shell{display:grid;gap:15px;max-width:1040px;margin:0 auto;color:#273039}
+.business-metro-header{display:flex;align-items:start;justify-content:space-between;gap:12px}
+.business-metro-header h3{margin:0;color:#22282e;font-size:clamp(22px,4vw,31px)}
+.business-metro-header p{font-size:13px;color:#676f76;margin:5px 0 0}
+.business-metro-now,.business-metro-week-nav button,.business-metro-footer button{background:#fff;border:1px solid #d5d9dd;border-radius:999px;color:#333b43;padding:10px 13px;font-weight:700}
+.business-metro-week-nav{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.business-metro-week-nav strong{font-size:13px;text-align:center;color:#37414b}
+.business-metro-week-rail{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;position:relative;padding:10px 0 13px;touch-action:pan-y}
+.business-metro-week-rail:before{content:'';position:absolute;top:74px;left:5%;right:5%;height:2px;background:#cfd4d7;pointer-events:none}
+.business-metro-station{background:transparent;border:0;display:flex;align-items:center;flex-direction:column;gap:5px;min-width:0;padding:5px 2px 7px;color:#535b64;position:relative;z-index:1;cursor:pointer}
+.business-metro-station.active{color:#252c32;font-weight:800}
+.business-metro-dow{font-size:11px;font-weight:760;text-transform:uppercase}
+.business-metro-dom{font-size:12px}
+.business-metro-dot{height:19px;width:19px;border:3px solid #b3bbc1;border-radius:50%;background:#fff;box-shadow:0 0 0 3px #fff}
+.business-metro-station.active .business-metro-dot{background:#30363b;border-color:#30363b;box-shadow:0 0 0 3px #fff,0 0 0 5px #555e66}
+.business-metro-count{font-size:11px;min-height:15px;font-variant-numeric:tabular-nums}
+.business-metro-filterline{display:flex;align-items:center;justify-content:space-between;gap:9px;flex-wrap:wrap}
+.business-metro-switch{display:flex;gap:7px;flex-wrap:wrap}
+.business-metro-switch button,.business-metro-filterline>button{background:#fff;color:#30383e;border:1px solid #d2d6da;padding:10px 14px;border-radius:999px;font-size:13px;font-weight:740}
+.business-metro-switch button.active,.business-metro-filterline>button.primary{background:#30363b;color:#fff;border-color:#30363b}
+.business-metro-selected{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid #dee2e6;padding-bottom:8px}
+.business-metro-selected h3{font-size:18px;margin:0}.business-metro-selected span{color:#69717a;font-size:12px}
+.business-metro-stack{position:relative;padding-left:23px;border-left:2px solid #d1d6da;display:grid;gap:12px;min-height:130px}
+.business-metro-post{background:#fff;border:1px solid #dce1e5;border-radius:16px;padding:16px;position:relative;box-shadow:0 2px 8px #00000006;overflow-wrap:anywhere}
+.business-metro-post:before{content:'';position:absolute;left:-31px;top:23px;border:3px solid #afb8c0;background:#fff;border-radius:50%;width:11px;height:11px}
+.business-metro-post p{color:#343d47;white-space:pre-wrap;line-height:1.6;font-size:14px;margin:8px 0 0}
+.business-metro-post-time{font-size:11px;color:#6a737b;display:flex;gap:8px;align-items:center;margin-bottom:9px}
+.business-metro-post .business-avatar{height:38px;width:38px;border-radius:12px}
+.business-metro-post .business-card-top{margin-bottom:4px}
+.business-metro-footer{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:7px 0}
+.business-metro-error{color:#a22c27;font-size:13px}
+@media(max-width:600px){.business-metro-shell{gap:12px}.business-metro-week-nav button{padding:9px 11px;font-size:12px}
+.business-metro-selected h3{font-size:15px}.business-metro-post{padding:13px}
+.business-metro-dow{font-size:9px}.business-metro-dom{font-size:11px}
+.business-metro-week-rail:before{top:71px}.business-metro-station{gap:5px}}
+
+/* v3.6a2: media screens use all usable viewport, instead of fixed 28% / 43% previews. */
+.sheet.cosmos-video-pick-review:not(.business-modal),
+.sheet.cosmos-creative-sheet:not(.business-modal){position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;
+ max-height:none!important;max-width:none!important;min-height:0!important;transform:none!important;border-radius:0!important;z-index:100!important;margin:0!important;
+ background:#fff!important;background-image:none!important;border:0!important}
+.sheet.cosmos-video-pick-review .sheet-inner{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;
+ min-height:0!important;width:100%!important;max-width:none!important;margin:0!important;
+ overflow-y:hidden!important;padding:8px 10px calc(env(safe-area-inset-bottom) + 9px)!important}
+.sheet.cosmos-video-pick-review .sheet-inner>.handle{display:none}
+.sheet.cosmos-video-pick-review .sheet-inner>h2,.sheet.cosmos-video-pick-review .sheet-inner>p:first-of-type{display:none}
+.sheet.cosmos-video-pick-review .cosmos-picked-video-shell{flex:1 1 auto!important;min-height:0!important;max-height:none!important;
+ height:auto!important;margin:0 0 6px!important;border-radius:6px!important;width:100%!important}
+.sheet.cosmos-video-pick-review .cosmos-video-review-details{flex:0 0 auto;font-size:12px;color:#3c454c}
+.sheet.cosmos-video-pick-review .cosmos-video-review-details summary{cursor:pointer;font-weight:700;padding:5px}
+.sheet.cosmos-video-pick-review .cosmos-video-selection-status{flex:0 0 auto;margin:4px 0;max-height:100px;overflow-y:auto;padding:9px 11px;font-size:12px}
+.sheet.cosmos-video-pick-review .cosmos-video-select-actions{flex:0 0 auto;margin:4px 0!important;padding-bottom:max(6px,env(safe-area-inset-bottom))!important}
+.sheet.cosmos-video-pick-review .cosmos-video-select-actions button{min-height:44px!important}
+.sheet.cosmos-creative-sheet .sheet-inner{display:flex!important;flex-direction:column!important;overflow-y:auto!important;min-height:0;max-width:none!important;
+ padding:8px 11px calc(env(safe-area-inset-bottom) + 10px)!important}
+.sheet.cosmos-creative-sheet .creative-stage{height:min(68dvh,760px)!important;max-height:none!important;min-height:40dvh!important;
+ background:#202327!important;flex-shrink:0;box-shadow:none!important}
+.sheet.cosmos-creative-sheet .creative-stage canvas{max-width:100%!important;max-height:100%!important;object-fit:contain!important}
+@media(min-width:760px){.sheet.cosmos-creative-sheet{width:100vw!important}.sheet.cosmos-creative-sheet .creative-stage{height:72dvh!important}}
 </style>
 </head>
 <body>
@@ -3045,8 +3115,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   function clearSelectedVideoPreview(){
     if(selectedVideoPreviewURL){URL.revokeObjectURL(selectedVideoPreviewURL);selectedVideoPreviewURL='';}
   }
-  function closeSheet(){clearSelectedVideoPreview();if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}if(sheet.classList.contains('business-modal'))updateUniverseSwitch('private');disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){clearSelectedVideoPreview();disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');
+  function closeSheet(){clearSelectedVideoPreview();if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}if(sheet.classList.contains('business-modal'))updateUniverseSwitch('private');disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','cosmos-video-pick-review','business-modal');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){clearSelectedVideoPreview();disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','cosmos-video-pick-review','business-modal');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -4113,7 +4183,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     openSheet(`<div class="business-shell"><div class="business-title-row"><div><div class="business-eyebrow">COSMOS / BUSINESS</div><h2>Business COSMOS</h2></div><button class="business-button" id="businessReturn">◈ Switch universe</button></div>
       <p class="business-subtitle">Professional activity lives here. Your personal moments stay in Private COSMOS.</p>
       <nav class="business-tabs" aria-label="Business sections">
-      ${[['feed','Work feed'],['people','Connections'],['profile','My profile'],['visitors','Who viewed me']].map(([id,label])=>`<button type="button" data-business-tab="${id}" class="${tab===id?'selected':''}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('')}
+      ${[['feed','Work feed'],['metro','Business Metro'],['people','Connections'],['profile','My profile'],['visitors','Who viewed me']].map(([id,label])=>`<button type="button" data-business-tab="${id}" class="${tab===id?'selected':''}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('')}
       </nav><div id="businessBody">${body}</div><p class="business-note">Private beta · Work posts visible only to accepted Connections · Profile visits recorded only with the visitor’s opt-in.</p></div>`);
     sheet.classList.add('business-modal');
     updateUniverseSwitch('business');
@@ -4123,8 +4193,96 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     $('sheetBackCamera').onclick=()=>enterUniverse('private');
     sheet.querySelectorAll('[data-business-tab]').forEach(b=>b.onclick=()=>openBusinessHub(b.dataset.businessTab));
   }
+  // Business Metro is a distinct lens on the SAME post IDs as the professional feed.
+  // It never reads or copies personal, family, camera or private Cosmos moments.
+  let businessMetroFocus=new Date(),businessMetroDay=new Date(),
+      businessMetroPosts=[],businessMetroCursor=null,businessMetroLoading=false,
+      businessMetroFetchId=0,businessMetroError='';
+  function businessMetroAtNoon(d){const out=new Date(d);out.setHours(12,0,0,0);return out;}
+  function businessMetroWeekStart(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-x.getDay());return x;}
+  function businessMetroLocalKey(d){const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+  function businessMetroSelectedWeek(){return businessMetroWeekStart(businessMetroFocus);}
+  function businessMetroMove(days){const d=new Date(businessMetroFocus);d.setDate(d.getDate()+days);businessMetroFocus=businessMetroAtNoon(d);businessMetroDay=businessMetroAtNoon(d);loadBusinessMetroWeek();}
+  function businessMetroCard(p){return `<article class="business-metro-post" data-business-post-id="${escapeHtml(p.id)}">
+      <div class="business-metro-post-time">${escapeHtml(businessDate(p.created_at))} <span class="business-label">${escapeHtml(p.category||'Update')}</span></div>
+      <div class="business-card-top"><span class="business-avatar" aria-hidden="true">${escapeHtml(businessInitials(p.author_name||p.author_username))}</span>
+        <div><strong>${escapeHtml(p.author_name||p.author_username||'Connection')}</strong><span class="business-meta">@${escapeHtml(p.author_username||'member')}</span></div></div>
+      <p>${escapeHtml(p.text||'')}</p>
+      ${p.can_delete?`<div class="business-actions"><button type="button" data-business-metro-delete="${escapeHtml(p.id)}">Delete my post</button></div>`:''}</article>`;}
+  function renderBusinessMetro(){
+    const root=$('businessBody');if(!root||!sheet.classList.contains('business-modal'))return;
+    const start=businessMetroSelectedWeek(),end=new Date(start);end.setDate(end.getDate()+6);
+    const local=businessMetroLocalKey(businessMetroDay);
+    const dayRows=businessMetroPosts.filter(p=>businessMetroLocalKey(p.created_at)===local)
+      .sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
+    const days=Array.from({length:7},(_,i)=>{const d=new Date(start);d.setDate(start.getDate()+i);return d;});
+    root.innerHTML=`<div class="business-metro-shell" aria-label="Professional time universe">
+      <div class="business-metro-header"><div><div class="business-eyebrow">BUSINESS / METRO</div>
+        <h3>Professional timeline</h3><p>Work moments only. Private COSMOS stays separate.</p></div>
+        <button type="button" class="business-metro-now" id="businessMetroNow">NOW</button></div>
+      <div class="business-metro-week-nav"><button type="button" id="businessMetroPrev" aria-label="Previous week">← Past</button>
+        <strong>${escapeHtml(start.toLocaleDateString('en-US',{month:'short',day:'numeric'}))} – ${escapeHtml(end.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}))}</strong>
+        <button type="button" id="businessMetroNext" aria-label="Next week">Future →</button></div>
+      <div class="business-metro-week-rail" id="businessMetroRail" aria-label="Select business timeline day">
+        ${days.map(d=>{const key=businessMetroLocalKey(d),count=businessMetroPosts.filter(p=>businessMetroLocalKey(p.created_at)===key).length;
+          const active=key===local;return `<button type="button" data-business-metro-day="${key}" aria-pressed="${active}" class="business-metro-station ${active?'active':''}">
+          <span class="business-metro-dow">${escapeHtml(d.toLocaleDateString('en-US',{weekday:'short'}))}</span><span class="business-metro-dom">${d.getDate()}</span>
+          <span class="business-metro-dot" aria-hidden="true"></span><span class="business-metro-count">${count}${businessMetroCursor?'+':''}</span></button>`;}).join('')}
+      </div>
+      <div class="business-metro-filterline"><div class="business-metro-switch" role="group" aria-label="Professional timeline audience">
+          <button type="button" data-business-metro-filter="connections" class="${businessFilter==='connections'?'active':''}" aria-pressed="${businessFilter==='connections'}">All work</button>
+          <button type="button" data-business-metro-filter="mine" class="${businessFilter==='mine'?'active':''}" aria-pressed="${businessFilter==='mine'}">My posts</button></div>
+          <button type="button" id="businessMetroCompose" class="primary">+ Post</button></div>
+      <div class="business-metro-selected"><h3>${escapeHtml(businessMetroDay.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))}</h3>
+        <span>${dayRows.length}${businessMetroCursor?'+':''} work moments</span></div>
+      <div class="business-metro-stack">${dayRows.map(businessMetroCard).join('') || `<div class="business-empty">${businessMetroLoading?'Loading Business Metro…':businessMetroError?escapeHtml(businessMetroError):businessMetroCursor?'No posts loaded for this day yet. Load earlier posts in the selected week.':'No professional posts on this day.'}</div>`}</div>
+      ${businessMetroError&&dayRows.length?`<p role="alert" class="business-metro-error">${escapeHtml(businessMetroError)}</p>`:''}
+      <div class="business-metro-footer">${businessMetroCursor?`<button type="button" id="businessMetroLoadMore" ${businessMetroLoading?'disabled':''}>${businessMetroLoading?'Loading…':'Load earlier posts in this week'}</button>`:''}
+       <button type="button" id="businessMetroFeed">View work feed</button></div>
+      <p class="business-note">Only your posts and posts from accepted, unblocked Connections. No family or private moments are shown. Each post has one ID in both Business Feed and Business Metro.</p>
+    </div>`;
+    $('businessMetroNow').onclick=()=>{businessMetroFocus=businessMetroAtNoon(new Date());businessMetroDay=businessMetroAtNoon(new Date());loadBusinessMetroWeek();};
+    $('businessMetroPrev').onclick=()=>businessMetroMove(-7);
+    $('businessMetroNext').onclick=()=>businessMetroMove(7);
+    $('businessMetroCompose').onclick=openBusinessCompose;
+    $('businessMetroFeed').onclick=()=>openBusinessHub('feed');
+    root.querySelectorAll('[data-business-metro-filter]').forEach(b=>b.onclick=()=>{
+      if(businessFilter===b.dataset.businessMetroFilter)return;businessFilter=b.dataset.businessMetroFilter;loadBusinessMetroWeek();});
+    root.querySelectorAll('[data-business-metro-day]').forEach(b=>b.onclick=()=>{
+      const [y,m,d]=b.dataset.businessMetroDay.split('-').map(Number);
+      businessMetroDay=businessMetroAtNoon(new Date(y,m-1,d));renderBusinessMetro();});
+    $('businessMetroLoadMore')?.addEventListener('click',()=>loadBusinessMetroWeek(true));
+    root.querySelectorAll('[data-business-metro-delete]').forEach(b=>b.onclick=async()=>{
+      if(!confirm('Delete your work post?'))return;
+      try{await api('/api/business/posts/'+encodeURIComponent(b.dataset.businessMetroDelete),{method:'DELETE'});
+        toastMsg('Work post deleted.');await loadBusinessMetroWeek();}catch(e){toastMsg(e.message||'Deletion unavailable.');}
+    });
+    let swipeStart=null;const rail=$('businessMetroRail');
+    rail.addEventListener('touchstart',e=>{swipeStart=e.touches[0]?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;},{passive:true});
+    rail.addEventListener('touchend',e=>{if(!swipeStart||!e.changedTouches[0])return;
+      const dx=e.changedTouches[0].clientX-swipeStart.x,dy=e.changedTouches[0].clientY-swipeStart.y;
+      if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.3)businessMetroMove(dx>0?-7:7);swipeStart=null;},{passive:true});
+  }
+  async function loadBusinessMetroWeek(more=false){
+    if(businessMetroLoading&&more)return;
+    const id=++businessMetroFetchId;
+    if(!more){businessMetroPosts=[];businessMetroCursor=null;businessMetroError='';}
+    businessMetroLoading=true;renderBusinessMetro();
+    const start=businessMetroSelectedWeek(),end=new Date(start);end.setDate(end.getDate()+7);
+    const q=new URLSearchParams({start:start.toISOString(),end:end.toISOString(),filter:businessFilter});
+    if(more&&businessMetroCursor)q.set('before',businessMetroCursor);
+    try{
+      const r=await api('/api/business/metro?'+q.toString());
+      if(id!==businessMetroFetchId||!sheet.classList.contains('business-modal'))return;
+      const all=new Map(businessMetroPosts.map(p=>[p.id,p]));
+      (r.posts||[]).forEach(p=>all.set(p.id,p));
+      businessMetroPosts=[...all.values()].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at));
+      businessMetroCursor=r.next_cursor||null;businessMetroError='';
+    }catch(e){if(id!==businessMetroFetchId)return;businessMetroError=e.message||'Unable to load Business Metro.';}
+    finally{if(id===businessMetroFetchId){businessMetroLoading=false;renderBusinessMetro();}}
+  }
   async function openBusinessHub(tab='feed',cursor='',append=false){
-    const selected=['feed','people','profile','visitors'].includes(tab)?tab:'feed';
+    const selected=['feed','metro','people','profile','visitors'].includes(tab)?tab:'feed';
     if(!append)businessFrame(selected,'<div class="business-empty" role="status">Loading your professional universe…</div>');
     const root=$('businessBody');if(!root)return;
     try{
@@ -4136,9 +4294,10 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         const content=posts.map(p=>`<article class="business-surface"><div class="business-card-top"><span class="business-avatar" aria-hidden="true">${escapeHtml(businessInitials(p.author_name))}</span><div><strong>${escapeHtml(p.author_name||p.author_username||'Connection')}</strong><span class="business-meta">@${escapeHtml(p.author_username||'member')} · ${escapeHtml(businessDate(p.created_at))}</span></div></div>
           <span class="business-label">${escapeHtml(p.category)}</span><p>${escapeHtml(p.text)}</p>${p.can_delete?`<div class="business-actions"><button type="button" data-business-delete="${escapeHtml(p.id)}">Delete my post</button></div>`:''}</article>`).join('');
         if(!append){
-          root.innerHTML=`<div class="business-actions"><button class="primary" id="businessNewPost">+ Post work update</button><button id="businessFilterPosts">${businessFilter==='mine'?'My posts · switch to all':'Work feed · show mine'}</button></div>
+          root.innerHTML=`<div class="business-actions"><button class="primary" id="businessNewPost">+ Post work update</button><button id="businessOpenMetro">◷ Business Metro →</button><button id="businessFilterPosts">${businessFilter==='mine'?'My posts · switch to all':'Work feed · show mine'}</button></div>
             <div id="businessPosts">${content||'<div class="business-empty">No professional posts yet. Share a project update or an insight to start.</div>'}</div><div class="business-actions" id="businessMoreZone"></div>`;
           $('businessNewPost').onclick=openBusinessCompose;
+          $('businessOpenMetro').onclick=()=>openBusinessHub('metro');
           $('businessFilterPosts').onclick=()=>{businessFilter=businessFilter==='mine'?'connections':'mine';openBusinessHub('feed');};
         } else if(posts.length){$('businessPosts')?.insertAdjacentHTML('beforeend',content);}
         const more=$('businessMoreZone');if(more){more.innerHTML=result.next_cursor?'<button type="button" id="businessMorePosts">Load earlier posts</button>':'';
@@ -4147,6 +4306,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
           if(!confirm('Delete your work post?'))return;
           try{await api('/api/business/posts/'+encodeURIComponent(b.dataset.businessDelete),{method:'DELETE'});toastMsg('Post deleted.');openBusinessHub('feed');}catch(e){toastMsg(e.message);}
         };});
+      }else if(selected==='metro'){
+        await loadBusinessMetroWeek();
       }else if(selected==='people'){
         const r=await api('/api/business/people');if(!root.isConnected)return;
         root.innerHTML=r.people?.length?r.people.map(p=>`<button class="business-person" type="button" data-business-person="${escapeHtml(p.user_id)}"><span class="business-avatar">${escapeHtml(businessInitials(p.name))}</span><span class="business-person-copy"><strong>${escapeHtml(p.name||'Connection')}</strong><small>${escapeHtml(p.headline||p.company||'Professional connection')}</small><small>@${escapeHtml(p.username)}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<div class="business-empty">No accepted Connections yet. Connect with people in COSMOS to see their work profiles.</div>';
@@ -4190,7 +4351,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     $('bCancelPost').onclick=()=>openBusinessHub('feed');
     $('bPublishPost').onclick=async()=>{
       const b=$('bPublishPost'),text=$('bPostText').value.trim();if(text.length<5)return toastMsg('Please write a little more.');b.disabled=true;
-      try{await api('/api/business/posts',{method:'POST',body:JSON.stringify({text,category:$('bCategory').value})});toastMsg('Work update shared with accepted Connections.');openBusinessHub('feed');}
+      try{await api('/api/business/posts',{method:'POST',body:JSON.stringify({text,category:$('bCategory').value})});toastMsg('Work update shared with accepted Connections and added to Business Metro.');openBusinessHub('metro');}
       catch(e){toastMsg(e.message,5200);b.disabled=false;}
     };
   }
@@ -4831,10 +4992,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     const sizeText=videoSizeText(file.size);
     openSheet(`<h2>Review your video</h2><p>Nothing has been uploaded yet. Review the clip, then choose Continue.</p>
       <div class="cosmos-picked-video-shell"><video id="cosmosPickedVideo" controls playsinline preload="metadata" aria-label="Selected video preview"></video></div>
+      <details class="cosmos-video-review-details"><summary>Video details · ${escapeHtml(file.name||'Selected video')}</summary>
       <div class="policy-card"><strong>${escapeHtml(file.name||'Selected video')}</strong><br>
         ${escapeHtml(sizeText)} · ${escapeHtml(file.type||'video')}<br>
         <span id="cosmosPickedDuration">Checking video length…</span><br>
-        <small>Maximum ${maxSeconds} seconds and ${Math.round(maxBytes/1048576)} MB. We never upload until you confirm.</small></div>
+        <small>Maximum ${maxSeconds} seconds and ${Math.round(maxBytes/1048576)} MB. We never upload until you confirm.</small></div></details>
       <p class="cosmos-video-selection-status ${oversized?'blocked':''}" id="cosmosPickedStatus" role="status" aria-live="polite">${oversized?
         `This video is ${escapeHtml(sizeText)}, above the ${Math.round(maxBytes/1048576)} MB limit. Trim or export a shorter, smaller clip in Photos, then choose it again.`:
         'Preparing your preview. You may continue after the check.'}</p>
