@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.5.0-business-private-beta" />
+  <meta name="cosmos-build" content="cosmos-next-v3.6a1-two-universes-video-picker-repair" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -2687,6 +2687,60 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 @media(min-width:900px){.sheet.business-modal{width:min(1080px,96vw)!important;max-width:1080px!important}.sheet.business-modal .sheet-inner{max-width:1080px!important}}
 @media(max-width:600px){.business-actions button{flex:1}.business-tabs button{font-size:12px;padding:9px 13px}}
 
+
+/* COSMOS v3.6a — TWO UNIVERSES: independent entry + separate Business workspace.
+   Business is still a Connections-only private beta. No paid access is enabled. */
+.cosmos-universe-switch{pointer-events:auto;min-height:36px;border-radius:999px;border:1px solid #d8dce0;background:#fff;color:#23282d;font-size:12px;font-weight:750;padding:8px 13px;white-space:nowrap;box-shadow:0 3px 12px #00000008}
+.cosmos-universe-switch:focus-visible,.universe-choice:focus-visible,.universe-entry button:focus-visible{outline:3px solid #606975;outline-offset:3px}
+.universe-entry{position:absolute;z-index:45;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;padding:calc(24px + env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));background:#fff;color:#252b32}
+.universe-entry-inner{width:min(890px,100%);display:grid;gap:23px}
+.universe-brand{font-size:13px;letter-spacing:.24em;font-weight:850}
+.universe-intro h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.045em;line-height:1.12;margin:0 0 10px;font-weight:800}
+.universe-intro p{max-width:55ch;font-size:15px;color:#666c74;line-height:1.6;margin:0}
+.universe-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.universe-choice{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:14px;padding:clamp(19px,3.2vw,32px);min-height:250px;border:1px solid #dbe0e4;border-radius:24px;background:#fff;color:#262c31;box-shadow:0 7px 27px rgba(0,0,0,.045);transition:border-color .2s,transform .2s,box-shadow .2s}
+.universe-choice:hover{border-color:#747e86;transform:translateY(-2px);box-shadow:0 13px 36px rgba(0,0,0,.08)}
+.universe-choice .universe-symbol{width:46px;height:46px;border:1px solid #c6cdd2;border-radius:15px;display:grid;place-items:center;font-size:22px}
+.universe-choice strong{font-size:clamp(24px,3vw,31px);letter-spacing:-.035em}
+.universe-choice small{font-size:13px;color:#5e6670;line-height:1.65;max-width:38ch}
+.universe-choice .universe-open{margin-top:auto;color:#252d32;font-size:13px;font-weight:750}
+.universe-fineprint{font-size:12px;color:#707780;line-height:1.55}
+/* Give Business a full independent workspace instead of a floating card. */
+.sheet.business-modal{position:absolute!important;inset:0!important;width:100%!important;max-width:none!important;min-height:0!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;transform:none!important;border-radius:0!important;border:0!important;background:#fff!important;box-shadow:none!important}
+.sheet.business-modal .sheet-inner{width:min(1120px,100%)!important;max-width:1120px!important;margin:0 auto!important;box-sizing:border-box;padding:22px clamp(15px,3vw,30px) calc(32px + env(safe-area-inset-bottom))!important;overflow-y:auto!important;background:#fff!important}
+.sheet.business-modal .sheet-quickbar{background:#fff!important;border-bottom:1px solid #e5e8eb!important}
+.sheet.business-modal .handle{display:none!important}
+.sheet.business-modal .business-title-row{align-items:center}
+.sheet.business-modal .business-shell{padding-bottom:30px}
+.sheet.business-modal .business-tabs{position:sticky;top:0;z-index:2;background:#fff;padding-top:10px;padding-bottom:10px}
+.sheet.business-modal .business-surface{background:#fff;border:1px solid #e2e5e7;box-shadow:0 3px 13px #00000005}
+.sheet.business-modal .business-subtitle,.sheet.business-modal .business-note{color:#646d75!important}
+@media(max-width:650px){
+  .cosmos-universe-switch{font-size:0;padding:8px 10px;min-width:39px}
+  .cosmos-universe-switch::before{content:'◈';font-size:16px}
+  .universe-entry{align-items:flex-start;padding-top:calc(64px + env(safe-area-inset-top))}
+  .universe-choices{grid-template-columns:1fr;gap:11px}
+  .universe-choice{min-height:185px;gap:9px}
+  .universe-intro h1{font-size:32px}
+}
+
+
+/* v3.6b: stable existing-video review on iPhone and laptop */
+.cosmos-picked-video-shell{width:100%;height:min(43vh,450px);min-height:190px;
+  overflow:hidden;background:#252a30;border-radius:18px;margin:12px 0 14px;display:grid;place-items:center}
+.cosmos-picked-video-shell video{width:100%;height:100%;object-fit:contain;background:#252a30}
+.cosmos-video-pick-review .sheet-inner{max-width:780px;margin-inline:auto}
+.cosmos-video-selection-status{border:1px solid #ccd2d7;border-radius:13px;padding:13px 15px;
+  line-height:1.55;font-size:14px;color:#32393e;background:#f6f7f7;overflow-wrap:anywhere}
+.cosmos-video-selection-status.blocked{border-color:#d5aba4;background:#fff9f7;color:#7d2825}
+.cosmos-video-select-actions{flex-wrap:wrap}
+.cosmos-video-select-actions button{min-width:140px;flex:1}
+@media(max-width:600px){
+  .cosmos-picked-video-shell{height:min(28dvh,280px);min-height:145px}
+  .cosmos-video-select-actions button{font-size:14px;min-height:48px}
+  .cosmos-video-select-actions{position:sticky;bottom:0;background:#fff;padding:10px 0 max(10px,env(safe-area-inset-bottom));z-index:4}
+  .cosmos-video-select-actions button.primary{order:-1;flex-basis:100%}
+}
 </style>
 </head>
 <body>
@@ -2722,7 +2776,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 
   <div class="topbar">
     <div><div class="brand">COSMOS<span class="tagline">Look deeper.</span></div></div>
-    <div class="cosmos-head-actions"><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Next camera or white view" title="Next camera or white view">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
+    <div class="cosmos-head-actions"><button type="button" class="cosmos-universe-switch" id="cosmosUniverseSwitch" aria-label="Switch between Private and Business universes" title="Switch universe">◈ Universes</button><button type="button" class="cosmos-camera-tool" id="cameraFlip" aria-label="Next camera or white view" title="Next camera or white view">⟳</button><button type="button" class="cosmos-camera-tool" id="cameraRotate" aria-label="Rotate camera view 90 degrees" title="Rotate camera view">↻ 0°</button><button type="button" class="cosmos-bell" id="noticeBell" aria-label="Notifications">🔔 <span id="noticeCount" hidden></span></button><button class="account" id="accountButton">You</button></div>
   </div>
 
   <div class="ambient" id="ambient">
@@ -2745,6 +2799,19 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
   <div class="sheet" id="sheet" hidden></div>
   <div class="panel" id="panel" hidden></div>
+
+  <!-- The universe entry is a selector, not a data-sharing or account-creation step. -->
+  <section class="universe-entry" id="cosmosUniverseEntry" role="dialog" aria-modal="true" aria-labelledby="cosmosUniverseTitle" hidden>
+    <div class="universe-entry-inner">
+      <div class="universe-brand">COSMOS</div>
+      <div class="universe-intro"><h1 id="cosmosUniverseTitle">Choose your universe.</h1><p>One identity. Two distinct places to live and connect. Nothing crosses from Private to Business without your explicit action.</p></div>
+      <div class="universe-choices">
+        <button type="button" class="universe-choice" id="cosmosChoosePrivate"><span class="universe-symbol" aria-hidden="true">◯</span><strong>Private</strong><small>Your moments, family, trusted Connections, sealed future surprises, camera and personal Metro.</small><span class="universe-open">Enter Private COSMOS →</span></button>
+        <button type="button" class="universe-choice" id="cosmosChooseBusiness"><span class="universe-symbol" aria-hidden="true">▣</span><strong>Business</strong><small>Your professional identity, work-only updates, projects, business connections and profile visitors.</small><span class="universe-open">Enter Business COSMOS →</span></button>
+      </div>
+      <div class="universe-fineprint">Business currently runs as a private beta: posts are shared only with accepted Connections. Public groups, paid circles and memberships are not yet live.</div>
+    </div>
+  </section>
 
   <section class="auth" id="auth">
     <div class="auth-card">
@@ -2787,6 +2854,43 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   const API = DEFAULT_API;
   localStorage.removeItem("cosmos_life_api");
   const TOKEN_KEY = "cosmos_life_token_v1";
+  const UNIVERSE_KEY='ptdtoday_cosmos_selected_universe_v1';
+  let currentUniverse='private';
+  function updateUniverseSwitch(mode){
+    currentUniverse=mode==='business'?'business':'private';
+    const button=document.getElementById('cosmosUniverseSwitch');
+    if(button){button.textContent=currentUniverse==='business'?'◈ Business':'◈ Private';button.setAttribute('aria-label','Current universe: '+currentUniverse+'. Switch universe');}
+  }
+  function shouldBypassUniverseEntry(){
+    // Existing invitation, notification and single-moment URLs must continue to open directly.
+    return Boolean(qs.get('invite')||qs.get('notice')||qs.get('moment')||qs.get('inbox')||qs.get('from')==='x');
+  }
+  function showUniverseEntry(){
+    if(!token||!me||!auth.hidden||usernameRequired)return;
+    const entry=document.getElementById('cosmosUniverseEntry');
+    if(!entry)return;
+    entry.hidden=false;
+    document.getElementById('cosmosChoosePrivate')?.focus();
+  }
+  function enterUniverse(choice){
+    if(!token||!me||!auth.hidden||usernameRequired)return;
+    const chosen=choice==='business'?'business':'private';
+    document.getElementById('cosmosUniverseEntry').hidden=true;
+    localStorage.setItem(UNIVERSE_KEY,chosen);
+    updateUniverseSwitch(chosen);
+    if(chosen==='business'){
+      openBusinessHub('feed');
+    }else{
+      closeSheet(); // preserves personal Metro position and private account permissions
+      renderJourney();
+    }
+  }
+  function scheduleUniverseEntry(){
+    if(shouldBypassUniverseEntry())return;
+    // Show explicit universe choice on each normal page opening; switching stays available in the header.
+    setTimeout(showUniverseEntry,250);
+  }
+
   const SESSION_RENEW_KEY = "cosmos_life_last_renew_v21";
   // v3.1.3 — COSMOS X handoff: short-lived, same-tab browser draft.
   // The user's answer is never put in a URL or auto-published.
@@ -2831,6 +2935,10 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   let authMode='login',authChallengeId='';
   const cameraVideo = $("cameraVideo"), cameraFallback = $("cameraFallback"), coreOrb = $("coreOrb"), hint = $("hint"), ambientTitle = $("ambientTitle"), ambientSub = $("ambientSub"), foundOrb = $("foundOrb"), foundLabel = $("foundLabel");
   const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput"), noticeBell=$("noticeBell"), noticeCount=$("noticeCount");
+  $('cosmosChoosePrivate').addEventListener('click',()=>enterUniverse('private'));
+  $('cosmosChooseBusiness').addEventListener('click',()=>enterUniverse('business'));
+  $('cosmosUniverseSwitch').addEventListener('click',showUniverseEntry);
+
   function setEmailAuthMode(mode){
     authMode=mode;authStart.hidden=false;authVerify.hidden=true;showAuthError('');
     $('authModeLogin').classList.toggle('selected',mode==='login');
@@ -2932,8 +3040,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(session.stream)releaseCameraStream(session.stream);
     if(session.previewURL){URL.revokeObjectURL(session.previewURL);session.previewURL='';}
   }
-  function closeSheet(){if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
-  function openSheet(html){disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');
+  // A picked video is local only until the visitor explicitly chooses Continue.
+  let selectedVideoPreviewURL='';
+  function clearSelectedVideoPreview(){
+    if(selectedVideoPreviewURL){URL.revokeObjectURL(selectedVideoPreviewURL);selectedVideoPreviewURL='';}
+  }
+  function closeSheet(){clearSelectedVideoPreview();if(usernameRequired){toastMsg('Choose your unique @username to continue.');return;}if(sheet.classList.contains('business-modal'))updateUniverseSwitch('private');disposePlaceMap();stopVideoCapture();stopPhotoCapture();sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');friendsViewGeneration++;circleViewGeneration++;sheet.hidden=true;sheetBackdrop.hidden=true;sheet.innerHTML="";compose=null;updateCameraEscape();}
+  function openSheet(html){clearSelectedVideoPreview();disposePlaceMap();stopVideoCapture();stopPhotoCapture();$('metroPopover')?.remove();weekMetroPopId=null;sheetBackdrop.classList.remove('future-backdrop','cosmos-neutral-reader-backdrop');sheet.classList.remove('metro-expanded','liquid-compose-menu','liquid-compact-step','future-date-sheet','cosmos-creative-sheet','cosmos-story-active','connection-metro-sheet','cosmos-capture-fullscreen','business-modal');
     sheet.innerHTML=`<div class="sheet-quickbar"><strong>COSMOS</strong><button type="button" id="sheetBackCamera">◯ Back to camera</button></div><div class="sheet-inner"><div class="handle"></div>${html}</div>`;
     sheet.hidden=false;sheetBackdrop.hidden=false;
     $("sheetBackCamera").onclick=returnToCamera;
@@ -3168,6 +3281,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         usernameRequired=false;closeSheet();accountButton.textContent=me.display_name||'@'+me.username;
         toastMsg('Welcome, @'+me.username+'!');
         startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();refreshNoticeBadge();
+        scheduleUniverseEntry();
         if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
         else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
         else if(ARRIVED_FROM_X)setTimeout(offerXToMetroSave,650);
@@ -3195,6 +3309,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       // Update the existing service worker for already-installed iPhone Home Screen apps.
       navigator.serviceWorker?.getRegistration('/cosmos-next.html').then(r=>r?.update()).catch(()=>{});
       setTimeout(recoverTappedNotification,320);
+      scheduleUniverseEntry();
       if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     }catch(e){
       if(e.status===401 || e.status===403){
@@ -3218,6 +3333,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,550);
     else if(ARRIVED_FROM_X)setTimeout(offerXToMetroSave,600);
     setTimeout(recoverTappedNotification,350);
+    scheduleUniverseEntry();
   }
   $('authModeLogin').addEventListener('click',()=>setEmailAuthMode('login'));
   $('authModeRegister').addEventListener('click',()=>setEmailAuthMode('register'));
@@ -3994,13 +4110,17 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   function businessInitials(name){return String(name||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toUpperCase().slice(0,2);}
   function businessDate(date){const d=new Date(date);return Number.isNaN(d.getTime())?'':d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});}
   function businessFrame(tab,body){
-    openSheet(`<div class="business-shell"><div class="business-title-row"><div><div class="business-eyebrow">COSMOS / BUSINESS</div><h2>Professional Metro</h2></div><button class="business-button" id="businessReturn">← My Cosmos</button></div>
-      <p class="business-subtitle">One identity. A separate work-only space. No private family moments appear here.</p>
+    openSheet(`<div class="business-shell"><div class="business-title-row"><div><div class="business-eyebrow">COSMOS / BUSINESS</div><h2>Business COSMOS</h2></div><button class="business-button" id="businessReturn">◈ Switch universe</button></div>
+      <p class="business-subtitle">Professional activity lives here. Your personal moments stay in Private COSMOS.</p>
       <nav class="business-tabs" aria-label="Business sections">
       ${[['feed','Work feed'],['people','Connections'],['profile','My profile'],['visitors','Who viewed me']].map(([id,label])=>`<button type="button" data-business-tab="${id}" class="${tab===id?'selected':''}" aria-current="${tab===id?'page':'false'}">${label}</button>`).join('')}
       </nav><div id="businessBody">${body}</div><p class="business-note">Private beta · Work posts visible only to accepted Connections · Profile visits recorded only with the visitor’s opt-in.</p></div>`);
     sheet.classList.add('business-modal');
-    $('businessReturn').onclick=closeSheet;
+    updateUniverseSwitch('business');
+    $('businessReturn').textContent='◈ Switch universe';
+    $('businessReturn').onclick=showUniverseEntry;
+    $('sheetBackCamera').textContent='◯ Private COSMOS';
+    $('sheetBackCamera').onclick=()=>enterUniverse('private');
     sheet.querySelectorAll('[data-business-tab]').forEach(b=>b.onclick=()=>openBusinessHub(b.dataset.businessTab));
   }
   async function openBusinessHub(tab='feed',cursor='',append=false){
@@ -4102,7 +4222,6 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <button class="choice" data-kind="video"><span class="liquid-choice-icon" aria-hidden="true">▶</span><span class="liquid-choice-words"><strong>Video</strong><span>30s · 5/month free</span></span></button>
       <button class="choice" data-kind="music"><span class="liquid-choice-icon" aria-hidden="true">♫</span><span class="liquid-choice-words"><strong>Music</strong><span>Share a song</span></span></button>
       <button class="choice" data-kind="link"><span class="liquid-choice-icon" aria-hidden="true">↗</span><span class="liquid-choice-words"><strong>Link</strong><span>Share a link</span></span></button>
-      <button class="choice" data-kind="business"><span class="liquid-choice-icon" aria-hidden="true">▣</span><span class="liquid-choice-words"><strong>Business</strong><span>Work-only Metro · people · free profile visitors</span></span></button>
       <button class="choice" data-kind="location"><span class="liquid-choice-icon" aria-hidden="true">⌖</span><span class="liquid-choice-words"><strong>Location</strong><span>Apple Maps · Google Maps</span></span></button>
     </div><div class="micro liquid-privacy"><span aria-hidden="true">◌</span> Private by default. You control who can see it.</div>`);
     sheet.classList.add('liquid-compose-menu');
@@ -4656,22 +4775,131 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     syncUI();render();
   }
 
+  // The iPhone Photos picker can return MOV/HEVC files whose duration the browser
+  // cannot decode locally, even when the Cloudflare Worker can verify the MOV header.
+  // Browser-side duration is advisory; the Worker is authoritative.
+  function normalizedVideoFile(file){
+    if(!file || !file.size)throw new Error('Choose a saved video first.');
+    const lower=String(file.name||'').toLowerCase();
+    const original=String(file.type||'').toLowerCase().split(';')[0].trim();
+    const type=(original==='video/mp4'||original==='video/quicktime'||original==='video/webm')?original:
+      /\.mov$/i.test(lower)?'video/quicktime':/\.(mp4|m4v)$/i.test(lower)?'video/mp4':/\.webm$/i.test(lower)?'video/webm':'';
+    if(!type)throw new Error('This file type is not supported. Export your clip as MP4 or MOV.');
+    // No encoding/conversion happens here; this only repairs missing or generic
+    // MIME labels from Files/Photos. The Worker still validates the actual bytes.
+    if(original===type)return file;
+    return new File([file],file.name||('cosmos-video.'+(type==='video/quicktime'?'mov':type==='video/webm'?'webm':'mp4')),
+      {type,lastModified:file.lastModified||Date.now()});
+  }
   async function durationFromFile(file){
     const url=URL.createObjectURL(file);
+    const v=document.createElement('video');v.preload='metadata';v.muted=true;v.playsInline=true;
     try{
-      const v=document.createElement('video');v.preload='metadata';v.muted=true;v.playsInline=true;
-      const d=await new Promise((resolve,reject)=>{
-        const timer=setTimeout(()=>reject(new Error('Video metadata timed out.')),10000);
-        v.onloadedmetadata=()=>{clearTimeout(timer);resolve(v.duration);};
-        v.onerror=()=>{clearTimeout(timer);reject(new Error('Video duration unavailable. Export as MP4 or MOV.'));};
+      return await new Promise((resolve)=>{
+        let settled=false;
+        const done=d=>{if(settled)return;settled=true;clearTimeout(timer);resolve(Number.isFinite(d)&&d>0?d:NaN);};
+        const check=()=>{if(Number.isFinite(v.duration)&&v.duration>0)done(v.duration);};
+        const timer=setTimeout(()=>done(NaN),8500);
+        v.onloadedmetadata=check;
+        v.ondurationchange=check;
+        v.onloadeddata=check;
+        v.onerror=()=>done(NaN);
         v.src=url;
+        try{v.load();}catch(_){done(NaN);}
       });
-      return Number.isFinite(d)?d:NaN;
-    }finally{URL.revokeObjectURL(url);}
+    }finally{
+      v.removeAttribute('src');try{v.load();}catch(_){}
+      URL.revokeObjectURL(url);
+    }
+  }
+  function videoSizeText(bytes){return (bytes/1048576).toFixed(1)+' MB';}
+
+  // The chooser always leads to a stable review/continue step, even if Safari
+  // cannot parse an iPhone video codec. Errors are shown in the page, not a
+  // short-lived toast that disappears when the composer redraws.
+  function reviewSelectedVideo(originalFile,policy,onSaved,onBack,onChooseAgain){
+    let file;
+    try{file=normalizedVideoFile(originalFile);}
+    catch(err){
+      openSheet(`<h2>Video needs another format</h2><p role="alert">${escapeHtml(err.message)}</p><div class="actions"><button id="vPickAgain">Choose another video</button><button id="vPickBack">Back</button></div>`);
+      $('vPickAgain').onclick=onChooseAgain;$('vPickBack').onclick=onBack;
+      return;
+    }
+    const maxBytes=Math.max(1,Number(policy.max_bytes)||12582912);
+    const maxSeconds=Math.max(1,Number(policy.max_seconds)||30);
+    const oversized=file.size>maxBytes;
+    const sizeText=videoSizeText(file.size);
+    openSheet(`<h2>Review your video</h2><p>Nothing has been uploaded yet. Review the clip, then choose Continue.</p>
+      <div class="cosmos-picked-video-shell"><video id="cosmosPickedVideo" controls playsinline preload="metadata" aria-label="Selected video preview"></video></div>
+      <div class="policy-card"><strong>${escapeHtml(file.name||'Selected video')}</strong><br>
+        ${escapeHtml(sizeText)} · ${escapeHtml(file.type||'video')}<br>
+        <span id="cosmosPickedDuration">Checking video length…</span><br>
+        <small>Maximum ${maxSeconds} seconds and ${Math.round(maxBytes/1048576)} MB. We never upload until you confirm.</small></div>
+      <p class="cosmos-video-selection-status ${oversized?'blocked':''}" id="cosmosPickedStatus" role="status" aria-live="polite">${oversized?
+        `This video is ${escapeHtml(sizeText)}, above the ${Math.round(maxBytes/1048576)} MB limit. Trim or export a shorter, smaller clip in Photos, then choose it again.`:
+        'Preparing your preview. You may continue after the check.'}</p>
+      <div class="actions cosmos-video-select-actions">
+        <button id="cosmosPickedBack" type="button">← Video options</button>
+        <button id="cosmosPickedAgain" type="button">Choose another</button>
+        <button id="cosmosPickedContinue" type="button" class="primary" ${oversized?'disabled':''}>Continue with video →</button>
+      </div>`);
+    sheet.classList.add('cosmos-video-pick-review');
+    const preview=$('cosmosPickedVideo'),status=$('cosmosPickedStatus'),durationLabel=$('cosmosPickedDuration'),continueButton=$('cosmosPickedContinue');
+    selectedVideoPreviewURL=URL.createObjectURL(file);
+    preview.src=selectedVideoPreviewURL;
+    $('cosmosPickedBack').onclick=onBack;
+    $('cosmosPickedAgain').onclick=onChooseAgain;
+    const checkPage=()=>status.isConnected && selectedVideoPreviewURL;
+    // Metadata is a convenience, not a reason to lock out supported iPhone videos.
+    durationFromFile(file).then(seconds=>{
+      if(!checkPage())return;
+      if(Number.isFinite(seconds)){
+        durationLabel.textContent=`Duration: ${seconds.toFixed(1)} seconds`;
+        if(seconds>maxSeconds+.05){
+          continueButton.disabled=true;
+          status.classList.add('blocked');
+          status.textContent=`This clip is ${Math.ceil(seconds)} seconds. The limit is ${maxSeconds} seconds. Trim it in your Photos app, then choose the shortened version.`;
+        }else if(!oversized){
+          status.classList.remove('blocked');status.textContent='Ready to continue. COSMOS will verify the video again before saving.';
+        }
+      }else{
+        durationLabel.textContent='Duration: not readable by this browser';
+        if(!oversized){status.classList.remove('blocked');status.textContent='Your browser could not read this video’s duration. You can still try Continue; COSMOS will check the video securely on the server. If it cannot verify the clip, export it as a finalized MP4 or MOV.';}
+      }
+    }).catch(()=>{
+      if(checkPage()){durationLabel.textContent='Duration: will be checked during upload';if(!oversized)status.textContent='Browser metadata is unavailable. COSMOS will validate duration on the server.';}
+    });
+    continueButton.onclick=async()=>{
+      if(continueButton.disabled||oversized)return;
+      continueButton.disabled=true;continueButton.textContent='Checking and uploading…';
+      status.classList.remove('blocked');status.textContent='Uploading privately. Keep this window open.';
+      try{
+        const media=await uploadFile(file);
+        if(!status.isConnected)return; // navigating away cancels the UI transition
+        await onSaved(media,file);
+      }catch(err){
+        if(!status.isConnected)return;
+        status.classList.add('blocked');
+        status.textContent=(err.message||'The video could not be uploaded.')+' You can choose another clip, or retry after correcting the issue.';
+        continueButton.disabled=false;continueButton.textContent='Try upload again →';
+      }
+    };
+  }
+  function chooseStoredVideo(policy,onSaved,onBack){
+    // Use generic video/* on iPhone Photos; restrictive accept lists can cause
+    // supported MOV clips to be filtered out of the user's library.
+    fileInput.accept='video/*,.mov,.mp4,.m4v,.webm';
+    fileInput.removeAttribute('capture');
+    fileInput.value='';fileInput.onchange=async()=>{
+      const file=fileInput.files?.[0];fileInput.onchange=null;
+      if(!file)return;
+      const chooseAgain=()=>chooseStoredVideo(policy,onSaved,onBack);
+      reviewSelectedVideo(file,policy,onSaved,onBack,chooseAgain);
+    };
+    fileInput.click();
   }
 
-  // v3.4.2: two explicit video paths. File picker never silently forces a camera.
-  // Live capture uses browser MediaRecorder, checked against existing server policy.
+  // Keep existing server-side video quota policy and recording workflow intact.
   async function videoRules(){
     openSheet('<h2>Short video</h2><p>Record with your camera or choose an existing clip.</p><div class="look-loading">Checking your allowance…</div>');
     try{
@@ -4692,26 +4920,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         ${canRecord?'':'<p>Your browser does not provide live video recording. You can still upload an existing clip or use your phone camera.</p>'}
         <div class="actions"><button id="cosmosVideoBack">← Back</button></div>`);
       $('cosmosVideoBack').onclick=showContentStep;
-      const pick=(nativeCamera=false)=>{
-        fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
-        if(nativeCamera)fileInput.setAttribute('capture','environment');
-        else fileInput.removeAttribute('capture');
-        fileInput.value='';
-        fileInput.onchange=async()=>{
-          const file=fileInput.files?.[0];fileInput.onchange=null;
-          if(!file)return;
-          try{
-            if(file.size>bytes)throw new Error(`Maximum video size is ${Math.round(bytes/1048576)} MB.`);
-            const length=await durationFromFile(file);
-            if(!Number.isFinite(length)||length<=0)throw new Error('Cannot read video duration. Please export as MP4 or MOV.');
-            if(length>seconds+.05)throw new Error(`Video is ${Math.ceil(length)} seconds; the maximum is ${seconds}.`);
-            openSheet('<h2>Uploading video…</h2><p>Securing your video privately.</p><div class="look-progress"></div>');
-            const media=await uploadFile(file);compose.media_id=media.id;afterContentStep();
-          }catch(err){toastMsg(err.message,5400);videoRules();}
-        };
-        fileInput.click();
-      };
-      $('cosmosChooseVideo').onclick=()=>pick(false);
+      $('cosmosChooseVideo').onclick=()=>chooseStoredVideo(policy,async media=>{
+        if(!compose)throw new Error('The moment draft is no longer available.');
+        compose.content_kind='video';compose.media_id=media.id;
+        afterContentStep();
+      },videoRules);
       if(canRecord)$('cosmosRecordVideo').onclick=()=>openVideoRecorder(policy);
     }catch(error){
       openSheet(`<h2>Video unavailable</h2><p>${escapeHtml(error.message)}</p><div class="actions"><button id="cosmosVideoBack">Back</button></div>`);
@@ -5896,19 +6109,23 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       },()=>openAddToMoment(item));
     }
     if(kind==='video'){
-      fileInput.accept='video/mp4,video/quicktime,video/webm,.mov,.mp4,.webm';
-      fileInput.removeAttribute('capture');fileInput.value='';fileInput.onchange=async()=>{
-        const file=fileInput.files?.[0];if(!file)return openAddToMoment(item);
-        try{
-          const policy=await api('/api/video/policy');if(policy.remaining<1)throw new Error('Monthly video allowance exhausted.');
-          if(file.size>policy.max_bytes)throw new Error('Video file is over the allowed size.');
-          const duration=await durationFromFile(file);
-          if(!Number.isFinite(duration)||duration>policy.max_seconds+.05)throw new Error('Trim video to '+policy.max_seconds+' seconds.');
-          openSheet('<h2>Saving attachment…</h2><p>Protecting your media.</p>');
-          const upload=await uploadFile(file);
-          showAdditionCommentStep(item,{kind,media_id:upload.id});
-        }catch(e){toastMsg(e.message,4200);openAddToMoment(item);}
-      };fileInput.click();
+      const policyLoading=()=>openSheet('<h2>Add a video</h2><p>Checking this moment’s video allowance…</p>');
+      policyLoading();
+      api('/api/video/policy').then(policy=>{
+        if(Number(policy.remaining)<1){
+          openSheet('<h2>Monthly video allowance reached</h2><p>You have used all available video uploads this month.</p><div class="actions"><button id="extraVideoBack">Back to moment</button></div>');
+          $('extraVideoBack').onclick=()=>openAddToMoment(item);return;
+        }
+        openSheet('<h2>Add a video</h2><p>Choose a saved video and review it before uploading.</p><div class="actions"><button id="extraVideoPick" class="primary">Choose existing video</button><button id="extraVideoBack">Back</button></div>');
+        $('extraVideoBack').onclick=()=>openAddToMoment(item);
+        $('extraVideoPick').onclick=()=>chooseStoredVideo(policy,media=>{
+          showAdditionCommentStep(item,{kind:'video',media_id:media.id});
+        },()=>openAddToMoment(item));
+      }).catch(e=>{
+        openSheet(`<h2>Video unavailable</h2><p>${escapeHtml(e.message)}</p><div class="actions"><button id="extraVideoBack">Back</button></div>`);
+        $('extraVideoBack').onclick=()=>openAddToMoment(item);
+      });
+      return;
     }
   }
 
@@ -6206,13 +6423,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }catch(e){if(root.isConnected){root.classList.remove('look-loading');root.textContent='Tags unavailable: '+e.message;}}
   }
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button id="openBusinessFromProfile" class="primary">▣ Business</button><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button id="openBusinessFromProfile" class="primary">◈ Switch universe</button><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
     $("openNotifications").onclick=showCosmosNotifications;
     $("openMyTags").onclick=showMomentTagRequests;
     $("openConnections").onclick=openFriends;
     $("openTogetherSpaces").onclick=openTogetherSpaces;
-    $("openBusinessFromProfile").onclick=()=>openBusinessHub("feed");
+    $("openBusinessFromProfile").onclick=showUniverseEntry;
     $("openMyArchive").onclick=()=>{closeSheet();showSpace("mine");};
     $("openWaitingArchive").onclick=()=>{closeSheet();showSpace("waiting");};
     $("saveUsername").onclick=async()=>{
