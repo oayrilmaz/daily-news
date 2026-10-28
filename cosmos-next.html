@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.6a7-business-jobs-ai" />
+  <meta name="cosmos-build" content="cosmos-next-v3.6a8-internal-external-jobs" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -2981,6 +2981,16 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 #sheet.business-modal .business-head-jobs{display:none}
 .cosmos-jobs .business-actions button{width:100%}}
 
+
+/* COSMOS v3.6a.8 internal-first external job discovery */
+.cosmos-job-filters{display:grid;grid-template-columns:1.25fr 1fr auto;align-items:end;gap:12px;margin-top:16px}
+.cosmos-job-filters label{font-weight:700;font-size:13px;display:grid;gap:7px}
+.cosmos-job-filters button{min-height:46px}
+.cosmos-job-group{font-size:17px;color:#223249;margin:28px 0 11px}
+.cosmos-job-source{font-weight:800;color:#263d51}
+.cosmos-jobs-external-link{display:inline-flex;align-items:center;padding:11px 16px;border-radius:12px;background:#30363a;color:white!important;font-weight:700;text-decoration:none;font-size:14px}
+@media(max-width:750px){.cosmos-job-filters{grid-template-columns:1fr}.cosmos-job-filters button{width:100%}}
+
 </style>
 </head>
 <body>
@@ -4606,6 +4616,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   // COSMOS v3.6a.7 — Jobs in Business. Private documents never enter the Personal Metro.
   const businessJobsCache=new Map();
   let businessJobsResumeId='';
+  let businessJobsSearchQuery='';
+  let businessJobsSearchLocation='';
+  let businessJobsSearchSerial=0;
   function businessJobsTabs(active){return `<div class="cosmos-jobs-tabs" role="navigation" aria-label="COSMOS Jobs">
     ${[['browse','Explore jobs'],['matches','My matches & résumé'],['applications','My applications'],['post','Post a job'],['hiring','Hiring dashboard']]
       .map(([id,label])=>`<button type="button" data-jobs-tab="${id}" class="${active===id?'active':''}" aria-current="${active===id?'page':'false'}">${label}</button>`).join('')}</div>`;}
@@ -4618,12 +4631,16 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   }
   function businessJobsCard(job,withEvidence=false){
     const e=job.evidence;
-    return `<article class="cosmos-jobs-card"><div class="business-eyebrow">${escapeHtml(job.work_model||'Work')} · ${escapeHtml(job.location||'Location not provided')}</div>
+    const ext=job.external===true;
+    const provenance=ext?`<span class="cosmos-job-source">External · ${escapeHtml(job.source||'Provider')}</span>`:
+      '<span class="cosmos-job-source">COSMOS · Member posted</span>';
+    return `<article class="cosmos-jobs-card"><div class="business-eyebrow">${provenance} · ${escapeHtml(job.work_model||'Work')} · ${escapeHtml(job.location||'Location not provided')}</div>
       <h3>${escapeHtml(job.title)}</h3><div class="cosmos-jobs-org">${escapeHtml(job.organization)}</div>
       <p>${escapeHtml(String(job.description||'').slice(0,250))}${String(job.description||'').length>250?'…':''}</p>
       ${withEvidence&&e?`<div class="cosmos-jobs-evidence"><strong>Documented overlap:</strong> ${escapeHtml(e.mentioned_in_both?.join(', ')||'No common skill phrases detected; manual review may still find a fit.')}
       <div class="business-note">Automated keywords are not a candidate score. Missing phrases do not prove missing ability.</div></div>`:''}
-      <div class="business-actions"><button type="button" class="primary" data-jobs-open="${escapeHtml(job.id)}">View job & apply →</button></div>
+      <div class="business-actions">${ext?`<a class="cosmos-jobs-external-link" href="${escapeHtml(job.external_url||'#')}" target="_blank" rel="noopener noreferrer">View original posting ↗</a>`:
+        `<button type="button" class="primary" data-jobs-open="${escapeHtml(job.id)}">View job & apply →</button>`}</div>
     </article>`;
   }
   function businessJobsBindCards(){sheet.querySelectorAll('[data-jobs-open]').forEach(b=>b.onclick=()=>businessJobsOpenJob(b.dataset.jobsOpen));}
@@ -4673,14 +4690,35 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         if(!resumes.some(d=>d.id===businessJobsResumeId))businessJobsResumeId=resumes[0]?.id||'';
         if(view==='browse'){
           (listing.jobs||[]).forEach(j=>businessJobsCache.set(j.id,j));
-          target.innerHTML=`<div class="cosmos-jobs-summary"><strong>Open COSMOS jobs</strong>
-            <p>Jobs published by signed-in COSMOS Business members. Company identity is not independently verified in this beta; openings are not imported from external job boards.</p>
-            <input id="jobsSearchText" aria-label="Filter job titles and organizations" placeholder="Search role, company or location…"/>
-            </div><div id="jobsBrowseResults" class="cosmos-jobs-list">${(listing.jobs||[]).map(j=>businessJobsCard(j)).join('')||'<div class="business-empty">No Business jobs have been posted yet.</div>'}</div>`;
-          const filter=()=>{const query=$('jobsSearchText').value.trim().toLowerCase();$('jobsBrowseResults').innerHTML=(listing.jobs||[])
-            .filter(j=>[j.title,j.organization,j.location,j.description].join(' ').toLowerCase().includes(query))
-            .map(j=>businessJobsCard(j)).join('')||'<div class="business-empty">No jobs match that search.</div>';businessJobsBindCards();};
-          $('jobsSearchText').oninput=filter;businessJobsBindCards();
+          target.innerHTML=`<div class="cosmos-jobs-summary"><strong>Search COSMOS first, then outside opportunities</strong>
+            <p>COSMOS member postings appear first. External openings come from attributed job providers and open on their own websites.</p>
+            <form id="cosmosSearchJobsForm" class="cosmos-job-filters"><label>Position or keywords
+              <input id="jobsSearchText" aria-label="Position or keywords" placeholder="e.g. vice president" value="${escapeHtml(businessJobsSearchQuery)}" /></label>
+              <label>Location (optional)<input id="jobsSearchLocation" placeholder="e.g. Raleigh, NC" value="${escapeHtml(businessJobsSearchLocation)}" /></label>
+              <button class="primary" type="submit">Search jobs</button></form>
+            <p class="business-note">Remote positions are available without setup. For broader US on-site and hybrid jobs, configure Adzuna API credentials on the COSMOS Life Worker.</p>
+            </div><h3 class="cosmos-job-group">1 · COSMOS Business opportunities</h3><div id="jobsBrowseResults" class="cosmos-jobs-list"></div>
+            <h3 class="cosmos-job-group">2 · External opportunities</h3><div id="jobsBrowseExternal" class="cosmos-jobs-list" role="status">Searching external providers…</div>
+            <p class="business-note" id="jobsProviderStatus"></p>`;
+          const search=async()=>{
+            const q=$('jobsSearchText').value.trim(),loc=$('jobsSearchLocation').value.trim();
+            businessJobsSearchQuery=q;businessJobsSearchLocation=loc;
+            const normalized=q.toLowerCase();
+            const internal=(listing.jobs||[]).filter(j=>!normalized||[j.title,j.organization,j.location,j.description].join(' ').toLowerCase().includes(normalized));
+            $('jobsBrowseResults').innerHTML=internal.map(j=>businessJobsCard(j)).join('')||'<div class="business-empty">No internal COSMOS postings match. Searching external sources below.</div>';
+            businessJobsBindCards();
+            $('jobsBrowseExternal').innerHTML='<div class="business-empty">Searching external job providers…</div>';
+            const serial=++businessJobsSearchSerial;
+            try{
+              const r=await api('/api/business/jobs/discover?q='+encodeURIComponent(q)+'&location='+encodeURIComponent(loc));
+              if(serial!==businessJobsSearchSerial||!$('jobsBrowseExternal'))return;
+              $('jobsBrowseExternal').innerHTML=(r.external||[]).map(j=>businessJobsCard(j)).join('')||
+                '<div class="business-empty">No matching external results from the available sources. Broader on-site/hybrid searches require an additional provider.</div>';
+              $('jobsProviderStatus').textContent=(r.providers||[]).map(p=>p.name+': '+(p.status==='ok'?p.count+' results':p.status==='not_configured'?'not configured':'unavailable')).join(' · ');
+            }catch(e){if(serial===businessJobsSearchSerial&&$('jobsBrowseExternal'))$('jobsBrowseExternal').textContent='External search unavailable: '+e.message;}
+          };
+          $('cosmosSearchJobsForm').onsubmit=e=>{e.preventDefault();search();};
+          search();
         }else{
           target.innerHTML=`<div class="cosmos-jobs-card"><h3>My private résumés</h3>
             <p>Upload a PDF, DOCX or TXT (up to 5 MB). COSMOS extracts text securely with Cloudflare. Files are private until you choose to apply.</p>
@@ -4688,7 +4726,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
             <label class="cosmos-jobs-check"><input type="checkbox" id="jobsResumeProcessConsent"> I understand COSMOS will store my document privately in Cloudflare and extract its text for skills matching. It is not shared with an employer unless I apply.</label>
             <button class="primary" id="jobsUploadResume">Upload résumé</button><p id="businessJobsUploadStatus" role="status" class="business-note"></p>
             <div class="business-field">${businessJobsDocumentSelect(resumes)}</div>
-            <div class="business-actions"><button id="jobsRefreshMatches" class="primary">Find jobs from my résumé</button>
+            <div class="business-field"><label for="jobsTargetRole">Target position for external search</label>
+              <input id="jobsTargetRole" maxlength="90" placeholder="e.g. Vice President of Operations" value="${escapeHtml(businessJobsSearchQuery)}" /></div>
+            <div class="business-field"><label for="jobsTargetLocation">Preferred location (optional)</label>
+              <input id="jobsTargetLocation" maxlength="90" placeholder="e.g. Raleigh, NC" value="${escapeHtml(businessJobsSearchLocation)}" /></div>
+            <div class="business-actions"><button id="jobsRefreshMatches" class="primary">Find internal + external opportunities</button>
             <button id="jobsDownloadMyResume">Download selected document</button>
             <button id="jobsDeleteMyResume">Delete selected document</button></div>
             <p class="business-note">COSMOS shows all current openings without automatically rejecting or ranking applicants.</p></div>
@@ -4710,11 +4752,22 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
                 <button class="primary" id="jobsSaveResumeText">Save text & find jobs</button>`;
               $('jobsSaveResumeText').onclick=async()=>{try{await api('/api/business/jobs/documents/'+selector.value,{method:'PATCH',body:JSON.stringify({extracted_text:$('jobsManualResume').value})});await openBusinessJobs('matches');}catch(e){toastMsg(e.message);}};return;
             }
-            $('jobsMatches').innerHTML='<p role="status">Comparing documented skills with open COSMOS jobs…</p>';
-            try{const r=await api('/api/business/jobs/matches?resume_id='+encodeURIComponent(selector.value));
-              (r.jobs||[]).forEach(j=>businessJobsCache.set(j.id,j));
-              $('jobsMatches').innerHTML=(r.jobs||[]).map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No openings have been posted yet.</div>';
+            const role=$('jobsTargetRole').value.trim(),location=$('jobsTargetLocation').value.trim();
+            businessJobsSearchQuery=role;businessJobsSearchLocation=location;
+            $('jobsMatches').innerHTML='<p role="status">Checking COSMOS jobs, then outside opportunities. Your résumé stays private in COSMOS.</p>';
+            try{
+              const [inside,outside]=await Promise.allSettled([
+                api('/api/business/jobs/matches?resume_id='+encodeURIComponent(selector.value)),
+                api('/api/business/jobs/discover?q='+encodeURIComponent(role)+'&location='+encodeURIComponent(location)+'&resume_id='+encodeURIComponent(selector.value))
+              ]);
+              const internal=inside.status==='fulfilled'?(inside.value.jobs||[]):[];
+              internal.forEach(j=>businessJobsCache.set(j.id,j));
+              const external=outside.status==='fulfilled'?(outside.value.external||[]):[];
+              $('jobsMatches').innerHTML=`<h3 class="cosmos-job-group">1 · COSMOS openings</h3>${internal.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No internal jobs available.</div>'}
+                <h3 class="cosmos-job-group">2 · External opportunities</h3>${external.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No matching external roles returned. Check the target position or configure Adzuna for broader US listings.</div>'}
+                <p class="business-note">Skill phrases are not a score or eligibility decision. External providers never receive your résumé.</p>`;
               businessJobsBindCards();
+              if(inside.status==='rejected'||outside.status==='rejected')toastMsg('One job source was unavailable. Other results are still shown.');
             }catch(e){$('jobsMatches').textContent=e.message;}
           };
         }
