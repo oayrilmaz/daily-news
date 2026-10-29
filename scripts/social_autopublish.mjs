@@ -7,6 +7,14 @@ const MODE = String(process.env.SOCIAL_MODE || "preview").trim().toLowerCase();
 const PLATFORM = String(process.env.SOCIAL_PLATFORM || "all").trim().toLowerCase();
 const ENABLED = String(process.env.SOCIAL_AUTOPUBLISH_ENABLED || "false").trim().toLowerCase() === "true";
 
+// COSMOS Grok experiment: mentions remain opt-in and limited. X requires prior
+// indication of consent for automated @mentions; a single Grok reply does not
+// authorize unlimited ongoing mentions. "review" requires item.grok_approved;
+// "auto" requires operator-confirmed permission via a separate variable.
+const GROK_MODE = String(process.env.SOCIAL_GROK_MODE || "review").trim().toLowerCase();
+const GROK_POLICY_AUTHORIZED = String(process.env.SOCIAL_GROK_POLICY_AUTHORIZED || "false").trim().toLowerCase() === "true";
+const GROK_MAX_PER_DAY = 1; // intentionally not configurable: one at most per UTC day
+
 const MAX_LINKEDIN_PER_DAY = toPositiveInt(process.env.MAX_LINKEDIN_PER_DAY, 1);
 const MAX_X_PER_DAY = toPositiveInt(process.env.MAX_X_PER_DAY, 3);
 const MAX_LINKEDIN_PER_RUN = toPositiveInt(process.env.MAX_LINKEDIN_PER_RUN, 1);
@@ -120,6 +128,66 @@ function xText(item, url) {
   return text;
 }
 
+function grokMentionedToday(state) {
+  return state.published.filter(row => row.platform === "x" && row.status === "published" &&
+    row.grok_mention === true && String(row.published_at || "").slice(0, 10) === todayUtc).length;
+}
+
+function eligibleGrokItem(item) {
+  return itemPlatformEnabled(item, "x") && item.enabled !== false &&
+    /\?/.test(String(item.x_text || "")) &&
+    ["discovery", "playful"].includes(String(item.content_kind || ""));
+}
+
+function pickGrokItem(candidates, state) {
+  if (GROK_MODE === "off" || grokMentionedToday(state) >= GROK_MAX_PER_DAY) return null;
+  if (GROK_MODE === "auto" && !GROK_POLICY_AUTHORIZED) {
+    console.log("GROK: auto mode blocked. X requires prior recipient opt-in for automated mentions; set SOCIAL_GROK_POLICY_AUTHORIZED only if you have confirmed authorization.");
+    return null;
+  }
+  const unseen = candidates.filter(item => eligibleGrokItem(item) && !alreadyPublished(state, item.id, "x"));
+  const allowed = GROK_MODE === "review" ? unseen.filter(item => item.grok_approved === true) : unseen;
+  // Focus on a researched, high-interest question; otherwise choose an original
+  // playful hypothetical. We do not mention Grok on every scheduled post.
+  return allowed.find(item => item.content_kind === "discovery") || allowed[0] || null;
+}
+
+const GROK_PROMPTS = [
+  "@grok — what surprising consequence are we missing?",
+  "@grok — which outcome is the most plausible, and why?",
+  "@grok — what would you challenge about this scenario?",
+  "@grok — where could the biggest ripple effect appear?"
+];
+
+function grokPromptFor(item) {
+  const digest = crypto.createHash("sha256").update(String(item.id)).digest();
+  return GROK_PROMPTS[digest[0] % GROK_PROMPTS.length];
+}
+
+function grokXText(item, url, shouldMention) {
+  if (!shouldMention) return xText(item, url);
+  const existing = cleanText(item.x_text || item.short_text || item.title);
+  if (/@grok\b/i.test(existing)) return xText(item, url);
+  // Insert a direct, distinct question above topic hashtags; preserve the
+  // canonical COSMOS destination link appended by xText().
+  const hashtagLine = /(?:^|\n)(?:#[A-Za-z][A-Za-z0-9_]*\s*){1,4}$/m;
+  const match = hashtagLine.exec(existing);
+  const prompts = [grokPromptFor(item), "@grok — what do you think?", "@grok, your take?", "@grok?"];
+  for (const prompt of prompts) {
+    const augmented = match
+      ? `${existing.slice(0, match.index).trimEnd()}\n\n${prompt}\n\n${existing.slice(match.index).trim()}`
+      : `${existing}\n\n${prompt}`;
+    try {
+      return xText({ ...item, x_text: augmented }, url);
+    } catch (error) {
+      if (prompt === prompts[prompts.length - 1]) {
+        console.warn(`GROK mention skipped for ${item.id}: ${error.message}`);
+      }
+    }
+  }
+  return xText(item, url);
+}
+
 function linkedInText(item, url) {
   return appendUrl(item.linkedin_text || item.long_text || item.title, url);
 }
@@ -148,14 +216,15 @@ function publishedToday(state, platform) {
   return state.published.filter(row => row.platform === platform && row.status === "published" && String(row.published_at || "").slice(0, 10) === todayUtc).length;
 }
 
-function recordPublished(state, item, platform, postId, sourceUrl) {
+function recordPublished(state, item, platform, postId, sourceUrl, grokMention = false) {
   state.published.push({
     item_id: item.id,
     platform,
     source_url: sourceUrl,
     post_id: postId || "",
     published_at: new Date().toISOString(),
-    status: "published"
+    status: "published",
+    ...(platform === "x" ? { grok_mention: Boolean(grokMention) } : {})
   });
 }
 
@@ -279,6 +348,7 @@ function validateItem(item) {
 async function main() {
   if (!["preview", "verify-x", "live"].includes(MODE)) throw new Error(`SOCIAL_MODE must be preview, verify-x, or live; got ${MODE}`);
   if (!["all", "linkedin", "x"].includes(PLATFORM)) throw new Error(`SOCIAL_PLATFORM must be all, linkedin, or x; got ${PLATFORM}`);
+  if (!["off", "review", "auto"].includes(GROK_MODE)) throw new Error(`SOCIAL_GROK_MODE must be off, review, or auto; got ${GROK_MODE}`);
   if (MODE === "live" && !ENABLED) {
     throw new Error("Live mode is locked. Set repository variable SOCIAL_AUTOPUBLISH_ENABLED=true before publishing.");
   }
@@ -293,6 +363,13 @@ async function main() {
   if (!Array.isArray(queue.items)) throw new Error(`${QUEUE_FILE} must contain items[].`);
   if (!Array.isArray(state.published)) state.published = [];
 
+  // Catch accidental unsolicited direct mentions in legacy generated queue data.
+  for (const item of queue.items) {
+    if (/@grok\b/i.test(String(item?.x_text || "")) && item.grok_approved !== true &&
+        !(GROK_MODE === "auto" && GROK_POLICY_AUTHORIZED)) {
+      throw new Error(`Queue ${item.id}: @grok mention is not approved for automation.`);
+    }
+  }
   const candidates = queue.items
     .filter(item => item?.enabled !== false)
     .filter(isDue)
@@ -306,7 +383,15 @@ async function main() {
   const runRemaining = { linkedin: MAX_LINKEDIN_PER_RUN, x: MAX_X_PER_RUN };
 
   let actions = 0;
+  const grokTarget = pickGrokItem(candidates, state);
+  let grokUsedThisRun = false;
   console.log(`PTD Today social publisher: mode=${MODE} platform=${PLATFORM} candidates=${candidates.length}`);
+  console.log(`GROK mode=${GROK_MODE} target=${grokTarget?.id || "none"}; max_one_per_utc_day=true`);
+  if (MODE === "preview" && grokTarget) {
+    const draft = grokXText(grokTarget, grokTarget.source_url, true);
+    console.log(`GROK PREVIEW (may be a later scheduled post): ${grokTarget.id}`);
+    console.log(draft);
+  }
 
   for (const item of candidates) {
     for (const platform of ["linkedin", "x"]) {
@@ -314,17 +399,20 @@ async function main() {
       if (alreadyPublished(state, item.id, platform)) continue;
       if (dailyRemaining[platform] <= 0 || runRemaining[platform] <= 0) continue;
 
-      const text = platform === "linkedin" ? linkedInText(item, item.source_url) : xText(item, item.source_url);
-      console.log(`\n[${MODE.toUpperCase()}] ${platform.toUpperCase()} :: ${item.id}`);
+      const isGrokTarget = platform === "x" && grokTarget?.id === item.id && !grokUsedThisRun;
+      const text = platform === "linkedin" ? linkedInText(item, item.source_url) : grokXText(item, item.source_url, isGrokTarget);
+      const grokTagged = platform === "x" && /@grok\b/i.test(text);
+      console.log(`\n[${MODE.toUpperCase()}] ${platform.toUpperCase()} :: ${item.id}${grokTagged ? " [GROK MENTION]" : ""}`);
       console.log(text);
 
       if (MODE === "live") {
         const postId = platform === "linkedin" ? await publishLinkedIn(text) : await publishX(text);
-        recordPublished(state, item, platform, postId, item.source_url);
+        recordPublished(state, item, platform, postId, item.source_url, grokTagged);
         saveState(state);
         console.log(`Published ${platform} post id=${postId || "(not returned)"}`);
       }
 
+      if (grokTagged) grokUsedThisRun = true;
       dailyRemaining[platform] -= 1;
       runRemaining[platform] -= 1;
       actions += 1;
