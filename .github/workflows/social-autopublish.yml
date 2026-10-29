@@ -64,6 +64,10 @@ jobs:
           SOCIAL_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.SOCIAL_MODE || 'preview' }}
           SOCIAL_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'all' }}
           SOCIAL_AUTOPUBLISH_ENABLED: ${{ vars.SOCIAL_AUTOPUBLISH_ENABLED || 'false' }}
+          # review = only queue items marked grok_approved; auto requires X-policy
+          # authorization to contact @grok and is limited to 1 mention per UTC day.
+          SOCIAL_GROK_MODE: ${{ vars.SOCIAL_GROK_MODE || 'review' }}
+          SOCIAL_GROK_POLICY_AUTHORIZED: ${{ vars.SOCIAL_GROK_POLICY_AUTHORIZED || 'false' }}
 
           MAX_LINKEDIN_PER_DAY: "1"
           MAX_X_PER_DAY: "5"
