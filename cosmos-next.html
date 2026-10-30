@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v3.6a8-internal-external-jobs" />
+  <meta name="cosmos-build" content="cosmos-next-v3.6a9-camera-opt-in" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -3119,6 +3119,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!token||!me||!auth.hidden||usernameRequired)return;
     const entry=document.getElementById('cosmosUniverseEntry');
     if(!entry)return;
+    // v3.6a.9 privacy fix: selecting a universe must never leave a live camera
+    // running behind the selection screen. This stops all ambient camera tracks.
+    stopAmbientCameraForWhite();
     entry.hidden=false;
     document.getElementById('cosmosChoosePrivate')?.focus();
   }
@@ -3129,6 +3132,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     localStorage.setItem(UNIVERSE_KEY,chosen);
     updateUniverseSwitch(chosen);
     if(chosen==='business'){
+      // v3.6a.9: Business timeline never keeps the ambient Private camera live.
+      // Business photo/video recording still opens only after a direct user action.
+      stopAmbientCameraForWhite();
       // A Business universe is a timeline first, not a static feed.
       businessMetroFocus=businessMetroAtNoon(new Date());
       businessMetroDay=businessMetroAtNoon(new Date());
@@ -3537,7 +3543,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         me=await api('/api/me/username',{method:'POST',body:JSON.stringify({username})});
         usernameRequired=false;closeSheet();accountButton.textContent=me.display_name||'@'+me.username;
         toastMsg('Welcome, @'+me.username+'!');
-        startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();refreshNoticeBadge();
+        // v3.6a.9: no automatic camera access when a user finishes username setup.
+        renderJourney();refreshFriendsSummary();refreshNoticeBadge();
         scheduleUniverseEntry();
         if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
         else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
@@ -3561,7 +3568,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       else if(OPEN_INBOX_FROM_LINK&&!FAMILY_INVITE_CODE)setTimeout(showCosmosNotifications,550);
       else if(ARRIVED_FROM_X)setTimeout(offerXToMetroSave,600);
       accountButton.textContent = me.display_name || (me.username?'@'+me.username:'You');
-      startCamera(false);scanHere(false);renderJourney();refreshFriendsSummary();
+      // v3.6a.9: restore the Metro without asking for camera access.
+      // A user may enable the live camera by tapping the camera-toggle control.
+      renderJourney();refreshFriendsSummary();
       renewSessionIfDue();
       // Update the existing service worker for already-installed iPhone Home Screen apps.
       navigator.serviceWorker?.getRegistration('/cosmos-next.html').then(r=>r?.update()).catch(()=>{});
@@ -3583,7 +3592,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;
     auth.hidden=true;accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');
     if(!me.username){showRequiredUsername();return;}
-    refreshNoticeBadge();startCamera(false);scanHere(false);
+    // v3.6a.9: sign-in shows a camera-off Metro until the person taps camera.
+    refreshNoticeBadge();
     refreshFriendsSummary();renderJourney();
     if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
@@ -3644,10 +3654,10 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   // iOS/WebKit must use facingMode rather than unstable enumerated device IDs.
   const mobileFacingCamera=/(iPhone|iPad|iPod|Android)/i.test(navigator.userAgent) ||
     (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  // On desktop start in true white mode: don't auto-select an OBS/virtual camera.
-  // On iPhone/Android preserve camera-first behavior. Camera can be switched on
-  // explicitly using the existing circle-arrow control on every device.
-  let preferWhiteMetro=!mobileFacingCamera,cameraCycleBusy=false,cameraPreviewReady=false,cameraStarting=false;
+  // v3.6a.9 privacy fix: all devices start camera-OFF, including iPhone.
+  // A person must tap the existing camera-arrow control to opt into the live
+  // preview. Merely loading COSMOS or choosing a universe cannot open a lens.
+  let preferWhiteMetro=true,cameraCycleBusy=false,cameraPreviewReady=false,cameraStarting=false;
   function updateMetroCameraState(){
     const live=Boolean(!preferWhiteMetro && cameraPreviewReady && cameraStream?.active &&
       cameraStream.getVideoTracks().some(t=>t.readyState==='live') &&
@@ -3770,7 +3780,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     $('cameraRotate').textContent='↻ '+cameraRotation+'°';
   }
   async function startCamera(showError=true,forceRestart=false){
-    if(preferWhiteMetro||photoSuspendedMainCamera){updateMetroCameraState();return false;}
+    // v3.6a.9: never reopen the ambient camera while choosing a universe or
+    // viewing the Business universe. Business photo/video capture is separate.
+    if(preferWhiteMetro||photoSuspendedMainCamera||currentUniverse==='business'||!document.getElementById('cosmosUniverseEntry').hidden){
+      updateMetroCameraState();return false;
+    }
     if(!navigator.mediaDevices?.getUserMedia){
       if(showError)toastMsg('This browser cannot open the camera.',3600);
       stopAmbientCameraForWhite();return false;
@@ -3858,7 +3872,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   // iOS suspends camera playback after switching apps or waking the phone.
   // Recover only an already-selected camera; NEVER restart White mode.
   function recoverCameraAfterResume(){
-    if(document.hidden||preferWhiteMetro||photoSuspendedMainCamera||!token||!auth.hidden)return;
+    if(document.hidden||preferWhiteMetro||photoSuspendedMainCamera||currentUniverse==='business'||
+       !document.getElementById('cosmosUniverseEntry').hidden||!token||!auth.hidden)return;
     setTimeout(async()=>{
       if(document.hidden||preferWhiteMetro||photoSuspendedMainCamera||cameraCycleBusy)return;
       const track=cameraStream?.getVideoTracks()?.[0];
@@ -8304,6 +8319,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     else if(e.key==='ArrowUp'){e.preventDefault();setDimension(dimension==='connections'?'mine':'public');}
     else if(e.key==='ArrowDown'){e.preventDefault();setDimension(dimension==='public'?'mine':'connections');}
   });
+  window.addEventListener('pagehide',stopAmbientCameraForWhite);
   window.addEventListener('pagehide',stopVideoCapture);
   window.addEventListener('pagehide',stopPhotoCapture);
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)periodicNearby();});
