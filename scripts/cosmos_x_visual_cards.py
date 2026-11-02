@@ -226,13 +226,18 @@ def playful_page(item, page:Path,image_url:str):
 
 def main():
     queue=json.loads(QUEUE.read_text(encoding='utf8'))
-    if queue.get('policy',{}).get('mode')!='cosmos_x_v4_curiosity_and_discovery':
-        raise ValueError('Expected v4 content queue; refusing to rewrite a different queue schema')
+    mode=queue.get('policy',{}).get('mode')
+    if mode not in ('cosmos_x_v4_curiosity_and_discovery','cosmos_real_qa_v6_1'):
+        raise ValueError('Unexpected COSMOS queue mode; no images were rewritten')
     items=queue.get('items') or []
-    if len(items)!=3 or [r.get('content_kind') for r in items] not in (
-        ['playful','discovery','playful'],
-        ['playful','playful','playful']
-    ):
+    kinds=[r.get('content_kind') for r in items]
+    if mode=='cosmos_real_qa_v6_1':
+        if not 1<=len(items)<=3 or any(k!='discovery' for k in kinds):
+            raise ValueError('v6.1 requires 1–3 real sourced Q&A discoveries')
+        for item in items:
+            if not item.get('discovery',{}).get('real_question') or not item.get('discovery',{}).get('youtube',{}).get('video_id'):
+                raise ValueError('Q&A missing actual question provenance or verified YouTube video')
+    elif len(items)!=3 or kinds not in (["playful","discovery","playful"],["playful","playful","playful"]):
         raise ValueError('Unexpected v5.4 entertainment-led queue sequence')
     for item in items:
         ident=slug_id(item['id'])
@@ -258,7 +263,7 @@ def main():
     queue['policy']['visuals']='original_locally_rendered_per_post_1200x630_png'
     queue['policy']['social_cards_note']='Preview images use original vector art and source-based text; the publisher must append source_url for OG cards to appear.'
     QUEUE.write_text(json.dumps(queue,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
-    print('COSMOS X v5 cards:',[(r['id'],r['discovery']['visual_theme']) for r in items])
+    print('COSMOS X cards:',[(r['id'],r['discovery']['visual_theme']) for r in items])
 
 if __name__=='__main__':
     try:main()
