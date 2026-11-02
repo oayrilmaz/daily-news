@@ -2,165 +2,86 @@ name: Build COSMOS X Curiosity Queue + Distinct Visuals
 
 on:
   workflow_dispatch:
-  # Multiple fallbacks; daily freshness guard keeps one build per 18 hours.
   schedule:
-    - cron: "47 9 * * *"
-    - cron: "37 10 * * *"
-    - cron: "27 11 * * *"
+    - cron: "47 11 * * *"
     - cron: "7 13 * * *"
-  workflow_run:
-    workflows:
-      - "Home AI + Video (PTD Today)"
-    types:
-      - completed
 
 permissions:
   contents: write
 
 concurrency:
-  group: ptdtoday-cosmos-universal-social-discovery
-  cancel-in-progress: true
+  group: cosmos-global-qa-v6-1
+  cancel-in-progress: false
 
 jobs:
   build:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout latest main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
-      - name: Sync with main
+      - name: Sync main
         run: |
           git fetch origin main
           git checkout main
           git reset --hard origin/main
-
-      - name: Verify discovery script
-        run: node --check scripts/cosmos_universal_social_discovery.mjs
-
-      - name: Check whether daily X queue is already fresh
-        id: queue_freshness
-        shell: bash
+      - name: Validate updated generator
         run: |
-          node - <<'NODE'
-          const fs=require('fs');
-          let build=true, reason='queue missing';
-          try {
-            const q=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
-            const age=(Date.now()-Date.parse(String(q.updated_at||'')))/3600000;
-            const items=Array.isArray(q.items)?q.items:[];
-            // Existing queues from older strategies are refreshed even when young.
-            const v4=q.policy?.mode==='cosmos_x_v4_curiosity_and_discovery' && q.policy?.visuals==='original_locally_rendered_per_post_1200x630_png';
-            const tagsReady=q.policy?.hashtag_policy==='v5_2_two_topic_tags_x_caption' && items.every(item => {
-              const tags=String(item.x_text||'').match(/#[A-Za-z][A-Za-z0-9_]*/g)||[];
-              const topical=tags.filter(tag => tag.toLowerCase()!=='#cosmos');
-              return topical.length>=2 && item.x_text.length<=225;
-            });
-            // Rebuild previously generated hashtag-free queues immediately.
-            const retryReady=q.policy?.discovery_retry_policy==='v5_3_focused_research_topup';
-            const audienceReady=q.policy?.audience_strategy==='v5_4_entertainment_first_2playful_1optional_research';
-            if(v4 && tagsReady && retryReady && audienceReady && items.length===3 && Number.isFinite(age) && age>=0 && age<18){
-              build=false;reason=`fresh v5.3 verified research queue: ${age.toFixed(1)}h`;
-            } else reason=`queue v4=${v4}, tagsReady=${tagsReady}, retryReady=${retryReady}, audienceReady=${audienceReady}, size=${items.length}, age=${age.toFixed(1)}h`;
-          }catch(e){reason=`queue check: ${e.message}`;}
-          console.log(reason);
-          fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_build=${build?'true':'false'}\n`);
-          NODE
-
-      - name: Build two entertaining posts and one optional high-interest discovery
-        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+          node --check scripts/cosmos_real_questions_v6_1.mjs
+          COSMOS_QA_SELF_TEST=1 node scripts/cosmos_real_questions_v6_1.mjs
+          python -m py_compile scripts/cosmos_x_visual_cards.py
+      - name: Build source-verified real questions, answers, Grok insights and YouTube links
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          COSMOS_DISCOVERY_MODEL: ${{ vars.COSMOS_DISCOVERY_MODEL || 'gpt-6-luna' }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
+          COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
+          COSMOS_QA_DAILY_COUNT: ${{ vars.COSMOS_QA_DAILY_COUNT || '3' }}
           SITE_ORIGIN: https://ptdtoday.com
-          SOCIAL_QUEUE_TARGET: '3'
-          COSMOS_STRICT_COMPOSITE: '58'
-          COSMOS_FALLBACK_COMPOSITE: '45'
-          COSMOS_FALLBACK_BUTTERFLY: '45'
-          COSMOS_HISTORY_DAYS: '7'
-        run: node scripts/cosmos_universal_social_discovery.mjs
-
-      - name: Install local visual-card dependency
-        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+        run: node scripts/cosmos_real_questions_v6_1.mjs
+      - name: Install social visual dependency
         run: python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
-
-      - name: Generate original 1200x630 social preview images
-        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+      - name: Generate verified preview cards
         run: python scripts/cosmos_x_visual_cards.py
-
-      - name: Validate v5 queue, destination pages and social images
-        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+      - name: Validate Q&A outputs
         shell: bash
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const queue=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
-          const items=queue.items;
-          if(queue.policy?.mode!=='cosmos_x_v4_curiosity_and_discovery'||queue.policy?.visuals!=='original_locally_rendered_per_post_1200x630_png'||queue.policy?.hashtag_policy!=='v5_2_two_topic_tags_x_caption'||queue.policy?.discovery_retry_policy!=='v5_3_focused_research_topup'||queue.policy?.audience_strategy!=='v5_4_entertainment_first_2playful_1optional_research')throw Error('Unexpected publishing mode, research top-up policy, hashtag policy or visual assets missing');
-          if(!Array.isArray(items)||items.length!==3)throw Error('Need exactly three X posts');
-          if(new Set(items.map(x=>x.id)).size!==items.length)throw Error('Duplicate post IDs');
-          const kinds=items.map(x=>x.content_kind);
-          if(!(['playful,discovery,playful','playful,playful,playful'].includes(kinds.join(','))))
-            throw Error('Expected two playful posts and optional sourced discovery');
-          if(kinds.filter(k=>k==='playful').length<2)throw Error('Not entertainment led');
-          for(const item of items){
-            if(JSON.stringify(item.platforms)!=='["x"]'||!item.enabled)throw Error('Invalid X-only item');
-            if(!item.x_text || /\n[A-E]\.\s/.test(item.x_text))throw Error('Multiple choice leaked into X caption');
-            if(item.x_text.length>225)throw Error(`X copy too long: ${item.x_text.length}`);
-            const tags=item.x_text.match(/#[A-Za-z][A-Za-z0-9_]*/g)||[];
-            const topical=tags.filter(tag=>tag.toLowerCase()!=='#cosmos');
-            if(topical.length<2 || tags.length>3)throw Error(`X caption missing 2 topical hashtags or contains too many tags: ${item.id}`);
-            const url=new URL(item.source_url);
-            if(url.hostname!=='ptdtoday.com'||url.protocol!=='https:')throw Error('URL not on public COSMOS');
-            const cardUrl=new URL(item.discovery?.visual_card_url||'');
-            if(cardUrl.hostname!=='ptdtoday.com'||!cardUrl.pathname.startsWith('/assets/cosmos-x-cards/')||!cardUrl.pathname.endsWith('.png'))throw Error('Missing topical image URL');
-            const cardFile=cardUrl.pathname.replace(/^\//,'');
-            if(!fs.existsSync(cardFile))throw Error('Missing actual image '+cardFile);
-            const sig=fs.readFileSync(cardFile).subarray(0,8).toString('hex');
-            if(sig!=='89504e470d0a1a0a')throw Error('Preview is not a valid PNG '+cardFile);
-            if(item.content_kind==='discovery'){
-              if(!url.pathname.startsWith('/q/'))throw Error('Discovery must link to its actual public question');
-              const pathname=url.pathname.replace(/^\//,'');
-              if(!fs.existsSync(pathname))throw Error(`Missing question page ${pathname}`);
-              const markup=fs.readFileSync(pathname,'utf8');
-              if(!markup.includes(item.discovery.visual_card_url)||!markup.includes('summary_large_image'))throw Error('OG/Twitter card tags missing on '+pathname);
-              if(!Array.isArray(item.discovery?.sources)||item.discovery.sources.length<2)throw Error('Missing corroboration');
-            } else {
-              if(!url.pathname.startsWith('/x/')||item.discovery?.creative!==true)throw Error('Invalid playful landing link');
-              const pathname=url.pathname.replace(/^\//,'');
-              if(!fs.existsSync(pathname))throw Error('Missing playful landing page');
-              const markup=fs.readFileSync(pathname,'utf8');
-              if(!markup.includes(item.discovery.visual_card_url)||!markup.includes('summary_large_image'))throw Error('Playful card tags missing');
-            }
+          const q=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
+          if(q.policy?.mode!=='cosmos_real_qa_v6_1')throw Error('Not the validated v6.1 real-question queue');
+          if(!Array.isArray(q.items)||q.items.length<1||q.items.length>3)throw Error('Invalid Q&A count');
+          for(const item of q.items){
+            if(item.content_kind!=='discovery'||!item.enabled||!item.discovery?.real_question)throw Error('Not a real sourced question');
+            if(item.grok_approved!==false)throw Error('Automated mentions must not be enabled');
+            if(!item.discovery?.grok_perspective || !item.discovery?.full_answer || !item.discovery?.youtube?.video_id)throw Error('Missing Grok/answer/video');
+            const src=new URL(item.source_url);
+            if(src.hostname!=='ptdtoday.com'||!/^\/q\/realqa-[a-z0-9-]+\.html$/.test(src.pathname))throw Error('Invalid COSMOS destination');
+            if(!fs.existsSync(src.pathname.slice(1)))throw Error('Q&A page not found');
+            const image=new URL(item.discovery.visual_card_url);
+            if(image.hostname!=='ptdtoday.com'||!fs.existsSync(image.pathname.slice(1)))throw Error('Image not found');
+            const png=fs.readFileSync(image.pathname.slice(1));
+            if(png.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('Invalid image');
           }
-          for(const file of ['data/cosmos-universal-discovery.json','data/cosmos-universal-discovery-history.json',
-            'cosmos-discoveries.html','sitemap-cosmos.xml']){
-            if(!fs.existsSync(file))throw Error(`Missing ${file}`);
-          }
-          console.log('Safe COSMOS X v5.4 entertainment-led queue with 3 distinct PNG cards validated.');
+          console.log(`Validated ${q.items.length} REAL questions + sources + Grok + YouTube + PNG + COSMOS pages`)
           NODE
-
-      - name: Commit questions and queue
-        if: ${{ steps.queue_freshness.outputs.should_build == 'true' }}
+      - name: Commit public Q&A assets and queue
         run: |
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          git add data/social-queue.json \
-            data/cosmos-universal-discovery.json \
-            data/cosmos-universal-discovery-history.json \
-            cosmos-discoveries.html sitemap-cosmos.xml q/ x/ assets/cosmos-x-cards/
+          git add data/social-queue.json data/cosmos-real-qa-latest.json data/cosmos-real-qa-history.json q/ sitemap-cosmos.xml assets/cosmos-x-cards/
           if git diff --cached --quiet; then
-            echo 'No changed discovery files.'
+            echo 'No new verified Q&A content. Existing queue remains unchanged.'
             exit 0
           fi
-          git commit -m 'Build COSMOS X curiosity queue with unique preview art'
+          git commit -m 'Build source-verified COSMOS Q&A with Grok and YouTube'
+          git pull --rebase origin main
           git push origin main
