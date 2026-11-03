@@ -1,20 +1,20 @@
-name: COSMOS Global Questions Review — Evidence-first v7.1 + Editorial QA
+name: COSMOS v7.2 — Source-First Editorial Review (No Public Pages)
 
 on:
   workflow_dispatch:
   schedule:
-    # Daily editorial PREVIEW only. Never posts to X.
+    # 10:09 UTC daily. Generate private drafts only; never publish to the site or X.
     - cron: '9 10 * * *'
 
 permissions:
-  contents: write
+  contents: write # Only safe metadata & removal of previously public draft pages
 
 concurrency:
   group: cosmos-v6-3-global-trends-review
   cancel-in-progress: false
 
 jobs:
-  build:
+  generate-private-editorial-review:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -24,19 +24,27 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Set up Node
+      - name: Set up Node 24
         uses: actions/setup-node@v4
         with:
           node-version: '24'
 
-      - name: Check source and run offline regressions
+      - name: Check files and run offline regressions (no API calls)
+        shell: bash
         run: |
+          set -euo pipefail
           node --check scripts/cosmos_global_trends_v6_3.mjs
-          node --check scripts/cosmos_global_quality_gate_v7_1.mjs
+          node --check scripts/cosmos_global_quality_gate_v7_2.mjs
           COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
+          COSMOS_GATE_TEST=1 node scripts/cosmos_global_quality_gate_v7_2.mjs
           python -m py_compile scripts/cosmos_global_cards_v6_3.py
+          if [ -f data/social-queue.json ]; then
+            sha256sum data/social-queue.json | awk '{print $1}' > "$RUNNER_TEMP/cosmos-social-before.sha"
+          else
+            echo absent > "$RUNNER_TEMP/cosmos-social-before.sha"
+          fi
 
-      - name: Discover trends and generate evidence-first question drafts
+      - name: Discover trends and produce REVIEW-ONLY evidence-first drafts
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -53,56 +61,42 @@ jobs:
           SITE_ORIGIN: https://ptdtoday.com
         run: node scripts/cosmos_global_trends_v6_3.mjs
 
-      - name: Make original COSMOS visual cards
+      - name: Generate original cards (review-only artifact pending gate)
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
           python scripts/cosmos_global_cards_v6_3.py
 
-      - name: Final editorial risk gate — FAIL CLOSED
-        run: node scripts/cosmos_global_quality_gate_v7_1.mjs
+      - name: Final editorial gate and review-only preview — FAIL CLOSED
+        run: node scripts/cosmos_global_quality_gate_v7_2.mjs
 
-      - name: Validate source provenance, quality gate, preview files and X isolation
+      - name: Validate zero public Q&A, source provenance and social isolation
+        shell: bash
         run: |
+          set -euo pipefail
+          COSMOS_GATE_VALIDATE=1 node scripts/cosmos_global_quality_gate_v7_2.mjs
           node - <<'NODE'
           const fs=require('fs');
-          const trends=JSON.parse(fs.readFileSync('data/cosmos-global-trend-signals.json','utf8'));
-          if(!Array.isArray(trends.topics)||!trends.topics.length)throw Error('No live trends signal');
-          const diag=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
-          const review=JSON.parse(fs.readFileSync('data/cosmos-global-questions-review.json','utf8'));
-          const audit=JSON.parse(fs.readFileSync('data/cosmos-global-questions-quality-audit.json','utf8'));
-          const latest=JSON.parse(fs.readFileSync('data/cosmos-global-questions-latest.json','utf8'));
-          if(diag.version!=='7.0.0'||review.version!=='6.3.1'||review.generator_version!=='7.0.0')throw Error('Wrong generator or review schema');
-          if(review.quality_gate_version!=='7.1.0'||audit.version!=='7.1.0')throw Error('Editorial gate did not run');
-          if(!Array.isArray(review.items)||review.items.length!==review.actual||review.actual>review.target)throw Error('Invalid review count');
-          if(diag.serpapi_requests>diag.serpapi_budget||diag.serpapi_requests>7)throw Error('SerpApi budget exceeded');
-          if(latest.publication_status!=='blocked_pending_human_editorial_approval'||latest.items.length!==0)throw Error('Unapproved questions leaked into latest feed');
-          const seen=new Set();
-          for(const a of review.items){
-            if(a.review_required!==true||a.automated_x_eligible!==false||a.editorial_gate?.approved!==false)throw Error('Review/approval flags missing');
-            if(!['review','hold','exclude'].includes(a.editorial_gate?.status))throw Error('Missing explicit editorial gate status');
-            if(!['editorial_evidence_first','google_paa'].includes(a.question_source_type))throw Error('Provenance missing');
-            if(a.question_source_type==='google_paa'&&!a.question_source.includes('People also ask'))throw Error('False PAA provenance');
-            if(a.question_source_type==='editorial_evidence_first'&&!a.question_source.includes('editorial'))throw Error('False editorial provenance');
-            if(seen.has(a.question))throw Error('Duplicate question'); seen.add(a.question);
-            if(!a.answer?.short_answer||!a.answer?.explanation||!Array.isArray(a.sources)||a.sources.length<2)throw Error('Incomplete answer/evidence');
-            const domain=s=>new URL(s.url).hostname.replace(/^(www|m|amp)\./,'');
-            if(new Set(a.sources.map(domain)).size<2)throw Error('Fewer than two source domains');
-            const refs=[...a.answer.explanation.matchAll(/\[(\d+)\]/g)].map(m=>+m[1]);
-            if(new Set(refs).size<2||refs.some(i=>i<1||i>a.sources.length))throw Error('Missing two valid citations');
-            const page=new URL(a.canonical_url).pathname.slice(1),png=new URL(a.image_url).pathname.slice(1);
-            if(a.editorial_gate.status==='review'){
-              if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Review candidate page missing/noindex removed');
-              if(!fs.existsSync(png))throw Error('Review candidate card missing');
-            } else if(fs.existsSync(page)||fs.existsSync(png))throw Error('Held/excluded draft still has published preview artifacts');
-            if(a.youtube && !/^[\w-]{11}$/.test(a.youtube.video_id))throw Error('Invalid optional YouTube video ID');
+          const d=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
+          const r=JSON.parse(fs.readFileSync('data/cosmos-global-questions-review.json','utf8'));
+          if(d.version!=='7.2.0'||r.generator_version!=='7.2.0'||r.quality_gate_version!=='7.2.0')throw Error('Code version mismatch');
+          if(d.serpapi_requests>d.serpapi_budget || d.serpapi_requests>7)throw Error('SerpApi budget exceeded');
+          for(const x of r.items){
+            if(!['editorial_evidence_first','google_paa'].includes(x.question_source_type))throw Error('Question source not labeled');
+            if(!Array.isArray(x.sources)||new Set(x.sources.map(s=>new URL(s.url).hostname)).size<2)throw Error('Missing independent linked domains');
+            const n=[...String(x.answer?.explanation||'').matchAll(/\[(\d+)\]/g)].map(y=>+y[1]);
+            if(new Set(n).size<2||n.some(i=>i<1||i>x.sources.length))throw Error('Bad citation markers');
           }
-          if(!fs.readFileSync('q/trends/index.html','utf8').includes('noindex,nofollow'))throw Error('Review index not noindexed');
-          if(audit.summary.total!==review.actual)throw Error('Quality audit count mismatch');
-          if(audit.summary.review+audit.summary.hold+audit.summary.exclude!==review.actual)throw Error('Quality category mismatch');
-          console.log(`${review.actual}/${review.target} drafts; ${audit.summary.review} require manual review, ${audit.summary.hold} held, ${audit.summary.exclude} excluded. Latest live feed EMPTY. 0 approved, 0 X posts.`);
+          console.log('COSMOS: provenance, budget and publication isolation verified.');
           NODE
+          if [ "$(cat "$RUNNER_TEMP/cosmos-social-before.sha")" = absent ]; then
+            test ! -f data/social-queue.json
+          else
+            test "$(sha256sum data/social-queue.json | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/cosmos-social-before.sha")"
+          fi
 
-      - name: Upload editorial review evidence as a GitHub Actions artifact
+      - name: Upload complete editorial artifact (not published to website)
         uses: actions/upload-artifact@v4
         with:
           name: cosmos-editorial-review-${{ github.run_number }}
@@ -110,23 +104,57 @@ jobs:
           retention-days: 14
           path: |
             data/cosmos-global-questions-review.json
+            data/cosmos-global-questions-diagnostics.json
             data/cosmos-global-questions-quality-audit.json
             data/cosmos-global-questions-quality-summary.md
-            data/cosmos-global-questions-diagnostics.json
-            q/trends/index.html
+            artifacts/cosmos-editorial-review/
 
-      - name: Commit non-approved editorial review files only (NEVER social queue)
+      - name: Publish ONLY safe status/history metadata and remove legacy draft previews
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-diagnostics.json data/cosmos-global-questions-quality-audit.json data/cosmos-global-questions-quality-summary.md data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
-            if [ -e "$f" ]; then git add -A -- "$f"; fi
-          done
+
+          # Old workflow versions committed draft JSON and noindexed pages to main.
+          # After the artifact has been uploaded, remove tracked copies. noindex is
+          # NOT privacy and these files must never be pushed by this workflow.
+          rm -f data/cosmos-global-questions-review.json \
+                data/cosmos-global-questions-diagnostics.json \
+                data/cosmos-global-questions-quality-audit.json \
+                data/cosmos-global-questions-quality-summary.md
+          git rm -f --ignore-unmatch -- \
+            data/cosmos-global-questions-review.json \
+            data/cosmos-global-questions-diagnostics.json \
+            data/cosmos-global-questions-quality-audit.json \
+            data/cosmos-global-questions-quality-summary.md
+
+          git add -A -- \
+            data/cosmos-global-trend-signals.json \
+            data/cosmos-global-questions-history.json \
+            data/cosmos-global-questions-latest.json \
+            data/cosmos-global-questions-run-status.json
+          if [ -d q/trends ]; then git add -u -- q/trends; fi
+          if [ -d assets/cosmos-global-cards ]; then git add -u -- assets/cosmos-global-cards; fi
+
+          # Explicit allowlist. q/trends and visual-card paths may ONLY be deleted.
+          while IFS=$'\t' read -r status filename; do
+            [ -z "$filename" ] && continue
+            case "$filename" in
+              data/cosmos-global-trend-signals.json|data/cosmos-global-questions-history.json|data/cosmos-global-questions-latest.json|data/cosmos-global-questions-run-status.json) ;;
+              data/cosmos-global-questions-review.json|data/cosmos-global-questions-diagnostics.json|data/cosmos-global-questions-quality-audit.json|data/cosmos-global-questions-quality-summary.md)
+                [ "$status" = D ] || { echo "FAIL: Private review file added to commit"; exit 1; } ;;
+              q/trends/*|assets/cosmos-global-cards/*)
+                [ "$status" = D ] || { echo "FAIL: Attempted to publish an unapproved site asset"; exit 1; } ;;
+              *) echo "FAIL: Unexpected staged path $filename"; exit 1 ;;
+            esac
+          done < <(git diff --cached --name-status)
+
           if git diff --cached --quiet; then
-            echo 'No editorial changes.'
+            echo 'No safe metadata changes to commit.'
             exit 0
           fi
-          git commit -m 'Build COSMOS v7 editorial quality review (no auto publication)'
-          git pull --rebase origin main
-          git push origin main
+          git commit -m 'COSMOS v7.2: retain safe review status, remove public unapproved previews'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
