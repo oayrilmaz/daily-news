@@ -1,0 +1,119 @@
+name: COSMOS v9 — Central Timeline + One Account
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "check_only validates files; apply updates site. Neither posts to X nor writes private data."
+        required: true
+        default: apply
+        type: choice
+        options:
+          - check_only
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  central-timeline:
+    name: Connect homepage, account, timeline, Public, Business and Ask
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout current main (not an old downloaded copy)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate patch against current repository — NO CHANGES
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_central_timeline_v9.py --check
+          node --check scripts/cosmos_public_distribution_v8_1.mjs
+
+      - name: Apply fail-closed, additive central-timeline patch
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_central_timeline_v9.py
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in ('cosmos-next.html','index.html','cosmos-entry-v0.1.html'):
+              s=Path(path).read_text(encoding='utf-8')
+              assert '<script>' in s and '</script>' in s,path
+              # End-of-page inline scripts are the app logic. Verify JS syntax below.
+              Path('/tmp/'+path+'.js').write_text(s.rsplit('<script>',1)[-1].split('</script>',1)[0],encoding='utf-8')
+          assert 'COSMOS_PUBLIC_FEED' in Path('cosmos-next.html').read_text()
+          assert 'maybeOpenCosmosAskDeepLink' in Path('cosmos-next.html').read_text()
+          assert 'cosmos-next.html?join=1' in Path('index.html').read_text()
+          PY
+          node --check /tmp/cosmos-next.html.js
+          node --check /tmp/index.html.js
+          node --check /tmp/cosmos-entry-v0.1.html.js
+          node --check scripts/cosmos_public_distribution_v8_1.mjs
+          git diff --check
+
+      - name: Refresh public timeline from PUBLISHED registry only
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          COSMOS_SITE_MODE: live
+        run: |
+          set -euo pipefail
+          # This generator reads the existing APPROVED feed; it does not discover new stories.
+          # Never run any OpenAI, SerpApi, Grok, YouTube, X, or private COSMOS API actions here.
+          mkdir -p artifacts/cosmos-autonomous-publish
+          touch artifacts/cosmos-autonomous-publish/commit-paths.txt
+          node scripts/cosmos_public_distribution_v8_1.mjs
+          node - <<'JS'
+          const fs=require('node:fs');
+          const x=JSON.parse(fs.readFileSync('data/cosmos-public-timeline.json','utf8'));
+          if(x.public_only!==true||!Array.isArray(x.items))throw Error('Public-only feed check failed');
+          for(const item of x.items){if(item.visibility!=='public'||item.type!=='cosmos_editorial_question')throw Error('Non-public data blocked');}
+          const html=fs.readFileSync('cosmos-public-moments.html','utf8');
+          if(!html.includes('Join COSMOS')||!html.includes('cosmos-next.html'))throw Error('Single-app navigation missing');
+          console.log('PUBLIC TIMELINE:',x.items.length,'approved moments, no private writes');
+          JS
+
+      - name: Commit only explicit public UI files and safe public metadata
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            cosmos-next.html \
+            index.html \
+            cosmos-entry-v0.1.html \
+            scripts/cosmos_public_distribution_v8_1.mjs \
+            cosmos-public-moments.html \
+            data/cosmos-public-timeline.json \
+            q/trends/index.html
+          STAGED="$(git diff --cached --name-only)"
+          printf '%s\n' "$STAGED"
+          if printf '%s\n' "$STAGED" | grep -E '(^artifacts/|cosmos-global-questions-review|social-queue|cosmos-life|\.env|secrets)' ; then
+            echo 'Unsafe staged path blocked'; exit 1
+          fi
+          if [ -z "$STAGED" ]; then
+            echo 'Already unified; no commit necessary'; exit 0
+          fi
+          git commit -m 'COSMOS v9: central account, unified timeline and approved Public moments'
+          git push origin HEAD:main
+          echo 'COSMOS v9 changes pushed to main; verify GitHub Pages deployment separately.'
+
+      - name: Report
+        if: always()
+        run: |
+          echo 'One account — one central timeline. Public is source-linked and read-only.'
+          echo 'Private/My/Connections and Business stay within existing Cloudflare permissions.'
+          echo 'No automatic X posting. No Cloudflare migration. No legacy history deleted.'
