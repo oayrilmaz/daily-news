@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""COSMOS Global Questions v6.3.2 — compatibility fix for v6.3.1 review format.
+"""COSMOS Global Questions v7.0 — source-first, PAA/editorial provenance and optional media.
 Produces unique 1200x630 editorial draft PNG cards.
 Does not publish and never mutates the automated social queue.
 Requires Pillow. Run after cosmos_global_trends_v6_3.mjs.
@@ -67,8 +67,12 @@ def draw_card(row,index):
     for line in lines:
         d.text((64,y),line,font=f,fill=(255,255,255));y+=size+13
     region=', '.join(row.get('trend_regions',[])[:4])
-    d.text((65,530),f'REAL QUESTION WORDING  ·  {region}',font=font(19,False),fill=(235,244,249))
-    d.text((65,565),'Answer + Grok perspective + YouTube on COSMOS',font=font(20,True),fill=hexc(accent))
+    origin = 'GOOGLE PEOPLE ALSO ASK' if row.get('question_source_type') == 'google_paa' else 'COSMOS EDITORIAL / SOURCE-BASED'
+    d.text((65,530),f'{origin}  ·  {region}',font=font(19,False),fill=(235,244,249))
+    extras=['EVIDENCE + ANSWER']
+    if row.get('grok_perspective'): extras.append('GROK')
+    if row.get('youtube'): extras.append('VIDEO')
+    d.text((65,565),'  +  '.join(extras)+'  ON COSMOS',font=font(20,True),fill=hexc(accent))
     return im
 
 def main():
