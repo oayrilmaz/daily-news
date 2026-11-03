@@ -1,9 +1,9 @@
-name: COSMOS v6.3.1 Global Questions — Trends First (Editorial Review)
+name: COSMOS Global Questions Review — Source-first v7.0
 
 on:
   workflow_dispatch:
   schedule:
-    # 10:09 UTC daily. Creates review material; NEVER publishes on X.
+    # Daily 10:09 UTC, editorial previews ONLY. Never automatically publishes to X.
     - cron: '9 10 * * *'
 
 permissions:
@@ -27,12 +27,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Check new source and run offline self-tests
+      - name: Check source and run offline regressions
         run: |
           node --check scripts/cosmos_global_trends_v6_3.mjs
           COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
           python -m py_compile scripts/cosmos_global_cards_v6_3.py
-      - name: Discover world trends and generate exact sourced question drafts
+      - name: Discover trends and generate evidence-first question drafts
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -43,44 +43,47 @@ jobs:
           COSMOS_TRENDS_REGIONS: ${{ vars.COSMOS_TRENDS_REGIONS || 'US,GB,CA,AU,IN,DE,FR,BR,JP,ZA,SG,PH' }}
           COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
           COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
+          COSMOS_TOPIC_SCAN_LIMIT: '24'
+          COSMOS_CANDIDATE_LIMIT: '18'
+          COSMOS_SOURCE_FETCH_LIMIT: '3'
           SITE_ORIGIN: https://ptdtoday.com
         run: node scripts/cosmos_global_trends_v6_3.mjs
-      - name: Create original visual cards
-        env:
-          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+      - name: Make original COSMOS visual cards
         run: |
-          if [ -z "$SERPAPI_API_KEY" ]; then
-            echo 'No SerpApi key; trend signals only. Skipping question cards.'
-          else
-            python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
-            python scripts/cosmos_global_cards_v6_3.py
-          fi
-      - name: Validate privacy, provenance, and X isolation
+          python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
+          python scripts/cosmos_global_cards_v6_3.py
+      - name: Validate evidence, provenance, preview files, and X isolation
         run: |
           node - <<'NODE'
           const fs=require('fs');
-          const t=JSON.parse(fs.readFileSync('data/cosmos-global-trend-signals.json'));
-          if(!Array.isArray(t.topics) || !t.topics.length)throw Error('No live trend topic signals');
-          const diagnostics=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
-          console.log('Selection diagnostics:',JSON.stringify(diagnostics.stages));
-          const file='data/cosmos-global-questions-review.json';
-          if(fs.existsSync(file)){
-            const q=JSON.parse(fs.readFileSync(file,'utf8'));
-            if(q.version!=='6.3.1')throw Error('Wrong review version');
-            for(const a of q.items||[]){
-              if(a.automated_x_eligible!==false || a.review_required!==true)throw Error('Missing safety review flag');
-              if(!a.question_source.includes('People also ask') || !a.answer?.explanation || !a.youtube?.video_id || !a.grok_perspective)throw Error('Incomplete Q&A');
-              const page=new URL(a.canonical_url).pathname.slice(1);
-              if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Missing noindex review page');
-              const png=new URL(a.image_url).pathname.slice(1);
-              if(!fs.existsSync(png))throw Error('Missing preview card');
-            }
-            console.log(`${q.items.length}/${q.target} authentic trend-related PAA question drafts validated; editorial review still required`);
+          const trends=JSON.parse(fs.readFileSync('data/cosmos-global-trend-signals.json','utf8'));
+          if(!Array.isArray(trends.topics)||!trends.topics.length)throw Error('No live trends signal');
+          const diag=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
+          const review=JSON.parse(fs.readFileSync('data/cosmos-global-questions-review.json','utf8'));
+          if(diag.version!=='7.0.0')throw Error('Wrong generator');
+          if(review.version!=='6.3.1'||review.generator_version!=='7.0.0')throw Error('Review/card schema mismatch');
+          if(!Array.isArray(review.items)||review.items.length!==review.actual||review.actual>review.target)throw Error('Invalid review count');
+          if(diag.serpapi_requests>diag.serpapi_budget||diag.serpapi_requests>7)throw Error('SerpApi budget exceeded');
+          const seen=new Set();
+          for(const a of review.items){
+            if(a.review_required!==true||a.automated_x_eligible!==false)throw Error('Editorial review safety flags missing');
+            if(!['editorial_evidence_first','google_paa'].includes(a.question_source_type))throw Error('Provenance missing');
+            if(a.question_source_type==='google_paa'&&!a.question_source.includes('People also ask'))throw Error('PAA provenance false');
+            if(a.question_source_type==='editorial_evidence_first'&&!a.question_source.includes('editorial'))throw Error('Editorial provenance false');
+            if(seen.has(a.question))throw Error('Duplicate question');seen.add(a.question);
+            if(!a.answer?.short_answer||!a.answer?.explanation||!Array.isArray(a.sources)||a.sources.length<2)throw Error('Incomplete answer/evidence');
+            const domain=s=>new URL(s.url).hostname.replace(/^(www|m|amp)\./,'');
+            if(new Set(a.sources.map(domain)).size<2)throw Error('Not two independent domains');
+            const citationIds=[...a.answer.explanation.matchAll(/\[(\d+)\]/g)].map(m=>+m[1]);
+            if(new Set(citationIds).size<2||citationIds.some(i=>i<1||i>a.sources.length))throw Error('Missing valid cross-source citations');
+            const page=new URL(a.canonical_url).pathname.slice(1),png=new URL(a.image_url).pathname.slice(1);
+            if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Review page missing/noindex removed');
+            if(!fs.existsSync(png))throw Error('Original image missing');
+            if(a.youtube && !/^[\w-]{11}$/.test(a.youtube.video_id))throw Error('Invalid optional YouTube video');
           }
-          // No code in this workflow runs the existing social publisher.
-          console.log('Existing social-queue.json left under v6.2 ownership; no X posting step.');
+          console.log(`${review.actual}/${review.target} evidence-first review drafts. PAA ${diag.stats.authentic_paa_accepted}; editorial ${diag.stats.source_first_accepted}. SerpApi ${diag.serpapi_requests}/7. No X posting.`);
           NODE
-      - name: Commit review files only, never social publishing files
+      - name: Commit editorial files only (never the social queue)
         shell: bash
         run: |
           git config user.name github-actions
@@ -89,9 +92,9 @@ jobs:
             if [ -e "$f" ]; then git add -A -- "$f"; fi
           done
           if git diff --cached --quiet; then
-            echo 'No new global trend material.'
+            echo 'No editorial changes.'
             exit 0
           fi
-          git commit -m 'Build trend-first COSMOS questions for editorial review'
+          git commit -m 'Build COSMOS v7 evidence-first editorial review'
           git pull --rebase origin main
           git push origin main
