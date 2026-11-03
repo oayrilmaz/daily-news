@@ -4,13 +4,12 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "47 11 * * *"
-    - cron: "7 13 * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: cosmos-global-qa-v6-1
+  group: cosmos-global-qa-v6-2
   cancel-in-progress: false
 
 jobs:
@@ -34,8 +33,8 @@ jobs:
           git reset --hard origin/main
       - name: Validate updated generator
         run: |
-          node --check scripts/cosmos_real_questions_v6_1.mjs
-          COSMOS_QA_SELF_TEST=1 node scripts/cosmos_real_questions_v6_1.mjs
+          node --check scripts/cosmos_real_questions_v6_2.mjs
+          COSMOS_QA_SELF_TEST=1 node scripts/cosmos_real_questions_v6_2.mjs
           python -m py_compile scripts/cosmos_x_visual_cards.py
       - name: Build source-verified real questions, answers, Grok insights and YouTube links
         env:
@@ -44,9 +43,9 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
           COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
-          COSMOS_QA_DAILY_COUNT: ${{ vars.COSMOS_QA_DAILY_COUNT || '3' }}
+          COSMOS_QA_DAILY_COUNT: ${{ vars.COSMOS_QA_DAILY_COUNT || '7' }}
           SITE_ORIGIN: https://ptdtoday.com
-        run: node scripts/cosmos_real_questions_v6_1.mjs
+        run: node scripts/cosmos_real_questions_v6_2.mjs
       - name: Install social visual dependency
         run: python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
       - name: Generate verified preview cards
@@ -57,8 +56,8 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const q=JSON.parse(fs.readFileSync('data/social-queue.json','utf8'));
-          if(q.policy?.mode!=='cosmos_real_qa_v6_1')throw Error('Not the validated v6.1 real-question queue');
-          if(!Array.isArray(q.items)||q.items.length<1||q.items.length>3)throw Error('Invalid Q&A count');
+          if(q.policy?.mode!=='cosmos_real_qa_v6_2')throw Error('Not the validated v6.2 real-question queue');
+          if(!Array.isArray(q.items)||q.items.length<5||q.items.length>10)throw Error('Invalid Q&A count');
           for(const item of q.items){
             if(item.content_kind!=='discovery'||!item.enabled||!item.discovery?.real_question)throw Error('Not a real sourced question');
             if(item.grok_approved!==false)throw Error('Automated mentions must not be enabled');
@@ -77,7 +76,7 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          git add data/social-queue.json data/cosmos-real-qa-latest.json data/cosmos-real-qa-history.json q/ sitemap-cosmos.xml assets/cosmos-x-cards/
+          git add data/social-queue.json data/cosmos-real-qa-latest.json data/cosmos-real-qa-history.json data/cosmos-trending-review.json q/ sitemap-cosmos.xml assets/cosmos-x-cards/
           if git diff --cached --quiet; then
             echo 'No new verified Q&A content. Existing queue remains unchanged.'
             exit 0
