@@ -1,4 +1,4 @@
-name: COSMOS v7.4.2 — Autonomous Website Publishing (Evidence-Checked)
+name: COSMOS v8.0 — Autonomous Verified COSMOS Website Publishing
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
           - dry_run
           - live
   schedule:
-    # Automatic daily only if COSMOS_AUTO_SITE_PUBLISH_ENABLED=true.
+    # Runs daily only when COSMOS_AUTO_SITE_PUBLISH_ENABLED=true.
     # 10:29 UTC = 05:29 EST / 06:29 EDT. Schedule may be delayed by GitHub.
     - cron: '29 10 * * *'
 
@@ -60,7 +60,7 @@ jobs:
           COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
           COSMOS_GATE_TEST=1 node scripts/cosmos_global_quality_gate_v7_2.mjs
           COSMOS_AUTO_SELF_TEST=1 node scripts/cosmos_autonomous_publish_v7_4.mjs
-          python -m py_compile scripts/cosmos_global_cards_v6_3.py
+          python -m py_compile scripts/cosmos_global_cards_v6_3.py scripts/cosmos_publish_card_v8.py
           if [ -f data/social-queue.json ]; then
             sha256sum data/social-queue.json | awk '{print $1}' > "$RUNNER_TEMP/social-before.sha"
           else
@@ -92,6 +92,9 @@ jobs:
           python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
           python scripts/cosmos_global_cards_v6_3.py
 
+      - name: Test the final exact-headline COSMOS card renderer
+        run: COSMOS_CARD_SELF_TEST=1 python scripts/cosmos_publish_card_v8.py
+
       - name: Run the existing v7.2 fail-closed editorial gate
         run: node scripts/cosmos_global_quality_gate_v7_2.mjs
 
@@ -103,6 +106,9 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: node scripts/cosmos_autonomous_publish_v7_4.mjs
 
+      - name: Create final matched-headline cards (private for dry runs, public only after audit)
+        run: python scripts/cosmos_publish_card_v8.py
+
       - name: Validate autonomous publishing did not change the X queue or private timeline
         shell: bash
         run: |
@@ -110,9 +116,18 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const x=JSON.parse(fs.readFileSync('data/cosmos-auto-publication-status.json'));
-          if(x.version!=='7.4.0'||x.x_posts!==0||x.cosmos_next_writes!==0)throw Error('Social/private timeline isolation failure');
+          if(x.version!=='7.4.0'||x.release!=='8.0.0'||x.x_posts!==0||x.cosmos_next_writes!==0)throw Error('Social/private timeline isolation failure');
           if(x.published>Number(process.env.COSMOS_AUTO_MAX_PUBLISH||3))throw Error('Daily cap exceeded');
           if(x.mode==='dry_run'&&x.published!==0)throw Error('Dry run published content');
+          const jobs=JSON.parse(fs.readFileSync('artifacts/cosmos-autonomous-publish/cards-to-render.json'));
+          if(jobs.length!==x.selected)throw Error('Card manifest does not match approved count');
+          for(const j of jobs){
+            if(!fs.existsSync(j.path))throw Error('Missing verified headline card '+j.path);
+            const b=fs.readFileSync(j.path);
+            if(b.length<5000||b.length>5000000||b.subarray(0,8).toString('hex')!=='89504e470d0a1a0a')throw Error('Bad verified headline card');
+            if(x.mode==='dry_run'&&!j.path.startsWith('artifacts/cosmos-autonomous-publish/cards/'))throw Error('Dry run used public output');
+            if(x.mode==='live'&&!j.path.startsWith('assets/cosmos-approved-cards/'))throw Error('Live public path invalid');
+          }
           console.log('COSMOS website-only auto publish validation PASS:',JSON.stringify(x));
           NODE
           if [ "$(cat "$RUNNER_TEMP/social-before.sha")" = absent ]; then
@@ -203,7 +218,11 @@ jobs:
           done < <(git diff --cached --name-status)
 
           if git diff --cached --quiet; then echo 'Nothing to publish this run.'; exit 0; fi
-          git commit -m 'COSMOS v7.4.2: attributed evidence-screened website update'
+          git commit -m 'COSMOS v8: automated two-source verified global questions'
+          # Generated review JSON is deliberately NOT committed. Discard tracked
+          # unstaged review modifications before rebasing so rebase cannot fail
+          # with a dirty working tree. The safe commit already exists in HEAD.
+          git reset --hard HEAD
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
