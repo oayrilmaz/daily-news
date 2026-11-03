@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""COSMOS Global Questions v6.3 — unique 1200x630 editorial draft PNG cards.
+"""COSMOS Global Questions v6.3.2 — compatibility fix for v6.3.1 review format.
+Produces unique 1200x630 editorial draft PNG cards.
 Does not publish and never mutates the automated social queue.
 Requires Pillow. Run after cosmos_global_trends_v6_3.mjs.
 """
@@ -74,7 +75,13 @@ def main():
     if not INPUT.exists():
         print('No COSMOS v6.3 review file yet; no cards generated.');return
     data=json.loads(INPUT.read_text(encoding='utf-8'))
-    if data.get('version')!='6.3':raise ValueError('Expected review file produced by v6.3')
+    # v6.3.1 added source diagnostics but kept the card fields unchanged.
+    # Accept both review schema versions. This keeps the older v6.3 review compatible.
+    version=str(data.get('version',''))
+    if version not in ('6.3','6.3.1'):
+        raise ValueError(f'Expected review file version 6.3 or 6.3.1; received {version!r}')
+    if not isinstance(data.get('items'),list):
+        raise ValueError('Review file must contain an items array')
     OUT.mkdir(parents=True,exist_ok=True)
     count=0
     for i,row in enumerate(data.get('items',[])):
