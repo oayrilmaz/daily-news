@@ -909,6 +909,13 @@
       .discoveryCopy small{font-size:10px}
     }
 
+
+/* COSMOS CENTRAL TIMELINE v9.0 HOME JOIN */
+.cosmosJoinTimeline{margin:18px auto 3px;display:flex;justify-content:center;flex-wrap:wrap;gap:9px;position:relative;z-index:4}
+.cosmosJoinTimeline a{display:inline-block;text-decoration:none;border:1px solid rgba(169,196,222,.45);border-radius:999px;padding:10px 15px;color:#eff8ff;background:rgba(19,46,67,.70);font-size:12px;font-weight:750}
+.cosmosJoinTimeline a:last-child{background:transparent}
+.cosmosJoinTimeline a:focus-visible{outline:3px solid #70cfff;outline-offset:3px}
+
 </style>
   <script>
     (() => {
@@ -979,6 +986,7 @@
       </form>
 
       <div class="hint" id="hint">Type a question or a subject. Cosmos will build the experience around you.</div>
+      <div class="cosmosJoinTimeline" id="cosmosJoinTimeline"><a href="/cosmos-next.html">Enter my timeline</a><a href="/cosmos-next.html?join=1">Create a COSMOS account</a></div>
       <section class="discoveryDock" id="discoveryDock" aria-label="Discover Cosmos" hidden>
         <button class="discoveryDoor moving" id="discoveryMoving" type="button">
           <span class="discoveryDot" aria-hidden="true"></span>
@@ -1487,7 +1495,7 @@
           view: resolved.view,
           question
         });
-        return `/cosmos.html?${params.toString()}`;
+        try{sessionStorage.setItem('ptdtoday_cosmos_ask_handoff_v9',JSON.stringify({question:String(question||'').trim().slice(0,650),created_at:Date.now()}));}catch{}return '/cosmos-next.html?ask=1';
       }
 
       input.addEventListener("focus", () => {

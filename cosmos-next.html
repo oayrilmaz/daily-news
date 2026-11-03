@@ -2991,6 +2991,23 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 .cosmos-jobs-external-link{display:inline-flex;align-items:center;padding:11px 16px;border-radius:12px;background:#30363a;color:white!important;font-weight:700;text-decoration:none;font-size:14px}
 @media(max-width:750px){.cosmos-job-filters{grid-template-columns:1fr}.cosmos-job-filters button{width:100%}}
 
+
+
+/* COSMOS CENTRAL TIMELINE v9.0 — single identity, central Metro, public editorial moments */
+.cosmos-membership-intro{font-size:13px;line-height:1.55;color:#425367;max-width:410px;margin:8px auto 16px;text-align:center}
+.cosmos-public-stack{display:grid;gap:11px;margin:13px 0 20px}
+.cosmos-public-card{display:grid;grid-template-columns:1fr;gap:9px;text-align:left;background:#fff;border:1px solid #dfe8eb;border-radius:17px;padding:14px;color:#27313a;box-shadow:0 3px 12px rgba(20,48,60,.035)}
+.cosmos-public-card .cosmos-public-eyebrow{font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:780;color:#397d94}
+.cosmos-public-card h3{margin:0;font-size:17px;line-height:1.32;color:#172835;overflow-wrap:anywhere}
+.cosmos-public-card p{margin:0;color:#445765;font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+.cosmos-public-card img{max-width:100%;height:auto;max-height:210px;object-fit:contain;border-radius:10px;background:#f7fafb}
+.cosmos-public-card .cosmos-public-links{display:flex;flex-wrap:wrap;gap:9px}
+.cosmos-public-card a{font-size:12px;color:#176382;font-weight:700;border:1px solid #d0e0e7;border-radius:999px;padding:8px 12px;text-decoration:none;display:inline-flex;align-items:center}
+.cosmos-public-card a:focus-visible{outline:3px solid #177699;outline-offset:2px}
+.cosmos-public-stack .metro-zero{margin:0}
+.metro-filters [data-cosmos-business-nav],.metro-filters [data-cosmos-ask-nav]{border:1px solid #bcd0d9;border-radius:100px;background:#fff;color:#2b5566;font-weight:750;padding:9px 12px;cursor:pointer}
+@media(max-width:640px){.cosmos-public-card{padding:12px}.cosmos-public-card h3{font-size:15px}.metro-filters [data-cosmos-business-nav],.metro-filters [data-cosmos-ask-nav]{font-size:12px}}
+
 </style>
 </head>
 <body>
@@ -3068,6 +3085,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <div class="auth-orb"></div>
       <h1>COSMOS</h1>
       <h2>Look deeper.</h2>
+      <p class="cosmos-membership-intro">One account, one timeline. Join COSMOS to save moments, connect with people, explore public intelligence and build your professional universe.</p>
       <div class="email-auth-tabs" role="group" aria-label="Cosmos sign-in options">
         <button type="button" id="authModeLogin" class="selected" aria-pressed="true">Sign in</button>
         <button type="button" id="authModeRegister" aria-pressed="false">Create account</button>
@@ -3076,7 +3094,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
         <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
         <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · can be changed later in Profile</div></div>
-        <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>Private family beta. Younger family members can explore with a parent.</p></div>
+        <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>One COSMOS account. Email verification is required. Your private moments stay private.</p></div>
         <button type="button" id="sendCodesButton">Sign in</button>
         <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
         <div class="auth-note" id="authIntroNote">Use your email and password. No phone number required.</div>
@@ -3109,7 +3127,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   function updateUniverseSwitch(mode){
     currentUniverse=mode==='business'?'business':'private';
     const button=document.getElementById('cosmosUniverseSwitch');
-    if(button){button.textContent=currentUniverse==='business'?'◈ Business':'◈ Private';button.setAttribute('aria-label','Current universe: '+currentUniverse+'. Switch universe');}
+    if(button){button.textContent=currentUniverse==='business'?'← Timeline':'▣ Business';button.setAttribute('aria-label',currentUniverse==='business'?'Return to central timeline':'Open Business timeline');}
   }
   function shouldBypassUniverseEntry(){
     // Existing invitation, notification and single-moment URLs must continue to open directly.
@@ -3145,9 +3163,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }
   }
   function scheduleUniverseEntry(){
-    if(shouldBypassUniverseEntry())return;
-    // Show explicit universe choice on each normal page opening; switching stays available in the header.
-    setTimeout(showUniverseEntry,250);
+    // COSMOS CENTRAL TIMELINE v9.0: login opens the timeline, not a second universe selector.
+    // Existing private-moment, invite and notification deep links remain unchanged.
+    return;
   }
 
   const SESSION_RENEW_KEY = "cosmos_life_last_renew_v21";
@@ -3196,7 +3214,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   const toast = $("toast"), sheetBackdrop = $("sheetBackdrop"), sheet = $("sheet"), panel = $("panel"), accountButton = $("accountButton"), fileInput = $("fileInput"), noticeBell=$("noticeBell"), noticeCount=$("noticeCount");
   $('cosmosChoosePrivate').addEventListener('click',()=>enterUniverse('private'));
   $('cosmosChooseBusiness').addEventListener('click',()=>enterUniverse('business'));
-  $('cosmosUniverseSwitch').addEventListener('click',showUniverseEntry);
+  $('cosmosUniverseSwitch').addEventListener('click',()=>enterUniverse(currentUniverse==='business'?'private':'business'));
 
   function setEmailAuthMode(mode){
     authMode=mode;authStart.hidden=false;authVerify.hidden=true;showAuthError('');
@@ -3545,7 +3563,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         toastMsg('Welcome, @'+me.username+'!');
         // v3.6a.9: no automatic camera access when a user finishes username setup.
         renderJourney();refreshFriendsSummary();refreshNoticeBadge();
-        scheduleUniverseEntry();
+        maybeOpenCosmosAskDeepLink();scheduleUniverseEntry();
         if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
         else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
         else if(ARRIVED_FROM_X)setTimeout(offerXToMetroSave,650);
@@ -3570,7 +3588,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       accountButton.textContent = me.display_name || (me.username?'@'+me.username:'You');
       // v3.6a.9: restore the Metro without asking for camera access.
       // A user may enable the live camera by tapping the camera-toggle control.
-      renderJourney();refreshFriendsSummary();
+      renderJourney();refreshFriendsSummary();maybeOpenCosmosAskDeepLink();
       renewSessionIfDue();
       // Update the existing service worker for already-installed iPhone Home Screen apps.
       navigator.serviceWorker?.getRegistration('/cosmos-next.html').then(r=>r?.update()).catch(()=>{});
@@ -3594,7 +3612,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!me.username){showRequiredUsername();return;}
     // v3.6a.9: sign-in shows a camera-off Metro until the person taps camera.
     refreshNoticeBadge();
-    refreshFriendsSummary();renderJourney();
+    refreshFriendsSummary();renderJourney();maybeOpenCosmosAskDeepLink();
     if(FAMILY_INVITE_CODE)setTimeout(showFamilyInvitation,180);
     else if(pendingNoticeId)setTimeout(openNotificationMomentFromLink,220);
     else if(OPEN_INBOX_FROM_LINK)setTimeout(showCosmosNotifications,550);
@@ -3646,7 +3664,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }catch(e){showAuthError(e.message);}finally{verifyCodesButton.disabled=false;verifyCodesButton.textContent=authMode==='reset'?'Reset password':'Verify email & enter Cosmos';}
   });
   restartAuthButton.addEventListener('click',()=>{authChallengeId='';emailCodeInput.value='';setEmailAuthMode('login');});
-  setEmailAuthMode('login');
+  setEmailAuthMode(qs.get('join')==='1'||qs.get('signup')==='1'?'register':'login');
 
   let preferredCameraFacing='environment',cameraRotation=0,cameraStream=null,cameraSeq=0,selectedCameraDeviceId=null;
   // COSMOS v2.9.4.7 — iPhone preview repair. Camera choices stay on ONE ⟳ control:
@@ -7437,7 +7455,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   }
   function goNow(){
     $('metroPopover')?.remove();
-    dimension="all";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
+    dimension="all";metroViewFilter="all";journeyFocus=null;journeyAt=new Date().toISOString();journeyKey="";
     timeMode="now";journeyStatus="";neighbors=[];metroAround=[];++metroFetchSeq;weekMetroDay=new Date();weekMetroView="day";weekMetroPopId=null;weekMetroCacheKey="";journeyGeneration++;travelQueue=0;journeyBusy=false;
     document.querySelectorAll('button[data-dimension]').forEach(b=>b.classList.toggle('active',b.dataset.dimension==='all'));
     renderJourney();scanHere(false);
@@ -7481,6 +7499,86 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       try{const url=await pending;if(!img.isConnected)return;img.src=url;img.hidden=false;}
       catch{metroMediaPromises.delete(id);}
     });
+  }
+
+
+  // COSMOS CENTRAL TIMELINE v9.0: only PUBLIC editorial records are loaded here.
+  // Private records still come exclusively from the authenticated Cloudflare Worker.
+  const COSMOS_PUBLIC_FEED='/data/cosmos-public-timeline.json';
+  const COSMOS_PUBLIC_DIRECT_ID=/^global-[a-z0-9-]{8,120}$/.test(qs.get('public_moment')||'')?qs.get('public_moment'):'';
+  let cosmosPublicMoments=[],cosmosPublicState='idle',cosmosPublicLast=0,cosmosPublicDeepLinkHandled=false;
+  function cosmosSafePublicPath(raw,pattern){
+    try{const u=new URL(String(raw||''),location.origin);return u.protocol==='https:' && u.origin===location.origin && !u.username && !u.password && !u.search && !u.hash && !/%2f|%5c/i.test(u.pathname) && pattern.test(u.pathname)?u.pathname:'';}
+    catch{return '';}
+  }
+  function cosmosPublicForDay(d){
+    const key=metroKeyLocal(d);
+    return cosmosPublicMoments.filter(x=>metroKeyLocal(x.published_at)===key);
+  }
+  function cosmosRenderPublicDay(d,withHeading=true){
+    const items=cosmosPublicForDay(d);
+    if(!items.length){
+      return metroViewFilter==='public'?`<div class="cosmos-public-stack"><div class="metro-zero">No published public intelligence moments on this date. Explore another day or use My and Connections.</div></div>`:'';
+    }
+    return `${withHeading?'<div class="metro-day-heading"><div class="d-text"><h2>Public intelligence</h2><p>Published, source-linked moments · read-only</p></div></div>':''}<div class="cosmos-public-stack">${items.map(x=>{
+      const link=cosmosSafePublicPath(x.url,/^\/q\/trends\/global-[a-z0-9-]+\.html$/);
+      const img=cosmosSafePublicPath(x.image_url,/^\/assets\/cosmos-approved-cards\/global-[a-z0-9-]+\.png$/);
+      if(!link)return '';
+      return `<article class="cosmos-public-card"><div class="cosmos-public-eyebrow">◎ Public · ${escapeHtml(x.category||'Intelligence')} · ${escapeHtml(new Date(x.published_at).toLocaleDateString(undefined,{month:'short',day:'numeric'}))}</div>
+      <h3>${escapeHtml(x.question)}</h3><p>${escapeHtml(x.short_answer)}</p>
+      ${img?`<img src="${escapeHtml(img)}" loading="lazy" alt="COSMOS card for ${escapeHtml(x.question)}">`:''}
+      <div class="cosmos-public-links"><a href="${escapeHtml(link)}">Read sources & full answer ↗</a><a href="/cosmos-next.html?public_moment=${encodeURIComponent(x.id)}">This moment in COSMOS</a></div></article>`;
+    }).join('')}</div>`;
+  }
+  async function cosmosRefreshPublicTimeline(force=false){
+    if(!token||!me||!auth.hidden||cosmosPublicState==='loading')return;
+    if(!force&&cosmosPublicLast&&Date.now()-cosmosPublicLast<15*60*1000)return;
+    cosmosPublicLast=Date.now();cosmosPublicState='loading';
+    try{
+      // PUBLIC endpoint only. Never send a bearer token or private data to this feed.
+      const response=await fetch(COSMOS_PUBLIC_FEED,{cache:'no-store',credentials:'omit'});
+      if(!response.ok)throw Error('Public feed unavailable');
+      const data=await response.json();if(data?.public_only!==true||!Array.isArray(data.items))throw Error('Invalid public feed');
+      const seen=new Set();cosmosPublicMoments=data.items.filter(x=>{
+        if(!x||x.visibility!=='public'||x.type!=='cosmos_editorial_question'||!/^global-[a-z0-9-]{8,120}$/.test(x.id||'')||seen.has(x.id))return false;
+        if(!cosmosSafePublicPath(x.url,/^\/q\/trends\/global-[a-z0-9-]+\.html$/))return false;
+        if(!Number.isFinite(Date.parse(x.published_at))||typeof x.question!=='string'||typeof x.short_answer!=='string')return false;
+        seen.add(x.id);return true;
+      }).slice(0,100);
+      cosmosPublicState='ready';
+      if(COSMOS_PUBLIC_DIRECT_ID&&!cosmosPublicDeepLinkHandled){
+        const item=cosmosPublicMoments.find(x=>x.id===COSMOS_PUBLIC_DIRECT_ID);
+        if(item){cosmosPublicDeepLinkHandled=true;metroViewFilter='public';weekMetroDay=new Date(item.published_at);weekMetroDay.setHours(12,0,0,0);weekMetroCacheKey='';}
+      }
+    }catch(e){cosmosPublicState='error';console.warn('COSMOS public feed temporarily unavailable:',e.message);}
+    finally{if(token&&me&&auth.hidden)renderWeekMetro();}
+  }
+  // COSMOS CENTRAL TIMELINE v9.0: private same-tab Ask handoff from the homepage.
+  // Questions are NOT put into URLs, server logs, or referrers; nothing is submitted automatically.
+  const COSMOS_ASK_HANDOFF_KEY='ptdtoday_cosmos_ask_handoff_v9';
+  function cosmosReadAskHandoff(){
+    if(qs.get('ask')!=='1')return '';
+    try{
+      const draft=JSON.parse(sessionStorage.getItem(COSMOS_ASK_HANDOFF_KEY)||'null');
+      if(!draft||!Number.isFinite(draft.created_at)||Date.now()-draft.created_at>86400000||draft.created_at>Date.now()+60000)return '';
+      return String(draft.question||'').trim().slice(0,650);
+    }catch{return '';}
+  }
+  const COSMOS_ASK_DEEP_LINK=cosmosReadAskHandoff();
+  let cosmosAskDeepLinkHandled=false;
+  function maybeOpenCosmosAskDeepLink(){
+    if(cosmosAskDeepLinkHandled||COSMOS_ASK_DEEP_LINK.length<4||!token||!me||!auth.hidden||usernameRequired)return;
+    // Private invitations and notifications always take priority.
+    if(FAMILY_INVITE_CODE||pendingNoticeId||pendingSharedMoment||ARRIVED_FROM_X||OPEN_INBOX_FROM_LINK)return;
+    cosmosAskDeepLinkHandled=true;
+    setTimeout(()=>{
+      if(token&&me&&auth.hidden&&sheet.hidden&&!usernameRequired){
+        try{sessionStorage.removeItem(COSMOS_ASK_HANDOFF_KEY);}catch{}
+        const newUrl=new URL(location.href);newUrl.searchParams.delete('ask');
+        history.replaceState(null,'',newUrl.pathname+newUrl.search+newUrl.hash);
+        showUnifiedAskComposer({question:COSMOS_ASK_DEEP_LINK});
+      }else{cosmosAskDeepLinkHandled=false;}
+    },400);
   }
 
   let metroViewFilter='all';
@@ -7602,16 +7700,18 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     app.style.setProperty('--time-world-opacity',(age*.5).toFixed(2));
     app.style.setProperty('--dim-wash',['all','mine'].includes(dimension)?'0':'.19');
     const names={all:'ALL MOMENTS',mine:'MY',connections:'CONNECTIONS',public:'PUBLIC'};
-    journeyLabel.textContent=`${names[dimension]}${timeMode==='now'?'':timeMode==='past'?' · PAST':' · FUTURE'}`;
+    journeyLabel.textContent=`${names[metroViewFilter]||names[dimension]}${timeMode==='now'?'':timeMode==='past'?' · PAST':' · FUTURE'}`;
     $('returnNow').hidden=(dimension==='all'&&timeMode==='now');
     journeyGuide.textContent='';
     const ds=metroDays(),range=ds[0].toLocaleDateString('en-US',{month:'short',day:'numeric'})+
       ' – '+ds[6].toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const countFor=d=>weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(d)&&metroFilterMatches(i));
+    const privateFor=d=>weekMetroItems.filter(i=>metroKeyLocal(i.date)===metroKeyLocal(d)&&metroFilterMatches(i));
+    const countFor=d=>[...privateFor(d),...(metroViewFilter==='all'||metroViewFilter==='public'?cosmosPublicForDay(d):[])];
     const week=metroWeekStationHtml(ds,chosen,countFor,'data-metro-day','Cosmos moments');
-    let main=metroRenderDay(countFor(weekMetroDay));
-    if(dimension==='public')main=`<div class="metro-day-heading"><div class="d-text"><h2>${escapeHtml(weekMetroDay.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}))}</h2><p>Public Cosmos</p></div></div>
-      <div class="metro-zero"><strong>Public Cosmos is preparing.</strong><br>Only moderated, opt-in public stories will appear here once enabled.<br>Future surprises will remain sealed until reveal.</div>`;
+    const privateToday=privateFor(weekMetroDay),publicToday=cosmosPublicForDay(weekMetroDay);
+    let main=metroViewFilter==='public'?cosmosRenderPublicDay(weekMetroDay):
+      (privateToday.length||!publicToday.length?metroRenderDay(privateToday):'')+
+      (metroViewFilter==='all'?cosmosRenderPublicDay(weekMetroDay):'');
     const prevDayScroller=$('metroDayScroll');
     const prevScrollKey=prevDayScroller?.dataset.scrollKey||'';
     const prevScrollTop=prevDayScroller?.scrollTop||0;
@@ -7619,7 +7719,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     journeyStage.innerHTML=`<div class="week-metro" aria-label="Permanent weekly Cosmos Metro"><div class="week-navigation">
       <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button>
       <span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button></div>
-      <div class="week-weekdays">${week}</div><div class="metro-filters" role="group" aria-label="Filter Cosmos moments">${[['all','All'],['mine','My'],['connections','Connections'],['public','Public']].map(([value,label])=>`<button type="button" data-metro-filter="${value}" class="${metroViewFilter===value?'active':''}" aria-pressed="${metroViewFilter===value}">${label}${value==='public'?' · Soon':''}</button>`).join('')}</div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
+      <div class="week-weekdays">${week}</div><div class="metro-filters" role="group" aria-label="Filter Cosmos moments">${[['all','All'],['mine','My'],['connections','Connections'],['public','Public']].map(([value,label])=>`<button type="button" data-metro-filter="${value}" class="${metroViewFilter===value?'active':''}" aria-pressed="${metroViewFilter===value}">${label}</button>`).join('')}<button type="button" data-cosmos-business-nav>Business</button><button type="button" data-cosmos-ask-nav>✧ Ask COSMOS</button></div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
       <div class="metro-main" id="metroMain">${main}</div>
       ${weekMetroLimited?'<div class="metro-week-note">Over 500 real moments this week; some are not yet shown.</div>':''}`;
     journeyStage.querySelectorAll('[data-metro-day]').forEach(btn=>btn.onclick=()=>{
@@ -7627,6 +7727,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     });
     journeyStage.querySelectorAll('[data-week-shift]').forEach(btn=>btn.onclick=()=>shiftWeekMetro(Number(btn.dataset.weekShift)));
     journeyStage.querySelectorAll('[data-metro-filter]').forEach(btn=>btn.onclick=()=>{metroViewFilter=btn.dataset.metroFilter;renderWeekMetro();});
+    journeyStage.querySelector('[data-cosmos-business-nav]')?.addEventListener('click',()=>enterUniverse('business'));
+    journeyStage.querySelector('[data-cosmos-ask-nav]')?.addEventListener('click',()=>showUnifiedAskComposer());
     $('metroPeople')?.addEventListener('click',openFriends);
     $('metroTogether')?.addEventListener('click',openTogetherSpaces);
     $('metroRetry')?.addEventListener('click',()=>{weekMetroCacheKey='';fetchMetroWeek();renderWeekMetro();});
@@ -7646,6 +7748,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       scroller.scrollTop=prevScrollKey===nextScrollKey?prevScrollTop:0;
     }
     if(!weekMetroBusy && !weekMetroError)fetchMetroWeek();
+    if(cosmosPublicState==='idle'||(['ready','error'].includes(cosmosPublicState)&&Date.now()-cosmosPublicLast>60*60*1000))cosmosRefreshPublicTimeline();
   }
   // Never convert horizontal browsing inside a moment branch into a date change.
   let metroTouchStart=null;
@@ -8305,8 +8408,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }else if(Math.abs(dy)>Math.abs(dx)*1.08){
       const region=e.target.closest?.('.journey-stage');
       if(region && region.scrollHeight>region.clientHeight+8)return;
-      if(dy<0)setDimension(dimension==='connections'?'mine':'public');
-      else setDimension(dimension==='public'?'mine':'connections');
+      if(dy<0)metroViewFilter=metroViewFilter==='connections'?'mine':'public';
+      else metroViewFilter=metroViewFilter==='public'?'mine':'connections';
+      renderWeekMetro();
     }
   },{passive:true});
   app.addEventListener('touchcancel',()=>gestureStart=null,{passive:true});
@@ -8316,8 +8420,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(e.target!==app||!sheet.hidden||!auth.hidden)return;
     if(e.key==='ArrowLeft'){e.preventDefault();travel(-1,1);}
     else if(e.key==='ArrowRight'){e.preventDefault();travel(1,1);}
-    else if(e.key==='ArrowUp'){e.preventDefault();setDimension(dimension==='connections'?'mine':'public');}
-    else if(e.key==='ArrowDown'){e.preventDefault();setDimension(dimension==='public'?'mine':'connections');}
+    else if(e.key==='ArrowUp'){e.preventDefault();metroViewFilter=metroViewFilter==='connections'?'mine':'public';renderWeekMetro();}
+    else if(e.key==='ArrowDown'){e.preventDefault();metroViewFilter=metroViewFilter==='public'?'mine':'connections';renderWeekMetro();}
   });
   window.addEventListener('pagehide',stopAmbientCameraForWhite);
   window.addEventListener('pagehide',stopVideoCapture);
