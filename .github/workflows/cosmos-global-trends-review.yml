@@ -1,9 +1,9 @@
-name: COSMOS Global Questions Review — Source-first v7.0
+name: COSMOS Global Questions Review — Evidence-first v7.1 + Editorial QA
 
 on:
   workflow_dispatch:
   schedule:
-    # Daily 10:09 UTC, editorial previews ONLY. Never automatically publishes to X.
+    # Daily editorial PREVIEW only. Never posts to X.
     - cron: '9 10 * * *'
 
 permissions:
@@ -23,15 +23,19 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Check source and run offline regressions
         run: |
           node --check scripts/cosmos_global_trends_v6_3.mjs
+          node --check scripts/cosmos_global_quality_gate_v7_1.mjs
           COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
           python -m py_compile scripts/cosmos_global_cards_v6_3.py
+
       - name: Discover trends and generate evidence-first question drafts
         env:
           SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
@@ -48,11 +52,16 @@ jobs:
           COSMOS_SOURCE_FETCH_LIMIT: '3'
           SITE_ORIGIN: https://ptdtoday.com
         run: node scripts/cosmos_global_trends_v6_3.mjs
+
       - name: Make original COSMOS visual cards
         run: |
           python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
           python scripts/cosmos_global_cards_v6_3.py
-      - name: Validate evidence, provenance, preview files, and X isolation
+
+      - name: Final editorial risk gate — FAIL CLOSED
+        run: node scripts/cosmos_global_quality_gate_v7_1.mjs
+
+      - name: Validate source provenance, quality gate, preview files and X isolation
         run: |
           node - <<'NODE'
           const fs=require('fs');
@@ -60,41 +69,64 @@ jobs:
           if(!Array.isArray(trends.topics)||!trends.topics.length)throw Error('No live trends signal');
           const diag=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
           const review=JSON.parse(fs.readFileSync('data/cosmos-global-questions-review.json','utf8'));
-          if(diag.version!=='7.0.0')throw Error('Wrong generator');
-          if(review.version!=='6.3.1'||review.generator_version!=='7.0.0')throw Error('Review/card schema mismatch');
+          const audit=JSON.parse(fs.readFileSync('data/cosmos-global-questions-quality-audit.json','utf8'));
+          const latest=JSON.parse(fs.readFileSync('data/cosmos-global-questions-latest.json','utf8'));
+          if(diag.version!=='7.0.0'||review.version!=='6.3.1'||review.generator_version!=='7.0.0')throw Error('Wrong generator or review schema');
+          if(review.quality_gate_version!=='7.1.0'||audit.version!=='7.1.0')throw Error('Editorial gate did not run');
           if(!Array.isArray(review.items)||review.items.length!==review.actual||review.actual>review.target)throw Error('Invalid review count');
           if(diag.serpapi_requests>diag.serpapi_budget||diag.serpapi_requests>7)throw Error('SerpApi budget exceeded');
+          if(latest.publication_status!=='blocked_pending_human_editorial_approval'||latest.items.length!==0)throw Error('Unapproved questions leaked into latest feed');
           const seen=new Set();
           for(const a of review.items){
-            if(a.review_required!==true||a.automated_x_eligible!==false)throw Error('Editorial review safety flags missing');
+            if(a.review_required!==true||a.automated_x_eligible!==false||a.editorial_gate?.approved!==false)throw Error('Review/approval flags missing');
+            if(!['review','hold','exclude'].includes(a.editorial_gate?.status))throw Error('Missing explicit editorial gate status');
             if(!['editorial_evidence_first','google_paa'].includes(a.question_source_type))throw Error('Provenance missing');
-            if(a.question_source_type==='google_paa'&&!a.question_source.includes('People also ask'))throw Error('PAA provenance false');
-            if(a.question_source_type==='editorial_evidence_first'&&!a.question_source.includes('editorial'))throw Error('Editorial provenance false');
-            if(seen.has(a.question))throw Error('Duplicate question');seen.add(a.question);
+            if(a.question_source_type==='google_paa'&&!a.question_source.includes('People also ask'))throw Error('False PAA provenance');
+            if(a.question_source_type==='editorial_evidence_first'&&!a.question_source.includes('editorial'))throw Error('False editorial provenance');
+            if(seen.has(a.question))throw Error('Duplicate question'); seen.add(a.question);
             if(!a.answer?.short_answer||!a.answer?.explanation||!Array.isArray(a.sources)||a.sources.length<2)throw Error('Incomplete answer/evidence');
             const domain=s=>new URL(s.url).hostname.replace(/^(www|m|amp)\./,'');
-            if(new Set(a.sources.map(domain)).size<2)throw Error('Not two independent domains');
-            const citationIds=[...a.answer.explanation.matchAll(/\[(\d+)\]/g)].map(m=>+m[1]);
-            if(new Set(citationIds).size<2||citationIds.some(i=>i<1||i>a.sources.length))throw Error('Missing valid cross-source citations');
+            if(new Set(a.sources.map(domain)).size<2)throw Error('Fewer than two source domains');
+            const refs=[...a.answer.explanation.matchAll(/\[(\d+)\]/g)].map(m=>+m[1]);
+            if(new Set(refs).size<2||refs.some(i=>i<1||i>a.sources.length))throw Error('Missing two valid citations');
             const page=new URL(a.canonical_url).pathname.slice(1),png=new URL(a.image_url).pathname.slice(1);
-            if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Review page missing/noindex removed');
-            if(!fs.existsSync(png))throw Error('Original image missing');
-            if(a.youtube && !/^[\w-]{11}$/.test(a.youtube.video_id))throw Error('Invalid optional YouTube video');
+            if(a.editorial_gate.status==='review'){
+              if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Review candidate page missing/noindex removed');
+              if(!fs.existsSync(png))throw Error('Review candidate card missing');
+            } else if(fs.existsSync(page)||fs.existsSync(png))throw Error('Held/excluded draft still has published preview artifacts');
+            if(a.youtube && !/^[\w-]{11}$/.test(a.youtube.video_id))throw Error('Invalid optional YouTube video ID');
           }
-          console.log(`${review.actual}/${review.target} evidence-first review drafts. PAA ${diag.stats.authentic_paa_accepted}; editorial ${diag.stats.source_first_accepted}. SerpApi ${diag.serpapi_requests}/7. No X posting.`);
+          if(!fs.readFileSync('q/trends/index.html','utf8').includes('noindex,nofollow'))throw Error('Review index not noindexed');
+          if(audit.summary.total!==review.actual)throw Error('Quality audit count mismatch');
+          if(audit.summary.review+audit.summary.hold+audit.summary.exclude!==review.actual)throw Error('Quality category mismatch');
+          console.log(`${review.actual}/${review.target} drafts; ${audit.summary.review} require manual review, ${audit.summary.hold} held, ${audit.summary.exclude} excluded. Latest live feed EMPTY. 0 approved, 0 X posts.`);
           NODE
-      - name: Commit editorial files only (never the social queue)
+
+      - name: Upload editorial review evidence as a GitHub Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-editorial-review-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            data/cosmos-global-questions-review.json
+            data/cosmos-global-questions-quality-audit.json
+            data/cosmos-global-questions-quality-summary.md
+            data/cosmos-global-questions-diagnostics.json
+            q/trends/index.html
+
+      - name: Commit non-approved editorial review files only (NEVER social queue)
         shell: bash
         run: |
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-diagnostics.json data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
+          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-diagnostics.json data/cosmos-global-questions-quality-audit.json data/cosmos-global-questions-quality-summary.md data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
             if [ -e "$f" ]; then git add -A -- "$f"; fi
           done
           if git diff --cached --quiet; then
             echo 'No editorial changes.'
             exit 0
           fi
-          git commit -m 'Build COSMOS v7 evidence-first editorial review'
+          git commit -m 'Build COSMOS v7 editorial quality review (no auto publication)'
           git pull --rebase origin main
           git push origin main
