@@ -1,4 +1,4 @@
-name: COSMOS v6.3 Global Questions — Trends First (Editorial Review)
+name: COSMOS v6.3.1 Global Questions — Trends First (Editorial Review)
 
 on:
   workflow_dispatch:
@@ -61,10 +61,12 @@ jobs:
           const fs=require('fs');
           const t=JSON.parse(fs.readFileSync('data/cosmos-global-trend-signals.json'));
           if(!Array.isArray(t.topics) || !t.topics.length)throw Error('No live trend topic signals');
+          const diagnostics=JSON.parse(fs.readFileSync('data/cosmos-global-questions-diagnostics.json','utf8'));
+          console.log('Selection diagnostics:',JSON.stringify(diagnostics.stages));
           const file='data/cosmos-global-questions-review.json';
           if(fs.existsSync(file)){
             const q=JSON.parse(fs.readFileSync(file,'utf8'));
-            if(q.version!=='6.3')throw Error('Wrong review version');
+            if(q.version!=='6.3.1')throw Error('Wrong review version');
             for(const a of q.items||[]){
               if(a.automated_x_eligible!==false || a.review_required!==true)throw Error('Missing safety review flag');
               if(!a.question_source.includes('People also ask') || !a.answer?.explanation || !a.youtube?.video_id || !a.grok_perspective)throw Error('Incomplete Q&A');
@@ -83,7 +85,7 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
+          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-diagnostics.json data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
             if [ -e "$f" ]; then git add -A -- "$f"; fi
           done
           if git diff --cached --quiet; then
