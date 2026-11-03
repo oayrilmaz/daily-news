@@ -1,0 +1,174 @@
+name: COSMOS v7.3 — Approve / Preview / Retract ONE Editorial Question
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'PREVIEW first. Publish and retract make public website changes.'
+        required: true
+        type: choice
+        options:
+          - preview
+          - publish
+          - retract
+      source_run_id:
+        description: 'Original v7.2 review GitHub Actions run ID (e.g. 41652057375); not needed for retract'
+        required: false
+        type: string
+      item_id:
+        description: 'Exact global-... ID copied from the editorial review JSON'
+        required: true
+        type: string
+      source_verified:
+        description: 'For publication only: type I_VERIFIED after checking dates, claims and sources'
+        required: false
+        type: string
+      confirmation:
+        description: 'Type PUBLISH for publish, RETRACT for retract; leave empty for preview'
+        required: false
+        type: string
+      verification_note:
+        description: 'Publication: what two independent sources and current details you verified (30+ characters; 80+ for HOLD)'
+        required: false
+        type: string
+      revised_question:
+        description: 'Optional corrected question (empty = generated original)'
+        required: false
+        type: string
+      revised_short_answer:
+        description: 'Optional corrected short answer (empty = generated original)'
+        required: false
+        type: string
+      revised_explanation:
+        description: 'Optional corrected explanation with source references [1][2] (empty = generated original)'
+        required: false
+        type: string
+      include_grok:
+        description: 'Show optional AI Grok perspective on published page? (default NO)'
+        required: true
+        default: false
+        type: boolean
+      include_video:
+        description: 'Show optionally attached YouTube video? (default NO)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: read
+
+# Same group as the v7.2 review workflow: avoids simultaneous site commits.
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  manual-editorial-publication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require repository owner and valid operation
+        shell: bash
+        env:
+          EDITOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+          ACTION: ${{ inputs.operation }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$REF_NAME" = main || { echo 'FAIL: main branch only'; exit 1; }
+          test "${EDITOR,,}" = "${OWNER,,}" || { echo 'FAIL: only repository owner can operate editorial publishing'; exit 1; }
+          case "$ACTION" in preview|publish|retract) ;; *) echo 'Invalid operation'; exit 1;; esac
+          node --check scripts/cosmos_editorial_publish_v7_3.mjs
+      - name: Validate source run is a successful main-branch v7.2 review workflow
+        if: ${{ inputs.operation != 'retract' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source_run_id }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]{5,20}$ ]] || { echo 'Provide numeric source run ID'; exit 1; }
+          gh api "repos/$REPOSITORY/actions/runs/$SOURCE_RUN" > "$RUNNER_TEMP/cosmos-source-run.json"
+          node - "$RUNNER_TEMP/cosmos-source-run.json" <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.argv[2]));
+          if(x.conclusion!=='success'||x.head_branch!=='main'||!String(x.path||'').endsWith('.github/workflows/cosmos-global-trends-review.yml'))
+            throw Error('Source must be successful main-branch COSMOS editorial review workflow');
+          console.log('Verified source editorial run:',x.id);
+          NODE
+      - name: Retrieve exact review artifact from original run
+        if: ${{ inputs.operation != 'retract' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cosmos-editorial-review-*
+          merge-multiple: true
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/cosmos-editorial-review-input
+      - name: Apply manual editorial operation (no X or private timeline)
+        env:
+          COSMOS_PUBLISH_MODE: ${{ inputs.operation }}
+          COSMOS_SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          COSMOS_ITEM_ID: ${{ inputs.item_id }}
+          COSMOS_REVIEWER: ${{ github.actor }}
+          COSMOS_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          COSMOS_SOURCE_VERIFIED: ${{ inputs.source_verified }}
+          COSMOS_PUBLISH_CONFIRM: ${{ inputs.confirmation }}
+          COSMOS_EVIDENCE_NOTE: ${{ inputs.verification_note }}
+          COSMOS_EDIT_QUESTION: ${{ inputs.revised_question }}
+          COSMOS_EDIT_SHORT: ${{ inputs.revised_short_answer }}
+          COSMOS_EDIT_EXPLANATION: ${{ inputs.revised_explanation }}
+          COSMOS_INCLUDE_VIDEO: ${{ inputs.include_video }}
+          COSMOS_INCLUDE_GROK: ${{ inputs.include_grok }}
+        run: node scripts/cosmos_editorial_publish_v7_3.mjs
+      - name: Upload local preview when PREVIEW selected (no public site change)
+        if: ${{ inputs.operation == 'preview' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-publication-preview-${{ github.run_number }}
+          retention-days: 7
+          path: artifacts/cosmos-publish-preview/
+          if-no-files-found: error
+      - name: Verify and commit ONLY approved website paths
+        if: ${{ inputs.operation != 'preview' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          mapfile -t paths < artifacts/cosmos-publish-preview/commit-paths.txt
+          test "${#paths[@]}" -ge 3 || { echo 'FAIL: missing expected files'; exit 1; }
+          for f in "${paths[@]}"; do
+            case "$f" in
+              data/cosmos-approved-moments.json|data/cosmos-publication-events.json|q/trends/index.html) ;;
+              q/trends/global-*.html|assets/cosmos-approved-cards/global-*.png) ;;
+              *) echo "FAIL: unexpected path $f"; exit 1;;
+            esac
+          done
+          git add -A -- "${paths[@]}"
+          while IFS=$'\t' read -r status f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              data/cosmos-approved-moments.json|data/cosmos-publication-events.json|q/trends/index.html) ;;
+              q/trends/global-*.html|assets/cosmos-approved-cards/global-*.png) ;;
+              *) echo "FAIL: unrelated file staged: $f"; exit 1;;
+            esac
+          done < <(git diff --cached --name-status)
+          git diff --cached --quiet && { echo 'FAIL: no public content changes'; exit 1; }
+          git commit -m "COSMOS v7.3: owner-approved editorial operation ${{ inputs.operation }}"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+          echo 'Human-approved static publication transaction committed. X and private timeline untouched.'
