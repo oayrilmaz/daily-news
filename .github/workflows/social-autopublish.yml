@@ -22,16 +22,21 @@ on:
           - linkedin
           - x
 
-  # Launch cadence: five spaced X opportunities per day, one post per run.
-  # Current Eastern Daylight Time equivalents are about 8:15 AM, 11:15 AM,
-  # 2:15 PM, 5:15 PM, and 8:15 PM. GitHub cron uses UTC, so local times
-  # shift by one hour when daylight-saving time changes.
+  # Launch cadence: ten spaced X opportunities per day, one post per run.
+  # X can publish up to MAX_X_PER_DAY from the validated evergreen queue.
+  # Trending-topic review items are excluded from automatic X posts.
+  # GitHub cron uses UTC; local times shift with daylight saving.
   schedule:
     - cron: "15 12 * * *"
+    - cron: "15 13 * * *"
+    - cron: "15 14 * * *"
     - cron: "15 15 * * *"
+    - cron: "15 16 * * *"
+    - cron: "15 17 * * *"
     - cron: "15 18 * * *"
+    - cron: "15 19 * * *"
+    - cron: "15 20 * * *"
     - cron: "15 21 * * *"
-    - cron: "15 0 * * *"
 
 permissions:
   contents: write
@@ -70,7 +75,7 @@ jobs:
           SOCIAL_GROK_POLICY_AUTHORIZED: ${{ vars.SOCIAL_GROK_POLICY_AUTHORIZED || 'false' }}
 
           MAX_LINKEDIN_PER_DAY: "1"
-          MAX_X_PER_DAY: "5"
+          MAX_X_PER_DAY: ${{ vars.COSMOS_QA_DAILY_COUNT || '7' }}
           MAX_LINKEDIN_PER_RUN: "1"
           MAX_X_PER_RUN: "1"
 
