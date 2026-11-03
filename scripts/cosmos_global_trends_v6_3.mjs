@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import {isIP} from 'node:net';
 
 const ROOT = process.cwd();
-// v7.4 evidence capture extension; 7.2 output schema retained for compatibility.
+// v7.4.1 targeted safe-topic prioritization + resilient evidence fetching; 7.2 output schema retained.
 const GENERATOR_VERSION = '7.2.0';
 const NOW = new Date().toISOString();
 const ORIGIN = (process.env.SITE_ORIGIN || 'https://ptdtoday.com').replace(/\/+$/, '');
@@ -41,7 +41,8 @@ const STOP = new Set(['why','how','what','when','where','who','which','are','the
 // headline context as well as the query, WITHOUT another paid search or API call.
 // These are broad editorial buckets, not claims about the real-world identity
 // of a person whose name is trending. Unknown topics stay "other".
-const SOURCE_FETCH_LIMIT = Math.max(0,Math.min(5,Number(process.env.COSMOS_SOURCE_FETCH_LIMIT ?? 5) || 0));
+const SOURCE_FETCH_LIMIT = Math.max(0,Math.min(8,Number(process.env.COSMOS_SOURCE_FETCH_LIMIT ?? 7) || 0));
+const AUTO_TOPIC_SELECTION = process.env.COSMOS_AUTO_TOPIC_SELECTION === 'true';
 const SOURCE_FETCH_TIMEOUT_MS = 5500;
 const CATEGORIES = ['technology','science','business','world','health','transport','weather','lifestyle','entertainment','sports','other'];
 function categoryFor(topic){
@@ -58,7 +59,7 @@ function categoryFor(topic){
   ['business', /\b(stock|stocks|shares|market|earnings|economy|inflation|rate cuts?|federal reserve|finance|investment|tariff|merger|acquisition|bitcoin|crypto)\b/i],
   ['health', /\b(health|medicine|medical|hospital|vaccine|nutrition|disease|virus|healthcare|clinical|doctor)\b/i],
   ['world', /\b(president|government|parliament|diplomacy|international|minister|policy|supreme court|united nations|legislation)\b/i],
-  ['entertainment', /\b(movie|film|cinema|actor|actress|celebrity|singer|album|concert|netflix|disney|marvel|avengers|grammys|oscars|trailer)\b/i],
+  ['entertainment', /\b(movie|film|cinema|actor|actress|celebrity|singer|album|concert|netflix|disney|marvel|avengers|grammys|oscars|trailer|gaming|gamer|videogame|video game|playstation|xbox|nintendo|bethesda|elder scrolls|game studio|game console)\b/i],
   ['lifestyle', /\b(travel|tourism|food|recipe|fashion|home|education|university|culture|festival|shopping|holiday|school)\b/i]
  ];
  for(const [cat,rx] of patterns)if(rx.test(primary))return cat;
@@ -199,7 +200,11 @@ const mainCategory = c => CATEGORIES.includes(c) ? c : 'other';
 const domainOf = url => {
  try {
   const h=new URL(url).hostname.toLowerCase().replace(/^(www|m|amp)\./,'');
-  return h;
+  const parts=h.split('.');
+  // Publisher-level grouping aligns generation with the later publication gate.
+  // Multiple subdomains of the same publisher do not count as independent.
+  const cc=new Set(['co.uk','org.uk','com.au','com.br','co.jp','co.nz','com.sg','co.za','com.tr']);
+  return parts.length<2?'':parts.slice(-(parts.length>=3 && cc.has(parts.slice(-2).join('.'))?3:2)).join('.');
  } catch {return '';}
 };
 const sourceCount = sources => new Set(sources.map(x=>domainOf(x.url)).filter(Boolean)).size;
@@ -225,7 +230,7 @@ function rssSources(topic){
  }
  all.sort((a,b)=>b.score-a.score);
  const picked=[],seen=new Set();
- for(const x of all){let h=domainOf(x.url);if(h&& !seen.has(h)){picked.push(x);seen.add(h);}if(picked.length>=5)break;}
+ for(const x of all){let h=domainOf(x.url);if(h&& !seen.has(h)){picked.push(x);seen.add(h);}if(picked.length>=7)break;}
  return picked;
 }
 function isStrongTopic(topic){
@@ -235,7 +240,13 @@ function isStrongTopic(topic){
  const significant=editorialTrendScore(topic);
  const vague=/^(\w{1,4}|\d+|vs|icc|ao3|bom)$/i.test(t);
  const narrow=/\b(fanfiction|trailer|rumor|recap|vs|fight card)\b/i.test(t);
- return {category:cat,news,quality:(significant+Math.min(4,sourceCount(news))*175+(news.some(x=>x.snippet.length>80)?40:0)-(vague?250:0)-(narrow?160:0)),vague};
+ // Autopublishing prefers independently linked, low-risk news. Human-review
+ // generation remains unchanged (COSMOS_AUTO_TOPIC_SELECTION is opt-in).
+ // This score NEVER removes evidence checks or allows high-risk publication.
+ const newsText=compact([t,...news.map(x=>x.title)].join(' '));
+ const highRisk=/\b(died|death|killed|fatal|suicide|murder|injury|injured|health|hospital|diagnos\w*|medical|disease|treatment|data breach|cyberattack|hacked|stolen data|personal data|private information|election|ballot|voting|taxes|stock drop|stock fell|shares fell|share price|lawsuit|criminal|arrested|assault|war|missile)\b/i.test(newsText);
+ const safeBonus=AUTO_TOPIC_SELECTION ? ((highRisk?-850:160)+(cat==='other'?-250:0)+(sourceCount(news)>=2?100:-250)) : 0;
+ return {category:cat,news,auto_topic_high_risk:highRisk,quality:(significant+Math.min(4,sourceCount(news))*175+(news.some(x=>x.snippet.length>80)?40:0)-(vague?250:0)-(narrow?160:0)+safeBonus),vague};
 }
 function prioritizeTopics(groups){
  const rows=groups.filter(t=>!BLOCK.test(t.topic)).map(t=>({...t,...isStrongTopic(t)}));
@@ -281,7 +292,7 @@ function mergeSources(primary,additional){
  for(const s of [...primary,...additional]){
   if(!s||!validURL(s.url)||!compact(s.title))continue;
   const dom=domainOf(s.url);if(seen.has(dom))continue;
-  seen.add(dom);out.push({...s});if(out.length===5)break;
+  seen.add(dom);out.push({...s});if(out.length===8)break;
  }
  return out;
 }
@@ -313,10 +324,17 @@ async function fetchSourceEvidence(source,topic){
  }catch(e){return {status:e.name==='AbortError'?'timeout':'unavailable'};}
  finally{clearTimeout(timer);}
 }
-async function enrichSources(sources,topic,stats){
+async function enrichSources(sources,topic,stats,fetcher=fetchSourceEvidence){
+ // Fetch in waves: first 4 independent publishers, then alternatives only if
+ // fewer than two useful readable passages were found. No extra SerpApi call.
+ // Missing/blocked article bodies NEVER become fabricated evidence.
  const sample=sources.slice(0,SOURCE_FETCH_LIMIT);
- const results=await Promise.all(sample.map(s=>fetchSourceEvidence(s,topic)));
- results.forEach((r,i)=>{stats[r.status]=(stats[r.status]||0)+1;if(r.status==='retrieved')sample[i].article_passage=r.passage;});
+ for(let offset=0;offset<sample.length;offset+=4){
+  const wave=sample.slice(offset,offset+4);
+  const results=await Promise.all(wave.map(s=>fetcher(s,topic)));
+  results.forEach((r,i)=>{stats[r.status]=(stats[r.status]||0)+1;if(r.status==='retrieved')wave[i].article_passage=r.passage;});
+  if(sourceCount(sample.filter(s=>s.article_passage&&s.article_passage.length>=90))>=2)break;
+ }
 }
 function sourceText(sources){
  return sources.map((s,i)=>`[${i+1}] ${s.title}\nSource URL: ${s.url}\nReported date: ${s.published||'unknown'}\nSource type: ${s.origin}\n${s.article_passage?'RETRIEVED ARTICLE TEXT: '+s.article_passage:'SEARCH/RSS EXCERPT (may be only headline): '+compact(s.snippet).slice(0,380)}`).join('\n\n');
@@ -405,13 +423,14 @@ function renderIndex(report){
  const elements=report.items.map((d,i)=>`<article><small>${i+1}/${report.items.length} · ${escapeHTML(d.editorial_category)} · ${escapeHTML(d.question_source_type==='google_paa'?'Google People also ask':'COSMOS editorial')}</small><h2>${escapeHTML(d.question)}</h2><p><strong>${escapeHTML(d.answer.short_answer)}</strong></p><p><a href="${escapeHTML(d.canonical_url)}">Open draft and sources</a>${d.youtube?' · <a href="'+escapeHTML(d.youtube.url)+'">YouTube video</a>':''}</p><details><summary>Copy X preview (manual review only)</summary><textarea readonly>${escapeHTML(d.x_preview)}</textarea></details></article>`).join('');
  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>COSMOS — Global Editorial Review</title><style>*{box-sizing:border-box}body{background:#f5f7f9;color:#172534;font:16px/1.6 system-ui;margin:0}main{max-width:850px;margin:auto;padding:32px 20px 70px}h1{font-size:38px;line-height:1.2}.alert,article{padding:20px 24px;background:#fff;border:1px solid #dfe7ed;border-radius:16px;margin:16px 0}h2{font-size:24px;margin:9px 0}small{color:#57697b}a{color:#12618b}textarea{width:100%;min-height:140px;padding:12px;margin-top:12px;border-radius:12px;border:1px solid #bac6ce}summary{cursor:pointer}</style></head><body><main><p><strong>PTD TODAY / COSMOS</strong></p><h1>Global Questions · Editorial Review</h1><div class="alert"><strong>${report.actual} of ${report.target} evidence-checked drafts.</strong><p>No automatic X posts. These questions may be verbatim Google People also ask or transparently labeled COSMOS editorial questions derived from real linked reporting. They are not ranked by global search volume. Grok and YouTube are included only when available and relevant.</p><small>${escapeHTML(report.generated_at)} · SerpApi requests: ${report.serpapi_queries}</small></div>${elements||'<p>No draft passed the evidence and editorial gates. No filler content was produced.</p>'}</main></body></html>`;
 }
-function selfTest(){
+async function selfTest(){
  const fixture=`<rss><channel><item><title>AI data centers</title><ht:approx_traffic>20K+</ht:approx_traffic><ht:news_item><ht:news_item_title>AI data centers require new electricity transmission lines</ht:news_item_title><ht:news_item_url>https://example.org/energy-story</ht:news_item_url><ht:news_item_source>Example</ht:news_item_source></ht:news_item><ht:news_item><ht:news_item_title>AI data centers drive demand for new electricity transmission lines</ht:news_item_title><ht:news_item_url>https://example.net/another</ht:news_item_url><ht:news_item_source>Another</ht:news_item_source></ht:news_item></item></channel></rss>`;
  const t=parseRSS(fixture,'US');if(t.length!==1||t[0].articles.length!==2||t[0].traffic_lower_bound!==20000)throw Error('Google Trends RSS parser');
  const g={topic:'AI data centers',regions:['US'],evidence:t,selection_score:100};
  const candidate=rssSources(g);if(sourceCount(candidate)!==2)throw Error('Distinct publisher source collection');
  if(validURL('https://169.254.169.254')||validURL('https://[::1]/secret')||validURL('https://internal.local')||!validURL('https://www.nasa.gov/science/'))throw Error('Unsafe URL blocked');
  if(normalizeEntity('Jesús de Miguel')!==normalizeEntity('Jesus de Miguel')||topicAnchored('playstation','What does actor Chew Chor Meng leaving Mediacorp mean?','No gaming reference')||!topicAnchored('shopify stock','How could Shopify stock affect growth?','Shopify earnings?')||!topicAnchored('Jesús de Miguel','What happened to Jesus de Miguel on the field?','Football'))throw Error('Event normalization and topic anchoring regression');
+ if(domainOf('https://science.nasa.gov/a')!==domainOf('https://www.nasa.gov/b') || domainOf('https://news.bbc.co.uk/a')===domainOf('https://bbc.com/b'))throw Error('Publisher grouping regression');
  if(!worthwhileQuestion('Why are AI data centers increasing electricity demand?')||worthwhileQuestion('What does SBS stand for?')||worthwhileQuestion('Did Caleb Wilson go to the NBA?'))throw Error('Editorial question screening');
  if(validCitations('An unsupported one-source claim [1]',2) || !validCitations('Two independent cited reports [1] [2]',2)||validCitations('False [1] [3]',2))throw Error('At least two valid citations');
  if(!extractArticleEvidence('<article><p>Data centers need electricity to power AI processors and cooling equipment, and power companies are planning grid expansion.</p><p>Regional grid upgrades also help industrial growth beyond new data centers.</p></article>','data centers','AI data centers need electricity').includes('cooling equipment'))throw Error('Article passage extraction');
@@ -420,11 +439,32 @@ function selfTest(){
  const mock={question:'Why are AI data centers increasing electricity demand?',answer:{short_answer:'Power use increases with computing and cooling.'},canonical_url:'https://ptdtoday.com/q/trends/test.html',youtube:null};
  if(!xText(mock)?.includes('ptdtoday.com'))throw Error('X preview without video');
  const noVideo={question:'Why do data centers require better electricity infrastructure?',question_source_type:'editorial_evidence_first',sources:candidate,answer:{short_answer:'Infrastructure matters for power delivery.',explanation:'A specific fact supported by both sources [1][2].'},trend_topic:g.topic,trend_regions:['US'],trend_source:'https://trends.google.com/trending/rss?geo=US',canonical_url:'https://ptdtoday.com/q/trends/test.html',image_url:'https://ptdtoday.com/cards/test.png',grok_perspective:null,youtube:null};
+ if(categoryFor({topic:'The Elder Scrolls VI',evidence:[]})!=='entertainment' ||
+    categoryFor({topic:'PlayStation',evidence:[]})!=='entertainment')throw Error('Gaming classification regression');
+ if(AUTO_TOPIC_SELECTION){
+  const safe=isStrongTopic({...g,topic:'Nintendo Switch',evidence:t});
+  const risky=isStrongTopic({...g,topic:'data breach',evidence:t});
+  if(safe.quality<=risky.quality)throw Error('Low-risk autonomous prioritization regression');
+ }
+ const waveSources=Array.from({length:7},(_,i)=>({url:'https://publisher'+i+'.example.com/post',title:'Energy storage system news story '+i}));
+ // All source URLs must be genuinely independent for this mock;
+ // using separate registered example publisher domains avoids false independence.
+ waveSources.forEach((x,i)=>x.url='https://publisher'+i+'.com/story');
+ let fetched=0;
+ const mockFetch=async x=>{fetched++;const n=Number(x.url.match(/publisher(\d+)/)[1]);
+   return n===0||n===5?{status:'retrieved',passage:'A credible publisher independently reports the same grounded electricity infrastructure event in detail today, with clear supporting facts for the requested story.'}:{status:'unavailable'};};
+ const waveStats={};await enrichSources(waveSources,'energy',waveStats,mockFetch);
+ if(fetched!==7||sourceCount(waveSources.filter(x=>x.article_passage))!==2)throw Error('Alternate-source fetch-wave regression');
+ const fastSources=waveSources.map(x=>({...x,article_passage:null}));
+ fetched=0;const mockFast=async x=>{fetched++;return fetched<=2?{status:'retrieved',passage:'Documented operational energy-storage evidence confirms the development across separate publishers with direct references.'}:{status:'unavailable'};};
+ await enrichSources(fastSources,'energy',{},mockFast);
+ if(fetched!==4)throw Error('Do not fetch unnecessary second wave');
  if(!renderPage(noVideo).includes('noindex,nofollow')||!renderIndex({generated_at:NOW,actual:1,target:7,serpapi_queries:0,items:[{...noVideo,x_preview:'test',editorial_category:'technology'}]}).includes('COSMOS editorial'))throw Error('Optional media and editorial provenance rendering');
+ console.log('COSMOS v7.4.1 targeted-selection tests PASS.');
  console.log('COSMOS v7.2 offline tests PASS: RSS, domain independence, PAA provenance, editorial questions, evidence citations, article extraction, optional media, review pages. No network/API calls.');
 }
 async function main(){
- if(process.env.COSMOS_QA_SELF_TEST==='1'){selfTest();return;}
+ if(process.env.COSMOS_QA_SELF_TEST==='1'){await selfTest();return;}
  if(!OPENAI)throw Error('OPENAI_API_KEY required for evidence-first questions. No files changed.');
  const groups=await trends();
  if(!groups.length)throw Error('Google Trends RSS unavailable: no review content overwritten.');
@@ -432,7 +472,7 @@ async function main(){
  save('data/cosmos-global-trend-signals.json',{generated_at:NOW,source:'Google Trends Trending Now RSS',interpretation:'Regional trending topics; not most-asked questions worldwide',regions:GEO,topics:groups.slice(0,100).map(x=>({topic:x.topic,regions:x.regions,selection_score:x.selection_score,evidence:x.evidence.map(e=>({region:e.region,source:e.source,published:e.published,approx_traffic:e.approx_traffic}))}))});
  const history=read(HISTORY,{ids:[]});const seen=new Set(history.ids||[]),usedVideo=new Set(),selected=[],seenCategories=new Map();
  const topics=prioritizeTopics(groups);
- const diag={version:GENERATOR_VERSION,generated_at:NOW,review_schema:'6.3.1',target:TARGET,serpapi_budget:MAX_SERP,serpapi_requests:0,source_fetches:{},stats:{topics_scanned:0,topics_with_two_sources:0,paa_questions_seen:0,openai_drafted:0,verification_passed:0,source_first_accepted:0,authentic_paa_accepted:0,video_attached:0,grok_attached:0,accepted:0},rejected:{},topic_results:[],notes:'Evidence-first reporting, optional exact PAA; no invented source facts; optional Grok/video; manual review; X untouched.'};
+ const diag={topic_selection_mode:AUTO_TOPIC_SELECTION?'autonomous_low_risk':'normal_editorial',version:GENERATOR_VERSION,generated_at:NOW,review_schema:'6.3.1',target:TARGET,serpapi_budget:MAX_SERP,serpapi_requests:0,source_fetches:{},stats:{topics_scanned:0,topics_with_two_sources:0,paa_questions_seen:0,openai_drafted:0,verification_passed:0,source_first_accepted:0,authentic_paa_accepted:0,video_attached:0,grok_attached:0,accepted:0},rejected:{},topic_results:[],notes:'Evidence-first reporting, optional exact PAA; no invented source facts; optional Grok/video; manual review; X untouched.'};
  const rejection=reason=>diag.rejected[reason]=(diag.rejected[reason]||0)+1;
  console.log('COSMOS topic allocation: '+JSON.stringify(topics.slice(0,MAX_SERP||7).map(t=>({topic:t.topic,category:t.category,linked_sources:t.news.length,regions:t.regions}))));
  for(const t of topics){
@@ -456,6 +496,14 @@ async function main(){
   try{
    await enrichSources(sources,t.topic,diag.source_fetches);
    log.retrieved=sources.filter(x=>x.article_passage).length;
+   log.readable_independent_sources=sourceCount(sources.filter(x=>x.article_passage && x.article_passage.length>=90));
+   // In autonomous selection, do not spend AI generation or validation tokens
+   // on content that can never pass the two-readable-publisher site gate.
+   if(AUTO_TOPIC_SELECTION && log.readable_independent_sources<2){
+    log.disposition='insufficient_readable_sources_for_auto';
+    rejection(log.disposition);
+    continue;
+   }
    const draft=await draftFromEvidence(t,sources,searched.paa);
    if(!draft.accepted){log.disposition=draft.reason;rejection('draft_'+draft.reason);continue;}
    diag.stats.openai_drafted++;
