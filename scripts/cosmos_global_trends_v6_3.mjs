@@ -1,5 +1,5 @@
 /**
- * PTD TODAY COSMOS v6.3.1 — Global Trends FIRST, with transparent candidate diagnostics, authentic Google PAA questions SECOND.
+ * PTD TODAY COSMOS v6.3.3 — PAA no-link fallback and transparent diagnostics; retains v6.3.1 review schema for deployed workflow compatibility.
  * Outputs editorial-review drafts. Does NOT touch social-queue.json or publish on X.
  * No invented question wording, search volume, sources, Grok response or YouTube URL.
  * GOOGLE TRENDS RSS is a trend-topic signal, NOT proof of most-asked questions worldwide.
@@ -85,32 +85,62 @@ async function trends(){
  .sort((a,b)=>b.selection_score-a.selection_score);
 }
 
-async function peopleAlsoAsk(topic,region){
- const params=new URLSearchParams({engine:'google',q:topic,gl:region.toLowerCase(),hl:'en',api_key:SERP,output:'json',num:'10'});
- const data=await json('https://serpapi.com/search.json?'+params,{timeout:28000});
- const organic=(data.organic_results||[]).slice(0,8).map(x=>({title:compact(x.title),url:validURL(x.link),snippet:compact(x.snippet)})).filter(x=>x.url&&x.snippet.length>=45);
+// SerpApi often returns a People-also-ask question plus a next_page_token,
+// but no link or answer snippet. Those PAA fields are OPTIONAL; do not call
+// serpapi_link for each question because that consumes additional searches.
+// Keep the exact PAA wording, and seek independently linked organic evidence.
+// Do not invent a missing Google answer URL, invent answer excerpts, or use a
+// search-results URL as if it were an independently verified answer source.
+function extractPeopleAlsoAsk(data,topic,region){
+ const organic=(Array.isArray(data.organic_results)?data.organic_results:[]).slice(0,12)
+  .map(x=>({title:compact(x.title),url:validURL(x.link),snippet:compact(x.snippet),origin:'Google organic search result'}))
+  .filter(x=>x.url&&x.title&&x.snippet.length>=55);
  const incoming=Array.isArray(data.related_questions)?data.related_questions:[];
  const audit={topic,region,serp_status:data.search_metadata?.status||null,paa_received:incoming.length,organic_received:organic.length,accepted:0,
-  rejected:{invalid_wording:0,sensitive:0,no_answer_url:0,short_answer_excerpt:0,weak_topic_match:0,other:0}};
+  missing_answer_url:0,organic_fallback_used:0,direct_paa_sources_used:0,
+  rejected:{invalid_wording:0,sensitive:0,no_answer_url:0,short_answer_excerpt:0,weak_topic_match:0,insufficient_independent_evidence:0,other:0}};
  const questions=[];
  for(const q of incoming){
   const question=compact(q.question),answer_url=validURL(q.link),snippet=compact(q.snippet);
   if(!isQuestion(question)){audit.rejected.invalid_wording++;continue;}
   if(BLOCK.test(question)){audit.rejected.sensitive++;continue;}
-  if(!answer_url){audit.rejected.no_answer_url++;continue;}
-  // A 55-character extract, with a direct source link, can be sufficient for the AI to determine
-  // whether there is adequate evidence. Never fabricate the original PAA wording or source.
-  if(snippet.length<55){audit.rejected.short_answer_excerpt++;continue;}
-  if(overlap(topic,question)<0.20){audit.rejected.weak_topic_match++;continue;}
-  const sources=[{title:compact(q.title)||'Google People also ask answer',url:answer_url,snippet,origin:'Google People also ask'}];
-  const supporting=organic.filter(x=>new URL(x.url).hostname!==new URL(answer_url).hostname &&
-    (overlap(question,x.title+' '+x.snippet)>=0.20 || overlap(topic,x.title+' '+x.snippet)>=0.25));
-  for(const x of supporting){if(!sources.some(s=>new URL(s.url).hostname===new URL(x.url).hostname))sources.push({...x,origin:'Google search result'});if(sources.length>=3)break;}
-  // At least the original PAA extract is always present. Model still must return supported:true.
-  questions.push({question,question_source:'Google search People also ask',question_source_url:answer_url,sources});
+  if(overlap(topic,question)<0.18){audit.rejected.weak_topic_match++;continue;}
+  if(!answer_url)audit.missing_answer_url++;
+  const sources=[];
+  const directPaaEvidence=Boolean(answer_url&&snippet.length>=55);
+  if(directPaaEvidence){
+   sources.push({title:compact(q.title)||'Google People also ask answer excerpt',url:answer_url,snippet,origin:'Google People also ask answer'});
+   audit.direct_paa_sources_used++;
+  }
+  // Organic excerpts are separately attributed evidence, NOT a substitute
+  // citation for a nonexistent PAA link. The AI must still assess support.
+  const supporting=organic.map(x=>({...x,question_match:overlap(question,x.title+' '+x.snippet),topic_match:overlap(topic,x.title+' '+x.snippet)}))
+   .filter(x=>x.question_match>=0.25||(x.question_match>=0.14&&x.topic_match>=0.35))
+   .sort((a,b)=>(b.question_match+b.topic_match)-(a.question_match+a.topic_match));
+  for(const x of supporting){
+   if(!sources.some(s=>new URL(s.url).hostname===new URL(x.url).hostname)){
+    const {question_match,topic_match,...src}=x;
+    sources.push(src);
+   }
+   if(sources.length>=3)break;
+  }
+  // An unlinked PAA question must have TWO independent organic source
+  // excerpts to proceed. A directly linked PAA excerpt counts as one source.
+  if(sources.length<(directPaaEvidence?1:2)){
+   audit.rejected.insufficient_independent_evidence++;
+   continue;
+  }
+  if(!directPaaEvidence)audit.organic_fallback_used++;
+  questions.push({question,question_source:'Google search People also ask',
+   question_source_url:answer_url||null,question_source_type:answer_url?'linked_paa':'unlinked_paa_with_organic_evidence',sources});
  }
  audit.accepted=questions.length;
  return {questions:questions.slice(0,8),audit};
+}
+async function peopleAlsoAsk(topic,region){
+ const params=new URLSearchParams({engine:'google',q:topic,gl:region.toLowerCase(),hl:'en',api_key:SERP,output:'json',num:'10'});
+ const data=await json('https://serpapi.com/search.json?'+params,{timeout:28000});
+ return extractPeopleAlsoAsk(data,topic,region);
 }
 async function explanation(q,topic){
  const evidence=q.sources.map((s,i)=>`[${i+1}] ${s.title}\nURL ${s.url}\nExcerpt ${s.snippet.slice(0,550)}`).join('\n\n');
@@ -163,9 +193,21 @@ function test(){
  if(!isQuestion('Why are data centers consuming so much electricity?')||isQuestion('AI data center'))throw Error('PAA question filter regression');
  if(!validURL('https://example.com/article')||validURL('http://localhost/'))throw Error('URL filter regression');
  if(overlap('AI data center','Why do AI data centers need power?')<.30)throw Error('Topic match regression');
+ const fixturePaa={search_metadata:{status:'Success'}, related_questions:[
+  {question:'Why is Example City growing so quickly?',next_page_token:'example'},
+  {question:'Where can I see Example City?'}], organic_results:[
+  {title:'Example City population growth analysis',link:'https://example.org/city',snippet:'Example City has experienced rapid population growth according to multiple recorded indicators and recent reports.'},
+  {title:'Example City growth and housing report',link:'https://sample.net/city',snippet:'Example City housing growth and population changes have been documented by city planning data for several years.'}
+ ]};
+ const extracted=extractPeopleAlsoAsk(fixturePaa,'Example City','US');
+ if(extracted.audit.missing_answer_url!==2 || extracted.questions.length<1 || extracted.questions[0].sources.length!==2 || extracted.audit.organic_fallback_used<1)
+   throw Error('Unlinked PAA organic fallback regression: '+JSON.stringify(extracted.audit));
+ const noEvidence=extractPeopleAlsoAsk({...fixturePaa,organic_results:fixturePaa.organic_results.slice(0,1)},'Example City','US');
+ if(noEvidence.questions.length!==0||noEvidence.audit.rejected.insufficient_independent_evidence<1)throw Error('Must reject unlinked PAA lacking two sources');
+
  const sample={id:'test',question:'Why are data centers consuming so much electricity?',canonical_url:'https://ptdtoday.com/q/trends/test.html',answer:{short_answer:'Compute and cooling consume power.',explanation:'The example [1] is just an offline fixture.'},youtube:{url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ'},sources:[],grok_perspective:'test'};
  if(!xText(sample)?.includes('ptdtoday.com'))throw Error('X preview regression');
- console.log('COSMOS v6.3.1 offline self-checks passed. No API calls, no files written.');
+ console.log('COSMOS v6.3.3 offline PAA fallback self-checks passed. No API calls, no files written.');
 }
 async function main(){
  if(process.env.COSMOS_QA_SELF_TEST==='1'){test();return;}
@@ -186,7 +228,7 @@ async function main(){
   if(BLOCK.test(topic.topic))continue;
   diagnostics.topics_screened++;let related=[];spent++;
   try{const result=await peopleAlsoAsk(topic.topic,topic.regions.includes('US')?'US':topic.regions[0]);related=result.questions;diagnostics.topics.push(result.audit);diagnostics.stages.paa_candidates+=related.length;
-   console.log(`PAA \"${topic.topic}\": ${result.audit.paa_received} returned, ${related.length} eligible | rejects ${JSON.stringify(result.audit.rejected)}`);}
+   console.log(`PAA \"${topic.topic}\": ${result.audit.paa_received} returned, ${related.length} eligible | organic=${result.audit.organic_received}, unlinked=${result.audit.missing_answer_url}, organic_fallback=${result.audit.organic_fallback_used} | rejects ${JSON.stringify(result.audit.rejected)}`);}
   catch(e){console.warn(`People also ask unavailable for ${topic.topic}: ${e.message}`);diagnostics.topics.push({topic:topic.topic,api_error:String(e.message).slice(0,200)});continue;}
   for(const q of related){
    if(selected.length>=TARGET)break;
@@ -224,7 +266,7 @@ async function main(){
  history.ids=[...new Set([...(history.ids||[]),...selected.map(x=>x.id)])].slice(-1800);save(HISTORY,history);
  for(const item of selected){const p=path.join('q','trends',item.id+'.html');fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,renderPage(item),'utf8');}
  fs.mkdirSync(path.join('q','trends'),{recursive:true});fs.writeFileSync(path.join('q','trends','index.html'),renderIndex(output),'utf8');
- console.log(`COSMOS v6.3.1 generated ${selected.length}/${TARGET} trend-first question drafts from ${spent} SerpApi searches; 0 sent to X. No change to data/social-queue.json.`);
+ console.log(`COSMOS v6.3.3 generator (6.3.1 review schema) generated ${selected.length}/${TARGET} trend-first question drafts from ${spent} SerpApi searches; 0 sent to X. No change to data/social-queue.json.`);
  if(selected.length<TARGET)console.warn(`Fewer than ${TARGET} passed source/answer/YouTube checks. No invented questions or filler added.`);
 }
 main().catch(e=>{console.error('COSMOS GLOBAL Q&A v6.3:',e.message);process.exitCode=1;});
