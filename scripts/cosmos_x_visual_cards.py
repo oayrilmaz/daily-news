@@ -227,13 +227,14 @@ def playful_page(item, page:Path,image_url:str):
 def main():
     queue=json.loads(QUEUE.read_text(encoding='utf8'))
     mode=queue.get('policy',{}).get('mode')
-    if mode not in ('cosmos_x_v4_curiosity_and_discovery','cosmos_real_qa_v6_1'):
+    if mode not in ('cosmos_x_v4_curiosity_and_discovery','cosmos_real_qa_v6_1','cosmos_real_qa_v6_2'):
         raise ValueError('Unexpected COSMOS queue mode; no images were rewritten')
     items=queue.get('items') or []
     kinds=[r.get('content_kind') for r in items]
-    if mode=='cosmos_real_qa_v6_1':
-        if not 1<=len(items)<=3 or any(k!='discovery' for k in kinds):
-            raise ValueError('v6.1 requires 1–3 real sourced Q&A discoveries')
+    if mode in ('cosmos_real_qa_v6_1','cosmos_real_qa_v6_2'):
+        low, high=(5,10) if mode=='cosmos_real_qa_v6_2' else (1,3)
+        if not low<=len(items)<=high or any(k!='discovery' for k in kinds):
+            raise ValueError(f'{mode} requires {low}–{high} real sourced Q&A discoveries')
         for item in items:
             if not item.get('discovery',{}).get('real_question') or not item.get('discovery',{}).get('youtube',{}).get('video_id'):
                 raise ValueError('Q&A missing actual question provenance or verified YouTube video')
