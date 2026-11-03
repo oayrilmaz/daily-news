@@ -1,4 +1,4 @@
-name: COSMOS v7.4 — Autonomous Website Publishing (Evidence-Checked)
+name: COSMOS v7.4.1 — Autonomous Website Publishing (Evidence-Checked)
 
 on:
   workflow_dispatch:
@@ -78,9 +78,10 @@ jobs:
           COSMOS_TRENDS_REGIONS: ${{ vars.COSMOS_TRENDS_REGIONS || 'US,GB,CA,AU,IN,DE,FR,BR,JP,ZA,SG,PH' }}
           COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
           COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
+          COSMOS_AUTO_TOPIC_SELECTION: 'true'
           COSMOS_TOPIC_SCAN_LIMIT: '24'
           COSMOS_CANDIDATE_LIMIT: '18'
-          COSMOS_SOURCE_FETCH_LIMIT: '5'
+          COSMOS_SOURCE_FETCH_LIMIT: '7'
           SITE_ORIGIN: https://ptdtoday.com
         run: node scripts/cosmos_global_trends_v6_3.mjs
 
@@ -202,7 +203,7 @@ jobs:
           done < <(git diff --cached --name-status)
 
           if git diff --cached --quiet; then echo 'Nothing to publish this run.'; exit 0; fi
-          git commit -m 'COSMOS v7.4: source-screened autonomous website update'
+          git commit -m 'COSMOS v7.4.1: safer source-screened autonomous website update'
           git fetch origin main
           git rebase origin/main
           git push origin HEAD:main
