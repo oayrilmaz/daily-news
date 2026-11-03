@@ -12,6 +12,7 @@ import crypto from 'node:crypto';
 import {isIP} from 'node:net';
 
 const ROOT = process.cwd();
+// v7.4 evidence capture extension; 7.2 output schema retained for compatibility.
 const GENERATOR_VERSION = '7.2.0';
 const NOW = new Date().toISOString();
 const ORIGIN = (process.env.SITE_ORIGIN || 'https://ptdtoday.com').replace(/\/+$/, '');
@@ -40,8 +41,8 @@ const STOP = new Set(['why','how','what','when','where','who','which','are','the
 // headline context as well as the query, WITHOUT another paid search or API call.
 // These are broad editorial buckets, not claims about the real-world identity
 // of a person whose name is trending. Unknown topics stay "other".
-const SOURCE_FETCH_LIMIT = Math.max(0,Math.min(4,Number(process.env.COSMOS_SOURCE_FETCH_LIMIT ?? 3) || 0));
-const SOURCE_FETCH_TIMEOUT_MS = 3800;
+const SOURCE_FETCH_LIMIT = Math.max(0,Math.min(5,Number(process.env.COSMOS_SOURCE_FETCH_LIMIT ?? 5) || 0));
+const SOURCE_FETCH_TIMEOUT_MS = 5500;
 const CATEGORIES = ['technology','science','business','world','health','transport','weather','lifestyle','entertainment','sports','other'];
 function categoryFor(topic){
  // Classify the TREND itself before external headlines: a video about a train
@@ -478,7 +479,7 @@ async function main(){
    let perspective=null,relatedVideo=null;
    try{perspective=await grok(draft);}catch(e){rejection('grok_optional_unavailable');console.warn(`Optional Grok unavailable for ${draft.question}: ${e.message}`);}
    try{relatedVideo=await video(draft,usedVideo);}catch(e){rejection('youtube_optional_unavailable');console.warn(`Optional YouTube unavailable for ${draft.question}: ${e.message}`);}
-   const item={id,event_key:eventKey,site_publication_status:'unpublished_review',question:draft.question,question_source:draft.question_source,question_source_type:draft.question_source_type,question_source_url:draft.question_source_url,trend_topic:t.topic,editorial_category:t.category,trend_regions:t.regions,trend_source:t.evidence[0]?.source,trend_evidence:t.evidence.map(e=>({region:e.region,published:e.published,traffic_bucket:e.approx_traffic})),selection_score:t.selection_score,editorial_score:t.quality,editorial_interest:draft.interest,answer:draft.answer,sources:sources.map(({article_passage,score,...s})=>({...s,source_read:article_passage?'retrieved':'headline_or_search_excerpt'})),grok_perspective:perspective,youtube:relatedVideo,canonical_url:`${ORIGIN}/q/trends/${id}.html`,image_url:`${ORIGIN}/assets/cosmos-global-cards/${id}.png`,generated_at:NOW,review_required:true,automated_x_eligible:false,question_popularity_rank:null,search_volume_verified:false};
+   const item={id,event_key:eventKey,site_publication_status:'unpublished_review',question:draft.question,question_source:draft.question_source,question_source_type:draft.question_source_type,question_source_url:draft.question_source_url,trend_topic:t.topic,editorial_category:t.category,trend_regions:t.regions,trend_source:t.evidence[0]?.source,trend_evidence:t.evidence.map(e=>({region:e.region,published:e.published,traffic_bucket:e.approx_traffic})),selection_score:t.selection_score,editorial_score:t.quality,editorial_interest:draft.interest,answer:draft.answer,sources:sources.map(({article_passage,score,...s})=>({...s,source_read:article_passage?'retrieved':'headline_or_search_excerpt',auto_review_evidence: article_passage ? compact(article_passage).slice(0,1700) : null})),grok_perspective:perspective,youtube:relatedVideo,canonical_url:`${ORIGIN}/q/trends/${id}.html`,image_url:`${ORIGIN}/assets/cosmos-global-cards/${id}.png`,generated_at:NOW,review_required:true,automated_x_eligible:false,question_popularity_rank:null,search_volume_verified:false};
    const caption=xText(item);if(!caption){log.disposition='x_preview_too_long';rejection('x_preview_too_long');continue;}
    item.x_preview=caption;selected.push(item);seenCategories.set(t.category,(seenCategories.get(t.category)||0)+1);
    if(relatedVideo){diag.stats.video_attached++;usedVideo.add(relatedVideo.video_id);}
