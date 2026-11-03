@@ -1,0 +1,95 @@
+name: COSMOS v6.3 Global Questions — Trends First (Editorial Review)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 10:09 UTC daily. Creates review material; NEVER publishes on X.
+    - cron: '9 10 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check new source and run offline self-tests
+        run: |
+          node --check scripts/cosmos_global_trends_v6_3.mjs
+          COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
+          python -m py_compile scripts/cosmos_global_cards_v6_3.py
+      - name: Discover world trends and generate exact sourced question drafts
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          COSMOS_QA_DAILY_COUNT: ${{ vars.COSMOS_QA_DAILY_COUNT || '7' }}
+          COSMOS_TRENDS_SERP_MAX: ${{ vars.COSMOS_TRENDS_SERP_MAX || '7' }}
+          COSMOS_TRENDS_REGIONS: ${{ vars.COSMOS_TRENDS_REGIONS || 'US,GB,CA,AU,IN,DE,FR,BR,JP,ZA,SG,PH' }}
+          COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
+          COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
+          SITE_ORIGIN: https://ptdtoday.com
+        run: node scripts/cosmos_global_trends_v6_3.mjs
+      - name: Create original visual cards
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        run: |
+          if [ -z "$SERPAPI_API_KEY" ]; then
+            echo 'No SerpApi key; trend signals only. Skipping question cards.'
+          else
+            python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
+            python scripts/cosmos_global_cards_v6_3.py
+          fi
+      - name: Validate privacy, provenance, and X isolation
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const t=JSON.parse(fs.readFileSync('data/cosmos-global-trend-signals.json'));
+          if(!Array.isArray(t.topics) || !t.topics.length)throw Error('No live trend topic signals');
+          const file='data/cosmos-global-questions-review.json';
+          if(fs.existsSync(file)){
+            const q=JSON.parse(fs.readFileSync(file,'utf8'));
+            if(q.version!=='6.3')throw Error('Wrong review version');
+            for(const a of q.items||[]){
+              if(a.automated_x_eligible!==false || a.review_required!==true)throw Error('Missing safety review flag');
+              if(!a.question_source.includes('People also ask') || !a.answer?.explanation || !a.youtube?.video_id || !a.grok_perspective)throw Error('Incomplete Q&A');
+              const page=new URL(a.canonical_url).pathname.slice(1);
+              if(!fs.existsSync(page)||!fs.readFileSync(page,'utf8').includes('noindex,nofollow'))throw Error('Missing noindex review page');
+              const png=new URL(a.image_url).pathname.slice(1);
+              if(!fs.existsSync(png))throw Error('Missing preview card');
+            }
+            console.log(`${q.items.length}/${q.target} authentic trend-related PAA question drafts validated; editorial review still required`);
+          }
+          // No code in this workflow runs the existing social publisher.
+          console.log('Existing social-queue.json left under v6.2 ownership; no X posting step.');
+          NODE
+      - name: Commit review files only, never social publishing files
+        shell: bash
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          for f in data/cosmos-global-trend-signals.json data/cosmos-global-questions-review.json data/cosmos-global-questions-latest.json data/cosmos-global-questions-history.json q/trends assets/cosmos-global-cards; do
+            if [ -e "$f" ]; then git add -A -- "$f"; fi
+          done
+          if git diff --cached --quiet; then
+            echo 'No new global trend material.'
+            exit 0
+          fi
+          git commit -m 'Build trend-first COSMOS questions for editorial review'
+          git pull --rebase origin main
+          git push origin main
