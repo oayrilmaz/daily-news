@@ -1,0 +1,209 @@
+name: COSMOS v7.4 — Autonomous Website Publishing (Evidence-Checked)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'DRY RUN first (no public changes), or LIVE only after one-time enable variable is true'
+        type: choice
+        required: true
+        default: dry_run
+        options:
+          - dry_run
+          - live
+  schedule:
+    # Automatic daily only if COSMOS_AUTO_SITE_PUBLISH_ENABLED=true.
+    # 10:29 UTC = 05:29 EST / 06:29 EDT. Schedule may be delayed by GitHub.
+    - cron: '29 10 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  # Match existing v7.2/v7.3 workflows so independent publications cannot race.
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  autonomous-website-publishing:
+    # When disabled, a scheduled run does NOTHING and incurs no API costs.
+    if: ${{ github.event_name != 'schedule' || vars.COSMOS_AUTO_SITE_PUBLISH_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      COSMOS_SITE_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.mode }}
+      COSMOS_AUTO_SITE_PUBLISH_ENABLED: ${{ vars.COSMOS_AUTO_SITE_PUBLISH_ENABLED || 'false' }}
+      COSMOS_AUTO_CHECK_MODEL: ${{ vars.COSMOS_AUTO_CHECK_MODEL || 'gpt-4.1-mini' }}
+      COSMOS_AUTO_MAX_PUBLISH: ${{ vars.COSMOS_AUTO_MAX_PUBLISH || '3' }}
+      COSMOS_AUTO_INCLUDE_GROK: 'false'
+      COSMOS_AUTO_INCLUDE_VIDEO: 'false'
+    steps:
+      - name: Checkout main with history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify branch, source files and offline security tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = main || { echo 'STOP: main branch only'; exit 1; }
+          node --check scripts/cosmos_global_trends_v6_3.mjs
+          node --check scripts/cosmos_global_quality_gate_v7_2.mjs
+          node --check scripts/cosmos_autonomous_publish_v7_4.mjs
+          COSMOS_QA_SELF_TEST=1 node scripts/cosmos_global_trends_v6_3.mjs
+          COSMOS_GATE_TEST=1 node scripts/cosmos_global_quality_gate_v7_2.mjs
+          COSMOS_AUTO_SELF_TEST=1 node scripts/cosmos_autonomous_publish_v7_4.mjs
+          python -m py_compile scripts/cosmos_global_cards_v6_3.py
+          if [ -f data/social-queue.json ]; then
+            sha256sum data/social-queue.json | awk '{print $1}' > "$RUNNER_TEMP/social-before.sha"
+          else
+            echo absent > "$RUNNER_TEMP/social-before.sha"
+          fi
+
+      - name: Generate fresh global questions and preserve evidence passages privately
+        env:
+          SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          COSMOS_QA_DAILY_COUNT: ${{ vars.COSMOS_QA_DAILY_COUNT || '7' }}
+          COSMOS_TRENDS_SERP_MAX: ${{ vars.COSMOS_TRENDS_SERP_MAX || '7' }}
+          COSMOS_TRENDS_REGIONS: ${{ vars.COSMOS_TRENDS_REGIONS || 'US,GB,CA,AU,IN,DE,FR,BR,JP,ZA,SG,PH' }}
+          COSMOS_QA_OPENAI_MODEL: ${{ vars.COSMOS_QA_OPENAI_MODEL || 'gpt-4.1-mini' }}
+          COSMOS_QA_GROK_MODEL: ${{ vars.COSMOS_QA_GROK_MODEL || 'grok-4.3' }}
+          COSMOS_TOPIC_SCAN_LIMIT: '24'
+          COSMOS_CANDIDATE_LIMIT: '18'
+          COSMOS_SOURCE_FETCH_LIMIT: '5'
+          SITE_ORIGIN: https://ptdtoday.com
+        run: node scripts/cosmos_global_trends_v6_3.mjs
+
+      - name: Create visual cards for the PRIVATE editorial artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'Pillow>=10,<13'
+          python scripts/cosmos_global_cards_v6_3.py
+
+      - name: Run the existing v7.2 fail-closed editorial gate
+        run: node scripts/cosmos_global_quality_gate_v7_2.mjs
+
+      - name: Validate that generated pages remain private BEFORE autonomous audit
+        run: COSMOS_GATE_VALIDATE=1 node scripts/cosmos_global_quality_gate_v7_2.mjs
+
+      - name: Independently audit every eligible article and stage only safe website publications
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: node scripts/cosmos_autonomous_publish_v7_4.mjs
+
+      - name: Validate autonomous publishing did not change the X queue or private timeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync('data/cosmos-auto-publication-status.json'));
+          if(x.version!=='7.4.0'||x.x_posts!==0||x.cosmos_next_writes!==0)throw Error('Social/private timeline isolation failure');
+          if(x.published>Number(process.env.COSMOS_AUTO_MAX_PUBLISH||3))throw Error('Daily cap exceeded');
+          if(x.mode==='dry_run'&&x.published!==0)throw Error('Dry run published content');
+          console.log('COSMOS website-only auto publish validation PASS:',JSON.stringify(x));
+          NODE
+          if [ "$(cat "$RUNNER_TEMP/social-before.sha")" = absent ]; then
+            test ! -f data/social-queue.json
+          else
+            test "$(sha256sum data/social-queue.json | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/social-before.sha")"
+          fi
+
+      - name: Upload private run report and draft visual review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-auto-review-${{ github.run_number }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            data/cosmos-global-questions-review.json
+            data/cosmos-global-questions-diagnostics.json
+            data/cosmos-global-questions-quality-audit.json
+            data/cosmos-global-questions-quality-summary.md
+            artifacts/cosmos-editorial-review/
+            artifacts/cosmos-autonomous-publish/
+
+      - name: Commit only allowlisted website files and safe status after live run
+        if: ${{ success() && env.COSMOS_SITE_MODE == 'live' && env.COSMOS_AUTO_SITE_PUBLISH_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+
+          # No private article drafts, diagnostics or source passages in Git history.
+          git rm -f --ignore-unmatch -- \
+            data/cosmos-global-questions-review.json \
+            data/cosmos-global-questions-diagnostics.json \
+            data/cosmos-global-questions-quality-audit.json \
+            data/cosmos-global-questions-quality-summary.md
+          rm -f data/cosmos-global-questions-review.json \
+                data/cosmos-global-questions-diagnostics.json \
+                data/cosmos-global-questions-quality-audit.json \
+                data/cosmos-global-questions-quality-summary.md
+
+          safe_meta=(
+            data/cosmos-global-trend-signals.json
+            data/cosmos-global-questions-history.json
+            data/cosmos-global-questions-latest.json
+            data/cosmos-global-questions-run-status.json
+            data/cosmos-auto-publication-status.json
+          )
+          for p in "${safe_meta[@]}"; do
+            if [ -e "$p" ] || git ls-files --error-unmatch "$p" >/dev/null 2>&1; then git add -A -- "$p"; fi
+          done
+
+          # The v7.2 gate may remove legacy unapproved, noindexed preview files.
+          # Stage DELETIONS ONLY from those paths; never stage new previews.
+          while IFS= read -r f; do
+            case "$f" in
+              q/trends/global-*.html|assets/cosmos-global-cards/global-*.png|q/trends/index.html)
+                git add -u -- "$f" ;;
+              *) echo "Unexpected deleted preview path: $f"; exit 1 ;;
+            esac
+          done < <(git diff --name-only --diff-filter=D -- q/trends assets/cosmos-global-cards)
+
+          # Stage exactly the publication manifest prepared by the audited writer.
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              data/cosmos-approved-moments.json|data/cosmos-publication-events.json|q/trends/index.html) ;;
+              q/trends/global-*.html|assets/cosmos-approved-cards/global-*.png) ;;
+              *) echo "Refusing unexpected proposed publication path: $f"; exit 1 ;;
+            esac
+            git add -A -- "$f"
+          done < artifacts/cosmos-autonomous-publish/commit-paths.txt
+
+          # Fail closed if ANY unapproved artifact or unrelated file was staged.
+          while IFS=$'\t' read -r status f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              data/cosmos-global-trend-signals.json|data/cosmos-global-questions-history.json|data/cosmos-global-questions-latest.json|data/cosmos-global-questions-run-status.json|data/cosmos-auto-publication-status.json|data/cosmos-approved-moments.json|data/cosmos-publication-events.json|q/trends/index.html) ;;
+              data/cosmos-global-questions-review.json|data/cosmos-global-questions-diagnostics.json|data/cosmos-global-questions-quality-audit.json|data/cosmos-global-questions-quality-summary.md)
+                [ "$status" = D ] || { echo 'PRIVATE FILE COMMIT BLOCKED'; exit 1; } ;;
+              q/trends/global-*.html|assets/cosmos-approved-cards/global-*.png)
+                case "$status" in A|M|D) ;; *) echo 'Unsafe publication status'; exit 1;; esac ;;
+              assets/cosmos-global-cards/global-*.png)
+                [ "$status" = D ] || { echo 'Unapproved card staging blocked'; exit 1; } ;;
+              *) echo "STAGED UNEXPECTED PATH: $f"; exit 1 ;;
+            esac
+          done < <(git diff --cached --name-status)
+
+          if git diff --cached --quiet; then echo 'Nothing to publish this run.'; exit 0; fi
+          git commit -m 'COSMOS v7.4: source-screened autonomous website update'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+          echo 'COSMOS website update committed; X and Cosmos Next private timeline untouched.'
