@@ -3008,7 +3008,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 .metro-filters [data-cosmos-business-nav],.metro-filters [data-cosmos-ask-nav]{border:1px solid #bcd0d9;border-radius:100px;background:#fff;color:#2b5566;font-weight:750;padding:9px 12px;cursor:pointer}
 @media(max-width:640px){.cosmos-public-card{padding:12px}.cosmos-public-card h3{font-size:15px}.metro-filters [data-cosmos-business-nav],.metro-filters [data-cosmos-ask-nav]{font-size:12px}}
 
-</style>
+.metro-filters .cosmos-origins-nav{display:inline-flex;align-items:center;border:1px solid #bcd0d9;border-radius:100px;background:#fff;color:#2b5566;font-weight:750;padding:9px 12px;text-decoration:none;font-size:12px}</style>
 </head>
 <body>
 <div class="app" id="app">
@@ -7046,6 +7046,64 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     const ok=document.execCommand('copy');input.remove();
     toastMsg(ok?'Private link copied.':'Copy is unavailable on this browser.',3600);
   }
+
+  // COSMOS LINKEDIN SHARE v9.1 — this never changes a private moment's audience.
+  // A public LinkedIn post is a separate, explicit user action. No private permalink is included.
+  function cosmosLinkedInHashtags(question){
+    const q=String(question||'').toLowerCase();
+    const tags=['#COSMOS','#ExploreTheConnections'];
+    const keywords=[[/\bdata\s?center|datacenter\b/,'#DataCenters'],[/\bgrid|high voltage|\bhv\b/,'#PowerGrid'],
+      [/\bartificial intelligence\b|\bai\b/,'#AI'],[/\bproject\b/,'#ProjectManagement'],
+      [/\benergy|renewable\b/,'#Energy'],[/\bbusiness|market\b/,'#Business'],
+      [/\belection|midterm\b/,'#Elections'],[/\btechnology\b/,'#Technology'],
+      [/\bclimate\b/,'#Climate'],[/\bscience\b/,'#Science']];
+    keywords.forEach(([re,t])=>{if(re.test(q)&&tags.length<6)tags.push(t);});
+    return tags.join(' ');
+  }
+  function cosmosSocialExcerpt(t){
+    const raw=String(t?.short_answer||t?.answer||'').replace(/\s+/g,' ').trim();
+    if(raw.length<=470)return raw;
+    const prefix=raw.slice(0,460);const cut=prefix.lastIndexOf('. ');
+    return (cut>150?prefix.slice(0,cut+1):prefix.trim())+'…';
+  }
+  function cosmosSocialDraft(item,discovery){
+    const turns=Array.isArray(discovery?.turns)?discovery.turns:[];
+    const latest=[...turns].sort((a,b)=>(Date.parse(b.created_at)||0)-(Date.parse(a.created_at)||0))[0]||{};
+    const question=String(latest.question||item.content_text||'A discovery').replace(/\s+/g,' ').trim().slice(0,340);
+    const answer=cosmosSocialExcerpt(latest);
+    const hashtags=cosmosLinkedInHashtags(question);
+    return ['A question I explored through COSMOS:',question,answer,'What connections do you see?',hashtags].filter(Boolean).join('\n\n');
+  }
+  async function cosmosCopySocialText(content){
+    let done=false;
+    try{await navigator.clipboard.writeText(content);done=true;}
+    catch{const t=document.createElement('textarea');t.value=content;t.style.cssText='position:fixed;left:-9999px;top:0';
+      document.body.appendChild(t);t.select();done=document.execCommand('copy');t.remove();}
+    toastMsg(done?'LinkedIn caption and hashtags copied. Paste them into a new LinkedIn post.':'Copy unavailable. Select the text manually.',4800);
+  }
+  function cosmosOpenDiscoveryShare(item,discovery){
+    const url=privateMomentUrl(item.id);
+    const draft=cosmosSocialDraft(item,discovery);
+    openSheet(`<h2>Share this discovery</h2>
+      <p class="cosmos-share-intro"><strong>🔒 Only me — PRIVATE</strong>. Your COSMOS discovery is not a public article. Its original link only works for authorized COSMOS accounts; posting that link on LinkedIn will not make it public.</p>
+      <div class="cosmos-maps"><strong>Share privately inside COSMOS</strong><p class="micro">This does not grant anyone new access.</p>
+        <button type="button" id="v91CopyPrivate" class="cosmos-share-pill">Copy private COSMOS link</button></div>
+      <div class="cosmos-maps" style="margin-top:13px"><strong>Prepare a separate public LinkedIn post</strong>
+        <p class="micro">Only the previewed text below will be copied. No private links, attachments, profile details or sealed content are included. Your original COSMOS remains PRIVATE.</p>
+        <textarea id="v91LinkedInDraft" readonly rows="8" style="display:block;width:100%;min-height:150px;border:1px solid #d9e2e8;border-radius:12px;padding:12px;background:white;color:#243544;white-space:pre-wrap">${escapeHtml(draft)}</textarea>
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:12px;margin:12px 0;color:#384b5a"><input type="checkbox" id="v91SocialConsent" style="width:20px;height:20px;flex:none">I choose to share this preview text publicly outside COSMOS. I understand others may copy it.</label>
+        <div class="cosmos-share-actions"><button type="button" class="primary" id="v91CopyLinkedIn" disabled>Copy post + hashtags</button>
+        <button type="button" id="v91OpenLinkedIn" disabled>Open LinkedIn ↗</button></div>
+        <p class="micro">LinkedIn cannot reliably prefill the caption from an external link. Copy the post first, then paste it into LinkedIn. No automatic posting occurs.</p></div>
+      <div class="cosmos-share-actions"><button type="button" id="v91ReturnDiscovery">← Back to discovery</button></div>`);
+    sheet.classList.add('liquid-compact-step');
+    $('v91CopyPrivate').onclick=()=>copyCosmosShareUrl(url);
+    $('v91SocialConsent').onchange=()=>{$('v91CopyLinkedIn').disabled=!$('v91SocialConsent').checked;$('v91OpenLinkedIn').disabled=!$('v91SocialConsent').checked;};
+    $('v91CopyLinkedIn').onclick=()=>cosmosCopySocialText($('v91LinkedInDraft').value);
+    $('v91OpenLinkedIn').onclick=()=>window.open('https://www.linkedin.com/feed/','_blank','noopener,noreferrer');
+    $('v91ReturnDiscovery').onclick=()=>openCosmos(item.id);
+  }
+
   function shareMomentPart(item,part=''){
     const url=privateMomentUrl(item.id,part);
     openSheet(`<h2>↗ Share ${part?'this section':'this Cosmos'}</h2>
@@ -7190,7 +7248,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       const studioQuickbar=sheet.querySelector('.sheet-quickbar');
       if(studioQuickbar)studioQuickbar.innerHTML='<strong>COSMOS <span class="cosmos-studio-header-tag">/ Discovery</span></strong><button type="button" id="sheetBackCamera">← Back to Metro</button>';
       if($('sheetBackCamera'))$('sheetBackCamera').onclick=returnToCamera;
-      $('cosmosStoryShare').onclick=()=>shareMomentPart(item);
+      $('cosmosStoryShare').onclick=()=>cosmosOpenDiscoveryShare(item,unifiedDiscovery);
       $('cosmosStoryMore').onclick=()=>{
         const menu=$('cosmosStoryMenu');menu.hidden=!menu.hidden;
         $('cosmosStoryMore').setAttribute('aria-expanded',String(!menu.hidden));
@@ -7719,7 +7777,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     journeyStage.innerHTML=`<div class="week-metro" aria-label="Permanent weekly Cosmos Metro"><div class="week-navigation">
       <button type="button" data-week-shift="-1" aria-label="Previous week">‹</button>
       <span>${escapeHtml(range)}</span><button type="button" data-week-shift="1" aria-label="Next week">›</button></div>
-      <div class="week-weekdays">${week}</div><div class="metro-filters" role="group" aria-label="Filter Cosmos moments">${[['all','All'],['mine','My'],['connections','Connections'],['public','Public']].map(([value,label])=>`<button type="button" data-metro-filter="${value}" class="${metroViewFilter===value?'active':''}" aria-pressed="${metroViewFilter===value}">${label}</button>`).join('')}<button type="button" data-cosmos-business-nav>Business</button><button type="button" data-cosmos-ask-nav>✧ Ask COSMOS</button></div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
+      <div class="week-weekdays">${week}</div><div class="metro-filters" role="group" aria-label="Filter Cosmos moments">${[['all','All'],['mine','My'],['connections','Connections'],['public','Public']].map(([value,label])=>`<button type="button" data-metro-filter="${value}" class="${metroViewFilter===value?'active':''}" aria-pressed="${metroViewFilter===value}">${label}</button>`).join('')}<button type="button" data-cosmos-business-nav>Business</button><button type="button" data-cosmos-ask-nav>✧ Ask COSMOS</button><a class="cosmos-origins-nav" href="/cosmos-original-home.html" title="Original COSMOS and saved journeys">◯ Origins</a></div><div class="metro-week-note">Swipe → past · ← future · tap a day</div></div>
       <div class="metro-main" id="metroMain">${main}</div>
       ${weekMetroLimited?'<div class="metro-week-note">Over 500 real moments this week; some are not yet shown.</div>':''}`;
     journeyStage.querySelectorAll('[data-metro-day]').forEach(btn=>btn.onclick=()=>{
