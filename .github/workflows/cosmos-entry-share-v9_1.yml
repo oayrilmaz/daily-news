@@ -85,7 +85,14 @@ jobs:
             test -f "$path"
             git add -- "$path"
           done < artifacts/cosmos-v9_1/changed-paths.txt
-          git diff --cached --check
+          # The preserved old homepage is an archival copy of the previous index.html.
+          # It may contain inherited trailing spaces. Keep it BYTE-FOR-BYTE intact;
+          # do not make an old formatting issue prevent deployment of the new homepage.
+          # Continue checking every other staged UI/public file normally.
+          git diff --cached --check -- . ':(exclude)cosmos-original-home.html'
+          # Still check the archive for other whitespace errors, but ignore
+          # pre-existing end-of-line spaces inside this one historical snapshot.
+          git -c core.whitespace=-blank-at-eol diff --cached --check -- cosmos-original-home.html
           if git diff --cached --quiet; then
             echo 'No changes: v9.1 is already installed.'
             exit 0
