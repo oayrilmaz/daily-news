@@ -1,0 +1,84 @@
+name: COSMOS v9.2 — Ask COSMOS Result Display & Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate (no changes) or apply targeted COSMOS Next frontend patch
+        type: choice
+        default: validate
+        required: true
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  ask-result:
+    name: Fix result popup without changing backend or private moments
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Validate current app and patch anchors — no changes
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_ask_result_v9_2.py --check
+      - name: Apply targeted frontend patch
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_ask_result_v9_2.py
+      - name: Validate complete COSMOS Next inline JavaScript
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile, os
+          html=Path('cosmos-next.html').read_text(encoding='utf-8')
+          assert 'COSMOS ASK RESULT DELIVERY v9.2' in html
+          assert html.count('async function cosmosRevealSavedAskV92(')==1
+          assert 'COSMOS LINKEDIN SHARE v9.1' in html
+          assert 'COSMOS CENTRAL TIMELINE v9.0' in html
+          scripts=re.findall(r'<script\b([^>]*)>(.*?)</script\s*>',html,flags=re.S|re.I)
+          tested=0
+          for attrs,code in scripts:
+            if re.search(r'\bsrc\s*=',attrs,re.I) or re.search(r'application/(?:ld\+json|json)',attrs,re.I):continue
+            with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False) as f:
+              f.write(code); temp=f.name
+            try:subprocess.run(['node','--check',temp],check=True)
+            finally:os.unlink(temp)
+            tested+=1
+          assert tested>0
+          print(f'PASS: {tested} inline JavaScript block(s), v9.1 privacy and central-timeline markers retained')
+          PY
+          git diff --check -- cosmos-next.html
+      - name: Commit only cosmos-next.html to main
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Already installed; no commit required.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Fix Ask COSMOS saved-result opening and persistent recovery (v9.2)'
+            git push origin HEAD:main
+          fi
+      - name: Report
+        run: |
+          echo 'COSMOS v9.2: no Worker, auth, timeline, Public, Business, or LinkedIn sharing changes.'
+          echo 'If AI request itself fails, the new UI will display the error instead of silently closing.'
