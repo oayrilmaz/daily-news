@@ -1,0 +1,113 @@
+name: COSMOS v9.1 — Clean Entry + Safe LinkedIn Sharing
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Validate first (no changes). Apply after checks pass."
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  entry-share:
+    name: Clean homepage, privacy labels, LinkedIn drafts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CURRENT main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Python and Node runtime
+        run: |
+          python3 --version
+          node --version
+      - name: Validate against current files — no changes
+        run: python3 scripts/apply_v91.py --check
+      - name: Apply fail-closed patch
+        if: ${{ inputs.mode == 'apply' }}
+        run: python3 scripts/apply_v91.py
+      - name: Verify source syntax and publication boundaries
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/cosmos_public_distribution_v8_1.mjs
+          node --check scripts/cosmos_autonomous_publish_v7_4.mjs
+          python3 - <<'PY'
+          import re,subprocess,tempfile,pathlib
+          for file in ['index.html','cosmos-next.html']:
+              text=pathlib.Path(file).read_text()
+              scripts=re.findall(r'<script\b([^>]*)>(.*?)</script\s*>',text,re.S|re.I)
+              for i,(attrs,body) in enumerate(scripts):
+                  if re.search(r'\bsrc\s*=',attrs,re.I) or 'application/ld+json' in attrs:continue
+                  with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False) as tmp:
+                      tmp.write(body);name=tmp.name
+                  subprocess.run(['node','--check',name],check=True)
+              print(file+': inline JavaScript syntax checked')
+          h=pathlib.Path('index.html').read_text()
+          old=pathlib.Path('cosmos-original-home.html').read_text()
+          app=pathlib.Path('cosmos-next.html').read_text()
+          assert 'COSMOS ENTRY v9.1' in h and 'cosmosFeature' in h
+          assert 'COSMOS CENTRAL TIMELINE v9.0 HOME JOIN' in old
+          assert 'Only me — PRIVATE' in app and 'COSMOS LINKEDIN SHARE v9.1' in app
+          assert 'data/cosmos-public-timeline.json' in h and 'cosmos-member-public-moments.json' in h
+          assert 'https://www.linkedin.com/feed/' in app
+          print('COSMOS v9.1 privacy, backup, and LinkedIn checks passed')
+          PY
+          git diff --check
+      - name: Commit ONLY allowlisted public files and current UI files
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f artifacts/cosmos-v9_1/changed-paths.txt
+          while IFS= read -r path; do
+            test -z "$path" && continue
+            case "$path" in
+              index.html|cosmos-original-home.html|cosmos-next.html|data/cosmos-member-public-moments.json|scripts/cosmos_autonomous_publish_v7_4.mjs|scripts/cosmos_public_distribution_v8_1.mjs) ;;
+              q/trends/global-*.html) ;;
+              *) echo "BLOCKED non-allowlisted path: $path"; exit 1 ;;
+            esac
+            test -f "$path"
+            git add -- "$path"
+          done < artifacts/cosmos-v9_1/changed-paths.txt
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No changes: v9.1 is already installed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'COSMOS v9.1: clean timeline-first entry and consent-based LinkedIn sharing'
+          git push origin HEAD:main
+          echo 'Commit pushed. Confirm subsequent Pages deployment before public announcement.'
+      - name: Request Pages refresh when Pages uses branch publishing
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A GITHUB_TOKEN push alone does not trigger a new Pages build.
+          # This API call is applicable only to branch-based Pages publishing.
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' 2>/dev/null | grep -q '^legacy$'; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null \
+              && echo 'GitHub Pages branch rebuild requested.' \
+              || echo 'Pages rebuild request unavailable; inspect Pages build status manually.'
+          else
+            echo 'This Pages site uses a custom deployment or its build type is unknown; check the existing deployment workflow.'
+          fi
