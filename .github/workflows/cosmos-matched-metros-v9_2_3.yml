@@ -51,12 +51,16 @@ jobs:
           from pathlib import Path
           import re, tempfile, subprocess, os
           s=Path('cosmos-next.html').read_text(encoding='utf-8')
-          for marker in ['COSMOS CENTRAL TIMELINE v9.0','COSMOS LINKEDIN SHARE v9.1',
-                         'COSMOS MATCHED METRO LAYOUT v9.2.3 CSS',
+          # v9.0 was inserted into several independent application sections.
+          # Presence is required; expecting exactly one occurrence was incorrect.
+          for marker in ['COSMOS CENTRAL TIMELINE v9.0', 'COSMOS LINKEDIN SHARE v9.1']:
+              assert marker in s, 'Missing original feature marker: '+marker
+          # These four markers belong to THIS patch and must occur exactly once.
+          for marker in ['COSMOS MATCHED METRO LAYOUT v9.2.3 CSS',
                          'COSMOS MATCHED METRO LAYOUT v9.2.3 JS',
                          'COSMOS MATCHED METRO LAYOUT v9.2.3 BUSINESS',
                          'COSMOS MATCHED METRO LAYOUT v9.2.3 BRIDGE']:
-              assert s.count(marker)==1, marker
+              assert s.count(marker)==1, 'Missing or duplicated patch marker: '+marker
           for selector in ['id="coreOrb"','id="returnNow"','id="businessMetroCompose"',
                            'id="businessMetroDate"','id="metroDayScroll"',
                            'id="businessMetroJobs"','/api/unified/ask']:
