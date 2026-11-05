@@ -1,0 +1,115 @@
+name: COSMOS v9.2.3 — Matching Personal and Business Timelines
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validate first, then apply'
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  layout:
+    name: Align both Metro screens without replacing features
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout CURRENT main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Confirm current source and patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/patch_cosmos_identical_metros_v9_2_3.py
+          python3 scripts/patch_cosmos_identical_metros_v9_2_3.py --check
+      - name: Apply patch to temporary runner workspace for BOTH modes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_identical_metros_v9_2_3.py
+          python3 scripts/patch_cosmos_identical_metros_v9_2_3.py
+      - name: Verify syntax, private access boundaries and no unrelated edits
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, tempfile, subprocess, os
+          s=Path('cosmos-next.html').read_text(encoding='utf-8')
+          for marker in ['COSMOS CENTRAL TIMELINE v9.0','COSMOS LINKEDIN SHARE v9.1',
+                         'COSMOS MATCHED METRO LAYOUT v9.2.3 CSS',
+                         'COSMOS MATCHED METRO LAYOUT v9.2.3 JS',
+                         'COSMOS MATCHED METRO LAYOUT v9.2.3 BUSINESS',
+                         'COSMOS MATCHED METRO LAYOUT v9.2.3 BRIDGE']:
+              assert s.count(marker)==1, marker
+          for selector in ['id="coreOrb"','id="returnNow"','id="businessMetroCompose"',
+                           'id="businessMetroDate"','id="metroDayScroll"',
+                           'id="businessMetroJobs"','/api/unified/ask']:
+              assert selector in s, selector
+          blocks=re.findall(r'<script\b([^>]*)>(.*?)</script\s*>',s,re.S|re.I)
+          count=0
+          for attributes, js in blocks:
+              if re.search(r'\bsrc\s*=',attributes,re.I):continue
+              with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False) as f:
+                  f.write(js);fname=f.name
+              try:
+                  subprocess.run(['node','--check',fname],check=True)
+              finally:os.unlink(fname)
+              count+=1
+          assert count>=2
+          print('PASS:',count,'JavaScript blocks, original private/business/auth handlers retained')
+          PY
+          git diff --check -- cosmos-next.html
+          changed="$(git diff --name-only)"
+          if [ -n "$changed" ]; then
+            while IFS= read -r path; do
+              case "$path" in cosmos-next.html) ;; *) echo "Unexpected changed file $path"; exit 1;; esac
+            done <<< "$changed"
+          fi
+      - name: Commit ONLY cosmos-next.html when mode is apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'No changes: patch already installed.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'COSMOS v9.2.3: match Personal and Business Metro layouts'
+            git push origin HEAD:main
+          fi
+      - name: Trigger GitHub Pages branch rebuild when applicable
+        if: ${{ inputs.mode == 'apply' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' 2>/dev/null | grep -q '^legacy$'; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" || true
+          else
+            echo 'Pages is Actions-hosted or another deployment; confirm normal Pages workflow completes.'
+          fi
+      - name: Result
+        shell: bash
+        run: |
+          echo 'Matching layout validated. Validate never pushes. Apply commits cosmos-next.html only.'
+          echo 'Backend, membership, Business posts, camera, notifications and all saved moments unchanged.'
