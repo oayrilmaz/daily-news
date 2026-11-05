@@ -1,0 +1,94 @@
+name: COSMOS v9.2.1 — Mobile Metro Scroll + Public Moment Tap
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Validate first; apply only after a green result"
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+  pages: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  mobile-metro:
+    name: Preserve Metro and fix Public card scrolling/taps
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Validate current timeline — no changes
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_mobile_metro_v9_2_1.py --check
+      - name: Apply minimal frontend patch
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_mobile_metro_v9_2_1.py
+      - name: Verify inline JS and privacy boundaries
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re,subprocess,tempfile,os
+          from pathlib import Path
+          h=Path('cosmos-next.html').read_text(encoding='utf-8')
+          for marker in ['COSMOS CENTRAL TIMELINE v9.0','COSMOS LINKEDIN SHARE v9.1','COSMOS MOBILE METRO SCROLL AND TAP v9.2.1']:
+              assert marker in h, f'Missing expected feature: {marker}'
+          assert h.count('COSMOS MOBILE METRO SCROLL AND TAP v9.2.1')==2
+          assert 'cosmos-public-scroller' in h and 'cosmosPublicScrollRefresh' in h
+          assert '/api/unified/ask' in h and 'data-cosmos-ask-nav' in h
+          assert 'public_moment' in h and 'getAccessibleCosmos' not in h # No Life Worker code is copied in.
+          scripts=re.findall(r'<script\b([^>]*)>(.*?)</script\s*>',h,re.I|re.S)
+          checked=0
+          for attrs,code in scripts:
+              if re.search(r'\bsrc\s*=',attrs,re.I) or re.search(r'application/(?:ld\+json|json)',attrs,re.I):continue
+              with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False) as f:
+                  f.write(code);filename=f.name
+              try:subprocess.run(['node','--check',filename],check=True)
+              finally:os.unlink(filename)
+              checked+=1
+          assert checked>=2
+          print(f'PASS: {checked} JavaScript blocks; original Metro/private account functions preserved')
+          PY
+          git diff --check -- cosmos-next.html
+      - name: Commit only COSMOS frontend if changed
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Already installed: no change necessary.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'COSMOS v9.2.1: restore Public Metro scrolling and whole-card taps'
+            git push origin HEAD:main
+          fi
+      - name: Request Pages rebuild if branch publishing is active
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' 2>/dev/null | grep -q '^legacy$'; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null && echo 'Pages refresh requested.' || echo 'Pages refresh unavailable; inspect Pages workflow.'
+          else
+            echo 'Pages uses a separate deployment path; check existing pages-build-deployment workflow.'
+          fi
