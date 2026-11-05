@@ -3245,6 +3245,60 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   #sheet.business-modal .business-metro-dock{bottom:calc(14px + env(safe-area-inset-bottom))!important;}
 }
 
+
+/* COSMOS BUSINESS PROFILE + CENTERED DOCK v9.2.4 CSS
+   Both Personal and Business use viewport center; no right-side anchoring. */
+#sheet.business-modal .business-metro-dock,
+#app.metro-live .bottom {
+  position:fixed!important;
+  left:50vw!important;
+  inset-inline-start:50vw!important;
+  right:auto!important;
+  inset-inline-end:auto!important;
+  top:auto!important;
+  transform:translate3d(-50%,0,0)!important;
+  translate:none!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  width:max-content!important;
+  max-width:calc(100vw - 24px)!important;
+  bottom:calc(17px + env(safe-area-inset-bottom))!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:10px!important;
+  pointer-events:none!important;
+  z-index:150!important;
+}
+#sheet.business-modal .business-metro-dock button,
+#app.metro-live .bottom button {pointer-events:auto!important;}
+#sheet.business-modal .business-metro-dock #businessMetroCompose,
+#app.metro-live .bottom #coreOrb{
+  margin-inline:auto!important;
+  display:grid!important;
+  place-items:center!important;
+  flex:none!important;
+}
+#sheet.business-modal .business-metro-dock #businessMetroDockAll{
+  margin-inline:auto!important;
+  max-width:calc(100vw - 24px)!important;
+}
+#sheet.business-modal .shared-metro-engine .metro-day-scroll{
+  padding-bottom:170px!important;
+  -webkit-overflow-scrolling:touch;
+}
+
+
+/* COSMOS SEARCH FOLLOW v9.2.5: isolated directory elements only. */
+.cosmos-directory-v925{padding:8px 4px 36px;max-width:780px;margin:auto}
+.cosmos-directory-v925 .actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}
+.cosmos-directory-v925 input[type=search]{width:100%;padding:13px;border:1px solid #bfcbd5;border-radius:12px;font-size:16px}
+.cosmos-directory-v925 input[type=checkbox]{width:21px;height:21px;vertical-align:middle;margin-right:8px}
+.cosmos-directory-v925 label{display:block;padding:12px 0}
+.cosmos-directory-card-v925{padding:16px;margin:12px 0;background:#fff;border:1px solid #dae3eb;border-radius:16px}
+.cosmos-directory-card-v925 .micro{overflow-wrap:anywhere}
+
 </style>
 </head>
 <body>
@@ -4739,6 +4793,25 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       p.kind==='video'?`<video src="${url}" controls playsinline preload="metadata" class="business-media-asset"></video>`:
       p.kind==='voice'?`<audio src="${url}" controls preload="metadata" class="business-media-audio"></audio>`:'';
   }
+  // COSMOS BUSINESS PROFILE + CENTERED DOCK v9.2.4 JS
+  let cosmosBusinessIdentityV924=null;
+  function cosmosUpdateBusinessAvatarV924(){
+    const avatar=document.getElementById('businessHeaderProfile');
+    if(!avatar)return;
+    const p=cosmosBusinessIdentityV924;
+    const name=p?.name||me?.display_name||me?.username||'Me';
+    avatar.textContent=businessInitials(name);
+    avatar.title='Business: '+name;
+    avatar.setAttribute('aria-label','Business profile for '+name);
+  }
+  async function cosmosLoadBusinessIdentityV924(){
+    if(cosmosBusinessIdentityV924){cosmosUpdateBusinessAvatarV924();return;}
+    try{
+      const r=await api('/api/business/me');
+      if(r?.profile)cosmosBusinessIdentityV924=r.profile;
+      cosmosUpdateBusinessAvatarV924();
+    }catch(_){/* A temporary profile fetch failure must never block the Metro. */}
+  }
   function businessFrame(tab,body){
     businessRevokeMedia();
     const labels={metro:'Business Metro',feed:'Work feed',people:'Business Connections',profile:'My business profile',visitors:'Profile visitors',jobs:'Jobs & talent'};
@@ -4763,6 +4836,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <div id="businessHeaderMenu" class="business-profile-menu" hidden role="menu">
       ${[['metro','Timeline'],['jobs','Jobs'],['feed','Work feed'],['people','Connections'],['profile','My profile'],['visitors','Who viewed me']].map(([id,label])=>`<button type="button" role="menuitem" data-business-nav="${id}">${label}</button>`).join('')}
       <button type="button" id="businessMenuPrivate" role="menuitem">Switch to Private</button></div></div></div>`;
+    void cosmosLoadBusinessIdentityV924();
     $('businessHeaderUniverse').onclick=showUniverseEntry;
     $('businessHeaderPrivate').onclick=()=>enterUniverse('private');
     $('businessHeaderJobs').onclick=()=>openBusinessJobs('browse');
@@ -4950,25 +5024,38 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       }else if(selected==='people'){
         const r=await api('/api/business/people');if(!root.isConnected)return;
         root.innerHTML=r.people?.length?r.people.map(p=>`<button class="business-person" type="button" data-business-person="${escapeHtml(p.user_id)}"><span class="business-avatar">${escapeHtml(businessInitials(p.name))}</span><span class="business-person-copy"><strong>${escapeHtml(p.name||'Connection')}</strong><small>${escapeHtml(p.headline||p.company||'Professional connection')}</small><small>@${escapeHtml(p.username)}</small></span><span aria-hidden="true">›</span></button>`).join(''):'<div class="business-empty">No accepted Connections yet. Connect with people in COSMOS to see their work profiles.</div>';
+        root.insertAdjacentHTML('afterbegin','<div class="business-actions"><button type="button" id="businessSearchV925">Search Business profiles</button></div>');
+        $('businessSearchV925').onclick=()=>cosmosDirectoryViewV925('business','search');
         root.querySelectorAll('[data-business-person]').forEach(b=>b.onclick=()=>openBusinessPerson(b.dataset.businessPerson));
       }else if(selected==='profile'){
         const r=await api('/api/business/me');if(!root.isConnected)return;
         const p=r.profile||{};
-        root.innerHTML=`<div class="business-surface"><h3>My professional profile</h3><p class="business-note">Your display name and @handle come from your COSMOS identity. Only accepted Connections can see this profile in the current beta.</p>
+        root.innerHTML=`<div class="business-surface"><h3>My Business profile</h3>
+          <!-- COSMOS BUSINESS PROFILE + CENTERED DOCK v9.2.4 UI -->
+          <p class="business-note">One COSMOS login, two independent profiles. Your Business name and @handle can differ from your Personal name and @handle. Full Business profiles remain for accepted Connections. You can separately opt into a limited, searchable preview for signed-in COSMOS members.</p>
+          <div class="business-field"><label for="bBusinessName">Business display name</label><input id="bBusinessName" maxlength="60" autocomplete="organization" value="${escapeHtml(p.business_name||'')}" placeholder="Company, brand or professional name"></div>
+          <div class="business-field"><label for="bBusinessHandle">Business @handle (optional)</label><input id="bBusinessHandle" maxlength="20" autocapitalize="none" autocomplete="off" spellcheck="false" value="${escapeHtml(p.business_handle||'')}" placeholder="unique_business_handle"><small>3–20 characters, starting with a letter. A separate public identifier from your Personal @handle. Leave blank to use your existing account @handle.</small></div>
           <div class="business-field"><label for="bHeadline">Headline</label><input id="bHeadline" maxlength="110" value="${escapeHtml(p.headline||'')}" placeholder="e.g. Energy infrastructure project leader"></div>
           <div class="business-field"><label for="bCompany">Company / organization</label><input id="bCompany" maxlength="100" value="${escapeHtml(p.company||'')}"></div>
           <div class="business-field"><label for="bIndustry">Industry</label><input id="bIndustry" maxlength="80" value="${escapeHtml(p.industry||'')}"></div>
           <div class="business-field"><label for="bLocation">Location (optional, publicly readable to accepted Connections)</label><input id="bLocation" maxlength="80" value="${escapeHtml(p.location_public||'')}" placeholder="City or region — not street address"></div>
           <div class="business-field"><label for="bAbout">About my work</label><textarea id="bAbout" maxlength="1800" rows="5" placeholder="Expertise, projects, what you enjoy working on">${escapeHtml(p.about||'')}</textarea></div>
           <label class="business-check"><input type="checkbox" id="bOpenToWork" ${p.open_to_work?'checked':''}><span>Open to professional opportunities</span></label>
+          <div class="business-actions"><button type="button" id="businessDirectoryV925">Search visibility & followers</button></div>
           <label class="business-check"><input type="checkbox" id="bVisitorOptIn" ${p.allow_named_visits?'checked':''}><span><strong>Let people know when I visit their professional profile.</strong> Off by default. If enabled, accepted Connections can see your name in their visitor history after you open their profiles. Turning it off deletes your earlier recorded visits.</span></label>
           <div class="business-actions"><button class="primary" id="businessSaveProfile">Save profile and privacy</button></div></div>`;
+        $('businessDirectoryV925').onclick=()=>cosmosDirectoryViewV925('business','settings');
         $('businessSaveProfile').onclick=async()=>{
           const b=$('businessSaveProfile');b.disabled=true;
-          try{await api('/api/business/me',{method:'PATCH',body:JSON.stringify({headline:$('bHeadline').value,
+          try{const response=await api('/api/business/me',{method:'PATCH',body:JSON.stringify({
+            business_name:$('bBusinessName').value.trim(),business_handle:$('bBusinessHandle').value.trim(),
+            headline:$('bHeadline').value,
             company:$('bCompany').value,industry:$('bIndustry').value,location_public:$('bLocation').value,
             about:$('bAbout').value,open_to_work:$('bOpenToWork').checked,
-            allow_named_visits:$('bVisitorOptIn').checked})});toastMsg('Professional profile saved.');await openBusinessHub('profile');}
+            allow_named_visits:$('bVisitorOptIn').checked})});
+            cosmosBusinessIdentityV924=response.profile||null;
+            cosmosUpdateBusinessAvatarV924();
+            toastMsg('Business profile saved independently of Personal.');await openBusinessHub('profile');}
           catch(e){toastMsg(e.message,5500);b.disabled=false;}
         };
       }else if(selected==='visitors'){
@@ -7706,9 +7793,119 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       });
     }catch(e){if(root.isConnected){root.classList.remove('look-loading');root.textContent='Tags unavailable: '+e.message;}}
   }
+
+  // COSMOS PROFILE DIRECTORY v9.2.5 — independent, opt-in search/follow per universe.
+  // This UI never attempts to read private timelines or protected Business posts.
+  function cosmosDirectoryViewV925(kind='personal',mode='search'){
+    const u=kind==='business'?'business':'personal';
+    openSheet(`<section class="cosmos-directory-v925" aria-label="COSMOS profile directory">
+      <div class="actions"><button type="button" id="dirV925Back">← ${u==='business'?'Business':'Personal'} timeline</button></div>
+      <h2>${u==='business'?'Business':'Personal'} COSMOS · People</h2>
+      <p class="micro">Find members who chose to be discoverable. Following never grants private or Connections-only access.</p>
+      <div class="actions"><button type="button" id="dirV925Search">Search</button><button type="button" id="dirV925Following">Following</button><button type="button" id="dirV925Settings">My privacy settings</button></div>
+      <div id="dirV925Content" aria-live="polite"></div>
+    </section>`);
+    const root=$('dirV925Content');
+    $('dirV925Back').onclick=()=>u==='business'?openBusinessHub('metro'):closeSheet();
+    $('dirV925Search').onclick=()=>cosmosDirectoryContentV925(u,'search',root);
+    $('dirV925Following').onclick=()=>cosmosDirectoryContentV925(u,'following',root);
+    $('dirV925Settings').onclick=()=>cosmosDirectoryContentV925(u,'settings',root);
+    void cosmosDirectoryContentV925(u,mode,root);
+  }
+  window.cosmosOpenDirectoryV925=cosmosDirectoryViewV925;
+  function cosmosDirectoryCardsV925(items,u,root){
+    if(!items.length){root.innerHTML='<p class="micro">No matching discoverable profiles. Try another name or @handle.</p>';return;}
+    root.innerHTML=items.map(p=>`<div class="cosmos-directory-card-v925">
+      <strong>${escapeHtml(p.name||('@'+p.handle))}</strong>
+      <div class="micro">@${escapeHtml(p.handle||'')}</div>
+      ${u==='business'&&p.headline?`<p>${escapeHtml(p.headline)}</p>`:''}
+      ${u==='business'&&p.company?`<div class="micro">${escapeHtml(p.company)}</div>`:''}
+      <div class="actions"><button type="button" data-dir-preview="${escapeHtml(p.user_id)}">View profile</button>
+      ${p.allow_followers?`<button type="button" data-dir-follow="${escapeHtml(p.user_id)}" data-following="${p.following?'1':'0'}" class="primary">${p.following?'Following ✓':'Follow +'}</button>`:'<span class="micro">Not accepting followers</span>'}</div></div>`).join('');
+    root.querySelectorAll('[data-dir-preview]').forEach(b=>b.onclick=()=>void cosmosDirectoryProfileV925(u,b.dataset.dirPreview));
+    root.querySelectorAll('[data-dir-follow]').forEach(b=>b.onclick=async()=>{
+      b.disabled=true;
+      try{
+        const next=b.dataset.following!=='1';
+        await api('/api/directory/follow?universe='+u,{method:next?'POST':'DELETE',body:JSON.stringify({user_id:b.dataset.dirFollow})});
+        b.dataset.following=next?'1':'0';b.textContent=next?'Following ✓':'Follow +';
+        toastMsg(next?'Following public updates.':'Unfollowed.');
+      }catch(e){toastMsg(e.message,5000);}finally{b.disabled=false;}
+    });
+  }
+  async function cosmosDirectoryProfileV925(u,id){
+    try{
+      const r=await api('/api/directory/profile/'+encodeURIComponent(id)+'?universe='+u);
+      const p=r.profile;
+      openSheet(`<div class="cosmos-directory-v925"><h2>${escapeHtml(p.name||('@'+p.handle))}</h2>
+        <p>@${escapeHtml(p.handle)}</p>
+        ${u==='business'?`<p>${escapeHtml(p.headline||'')}</p><p>${escapeHtml(p.company||'')}</p>`:''}
+        <p class="micro">This is a discoverable profile preview, not a private timeline. Following does not create a Connection.</p>
+        <div class="actions"><button id="dirV925ProfileBack">Back to search</button>
+        ${p.allow_followers?`<button class="primary" id="dirV925ProfileFollow">${p.following?'Unfollow':'Follow'}</button>`:''}</div></div>`);
+      $('dirV925ProfileBack').onclick=()=>cosmosDirectoryViewV925(u,'search');
+      const follow=$('dirV925ProfileFollow');if(follow)follow.onclick=async()=>{
+        follow.disabled=true;
+        try{await api('/api/directory/follow?universe='+u,{method:p.following?'DELETE':'POST',body:JSON.stringify({user_id:id})});
+          toastMsg(p.following?'Unfollowed.':'Following public updates.');cosmosDirectoryViewV925(u,'following');
+        }catch(e){toastMsg(e.message,4500);follow.disabled=false;}
+      };
+    }catch(e){toastMsg(e.message,5000);}
+  }
+  async function cosmosDirectoryContentV925(u,mode,root){
+    if(!root?.isConnected)return;
+    if(mode==='settings'){
+      root.innerHTML='<p>Loading privacy settings…</p>';
+      try{
+        const r=await api('/api/directory/settings?universe='+u);if(!root.isConnected)return;
+        root.innerHTML=`<div class="cosmos-directory-card-v925"><h3>${u==='business'?'Business':'Personal'} visibility</h3>
+          <label><input type="checkbox" id="dirV925Discoverable" ${r.discoverable?'checked':''}> Appear in signed-in member search</label>
+          <label><input type="checkbox" id="dirV925AllowFollow" ${r.allow_followers?'checked':''}> Allow people to follow this profile</label>
+          <p class="micro">Off by default. If enabled, members can search your display name and @handle${u==='business'?', and see your professional headline and company':''}. Your email, location, private posts and Connections-only moments remain hidden.</p>
+          <p class="micro">Followers: ${Number(r.followers||0)}. Switching either option off removes existing followers.</p>
+          ${u==='business'?'<p class="micro">Save a separate Business name and @handle in your Business profile first.</p>':''}
+          <div class="actions"><button class="primary" type="button" id="dirV925Save">Save discovery settings</button></div>
+        </div>`;
+        $('dirV925Discoverable').onchange=()=>{if(!$('dirV925Discoverable').checked)$('dirV925AllowFollow').checked=false;};
+        $('dirV925Save').onclick=async()=>{
+          const button=$('dirV925Save');button.disabled=true;
+          const discoverable=$('dirV925Discoverable').checked,allow_followers=$('dirV925AllowFollow').checked;
+          if((!discoverable||!allow_followers)&&r.followers>0&& !confirm('Disable discovery/following and remove existing followers?')){button.disabled=false;return;}
+          try{await api('/api/directory/settings?universe='+u,{method:'PATCH',body:JSON.stringify({discoverable,allow_followers})});
+            toastMsg('Your '+u+' search and follow preferences are saved.');
+            await cosmosDirectoryContentV925(u,'settings',root);
+          }catch(e){toastMsg(e.message,5000);button.disabled=false;}
+        };
+      }catch(e){root.textContent='Settings unavailable: '+e.message;}
+      return;
+    }
+    if(mode==='following'){
+      root.textContent='Loading followed profiles…';
+      try{const r=await api('/api/directory/following?universe='+u);if(root.isConnected)cosmosDirectoryCardsV925(r.following||[],u,root);}
+      catch(e){if(root.isConnected)root.textContent='Following unavailable: '+e.message;}
+      return;
+    }
+    root.innerHTML=`<div class="field"><label for="dirV925Query">Search ${u==='business'?'Business':'Personal'} profiles</label>
+      <input id="dirV925Query" type="search" maxlength="60" placeholder="Name or @handle" autocomplete="off"></div>
+      <div class="actions"><button type="button" class="primary" id="dirV925Go">Search profiles</button></div>
+      <div id="dirV925Results" aria-live="polite"><p class="micro">Enter at least 3 characters to find opted-in profiles.</p></div>`;
+    const search=async()=>{
+      const q=$('dirV925Query').value.trim(),zone=$('dirV925Results');
+      if(q.replace(/^@/,'').length<3){zone.textContent='Enter at least 3 characters.';return;}
+      zone.textContent='Searching…';
+      try{const r=await api('/api/directory/search?universe='+u+'&q='+encodeURIComponent(q));
+        if(zone.isConnected)cosmosDirectoryCardsV925(r.results||[],u,zone);
+      }catch(e){if(zone.isConnected)zone.textContent='Search unavailable: '+e.message;}
+    };
+    $('dirV925Go').onclick=search;
+    $('dirV925Query').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();void search();}};
+  }
+
+
   accountButton.addEventListener("click",()=>{
-    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button id="openBusinessFromProfile" class="primary">◈ Switch universe</button><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
+    openSheet(`<h2>${escapeHtml(me?.display_name||('@'+(me?.username||'You')))}</h2><p><strong>@${escapeHtml(me?.username||'username needed')}</strong> · Unique COSMOS username · Editable in Profile.</p><p>Your email address remains private. Your Cosmos is private unless you deliberately create a shared layer.</p><div class="field"><label>Display name</label><input id="displayName" value="${escapeHtml(me?.display_name||"")}" placeholder="Optional"></div><div class="field"><label for="profileUsername">Edit @username</label><input id="profileUsername" value="${escapeHtml(me?.username||'')}" placeholder="cosmos_explorer" maxlength="21" autocapitalize="none" autocomplete="off" spellcheck="false"></div><div class="micro">3–20 characters · starts with a letter · letters, numbers and underscores only. You may change your handle once every 24 hours. Your previous handles stay reserved to you.</div><div class="actions"><button type="button" id="saveUsername">Change @username</button></div><p id="profileUsernameError" class="micro" role="alert" hidden></p><div class="field"><label><input id="noticeToggle" type="checkbox" ${noticesEnabled?"checked":""} style="width:auto;margin-right:8px">Show nearby private Cosmos notices while this page is open</label></div><div class="micro">Off by default. Uses location with permission. Background push for direct messages requires notification permission and an installed Home Screen web app on iPhone. Place alerts still work only while Cosmos is open. Public Cosmos remains disabled.</div><div class="actions"><button type="button" id="personalDirectoryV925">Search people & follower settings</button></div><div class="actions"><button id="openNotifications" class="primary">Notifications</button><button id="openConnections">Connections</button><button id="openMyTags">@ Tag requests</button></div><div class="actions"><button id="openBusinessFromProfile" class="primary">◈ Switch universe</button><button class="primary" id="openTogetherSpaces">♫ Together Spaces</button><button id="openMyArchive">My posts</button><button id="openWaitingArchive">Waiting</button></div><div class="actions"><button id="saveName" class="primary">Save</button><button id="logout">Sign out</button></div><div class="micro">COSMOS IS FOR GOOD. People are never public content without consent.</div>`);
     $("noticeToggle").onchange=async e=>{noticesEnabled=e.target.checked;localStorage.setItem(NOTICE_KEY,noticesEnabled?"on":"off");if(noticesEnabled){lastConnectionPoll=0;try{lastScanLoc=await getLocation();await refreshConnections(true);}catch(err){toastMsg(err.message,3500);}}};
+    $("personalDirectoryV925").onclick=()=>cosmosDirectoryViewV925("personal","search");
     $("openNotifications").onclick=showCosmosNotifications;
     $("openMyTags").onclick=showMomentTagRequests;
     $("openConnections").onclick=openFriends;
@@ -8929,11 +9126,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     personal:[
       ['ask','✧ Ask COSMOS'],['business','◈ Business timeline'],
       ['people','People & Connections'],['together','♫ Together'],
-      ['origins','Origins · Original COSMOS'],['account','Account & settings'],
+      ['origins','Origins · Original COSMOS'],['directory','Search Personal people'],['account','Account & settings'],
     ],
     business:[
       ['personal','◈ Personal timeline'],['jobs','Jobs & talent'],
-      ['feed','Work feed'],['profile','Business profile'],['visitors','Profile visitors'],['account','Account & settings'],
+      ['feed','Work feed'],['profile','Business profile'],['visitors','Profile visitors'],['directory','Search Business people'],['account','Account & settings'],
     ],
   };
   let overlay=document.getElementById('cosmosMetroMoreOverlayV923');
@@ -8952,12 +9149,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!item||item.disabled)return;
     const name=item.dataset.cosmosMenuAction;
     close();
+    if(name==='directory'){window.cosmosOpenDirectoryV925?.(overlay.dataset.cosmosUniverseV925||'personal','search');return;}
     const handlers=window.cosmosMetroShortcutsV923;
     if(handlers&&typeof handlers[name]==='function')handlers[name]();
   });
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden)close();});
   function open(kind,origin){
-    lastOrigin=origin;
+    lastOrigin=origin;overlay.dataset.cosmosUniverseV925=kind;
     document.getElementById('cosmosMetroMoreTitleV923').textContent=kind==='business'?'Business COSMOS':'Personal COSMOS';
     document.getElementById('cosmosMetroMoreListV923').innerHTML=actions[kind].map(([value,label])=>
       `<button type="button" class="cosmos-menu-entry" data-cosmos-menu-action="${value}">${label}</button>`).join('');
