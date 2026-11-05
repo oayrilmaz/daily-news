@@ -168,7 +168,45 @@ function publicRecord(original,proposal,when){
 }
 function page(rec){const sourceLinks=rec.sources.map((s,i)=>`<li><a rel="noopener noreferrer" target="_blank" href="${esc(s.url)}">[${i+1}] ${esc(s.title)}</a> · ${esc(s.domain)}</li>`).join('');
  const media=rec.youtube?`<section><h2>Watch</h2><a href="${esc(rec.youtube.url)}" rel="noopener noreferrer" target="_blank">${esc(rec.youtube.title)}</a><p class="muted">Supplemental video, not evidence for this answer.</p></section>`:'';
- return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="index,follow"><title>${esc(rec.question)} | PTD COSMOS</title><meta name="description" content="${esc(rec.short_answer.slice(0,170))}"><meta property="og:type" content="article"><meta property="og:url" content="${esc(rec.url)}"><meta property="og:title" content="${esc(rec.question)}"><meta property="og:description" content="${esc(rec.short_answer)}"><meta property="og:image" content="${esc(rec.image_url)}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${esc(rec.url)}"><style>*{box-sizing:border-box}body{margin:0;background:#f9fafb;color:#172132;font:16px/1.65 system-ui,-apple-system,sans-serif}main{max-width:850px;margin:auto;padding:clamp(20px,5vw,60px)}a{color:#176b89}nav{display:flex;gap:18px;justify-content:space-between}nav a{text-decoration:none}h1{font-size:clamp(29px,5vw,49px);line-height:1.14;letter-spacing:-.03em}h2{font-size:22px}section{border-top:1px solid #dce3e8;padding:22px 0}li{margin:12px 0;overflow-wrap:anywhere}.hero{width:100%;height:auto;border-radius:16px}.muted{color:#607386;font-size:14px}.answer{font-size:21px;font-weight:650}.tag{font-size:12px;border:1px solid #cedce4;border-radius:20px;padding:5px 12px}</style></head><body><main><nav><a href="https://ptdtoday.com/">PTD TODAY / COSMOS</a><a href="https://ptdtoday.com/q/trends/">Global Questions</a></nav><p class="muted">${esc(rec.category)} · ${esc(rec.published_at.slice(0,10))}</p><h1>${esc(rec.question)}</h1><span class="tag">Source-linked · AI-assisted</span><p class="muted">Published through automated editorial checks. Verify time-sensitive details with original reporting.</p><img class="hero" src="${esc(rec.image_url)}" alt="COSMOS illustration of the question"><section><h2>The answer</h2><p class="answer">${esc(rec.short_answer)}</p><p>${esc(rec.explanation)}</p></section>${media}<section><h2>Original sources</h2><ol>${sourceLinks}</ol><p class="muted">Independent source passages were checked for the main news fact. Automated fact-checking can still make mistakes. This is a COSMOS editorial question, not a measured most-searched question.</p></section></main></body></html>`;
+ return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="index,follow"><title>${esc(rec.question)} | PTD COSMOS</title><meta name="description" content="${esc(rec.short_answer.slice(0,170))}"><meta property="og:type" content="article"><meta property="og:url" content="${esc(rec.url)}"><meta property="og:title" content="${esc(rec.question)}"><meta property="og:description" content="${esc(rec.short_answer)}"><meta property="og:image" content="${esc(rec.image_url)}"><meta name="twitter:card" content="summary_large_image"><link rel="canonical" href="${esc(rec.url)}"><style>*{box-sizing:border-box}body{margin:0;background:#f9fafb;color:#172132;font:16px/1.65 system-ui,-apple-system,sans-serif}main{max-width:850px;margin:auto;padding:clamp(20px,5vw,60px)}a{color:#176b89}nav{display:flex;gap:18px;justify-content:space-between}nav a{text-decoration:none}h1{font-size:clamp(29px,5vw,49px);line-height:1.14;letter-spacing:-.03em}h2{font-size:22px}section{border-top:1px solid #dce3e8;padding:22px 0}li{margin:12px 0;overflow-wrap:anywhere}.hero{width:100%;height:auto;border-radius:16px}.muted{color:#607386;font-size:14px}.answer{font-size:21px;font-weight:650}.tag{font-size:12px;border:1px solid #cedce4;border-radius:20px;padding:5px 12px}
+
+/* COSMOS ARTICLE RETURN v9.2.2: always accessible on mobile and desktop. */
+.cosmos-article-return-top {position:sticky;top:0;z-index:50;
+ margin:12px 0 22px;padding:10px 0;
+ background:rgba(249,250,251,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+ border-bottom:1px solid #dbe3ea}
+.cosmos-article-return-bottom {margin:34px 0 12px;padding:22px 0;
+ border-top:1px solid #dbe3ea;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.cosmos-article-return-top a,.cosmos-article-return-bottom a {
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:48px;padding:10px 18px;border-radius:999px;
+ text-decoration:none!important;font-weight:750;font-size:15px;line-height:1.35;
+ background:#193347;color:#fff!important;border:1px solid #193347;
+ box-shadow:0 2px 6px rgba(18,42,58,.10)}
+.cosmos-article-return-top a:focus-visible,.cosmos-article-return-bottom a:focus-visible {
+ outline:3px solid #2082b8;outline-offset:3px}
+@media(max-width:640px){.cosmos-article-return-top{margin:8px -4px 16px;padding:6px 4px}
+.cosmos-article-return-top a,.cosmos-article-return-bottom a{width:100%;max-width:100%;font-size:16px}}
+
+</style></head><body><main><nav><a href="https://ptdtoday.com/">PTD TODAY / COSMOS</a><a href="https://ptdtoday.com/q/trends/">Global Questions</a></nav><div class="cosmos-article-return-top" id="cosmos-article-return-v922"><a href="/cosmos-next.html" data-cosmos-return>← Back to COSMOS Timeline</a></div><p class="muted">${esc(rec.category)} · ${esc(rec.published_at.slice(0,10))}</p><h1>${esc(rec.question)}</h1><span class="tag">Source-linked · AI-assisted</span><p class="muted">Published through automated editorial checks. Verify time-sensitive details with original reporting.</p><img class="hero" src="${esc(rec.image_url)}" alt="COSMOS illustration of the question"><section><h2>The answer</h2><p class="answer">${esc(rec.short_answer)}</p><p>${esc(rec.explanation)}</p></section>${media}<section><h2>Original sources</h2><ol>${sourceLinks}</ol><p class="muted">Independent source passages were checked for the main news fact. Automated fact-checking can still make mistakes. This is a COSMOS editorial question, not a measured most-searched question.</p></section><footer class="cosmos-article-return-bottom"><a href="/cosmos-next.html" data-cosmos-return>← Back to COSMOS Timeline</a></footer></main><script id="cosmos-article-return-script-v922">
+/* COSMOS ARTICLE RETURN v9.2.2: same-browser navigation, never forces login. */
+(function(){
+  'use strict';
+  document.addEventListener('click',function(event){
+    var link=event.target.closest && event.target.closest('a[data-cosmos-return]');
+    if(!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    try {
+      var prev=new URL(document.referrer);
+      var backToMetro=prev.origin===location.origin &&
+        (prev.pathname==='/cosmos-next.html' || prev.pathname==='/cosmos-next');
+      if(backToMetro && history.length>1){
+        event.preventDefault();
+        history.back();
+      }
+    }catch(_e){ /* Missing/foreign referrer: use normal href fallback. */ }
+  });
+})();
+</script></body></html>`;
 }
 function indexPage(reg){const cards=reg.items.filter(x=>x.publication_status==='published').slice(0,100).map(x=>`<article><a href="${esc(x.url)}"><img src="${esc(x.image_url)}" alt="COSMOS card" loading="lazy"><h2>${esc(x.question)}</h2><p>${esc(x.short_answer)}</p><small>${esc(x.category)} · ${esc(x.published_at.slice(0,10))}</small></a></article>`).join('');return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="index,follow"><title>Global Questions | PTD COSMOS</title><link rel="canonical" href="https://ptdtoday.com/q/trends/"><style>body{font:16px/1.5 system-ui;margin:0;background:#f9fafb;color:#172132}main{max-width:1100px;margin:auto;padding:38px 22px}h1{font-size:clamp(35px,5vw,58px)}section{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}article{background:#fff;border:1px solid #dde5ea;border-radius:16px;overflow:hidden}article img{width:100%;aspect-ratio:1200/630;object-fit:cover}article a{text-decoration:none;color:inherit}article h2,article p,article small{margin:14px 18px;display:block}article p,small{color:#546376}nav a{color:#176b89}</style></head><body><main><nav><a href="https://ptdtoday.com/">PTD TODAY / COSMOS</a></nav><h1>Questions worth exploring.</h1><p>Real developments, concise source-linked explanations. Automated publishing is evidence-screened.</p><section>${cards||'<p>No stories published yet.</p>'}</section></main></body></html>`;}
 async function run({mode=MODE,enabled=ENABLED,reviewData=null,gateData=null,registry=null,composer=composeAndAudit}={}){
