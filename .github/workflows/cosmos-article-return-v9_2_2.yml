@@ -1,0 +1,101 @@
+name: COSMOS v9.2.2 — Public Article Back to Timeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Validate first, then apply"
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+  pages: write
+
+# Serializes with other COSMOS publisher/patch workflows using this group.
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  article-return:
+    name: Add visible return navigation to public articles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Validate publisher and published pages without changes
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_article_return_v9_2_2.py --check
+          node --check scripts/cosmos_autonomous_publish_v7_4.mjs
+
+      - name: Apply navigation fix to future and existing articles
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/patch_cosmos_article_return_v9_2_2.py --apply
+          node --check scripts/cosmos_autonomous_publish_v7_4.mjs
+          python3 scripts/patch_cosmos_article_return_v9_2_2.py --check
+
+      - name: Verify article navigation, private isolation, and safe links
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          g=Path('scripts/cosmos_autonomous_publish_v7_4.mjs').read_text()
+          segment=g.split('function page(rec)',1)[1].split('function indexPage(',1)[0]
+          assert segment.count('cosmos-article-return-v922')==1
+          assert 'href="/cosmos-next.html" data-cosmos-return' in segment
+          assert 'history.back()' in segment
+          published=0
+          for p in Path('q/trends').glob('global-*.html'):
+              html=p.read_text()
+              if '<meta name="robots" content="index,follow">' in html and ('Published through automated editorial checks.' in html or 'Source-linked · AI-assisted' in html):
+                  published+=1
+                  assert html.count('id="cosmos-article-return-v922"')==1,p
+                  assert html.count('cosmos-article-return-script-v922')==1,p
+                  assert html.count('class="cosmos-article-return-bottom"')==1,p
+                  assert html.count('href="/cosmos-next.html" data-cosmos-return')==2,p
+          print(f'PASS: {published} published articles have top and bottom COSMOS Timeline buttons')
+          print('PASS: no authentication/session storage/Cloudflare files modified')
+          PY
+          git diff --check -- scripts/cosmos_autonomous_publish_v7_4.mjs q/trends/
+
+      - name: Commit ONLY article generator and public article HTML
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          set -euo pipefail
+          git add -- scripts/cosmos_autonomous_publish_v7_4.mjs
+          git add -u -- q/trends/
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Already applied; no change to publish.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'COSMOS: add Back to Timeline navigation on published questions'
+            git push origin HEAD:main
+          fi
+
+      - name: Request Pages refresh if branch-based publishing is enabled
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' 2>/dev/null | grep -q '^legacy$'; then
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/dev/null || echo 'Check Pages deployment runs.'
+          else
+            echo 'Check existing pages-build-deployment workflow for the new commit.'
+          fi
