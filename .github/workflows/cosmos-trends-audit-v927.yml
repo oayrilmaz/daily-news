@@ -1,0 +1,36 @@
+name: COSMOS v9.2.7 — Read-only Global Trends Publishing Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read current main without write permissions
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax and offline self-test
+        run: |
+          node --check scripts/cosmos_trends_audit_v927.mjs
+          node scripts/cosmos_trends_audit_v927.mjs --self-test
+      - name: Audit published registry, timeline feed, and latest run status
+        run: node scripts/cosmos_trends_audit_v927.mjs
+      - name: Upload report (no private editorial files)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cosmos-trends-audit-v927
+          retention-days: 14
+          path: |
+            artifacts/cosmos-trends-audit-v927/report.md
+            artifacts/cosmos-trends-audit-v927/report.json
