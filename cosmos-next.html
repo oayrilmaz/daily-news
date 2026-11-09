@@ -3415,6 +3415,76 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 .cosmos933-profile-dialog .cosmos933-photo-tools{justify-content:center;padding:0 14px 18px}
 @media(max-width:540px){.cosmos933-photo-dialog{border-radius:15px}.cosmos933-photo-body{padding:9px}.cosmos933-photo-heading{padding:11px 12px}.cosmos933-photo-heading h2{font-size:15px}.cosmos933-photo-tools button{font-size:12px}}
 
+
+/* COSMOS v9.3.5 — Business Metro transparent like Personal.
+   Important: scoped to the TIMELINE only. Job search, profile, media
+   viewer, editor, and full-screen Business background stay independent. */
+#sheet.business-modal[data-business-tab="metro"]{
+  background:transparent!important;background-image:none!important;
+  border:0!important;box-shadow:none!important;
+}
+/* Restore the owner's selected Business wallpaper without letting the
+   v9.3.3 cover image leak into other Business tabs. */
+#sheet.business-modal[data-business-tab="metro"].cosmos933-has-business-bg{
+  background-image:var(--cosmos933-business-bg)!important;
+  background-position:center center!important;
+  background-size:cover!important;background-repeat:no-repeat!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .sheet-inner,
+#sheet.business-modal[data-business-tab="metro"] .business-shell.business-timeline-first,
+#sheet.business-modal[data-business-tab="metro"] #businessBody,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .week-metro,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-main,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-scroll,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .living-day-chart,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-heading{
+  background:transparent!important;background-image:none!important;
+  box-shadow:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .sheet-quickbar{
+  background:rgba(255,255,255,.22)!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  border-color:rgba(255,255,255,.25)!important;
+}
+/* Live-camera or owner's photo remains visible, with a readable compact
+   heading and small glassy empty-state only; no full-height white surface. */
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-heading{
+  border-radius:12px;padding:6px 9px!important;
+  text-shadow:0 1px 4px rgba(255,255,255,.9)!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .living-empty{
+  background:rgba(255,255,255,.64)!important;
+  border:1px solid rgba(255,255,255,.70)!important;
+  border-radius:18px!important;
+  padding:15px!important;
+  color:#263744!important;
+  -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);
+}
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .living-entry{
+  background:rgba(255,255,255,.88)!important;
+  border:1px solid rgba(255,255,255,.85)!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-week-note,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-heading h2,
+#sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-heading p{
+  text-shadow:0 1px 4px rgba(255,255,255,.95)!important;
+}
+/* Avoid the blur and dim backdrop placed behind a standard modal sheet. */
+#sheetBackdrop:has(+ #sheet.business-modal[data-business-tab="metro"]){
+  background:transparent!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+  pointer-events:none!important;
+}
+@media(max-width:650px){
+ #sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .living-empty{
+   left:5%!important;right:5%!important;padding:12px!important;
+ }
+ #sheet.business-modal[data-business-tab="metro"] .shared-metro-engine .metro-day-heading{
+   padding:6px!important;
+ }
+}
+
 </style>
 <!-- COSMOS v9.2.8 · Interface patch -->
 
