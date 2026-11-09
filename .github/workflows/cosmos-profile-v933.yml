@@ -1,0 +1,44 @@
+name: COSMOS v9.3.3 — Photo Editor and Fullscreen Backgrounds
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate or apply guarded v9.3.3 frontend correction
+        run: python scripts/apply_cosmos_profile_v933.py "${{ inputs.mode }}"
+      - name: Commit only the frontend in apply mode
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name 'COSMOS GitHub Actions'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add cosmos-next.html
+            git commit -m 'COSMOS v9.3.3 profile photo editor and responsive backgrounds'
+            git push origin HEAD:main
+          else
+            echo 'No update required.'
+          fi
