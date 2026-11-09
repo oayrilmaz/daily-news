@@ -3485,6 +3485,68 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
  }
 }
 
+
+/* COSMOS v9.3.6 — identical Origins circle / logo language in both universes.
+   One appearance; separate authenticated Personal and Business portraits. */
+#sheet.business-modal .sheet-quickbar{
+  display:flex!important;flex-wrap:nowrap!important;align-items:center!important;
+  justify-content:space-between!important;gap:8px!important;
+}
+#sheet.business-modal .cosmos936-business-brand{
+  display:flex!important;align-items:center!important;gap:11px!important;
+  min-width:0!important;flex:0 1 auto!important;pointer-events:auto;
+}
+#sheet.business-modal .cosmos936-business-brand .cosmos929-origin-orb{
+  display:grid!important;flex:0 0 34px!important;min-width:34px!important;
+  width:34px!important;height:34px!important;place-items:center!important;
+  border:1.5px solid #8c9ba6!important;border-radius:50%!important;
+  background:#fff!important;box-shadow:0 2px 12px #00000012!important;
+}
+#sheet.business-modal .cosmos936-business-brand .cosmos929-origin-orb span{
+  width:18px!important;height:18px!important;border:1px solid #6b8295!important;
+  border-radius:50%!important;
+}
+#sheet.business-modal .cosmos936-business-brand > .business-header-brand{
+  display:block!important;min-width:0!important;min-height:0!important;
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;padding:0!important;text-align:left!important;
+  text-transform:uppercase!important;font-size:13px!important;
+  line-height:1.25!important;letter-spacing:.20em!important;
+  font-weight:800!important;color:#272c31!important;
+  text-shadow:0 1px 12px rgba(255,255,255,.9)!important;
+  white-space:nowrap!important;
+}
+#sheet.business-modal .cosmos936-business-brand > .business-header-brand .tagline{
+  display:block!important;margin-top:5px!important;font-size:11px!important;
+  letter-spacing:.01em!important;font-weight:500!important;
+  color:#697183!important;text-transform:none!important;
+}
+#sheet.business-modal .business-header-actions{
+  display:flex!important;flex:0 0 auto!important;align-items:center!important;
+  justify-content:flex-end!important;gap:clamp(4px,1vw,8px)!important;
+  margin-left:auto!important;
+}
+/* Older styles forced a solid background with !important, preventing
+   authenticated owner portrait URLs from appearing in the circle. */
+#app .cosmos933-header-avatar,#sheet.business-modal .cosmos933-header-avatar{
+  background-color:#f2f4f6!important;
+  background-size:cover!important;background-position:center center!important;
+  background-repeat:no-repeat!important;
+}
+#app .cosmos933-header-avatar.has-photo,
+#sheet.business-modal .cosmos933-header-avatar.has-photo{
+  color:transparent!important;
+}
+@media(max-width:540px){
+  #sheet.business-modal .cosmos936-business-brand{gap:9px!important;}
+  #sheet.business-modal .cosmos936-business-brand > .business-header-brand{
+    font-size:12px!important;
+  }
+  #sheet.business-modal .cosmos936-business-brand > .business-header-brand .tagline{
+    font-size:11px!important;
+  }
+}
+
 </style>
 <!-- COSMOS v9.2.8 · Interface patch -->
 
@@ -5016,7 +5078,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     sheet.dataset.businessTab=tab;
     updateUniverseSwitch('business');
     const header=sheet.querySelector('.sheet-quickbar');
-    header.innerHTML=`<button type="button" class="business-header-brand" id="businessHeaderUniverse" aria-label="Choose COSMOS universe" title="Choose universe"><strong>COSMOS</strong><span>Look deeper.</span></button>
+    header.innerHTML=`<div class="cosmos929-brand cosmos936-business-brand"><a class="cosmos929-origin-orb" href="/cosmos-original-home.html" aria-label="Open original COSMOS Origins" title="Original COSMOS"><span aria-hidden="true"></span></a><button type="button" class="business-header-brand brand" id="businessHeaderUniverse" aria-label="Choose COSMOS universe" title="Choose universe">COSMOS<span class="tagline">Look deeper.</span></button></div>
       <div class="business-header-actions" aria-label="COSMOS controls">
       <button type="button" class="business-private-switch" id="businessHeaderPrivate" title="Switch to Private COSMOS">◈ Private</button>
       <button type="button" class="business-head-jobs" id="businessHeaderJobs" title="COSMOS Jobs" aria-label="Open COSMOS Jobs">Jobs</button>
@@ -8282,7 +8344,12 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!url)return;
     if(kind==='avatar'){
       const mini=document.getElementById('cosmos933-avatar-'+universe);
-      if(mini){mini.style.backgroundImage='url("'+url+'")';mini.classList.add('has-photo');}
+      if(mini){
+        // Override legacy !important background shorthand on both header avatars.
+        // The image is an authenticated owner-only blob URL, never a public R2 URL.
+        mini.style.setProperty('background-image','url("'+url+'")','important');
+        mini.classList.add('has-photo');
+      }
     }else if(universe==='personal'){
       app.style.setProperty('--cosmos933-personal-bg','url("'+url+'")');
       app.classList.add('cosmos933-has-personal-bg');
