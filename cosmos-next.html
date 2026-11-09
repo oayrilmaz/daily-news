@@ -8121,8 +8121,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 
 
 
-  /* v9.2.9: Separate owner-only Personal/Business profile photos.
-     Cloudflare Worker rejects metadata-bearing image originals; browser re-encodes.
+  /* v9.3.4: Separate owner-only Personal/Business profile photos.
+     Both the browser and Cloudflare Worker automatically normalize image metadata.
      Never expose a bearer token in image URLs or to the public editorial feed. */
   const cosmos929ImageUrls=new Map();
   async function cosmos929ReadPhoto(path){
@@ -8181,7 +8181,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         <input class="cosmos933-native-file" id="cosmos929-${universe}-${kind}" type="file" accept="image/*,.heic,.heif" data-cosmos929-upload="${kind}">
         <div class="cosmos933-photo-actions"><button type="button" data-cosmos933-edit-existing="${kind}">Edit existing ${kind==='avatar'?'portrait':'background'}</button></div>
       </div>`).join('')}</div>
-      <p class="cosmos929-photo-status" role="status" aria-live="polite">Choose a file to open the editor. Your original file is not uploaded until you choose Save.</p>`;
+      <p class="cosmos929-photo-status" role="status" aria-live="polite">Choose a file to open the editor. COSMOS automatically removes location metadata when you save; no manual export is required.</p>`;
     container.prepend(section);
     const status=section.querySelector('.cosmos929-photo-status');
     section.querySelectorAll('[data-cosmos929-upload]').forEach(input=>input.addEventListener('change',async()=>{
@@ -8325,7 +8325,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     };
   }
   async function cosmos933Upload(universe,kind,file,status){
-    if(status)status.textContent='Uploading securely…';
+    if(status)status.textContent='Saving edited photo securely (location metadata removed automatically)…';
     try{
       const form=new FormData();form.append('file',file);
       await api('/api/identity-media/'+universe+'/'+kind,{method:'POST',body:form});
@@ -8342,6 +8342,29 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       if(status)status.textContent='Saved successfully to your '+universe+' profile.';
       return true;
     }catch(e){if(status)status.textContent='Photo not saved: '+(e?.message||'Upload failed.');return false;}
+  }
+  // v9.3.4: Do not require people to manually remove iPhone photo metadata.
+  // The original photo stays local; only the edited, metadata-stripped output is uploaded.
+  async function cosmos934CleanCanvasJpeg(blob){
+    const b=new Uint8Array(await blob.arrayBuffer());
+    if(b.length<4||b[0]!==255||b[1]!==216)throw Error('Could not create a JPEG. Please try again.');
+    const parts=[b.subarray(0,2)];let pos=2,found=false;
+    while(pos<b.length){
+      if(b[pos]!==255)throw Error('The photo export was incomplete. Please retry.');
+      const start=pos;while(pos<b.length&&b[pos]===255)pos++;
+      if(pos>=b.length)throw Error('The photo export was incomplete. Please retry.');
+      const marker=b[pos++];
+      if(marker===0xda){parts.push(b.subarray(start));found=true;break;}
+      if(marker===0xd9)break;
+      if(marker===0x01||(marker>=0xd0&&marker<=0xd7)){parts.push(b.subarray(start,pos));continue;}
+      if(pos+2>b.length)throw Error('The photo export was incomplete. Please retry.');
+      const len=b[pos]*256+b[pos+1];
+      if(len<2||pos+len>b.length)throw Error('The photo export was incomplete. Please retry.');
+      if(!((marker>=0xe0&&marker<=0xef)||marker===0xfe))parts.push(b.subarray(start,pos+len));
+      pos+=len;
+    }
+    if(!found)throw Error('The photo export was incomplete. Please retry.');
+    return new Blob(parts,{type:'image/jpeg'});
   }
   async function cosmos933EditPhoto(file,kind){
     if(!file||file.size>35*1024*1024){toastMsg('Select an image smaller than 35 MB.',5000);return null;}
@@ -8401,7 +8424,10 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
           let blob=await new Promise(resolve=>output.toBlob(resolve,'image/jpeg',.84));
           if(blob?.size>(kind==='avatar'?3:6)*1024*1024)blob=await new Promise(resolve=>output.toBlob(resolve,'image/jpeg',.65));
           if(!blob)throw Error('The browser could not export this photo.');
-          finish(new File([blob],kind==='avatar'?'cosmos-avatar.jpg':'cosmos-background.jpg',{type:'image/jpeg'}));
+          // iPhone Safari may add ICC/APP metadata even to a canvas-made JPEG.
+          // The backend strips metadata too; keep the UI copy privacy-safe.
+          const sanitized=await cosmos934CleanCanvasJpeg(blob);
+          finish(new File([sanitized],kind==='avatar'?'cosmos-avatar.jpg':'cosmos-background.jpg',{type:'image/jpeg'}));
         }catch(e){body.querySelector('.cosmos933-photo-error').textContent=e.message;save.disabled=false;}
       };
     });
