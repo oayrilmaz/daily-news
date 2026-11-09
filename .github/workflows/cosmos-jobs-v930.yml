@@ -1,0 +1,43 @@
+name: COSMOS v9.3.0 - Career AI + Global Jobs Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first; apply only after successful validation
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+jobs:
+  correct-jobs-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact repository branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Confirm environment
+        run: |
+          python3 --version
+          node --version
+      - name: Guard source and validate corrected COSMOS frontend
+        run: python3 scripts/apply_cosmos_jobs_v930.py "${{ inputs.mode }}"
+      - name: Commit only the updated front page
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          if git diff --quiet -- cosmos-next.html; then
+            echo "No changes necessary."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cosmos-next.html
+          git commit -m "COSMOS Jobs v9.3.0: private career analysis and global-first role discovery"
+          git push
