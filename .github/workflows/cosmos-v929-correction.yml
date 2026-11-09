@@ -1,0 +1,51 @@
+name: COSMOS v9.2.9 — Source-Corrected Interface
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validate first. Apply only after validation is green.'
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+concurrency:
+  group: cosmos-v929-source-corrected
+  cancel-in-progress: false
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Node for JavaScript syntax tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify baseline and produce non-deployed preview
+        run: |
+          python3 scripts/cosmos_v929_patch.py validate
+          python3 scripts/validate_cosmos_v929.py /tmp/cosmos_v929_preview.html
+          git diff --exit-code -- cosmos-next.html
+      - name: Apply to current COSMOS source (only in apply mode)
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          python3 scripts/cosmos_v929_patch.py apply
+          python3 scripts/validate_cosmos_v929.py cosmos-next.html
+          git add -- cosmos-next.html
+          if git diff --cached --quiet; then
+            echo 'v9.2.9 already applied: no new commit.'
+          else
+            git -c user.name='COSMOS UI Bot' -c user.email='github-actions[bot]@users.noreply.github.com' commit -m 'COSMOS v9.2.9 corrected interface against verified source'
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
