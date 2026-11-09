@@ -1,0 +1,78 @@
+name: COSMOS v9.2.8 — Unified Interface + Marketplaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validate first; apply only after Cloudflare schema + Life Worker are ready'
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v6-3-global-trends-review
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate current files, JS and marketplace HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = main || { echo 'STOP: use main'; exit 1; }
+          test -s assets/cosmos-v928-ui.js
+          test -s assets/cosmos-v928-ui.css
+          test -s cosmos-market-personal.html
+          test -s cosmos-market-business.html
+          test -s scripts/apply_cosmos_v928_ui.py
+          test -s scripts/enrich_public_regions_v928.mjs
+          node --check scripts/enrich_public_regions_v928.mjs
+          node scripts/enrich_public_regions_v928.mjs validate
+          node --check assets/cosmos-v928-ui.js
+          python - <<'PY'
+          import re,pathlib,subprocess,tempfile
+          for name in ['cosmos-market-personal.html','cosmos-market-business.html']:
+              txt=pathlib.Path(name).read_text()
+              chunks=re.findall(r'<script[^>]*>(.*?)</script>',txt,re.S|re.I)
+              assert len(chunks)==1 and 'cosmos_life_token_v1' in txt, name
+              with tempfile.NamedTemporaryFile(suffix='.js',mode='w',encoding='utf8') as f:
+                  f.write(chunks[0]);f.flush()
+                  subprocess.run(['node','--check',f.name],check=True)
+          print('Both marketplace pages: PASS')
+          PY
+          python -m py_compile scripts/apply_cosmos_v928_ui.py
+          python scripts/apply_cosmos_v928_ui.py cosmos-next.html validate
+      - name: Apply to the existing central timeline (no replacement)
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/apply_cosmos_v928_ui.py cosmos-next.html apply
+          node scripts/enrich_public_regions_v928.mjs apply
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add -- cosmos-next.html
+          if [ -f data/cosmos-public-timeline.json ]; then git add -- data/cosmos-public-timeline.json; fi
+          if git diff --cached --quiet; then echo 'v928 already installed'; exit 0; fi
+          git commit -m 'COSMOS v9.2.8: link unified UI and marketplaces'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
