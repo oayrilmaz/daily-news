@@ -1,0 +1,44 @@
+name: COSMOS v9.3.1 — Auto Global CV Matches Fix
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply after green
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate or apply guarded correction
+        run: python scripts/apply_cosmos_jobs_v931.py "${{ inputs.mode }}"
+      - name: Commit corrected frontend only if apply mode
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name 'COSMOS GitHub Actions'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add cosmos-next.html
+            git commit -m 'Fix automatic global CV job discovery v9.3.1'
+            git push origin HEAD:main
+          else
+            echo 'No changes required.'
+          fi
