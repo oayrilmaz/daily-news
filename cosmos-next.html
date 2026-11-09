@@ -5186,6 +5186,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     return `<article class="cosmos-jobs-card"><div class="business-eyebrow">${provenance} · ${escapeHtml(job.work_model||'Work')} · ${escapeHtml(job.location||'Location not provided')}</div>
       <h3>${escapeHtml(job.title)}</h3><div class="cosmos-jobs-org">${escapeHtml(job.organization)}</div>
       <p>${escapeHtml(String(job.description||'').slice(0,250))}${String(job.description||'').length>250?'…':''}</p>
+      ${job.source_employer?`<p class="business-note">Source: ${escapeHtml(job.source_employer)} public careers page · verify open status before applying.</p>`:''}
       ${job.relevance?`<div class="cosmos-jobs-evidence"><strong>${escapeHtml(job.relevance.tier)}</strong>
         <div>${escapeHtml(job.relevance.reason||'Professional role context')}</div>
         <div class="business-note">${escapeHtml(job.relevance.note||'Opportunity discovery, not an employment decision.')}</div></div>`:''}
@@ -5261,7 +5262,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         if(view==='browse'){
           (listing.jobs||[]).forEach(j=>businessJobsCache.set(j.id,j));
           target.innerHTML=`<div class="cosmos-jobs-summary"><strong>Search COSMOS first, then outside opportunities</strong>
-            <p>COSMOS member postings appear first. External openings come from attributed job providers and open on their own websites.</p>
+            <p>COSMOS member postings appear first. External openings now include selected public employer career boards, Jobicy remote roles, and optional national-market sources.</p>
             <form id="cosmosSearchJobsForm" class="cosmos-job-filters"><label>Position or keywords
               <input id="jobsSearchText" aria-label="Position or keywords" placeholder="e.g. vice president" value="${escapeHtml(businessJobsSearchQuery)}" /></label>
               <label>Location (optional)<input id="jobsSearchLocation" placeholder="e.g. Raleigh, NC" value="${escapeHtml(businessJobsSearchLocation)}" /></label>
@@ -5284,7 +5285,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
               const r=await api('/api/business/jobs/discover?q='+encodeURIComponent(q)+'&location='+encodeURIComponent(loc));
               if(serial!==businessJobsSearchSerial||!$('jobsBrowseExternal'))return;
               $('jobsBrowseExternal').innerHTML=(r.external||[]).map(j=>businessJobsCard(j)).join('')||
-                '<div class="business-empty">No matching external results from the available sources. Broader on-site/hybrid searches require an additional provider.</div>';
+                '<div class="business-empty">No matching external results from the available sources. Provider coverage is limited; try different roles or expand employer sources.</div>';
               $('jobsProviderStatus').textContent=(r.providers||[]).map(p=>p.name+': '+(p.status==='ok'?p.count+' results':p.status==='not_configured'?'not configured':'unavailable')).join(' · ');
             }catch(e){if(serial===businessJobsSearchSerial&&$('jobsBrowseExternal'))$('jobsBrowseExternal').textContent='External search unavailable: '+e.message;}
           };
@@ -5359,13 +5360,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
             const providers=outside.status==='fulfilled'?(outside.value.providers||[]):[];
             const scope=location?'Requested region: '+location:'Worldwide first · no location restriction';
             const problems=[inside.status==='rejected'?'Internal search: '+inside.reason.message:null,outside.status==='rejected'?'External search: '+outside.reason.message:null,career.status==='rejected'?'Career assessment: '+career.reason.message:null].filter(Boolean);
-            $('jobsMatches').innerHTML=`<p class="business-note">${escapeHtml(scope)} · Matching started automatically from your résumé. Internal and external openings are grouped separately and ranked by career relevance.</p>
+            $('jobsMatches').innerHTML=`<p class="business-note">${escapeHtml(scope)} · Matching started automatically from your résumé. Internal and external openings appear separately, ordered by documented field, role and seniority alignment.</p>
               ${problems.length?`<p class="business-note" role="alert">${escapeHtml(problems.join(' · '))}</p>`:''}
               <h3 class="cosmos-job-group">1 · COSMOS openings</h3>${internal.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No sufficiently relevant internal openings found.</div>'}
-              <h3 class="cosmos-job-group">2 · External openings</h3>${external.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No relevant external positions returned from currently available sources. Broader coverage needs additional providers.</div>'}
+              <h3 class="cosmos-job-group">2 · External openings</h3>${external.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No close opportunities among connected sources. COSMOS does not yet index every employer career site or country.</div>'}
               <p class="business-note">Search coverage: ${escapeHtml(providers.map(p=>p.name+': '+(p.status==='ok'?p.count+' listings':p.status.replace('_',' '))).join(' · ')||'Provider status unavailable')}.</p>
-              <p class="business-note">Showing ${internal.length} relevant COSMOS positions and ${external.length} external positions from currently available providers. A missing external provider does not mean there are no jobs worldwide.</p>
-              <p class="business-note">Only currently returned postings are displayed; verify availability and eligibility on each original listing. Only generic role search terms—not the uploaded document—are sent to external job providers.</p>`;
+              <p class="business-note">Showing ${internal.length} relevant COSMOS positions and ${external.length} external positions from currently available providers. Career-board feeds cover selected employers, not every company worldwide.</p>
+              <p class="business-note">Live source coverage is limited to connected public career boards, recent remote feeds and configured national markets. Confirm vacancy status on the original employer page. Your résumé is never sent to external job providers.</p>`;
             businessJobsBindCards();
             if(career.status==='rejected'||inside.status==='rejected'||outside.status==='rejected')toastMsg('Some AI analysis or providers were unavailable; check coverage details.');
           };
