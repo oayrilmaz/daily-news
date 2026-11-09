@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="COSMOS" />
   <meta name="theme-color" content="#ffffff" />
-  <meta name="cosmos-build" content="cosmos-next-v9.2.9-source-corrected" />
+  <meta name="cosmos-build" content="cosmos-next-v9.3.0-jobs-ai-on-v9.2.9" />
   <title>COSMOS — Look deeper.</title>
   <style>
     :root{
@@ -5186,8 +5186,10 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     return `<article class="cosmos-jobs-card"><div class="business-eyebrow">${provenance} · ${escapeHtml(job.work_model||'Work')} · ${escapeHtml(job.location||'Location not provided')}</div>
       <h3>${escapeHtml(job.title)}</h3><div class="cosmos-jobs-org">${escapeHtml(job.organization)}</div>
       <p>${escapeHtml(String(job.description||'').slice(0,250))}${String(job.description||'').length>250?'…':''}</p>
-      ${withEvidence&&e?`<div class="cosmos-jobs-evidence"><strong>Documented overlap:</strong> ${escapeHtml(e.mentioned_in_both?.join(', ')||'No common skill phrases detected; manual review may still find a fit.')}
-      <div class="business-note">Automated keywords are not a candidate score. Missing phrases do not prove missing ability.</div></div>`:''}
+      ${job.relevance?`<div class="cosmos-jobs-evidence"><strong>${escapeHtml(job.relevance.tier)}</strong>
+        <div>${escapeHtml(job.relevance.reason||'Professional role context')}</div>
+        <div class="business-note">${escapeHtml(job.relevance.note||'Opportunity discovery, not an employment decision.')}</div></div>`:''}
+      ${withEvidence&&!job.relevance&&e?`<div class="cosmos-jobs-evidence"><strong>Documented evidence:</strong> ${escapeHtml(e.mentioned_in_both?.join(', ')||'Job requirements available in original listing.')}</div>`:''}
       <div class="business-actions">${ext?`<a class="cosmos-jobs-external-link" href="${escapeHtml(job.external_url||'#')}" target="_blank" rel="noopener noreferrer">View original posting ↗</a>`:
         `<button type="button" class="primary" data-jobs-open="${escapeHtml(job.id)}">View job & apply →</button>`}</div>
     </article>`;
@@ -5197,7 +5199,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     <option value="">Choose a document…</option>${docs.filter(d=>d.type===kind).map(d=>`<option value="${escapeHtml(d.id)}" ${businessJobsResumeId===d.id?'selected':''}>${escapeHtml(d.filename)} · ${d.parse_status==='ready'?'Text ready':'Needs text'}</option>`).join('')}</select>`;}
   async function businessJobsUpload(type,element,after){
     const file=element.files?.[0];if(!file)return toastMsg('Choose a PDF, DOCX or TXT file.');
-    const status=$('businessJobsUploadStatus');if(status)status.textContent='Uploading and extracting professional text…';
+    const status=$('businessJobsUploadStatus');if(status)status.textContent=type==='resume'?'Uploading and preparing your private AI career assessment…':'Uploading and extracting professional text…';
     try{
       const form=new FormData();form.append('document_type',type);form.append('file',file,file.name);
       const result=await api('/api/business/jobs/documents',{method:'POST',body:form});
@@ -5227,6 +5229,22 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <p>${escapeHtml(r.explanation)}</p><small>${escapeHtml(r.note||'Not an eligibility score or hiring decision.')}</small></div>`;
     }catch(e){if(node)node.textContent=e.message||'AI review unavailable.';}
   }
+  function businessJobsCareerHtml(data){
+    if(data?.status==='needs_text')return '<p>Add readable résumé text to enable career analysis.</p>';
+    if(!data?.profile)return `<h3>Private AI career assessment</h3><p>AI assessment has not completed. Retry it to receive a professional summary and role-specific recommendations.</p>
+      <button type="button" id="jobsRetryCareerAnalysis">Retry AI analysis</button>`;
+    const p=data.profile;
+    const list=(items)=>Array.isArray(items)?items.map(s=>`<li>${escapeHtml(s)}</li>`).join(''):'';
+    return `<div class="business-eyebrow">PRIVATE · EVIDENCE-BASED CAREER OVERVIEW</div>
+      <h3>${escapeHtml(p.headline||'Professional career assessment')}</h3><p>${escapeHtml(p.career_summary||'')}</p>
+      ${p.leadership_scope?`<p><strong>Documented leadership:</strong> ${escapeHtml(p.leadership_scope)}</p>`:''}
+      <h4>Closest role directions</h4><ul>${list(p.target_roles)}</ul>
+      <h4>Documented strengths</h4><ul>${list(p.strengths)}</ul>
+      <h4>Career development directions</h4><ul>${list(p.development_paths)}</ul>
+      ${p.limitations?.length?`<p class="business-note">Assessment limitations: ${escapeHtml(p.limitations.join(' · '))}</p>`:''}
+      <p class="business-note">Derived from your uploaded CV; not a hiring or eligibility decision. Verify the details and adjust your search terms as needed.</p>
+      <button type="button" id="jobsRetryCareerAnalysis">Reanalyze this résumé</button>`;
+  }
   async function openBusinessJobs(view='browse'){
     if(!['browse','matches','applications','post','hiring'].includes(view))view='browse';
     businessJobsShell(view,'<p class="business-note" role="status">Loading Jobs…</p>');
@@ -5245,7 +5263,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
               <input id="jobsSearchText" aria-label="Position or keywords" placeholder="e.g. vice president" value="${escapeHtml(businessJobsSearchQuery)}" /></label>
               <label>Location (optional)<input id="jobsSearchLocation" placeholder="e.g. Raleigh, NC" value="${escapeHtml(businessJobsSearchLocation)}" /></label>
               <button class="primary" type="submit">Search jobs</button></form>
-            <p class="business-note">Remote positions are available without setup. For broader US on-site and hybrid jobs, configure Adzuna API credentials on the COSMOS Life Worker.</p>
+            <p class="business-note">Worldwide search is the default. Jobicy currently provides recent remote vacancies; Adzuna adds its supported national markets only when configured. Coverage is not exhaustive.</p>
             </div><h3 class="cosmos-job-group">1 · COSMOS Business opportunities</h3><div id="jobsBrowseResults" class="cosmos-jobs-list"></div>
             <h3 class="cosmos-job-group">2 · External opportunities</h3><div id="jobsBrowseExternal" class="cosmos-jobs-list" role="status">Searching external providers…</div>
             <p class="business-note" id="jobsProviderStatus"></p>`;
@@ -5253,7 +5271,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
             const q=$('jobsSearchText').value.trim(),loc=$('jobsSearchLocation').value.trim();
             businessJobsSearchQuery=q;businessJobsSearchLocation=loc;
             const normalized=q.toLowerCase();
-            const internal=(listing.jobs||[]).filter(j=>!normalized||[j.title,j.organization,j.location,j.description].join(' ').toLowerCase().includes(normalized));
+            const localized=loc?await api('/api/business/jobs?location='+encodeURIComponent(loc)):listing;
+            const internal=(localized.jobs||[]).filter(j=>!normalized||[j.title,j.organization,j.location,j.description].join(' ').toLowerCase().includes(normalized));
             $('jobsBrowseResults').innerHTML=internal.map(j=>businessJobsCard(j)).join('')||'<div class="business-empty">No internal COSMOS postings match. Searching external sources below.</div>';
             businessJobsBindCards();
             $('jobsBrowseExternal').innerHTML='<div class="business-empty">Searching external job providers…</div>';
@@ -5270,19 +5289,20 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
           search();
         }else{
           target.innerHTML=`<div class="cosmos-jobs-card"><h3>My private résumés</h3>
-            <p>Upload a PDF, DOCX or TXT (up to 5 MB). COSMOS extracts text securely with Cloudflare. Files are private until you choose to apply.</p>
+            <p>Upload a PDF, DOCX or TXT (up to 5 MB). COSMOS automatically analyzes your work history and suggests relevant roles. Your original file and career assessment remain private until you explicitly apply.</p>
             <input id="jobsResumeUpload" type="file" accept=".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" aria-label="Upload résumé">
-            <label class="cosmos-jobs-check"><input type="checkbox" id="jobsResumeProcessConsent"> I understand COSMOS will store my document privately in Cloudflare and extract its text for skills matching. It is not shared with an employer unless I apply.</label>
+            <label class="cosmos-jobs-check"><input type="checkbox" id="jobsResumeProcessConsent"> I consent to COSMOS privately extracting and analyzing my professional résumé with Workers AI for career guidance and job discovery. The original résumé is not sent to external job providers or employers unless I explicitly apply.</label>
             <button class="primary" id="jobsUploadResume">Upload résumé</button><p id="businessJobsUploadStatus" role="status" class="business-note"></p>
             <div class="business-field">${businessJobsDocumentSelect(resumes)}</div>
+            <div id="jobsCareerAssessment" class="cosmos-jobs-card" role="region" aria-label="Private AI career assessment"><p class="business-note">Your AI career assessment will appear here when a résumé is selected.</p></div>
             <div class="business-field"><label for="jobsTargetRole">Target position for external search (optional)</label>
               <input id="jobsTargetRole" maxlength="90" placeholder="e.g. Vice President of Operations" value="${escapeHtml(businessJobsSearchQuery)}" /></div>
-            <div class="business-field"><label for="jobsTargetLocation">Preferred location (optional)</label>
-              <input id="jobsTargetLocation" maxlength="90" placeholder="e.g. Raleigh, NC" value="${escapeHtml(businessJobsSearchLocation)}" /></div>
+            <div class="business-field"><label for="jobsTargetLocation">Preferred location — optional (blank = global)</label>
+              <input id="jobsTargetLocation" maxlength="90" placeholder="Global / all available countries" value="${escapeHtml(businessJobsSearchLocation)}" /></div>
             <div class="business-actions"><button id="jobsRefreshMatches" class="primary">Find internal + external opportunities</button>
             <button id="jobsDownloadMyResume">Download selected document</button>
             <button id="jobsDeleteMyResume">Delete selected document</button></div>
-            <p class="business-note">COSMOS shows all current openings without automatically rejecting or ranking applicants.</p></div>
+            <p class="business-note">COSMOS organizes opportunities by professional relevance. This is not an eligibility score or automated hiring decision. Global is the default; country/city filters narrow results on request.</p></div>
             <div id="jobsResumeText" class="cosmos-jobs-card" hidden></div><div id="jobsMatches" class="cosmos-jobs-list"></div>`;
           const selector=$('businessJobResume');selector.onchange=()=>{businessJobsResumeId=selector.value;const d=resumes.find(x=>x.id===selector.value);if(d?.parse_status==='ready')$('jobsRefreshMatches')?.click();};
           $('jobsUploadResume').onclick=()=>{if(!$('jobsResumeProcessConsent').checked)return toastMsg('Please confirm private document processing before uploading.');businessJobsUpload('resume',$('jobsResumeUpload'),()=>openBusinessJobs('matches'));};
@@ -5296,28 +5316,48 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
             if(picked?.parse_status!=='ready'){
               $('jobsResumeText').hidden=false;
               $('jobsResumeText').innerHTML=`<h3>Add your professional experience as text</h3>
-                <p>We could store the document but could not reliably extract its contents. Paste the relevant experience for matching.</p>
-                <textarea id="jobsManualResume" rows="7" maxlength="22000" placeholder="Paste text from your résumé"></textarea>
-                <button class="primary" id="jobsSaveResumeText">Save text & find jobs</button>`;
+                <p>We stored the document, but could not reliably extract its contents. Paste your experience for private career analysis.</p>
+                <textarea id="jobsManualResume" rows="7" maxlength="48000" placeholder="Paste text from your résumé"></textarea>
+                <button class="primary" id="jobsSaveResumeText">Save text & analyze career</button>`;
               $('jobsSaveResumeText').onclick=async()=>{try{await api('/api/business/jobs/documents/'+selector.value,{method:'PATCH',body:JSON.stringify({extracted_text:$('jobsManualResume').value})});await openBusinessJobs('matches');}catch(e){toastMsg(e.message);}};return;
             }
             const role=$('jobsTargetRole').value.trim(),location=$('jobsTargetLocation').value.trim();
             businessJobsSearchQuery=role;businessJobsSearchLocation=location;
-            $('jobsMatches').innerHTML='<p role="status">Checking COSMOS jobs, then outside opportunities. Your résumé stays private in COSMOS.</p>';
-            try{
-              const [inside,outside]=await Promise.allSettled([
-                api('/api/business/jobs/matches?resume_id='+encodeURIComponent(selector.value)),
-                api('/api/business/jobs/discover?q='+encodeURIComponent(role)+'&location='+encodeURIComponent(location)+'&resume_id='+encodeURIComponent(selector.value))
-              ]);
-              const internal=inside.status==='fulfilled'?(inside.value.jobs||[]):[];
-              internal.forEach(j=>businessJobsCache.set(j.id,j));
-              const external=outside.status==='fulfilled'?(outside.value.external||[]):[];
-              $('jobsMatches').innerHTML=`<h3 class="cosmos-job-group">1 · COSMOS openings</h3>${internal.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No internal jobs available.</div>'}
-                <h3 class="cosmos-job-group">2 · External opportunities</h3>${external.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No matching external roles returned. Check the target position or configure Adzuna for broader US listings.</div>'}
-                <p class="business-note">Skill phrases are not a score or eligibility decision. External providers never receive your résumé.</p>`;
-              businessJobsBindCards();
-              if(inside.status==='rejected'||outside.status==='rejected')toastMsg('One job source was unavailable. Other results are still shown.');
-            }catch(e){$('jobsMatches').textContent=e.message;}
+            $('jobsMatches').innerHTML='<p role="status">Analyzing your CV and searching COSMOS first, then available global sources…</p>';
+            const docId=selector.value;
+            // Build a missing career profile first (for résumés uploaded before v9.3.0),
+            // so both internal and external suggestions use the same completed assessment.
+            let career;
+            try{career={status:'fulfilled',value:await api('/api/business/jobs/career-profile?resume_id='+encodeURIComponent(docId))};}
+            catch(e){career={status:'rejected',reason:e};}
+            const [inside,outside]=await Promise.allSettled([
+              api('/api/business/jobs/matches?resume_id='+encodeURIComponent(docId)+'&location='+encodeURIComponent(location)),
+              api('/api/business/jobs/discover?q='+encodeURIComponent(role)+'&location='+encodeURIComponent(location)+'&resume_id='+encodeURIComponent(docId))
+            ]);
+            if(!$('jobsMatches')||selector.value!==docId)return;
+            const careerData=career.status==='fulfilled'?career.value:null;
+            const panel=$('jobsCareerAssessment');if(panel){
+              panel.innerHTML=businessJobsCareerHtml(careerData);
+              const retry=$('jobsRetryCareerAnalysis');if(retry)retry.onclick=async()=>{
+                retry.disabled=true;panel.innerHTML='<p>Reanalyzing your professional résumé privately…</p>';
+                try{await api('/api/business/jobs/career-profile',{method:'POST',body:JSON.stringify({resume_id:docId})});
+                  if(selector.value===docId)$('jobsRefreshMatches')?.click();
+                }catch(e){panel.innerHTML='<p role="alert">'+escapeHtml(e.message)+'</p><button id="jobsRetryCareerAnalysis">Retry analysis</button>';
+                  $('jobsRetryCareerAnalysis').onclick=()=>{$('jobsRefreshMatches')?.click();};}
+              };
+            }
+            const internal=inside.status==='fulfilled'?(inside.value.jobs||[]):[];
+            internal.forEach(j=>businessJobsCache.set(j.id,j));
+            const external=outside.status==='fulfilled'?(outside.value.external||[]):[];
+            const providers=outside.status==='fulfilled'?(outside.value.providers||[]):[];
+            const scope=location?'Requested region: '+location:'Global-first · available sources';
+            $('jobsMatches').innerHTML=`<p class="business-note">${escapeHtml(scope)} · Internal COSMOS openings shown first; each group ordered by documented role relevance.</p>
+              <h3 class="cosmos-job-group">1 · COSMOS openings</h3>${internal.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No sufficiently relevant internal openings found.</div>'}
+              <h3 class="cosmos-job-group">2 · External openings</h3>${external.map(j=>businessJobsCard(j,true)).join('')||'<div class="business-empty">No relevant external positions returned from currently available sources. Broader coverage needs additional providers.</div>'}
+              <p class="business-note">Search coverage: ${escapeHtml(providers.map(p=>p.name+': '+(p.status==='ok'?p.count+' listings':p.status.replace('_',' '))).join(' · ')||'Provider status unavailable')}.</p>
+              <p class="business-note">Only currently returned postings are displayed; verify availability and eligibility on each original listing. Only generic role search terms—not the uploaded document—are sent to external job providers.</p>`;
+            businessJobsBindCards();
+            if(career.status==='rejected'||inside.status==='rejected'||outside.status==='rejected')toastMsg('Some AI analysis or providers were unavailable; check coverage details.');
           };
           // Automatically start internal-first matching for a ready saved/uploaded résumé.
           // No résumé bytes are sent to external providers by this browser action.
