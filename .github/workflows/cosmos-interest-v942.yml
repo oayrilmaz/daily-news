@@ -1,0 +1,52 @@
+name: COSMOS v9.4.2 — Universal Interest Catalog Fix
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, apply after success
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+concurrency:
+  group: cosmos-interest-v942-installer
+  cancel-in-progress: false
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate or apply guarded universal-interest update
+        run: python scripts/apply_cosmos_interest_v942.py --mode '${{ inputs.mode }}'
+      - name: Syntax and classification tests
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          node --check scripts/cosmos_interest_feeds_v941.mjs
+          COSMOS_INTEREST_SELF_TEST=1 node scripts/cosmos_interest_feeds_v941.mjs
+      - name: Commit HTML and generator only (no workflow-file permission required)
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html scripts/cosmos_interest_feeds_v941.mjs
+          if git diff --cached --quiet; then echo 'Already installed'; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'COSMOS v9.4.2 universal interests and diagnosis'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
