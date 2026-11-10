@@ -64,9 +64,15 @@ jobs:
       - name: Validate publisher syntax
         run: node --check scripts/social_autopublish.mjs
 
+      - name: Explain scheduled publishing policy
+        run: |
+          echo 'Scheduled jobs publish only when SOCIAL_AUTOPUBLISH_ENABLED=true in repository variables.'
+          echo 'Manual runs use the selected preview / verify-x / live mode.'
+          echo 'Publisher refuses unsafe or unapproved @mentions; no policy is bypassed.'
+
       - name: Publish / preview queued Cosmos posts
         env:
-          SOCIAL_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.SOCIAL_MODE || 'preview' }}
+          SOCIAL_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || (vars.SOCIAL_AUTOPUBLISH_ENABLED == 'true' && 'live' || 'preview') }}
           SOCIAL_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'all' }}
           SOCIAL_AUTOPUBLISH_ENABLED: ${{ vars.SOCIAL_AUTOPUBLISH_ENABLED || 'false' }}
           # review = only queue items marked grok_approved; auto requires X-policy
