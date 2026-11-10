@@ -1,0 +1,62 @@
+name: COSMOS v9.4.3 — Region News and Full-Screen Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first; apply only after green
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate or apply guarded v9.4.3 patch
+        run: python scripts/apply_cosmos_discovery_v943.py --mode "${{ inputs.mode }}"
+      - name: Validate inline JavaScript
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re,subprocess,tempfile,pathlib
+          text=pathlib.Path('cosmos-next.html').read_text()
+          scripts=re.findall(r'<script([^>]*)>(.*?)</script>',text,re.S)
+          for attr,body in scripts:
+              if 'src=' in attr: continue
+              with tempfile.NamedTemporaryFile(mode='w',suffix='.js',delete=False) as out:
+                  out.write(body); name=out.name
+              try: subprocess.run(['node','--check',name],check=True)
+              finally: pathlib.Path(name).unlink(missing_ok=True)
+          print('All inline scripts passed Node syntax checks.')
+          PY
+      - name: Commit only frontend after apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.3 regional news and full-screen Metro"
+            git push origin HEAD:main
+          else
+            echo "Frontend already at target version; no commit needed."
+          fi
