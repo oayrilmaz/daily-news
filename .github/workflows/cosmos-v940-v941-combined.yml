@@ -1,0 +1,62 @@
+name: COSMOS v9.4.1 — Combined Time Lens and Personalized Discovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate both v9.4.0 and v9.4.1 changes before applying
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v940-v941-combined-install
+  cancel-in-progress: false
+
+jobs:
+  combined:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate or apply both guarded patches
+        run: python scripts/apply_cosmos_v940_v941_combined.py --mode '${{ inputs.mode }}'
+      - name: Self-test interest feed generator
+        if: ${{ inputs.mode == 'apply' }}
+        run: |
+          node --check scripts/cosmos_interest_feeds_v941.mjs
+          COSMOS_INTEREST_SELF_TEST=1 node scripts/cosmos_interest_feeds_v941.mjs
+      - name: Commit combined frontend and feed automation only on apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html scripts/cosmos_interest_feeds_v941.mjs .github/workflows/cosmos-interest-feeds-v941.yml .github/workflows/social-autopublish.yml
+          if git diff --cached --quiet; then
+            echo 'No changes to commit; combined update already applied.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'COSMOS combined endless time lens and personalized discovery'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
