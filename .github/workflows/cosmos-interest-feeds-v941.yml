@@ -1,0 +1,80 @@
+name: COSMOS v9.4.1 — Personal and Business Discovery
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '11 19 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-interest-feeds-v941
+  cancel-in-progress: false
+
+jobs:
+  build-interest-discovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate public-only classification
+        run: |
+          node --check scripts/cosmos_interest_feeds_v941.mjs
+          COSMOS_INTEREST_SELF_TEST=1 node scripts/cosmos_interest_feeds_v941.mjs
+      - name: Build separate Personal and Business public discovery feeds
+        run: node scripts/cosmos_interest_feeds_v941.mjs
+      - name: Validate public feeds and source links
+        run: |
+          node - <<'NODE'
+          const fs=require('node:fs');
+          for(const space of ['personal','business']){
+            const d=JSON.parse(fs.readFileSync(`data/cosmos-${space}-discovery.json`,'utf8'));
+            if(d.public_only!==true||d.space!==space||!Array.isArray(d.items)||d.items.length>120)throw Error('Wrong public feed: '+space);
+            for(const x of d.items){
+              const u=new URL(x.url);
+              if(u.protocol!=='https:'||u.username||u.password||!Array.isArray(x.topics)||x.topics.length<1||!x.title)throw Error('Unsafe item');
+            }
+            console.log(`${space}: ${d.items.length} source-linked discoveries`);
+          }
+          NODE
+      - name: Publishing diagnostics — not a claim of live publishing
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,datetime,os
+          now=datetime.datetime.now(datetime.timezone.utc)
+          def data(p):
+            try:return json.load(open(p,encoding='utf-8'))
+            except Exception:return {}
+          a=data('data/cosmos-auto-publication-status.json'); q=data('data/cosmos-global-questions-run-status.json')
+          x=data('data/social-published.json'); queue=data('data/social-queue.json')
+          posts=[i for i in x.get('published',[]) if i.get('platform')=='x' and i.get('status')=='published']
+          last=max((i.get('published_at','') for i in posts),default='none')
+          lines=['## COSMOS publishing diagnostics','',
+                 f"- Website run: {a.get('run_at','unknown')} — mode {a.get('mode','unknown')}, drafted {a.get('drafted','?')}, selected {a.get('selected','?')}, published {a.get('published','?')}",
+                 f"- Editorial approval: {q.get('summary',{}).get('approved','unknown')}",
+                 f"- X queue updated: {queue.get('updated_at','unknown')}",
+                 f"- Last recorded successful X API post in repository: {last}",
+                 '- Publication is performed by separate GitHub workflows; generating feeds does NOT post to X or to private timelines.']
+          for line in lines:print(line)
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:f.write('\n'.join(lines)+'\n')
+          PY
+      - name: Commit public source-linked feeds only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add -- data/cosmos-personal-discovery.json data/cosmos-business-discovery.json
+          if git diff --cached --quiet; then echo 'Discovery feeds unchanged'; exit 0; fi
+          git commit -m 'Update public COSMOS Personal and Business discovery feeds'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
