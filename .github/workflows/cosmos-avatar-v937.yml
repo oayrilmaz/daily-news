@@ -1,0 +1,46 @@
+name: COSMOS v9.3.7 - Visible Profile Portraits
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply
+        required: true
+        type: choice
+        options:
+          - validate
+          - apply
+        default: validate
+permissions:
+  contents: write
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate or apply profile portrait update
+        run: python scripts/apply_cosmos_avatar_v937.py "${{ inputs.mode }}"
+      - name: Commit frontend after apply only
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name 'COSMOS GitHub Actions'
+            git config user.email 'github-actions[bot]@users.noreply.github.com'
+            git add -- cosmos-next.html
+            git commit -m 'COSMOS v9.3.7 visible authenticated portraits'
+            git push origin HEAD:main
+          else
+            echo 'No changes needed.'
+          fi
