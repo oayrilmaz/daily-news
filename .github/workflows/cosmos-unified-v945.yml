@@ -1,0 +1,54 @@
+name: COSMOS v9.4.5 — Unified Unobstructed Metro
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-unified-v945-main
+  cancel-in-progress: false
+
+jobs:
+  unified-metro:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate or apply guarded v9.4.5 patch
+        run: python scripts/apply_cosmos_unified_v945.py --mode "${{ inputs.mode }}"
+      - name: Commit HTML only when applying
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.5 unified unobstructed Metro"
+            git push origin HEAD:main
+          else
+            echo "Already installed; nothing to commit."
+          fi
