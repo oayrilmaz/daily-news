@@ -1,0 +1,65 @@
+name: COSMOS v9.4.4 — Unified Metro and Scrollable Locations
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate or apply guarded v9.4.4 update
+        run: python scripts/apply_cosmos_timeline_v944.py --mode "${{ inputs.mode }}"
+      - name: Validate inline JavaScript after apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          python - <<'PY2'
+          import re,pathlib,subprocess,tempfile
+          html=pathlib.Path('cosmos-next.html').read_text(encoding='utf-8')
+          for attrs,js in re.findall(r'<script([^>]*)>(.*?)</script>',html,re.S):
+              if 'src=' in attrs:continue
+              with tempfile.NamedTemporaryFile('w',suffix='.js',delete=False) as f:
+                  f.write(js);path=f.name
+              try:subprocess.run(['node','--check',path],check=True)
+              finally:pathlib.Path(path).unlink(missing_ok=True)
+          print('All inline scripts passed syntax checks.')
+          PY2
+      - name: Commit only the frontend in apply mode
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.4 Metro/photo and location picker"
+            git push origin HEAD:main
+          else
+            echo "Already updated, no commit needed."
+          fi
