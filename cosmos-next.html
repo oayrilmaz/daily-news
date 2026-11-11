@@ -10533,31 +10533,59 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
  }
  function openLocationEditor(space){
   document.getElementById('cosmos943LocationEditor')?.remove();
-  const view=document.createElement('div');view.id='cosmos943LocationEditor';view.className='cosmos943-loc-modal';
+  const view=document.createElement('div');view.id='cosmos943LocationEditor';view.className='cosmos943-loc-modal cosmos944-location-modal';
   const old=state.locations[space]||'';
-  view.innerHTML='<form class="cosmos943-loc-dialog" role="dialog" aria-modal="true" aria-label="News location">'+
-   '<h2>News location · '+(space==='personal'?'Personal':'Business')+'</h2><p>Worldwide is the default. To follow a country or city, enter its name. '+
-   'COSMOS requests public news for your chosen topics and place; it never uses device GPS or your street address.</p>'+
-   '<label for="cosmos943LocationInput">Country, region or city</label><input id="cosmos943LocationInput" maxlength="80" autocomplete="off" placeholder="e.g. Raleigh, NC or France" value="'+escape(old)+'">'+
-   '<p>Leave blank for Worldwide. City/region news depends on the source provider; coverage is not guaranteed.</p>'+
-   '<div class="cosmos943-loc-error" role="alert"></div><div class="cosmos943-loc-actions"><button type="button" data-global>🌐 Worldwide</button><button type="button" data-cancel>Cancel</button><button type="submit">Save location</button></div></form>';
-  document.body.appendChild(view);const input=view.querySelector('input'),status=view.querySelector('.cosmos943-loc-error');
+  const groups={"Cities":["Raleigh, NC","Cary, NC","Apex, NC","Durham, NC","Charlotte, NC","New York, NY","Washington, DC","Boston, MA","Atlanta, GA","Miami, FL","Orlando, FL","Tampa, FL","Chicago, IL","Houston, TX","Dallas, TX","Austin, TX","Denver, CO","Phoenix, AZ","San Francisco, CA","Los Angeles, CA","San Diego, CA","Seattle, WA","Portland, OR","Nashville, TN","Detroit, MI","Philadelphia, PA","Minneapolis, MN","Las Vegas, NV","Salt Lake City, UT","Pittsburgh, PA","Columbus, OH","Indianapolis, IN","Toronto, Canada","Vancouver, Canada","Montréal, Canada","Mexico City, Mexico","São Paulo, Brazil","Rio de Janeiro, Brazil","Buenos Aires, Argentina","Santiago, Chile","Bogotá, Colombia","Lima, Peru","London, United Kingdom","Manchester, United Kingdom","Paris, France","Berlin, Germany","Munich, Germany","Frankfurt, Germany","Amsterdam, Netherlands","Brussels, Belgium","Madrid, Spain","Barcelona, Spain","Lisbon, Portugal","Rome, Italy","Milan, Italy","Vienna, Austria","Zurich, Switzerland","Stockholm, Sweden","Copenhagen, Denmark","Oslo, Norway","Warsaw, Poland","Prague, Czechia","Istanbul, Türkiye","Ankara, Türkiye","Izmir, Türkiye","Athens, Greece","Dublin, Ireland","Edinburgh, United Kingdom","Cairo, Egypt","Nairobi, Kenya","Lagos, Nigeria","Johannesburg, South Africa","Cape Town, South Africa","Casablanca, Morocco","Dubai, United Arab Emirates","Abu Dhabi, United Arab Emirates","Riyadh, Saudi Arabia","Doha, Qatar","Tel Aviv, Israel","Tokyo, Japan","Osaka, Japan","Seoul, South Korea","Beijing, China","Shanghai, China","Hong Kong, China","Singapore","Bangkok, Thailand","Jakarta, Indonesia","Kuala Lumpur, Malaysia","Manila, Philippines","Hanoi, Vietnam","Mumbai, India","Delhi, India","Bengaluru, India","Hyderabad, India","Taipei, Taiwan","Sydney, Australia","Melbourne, Australia","Brisbane, Australia","Perth, Australia","Auckland, New Zealand","Wellington, New Zealand"],"US states":["Alabama, USA","Alaska, USA","Arizona, USA","Arkansas, USA","California, USA","Colorado, USA","Connecticut, USA","Delaware, USA","Florida, USA","Georgia, USA","Hawaii, USA","Idaho, USA","Illinois, USA","Indiana, USA","Iowa, USA","Kansas, USA","Kentucky, USA","Louisiana, USA","Maine, USA","Maryland, USA","Massachusetts, USA","Michigan, USA","Minnesota, USA","Mississippi, USA","Missouri, USA","Montana, USA","Nebraska, USA","Nevada, USA","New Hampshire, USA","New Jersey, USA","New Mexico, USA","New York, USA","North Carolina, USA","North Dakota, USA","Ohio, USA","Oklahoma, USA","Oregon, USA","Pennsylvania, USA","Rhode Island, USA","South Carolina, USA","South Dakota, USA","Tennessee, USA","Texas, USA","Utah, USA","Vermont, USA","Virginia, USA","Washington, USA","West Virginia, USA","Wisconsin, USA","Wyoming, USA","District of Columbia, USA"],"Countries":["Afghanistan","Albania","Algeria","American Samoa","Andorra","Angola","Anguilla","Antarctica","Antigua and Barbuda","Argentina","Armenia","Aruba","Australia","Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin","Bermuda","Bhutan","Bolivia, Plurinational State of","Bonaire, Sint Eustatius and Saba","Bosnia and Herzegovina","Botswana","Bouvet Island","Brazil","British Indian Ocean Territory","Brunei Darussalam","Bulgaria","Burkina Faso","Burundi","Cabo Verde","Cambodia","Cameroon","Canada","Cayman Islands","Central African Republic","Chad","Chile","China","Christmas Island","Colombia","Comoros","Congo","Congo, The Democratic Republic of the","Cook Islands","Costa Rica","Croatia","Cuba","Curaçao","Cyprus","Czechia","Côte d'Ivoire","Denmark","Djibouti","Dominica","Dominican Republic","Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia","Eswatini","Ethiopia","Faroe Islands","Fiji","Finland","France","French Guiana","French Polynesia","French Southern Territories","Gabon","Gambia","Georgia","Germany","Ghana","Gibraltar","Greece","Greenland","Grenada","Guadeloupe","Guam","Guatemala","Guernsey","Guinea","Guinea-Bissau","Guyana","Haiti","Heard Island and McDonald Islands","Honduras","Hong Kong","Hungary","Iceland","India","Indonesia","Iran, Islamic Republic of","Iraq","Ireland","Isle of Man","Israel","Italy","Jamaica","Japan","Jersey","Jordan","Kazakhstan","Kenya","Kiribati","Korea, Democratic People's Republic of","Korea, Republic of","Kuwait","Kyrgyzstan","Lao People's Democratic Republic","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein","Lithuania","Luxembourg","Macao","Madagascar","Malawi","Malaysia","Maldives","Mali","Malta","Marshall Islands","Martinique","Mauritania","Mauritius","Mayotte","Mexico","Micronesia, Federated States of","Moldova, Republic of","Monaco","Mongolia","Montenegro","Montserrat","Morocco","Mozambique","Myanmar","Namibia","Nauru","Nepal","Netherlands","New Caledonia","New Zealand","Nicaragua","Niger","Nigeria","Niue","Norfolk Island","North Macedonia","Northern Mariana Islands","Norway","Oman","Pakistan","Palau","Palestine, State of","Panama","Papua New Guinea","Paraguay","Peru","Philippines","Pitcairn","Poland","Portugal","Puerto Rico","Qatar","Romania","Russian Federation","Rwanda","Réunion","Saint Barthélemy","Saint Helena, Ascension and Tristan da Cunha","Saint Kitts and Nevis","Saint Lucia","Saint Pierre and Miquelon","Saint Vincent and the Grenadines","Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal","Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia","Solomon Islands","Somalia","South Africa","South Georgia and the South Sandwich Islands","South Korea","South Sudan","Spain","Sri Lanka","Sudan","Suriname","Svalbard and Jan Mayen","Sweden","Switzerland","Syrian Arab Republic","Taiwan, Province of China","Tajikistan","Tanzania, United Republic of","Thailand","Timor-Leste","Togo","Tokelau","Tonga","Trinidad and Tobago","Tunisia","Turkmenistan","Turks and Caicos Islands","Tuvalu","Türkiye","Uganda","Ukraine","United Arab Emirates","United Kingdom","United States","United States Minor Outlying Islands","Uruguay","Uzbekistan","Vanuatu","Venezuela, Bolivarian Republic of","Viet Nam","Virgin Islands, British","Virgin Islands, U.S.","Wallis and Futuna","Western Sahara","Yemen","Zambia","Zimbabwe","Åland Islands"]};
+  const all=Object.values(groups).flat();
+  if(old&&!all.includes(old))groups['Saved choice']=[old];
+  const choiceButtons='<button type="button" class="cosmos944-place-choice" data-place="" aria-pressed="'+String(!old)+'"><span>🌐 Worldwide</span><small>All available global sources</small></button>'+
+   Object.entries(groups).map(([group,places])=>'<div class="cosmos944-place-group" data-place-group><h3>'+escape(group)+'</h3>'+places.map(place=>
+     '<button type="button" class="cosmos944-place-choice" data-place="'+escape(place)+'" aria-pressed="'+String(place===old)+'"><span>'+escape(place)+'</span></button>').join('')+'</div>').join('');
+  view.innerHTML='<form class="cosmos943-loc-dialog cosmos944-loc-dialog" role="dialog" aria-modal="true" aria-label="News location">'+
+    '<div class="cosmos944-loc-heading"><h2>News location · '+(space==='personal'?'Personal':'Business')+'</h2><button type="button" data-cancel aria-label="Close location picker">✕</button></div>'+
+    '<p>Choose Worldwide or scroll to a city, U.S. state, or country. Search the list or enter another city below. Your chosen location is separate for Personal and Business; no GPS is used.</p>'+
+    '<label for="cosmos944PlaceSearch">Find a place</label><input type="search" id="cosmos944PlaceSearch" autocomplete="off" placeholder="Search cities, states, countries…">'+
+    '<div class="cosmos944-location-count" aria-live="polite"></div>'+
+    '<div class="cosmos944-place-scroll" role="group" aria-label="Scrollable news locations">'+choiceButtons+'</div>'+
+    '<label for="cosmos944OtherPlace">Other city or region (optional)</label><input type="text" id="cosmos944OtherPlace" maxlength="80" autocomplete="off" placeholder="e.g. Bursa, Türkiye">'+
+    '<p class="cosmos944-choice-status" role="status">Selected: '+(old?escape(old):'Worldwide')+'</p>'+
+    '<div class="cosmos943-loc-error" role="alert"></div><div class="cosmos943-loc-actions"><button type="button" data-cancel>Cancel</button><button type="submit">Save location</button></div></form>';
+  document.body.appendChild(view);
+  const search=view.querySelector('#cosmos944PlaceSearch');
+  const other=view.querySelector('#cosmos944OtherPlace');
+  const status=view.querySelector('.cosmos943-loc-error');
+  const choiceStatus=view.querySelector('.cosmos944-choice-status');
+  const items=[...view.querySelectorAll('.cosmos944-place-choice')];
+  let chosen=old;
+  const mark=()=>{for(const el of items)el.setAttribute('aria-pressed',String(el.dataset.place===chosen));
+    choiceStatus.textContent='Selected: '+(other.value.trim()||chosen||'Worldwide');};
   const dismiss=()=>{view.remove();document.removeEventListener('keydown',onKey);};
   const onKey=e=>{if(e.key==='Escape')dismiss();};document.addEventListener('keydown',onKey);
-  view.querySelector('[data-cancel]').onclick=dismiss;
-  view.querySelector('[data-global]').onclick=()=>{input.value='';view.querySelector('form').requestSubmit();};
+  view.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=dismiss);
+  items.forEach(b=>b.addEventListener('click',()=>{chosen=b.dataset.place;other.value='';mark();}));
+  other.addEventListener('input',()=>{mark();});
+  const count=view.querySelector('.cosmos944-location-count');
+  search.addEventListener('input',()=>{
+    const q=search.value.toLocaleLowerCase().trim();let visible=0;
+    for(const b of items){const ok=!q||(b.dataset.place||'Worldwide').toLocaleLowerCase().includes(q);
+      b.hidden=!ok;if(ok)visible++;}
+    view.querySelectorAll('[data-place-group]').forEach(g=>{g.hidden=![...g.querySelectorAll('.cosmos944-place-choice')].some(b=>!b.hidden);});
+    count.textContent=visible+' locations · scroll and select';
+  });
+  search.dispatchEvent(new Event('input'));
   view.querySelector('form').onsubmit=async e=>{
-   e.preventDefault();const val=input.value.trim();
-   if(val&&!/^[\p{L}][\p{L}\p{N} .,'-]{1,79}$/u.test(val)){status.textContent='Enter a city, region, or country name (no street address or URL).';return;}
-   const submit=view.querySelector('[type=submit]');submit.disabled=true;
-   try{const locations={...state.locations,[space]:val};
-    const saved=await requestAPI('/api/discovery/preferences',{method:'PATCH',body:JSON.stringify({personal:state.prefs.personal,business:state.prefs.business,locations})});
-    state.locations={personal:String(saved.locations?.personal||''),business:String(saved.locations?.business||'')};
-    state.localKey[space]='';delete state.local[space];dismiss();schedule();
-   }catch(err){status.textContent=err.message||'Location could not be saved.';submit.disabled=false;}
-  };input.focus();
+    e.preventDefault();const val=(other.value.trim()||chosen).replace(/\s+/g,' ');
+    if(val&&!/^[\p{L}][\p{L}\p{N} .,'-]{1,79}$/u.test(val)){
+      status.textContent='Use a city, region or country (not an address or URL).';return;}
+    const submit=view.querySelector('[type=submit]');submit.disabled=true;status.textContent='Saving location…';
+    try{const locations={...state.locations,[space]:val};
+      const saved=await requestAPI('/api/discovery/preferences',{method:'PATCH',body:JSON.stringify({personal:state.prefs.personal,business:state.prefs.business,locations})});
+      state.locations={personal:String(saved.locations?.personal||''),business:String(saved.locations?.business||'')};
+      state.localKey[space]='';delete state.local[space];dismiss();schedule();
+    }catch(err){status.textContent=err.message||'Location could not be saved.';submit.disabled=false;}
+  };mark();search.focus();
  }
- function openEditor(space){
+  function openEditor(space){
   document.getElementById('cosmos942Modal')?.remove();
   const selected=new Set(state.prefs[space]);
   const el=document.createElement('div');el.id='cosmos942Modal';el.className='cosmos942-modal';
@@ -10635,8 +10663,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
 <script id="cosmos943WallpaperTools">
 (()=>{'use strict';
   let last=null;const key='cosmos943_business_wallpaper_fit';
-  const get=()=>{try{return localStorage.getItem(key)==='whole';}catch{return false;}};
-  const set=v=>{try{localStorage.setItem(key,v?'whole':'fill');}catch{}};
+  const get=()=>{try{return localStorage.getItem('cosmos944_wallpaper_fit')!=='fill';}catch{return true;}};
+  const set=v=>{try{localStorage.setItem('cosmos944_wallpaper_fit',v?'whole':'fill');}catch{}};
   function openViewer(){
     document.getElementById('cosmos943BackgroundViewer')?.remove();
     const pane=document.createElement('div');pane.id='cosmos943BackgroundViewer';pane.className='cosmos943-bg-viewer';
@@ -10670,5 +10698,91 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   sync();
 })();
 </script>
+<style id="cosmos944TimeRailPhotoLocation">
+/* Preserve all three layers: background, pinned week Metro, and scrollable moment cards. */
+#app.metro-live .journey-stage{
+  overflow-y:auto!important;overflow-x:hidden!important;display:block!important;
+  overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;padding-bottom:calc(90px + env(safe-area-inset-bottom))!important;
+}
+#app.metro-live .journey-stage>.week-metro{
+  position:sticky!important;top:0!important;z-index:8!important;
+  background:rgba(255,255,255,.13)!important;border-radius:14px!important;
+  backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);
+}
+#app.metro-live .journey-stage>.metro-main,
+#app.metro-live .journey-stage #metroMain{
+  overflow:visible!important;min-height:clamp(320px,65dvh,1000px)!important;
+  flex:none!important;height:auto!important;max-height:none!important;
+  display:flex!important;flex-direction:column!important;
+}
+#app.metro-live .journey-stage .metro-day-scroll{
+  overflow-y:visible!important;overflow-x:hidden!important;mask-image:none!important;
+  height:auto!important;flex:none!important;min-height:clamp(280px,55dvh,920px)!important;
+  padding-bottom:100px!important;
+}
+#app.metro-live .journey-stage .living-day-chart{min-height:clamp(280px,48dvh,860px)!important}
+#app.metro-live .journey-stage #metroMain.cosmos-public-scroller{overflow:visible!important}
+/* Business uses the same week rail as Personal; the controls and weekday stations remain visible while reading. */
+#sheet.business-modal[data-business-tab="metro"] .business-metro-main-selector{
+  position:sticky!important;top:0!important;z-index:25!important;
+  background:rgba(249,252,255,.72)!important;border-radius:16px!important;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro{
+  position:sticky!important;top:52px!important;z-index:24!important;
+  background:rgba(250,252,255,.55)!important;border-radius:16px!important;
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+  overflow:visible!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell .week-navigation,
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell .week-weekdays{
+  visibility:visible!important;opacity:1!important;overflow:visible!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell .metro-main,
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell .metro-day-scroll{
+  overflow:visible!important;max-height:none!important;flex:none!important;height:auto!important;
+  mask-image:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell .metro-day-scroll{
+  min-height:clamp(300px,57dvh,900px)!important;padding-bottom:175px!important;
+}
+#sheet.business-modal[data-business-tab="metro"].cosmos933-has-business-bg.cosmos943-fit-whole{
+  background-image:var(--cosmos933-business-bg)!important;
+  background-size:contain!important;background-position:center center!important;
+  background-repeat:no-repeat!important;background-color:#eef1f5!important;
+}
+/* Location picker: a true vertical, searchable selection list, plus optional custom city. */
+.cosmos944-location-modal{overflow-y:auto;overscroll-behavior:contain;align-items:center!important}
+.cosmos944-loc-dialog{display:flex;flex-direction:column;max-height:min(92dvh,900px);overflow:hidden;
+  width:min(620px,100%)!important;padding:clamp(12px,2.5vw,20px)!important}
+.cosmos944-loc-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cosmos944-loc-heading button{border:1px solid #d0dbe4;background:white;border-radius:99px;
+  min-width:38px;min-height:38px;color:#253d51;font-weight:700;cursor:pointer}
+.cosmos944-loc-dialog p{margin:7px 0!important}
+.cosmos944-loc-dialog label{margin:8px 0 5px!important}
+.cosmos944-location-count{font-size:12px;color:#607486;margin:6px 0}
+.cosmos944-place-scroll{flex:1;min-height:110px;max-height:48dvh;overflow-y:auto!important;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  border:1px solid #d9e2e9;border-radius:13px;background:#f9fbfd;padding:8px;scrollbar-width:thin}
+.cosmos944-place-scroll .cosmos944-place-group h3{font-size:12px;position:sticky;top:0;
+  background:#ecf2f7;color:#456277;border-radius:7px;padding:7px;margin:9px 0 5px;z-index:1}
+.cosmos944-place-choice{display:flex;align-items:center;justify-content:space-between;gap:9px;
+  background:white;border:1px solid #e0e8ef;border-radius:10px;padding:11px 13px;width:100%;
+  color:#243748;text-align:left;font:inherit;font-size:14px;cursor:pointer;margin:4px 0}
+.cosmos944-place-choice[aria-pressed="true"]{border-color:#5586b1;background:#e7f2fd;font-weight:800}
+.cosmos944-place-choice[aria-pressed="true"]:after{content:'✓';font-weight:900;color:#1763a0}
+.cosmos944-place-choice small{color:#63798b;font-size:11px}
+.cosmos944-place-choice[hidden],.cosmos944-place-group[hidden]{display:none!important}
+.cosmos944-choice-status{background:#f0f6fa;padding:7px 9px;border-radius:9px;
+  font-weight:750;color:#2b506a!important}
+.cosmos944-loc-dialog .cosmos943-loc-actions{flex:none;margin-top:9px!important;
+  padding-top:8px;border-top:1px solid #e2e8ee}
+@media(max-width:650px){
+  #sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro{top:48px!important}
+  .cosmos944-place-scroll{max-height:44dvh}
+  .cosmos944-loc-dialog{max-height:94dvh}
+}
+</style>
 </body>
 </html>
