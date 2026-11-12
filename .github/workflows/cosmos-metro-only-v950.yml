@@ -1,0 +1,41 @@
+name: COSMOS v9.5.0 — Metro Only (No Legal Gate)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Validate first, then apply in a new run"
+        required: true
+        default: validate
+        type: choice
+        options: [validate, apply]
+permissions:
+  contents: write
+jobs:
+  metro-layout-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate or apply only the Metro CSS
+        run: python scripts/apply_cosmos_metro_only_v950.py --mode "${{ inputs.mode }}"
+      - name: Commit changed frontend only (apply mode)
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- cosmos-next.html; then
+            echo 'Already applied: no commit required.'
+          else
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -- cosmos-next.html
+            git commit -m 'COSMOS v9.5.0 Metro-only layout correction'
+            git push origin HEAD:main
+          fi
