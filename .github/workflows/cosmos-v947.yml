@@ -1,0 +1,54 @@
+name: COSMOS v9.4.7 — Direct Menu, Full Profile, Dated News and Metro
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first, then apply
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-v947-frontend-main
+  cancel-in-progress: false
+
+jobs:
+  frontend-v947:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate or apply guarded v9.4.7 update
+        run: python scripts/apply_cosmos_v947.py --mode "${{ inputs.mode }}"
+      - name: Commit frontend only after successful apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.7 direct menu full profile dated news and Metro"
+            git push origin HEAD:main
+          else
+            echo "Already updated; nothing to commit."
+          fi
