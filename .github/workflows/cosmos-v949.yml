@@ -1,0 +1,43 @@
+name: COSMOS v9.4.9 - Personal and Business Metro Parity
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run validate first; apply only after green'
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate or apply guarded COSMOS v9.4.9
+        run: python scripts/apply_cosmos_v949.py --mode "${{ inputs.mode }}"
+      - name: Commit frontend only on apply
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.9 align personal and business dated moments"
+            git push origin HEAD:main
+          else
+            echo "Already at COSMOS v9.4.9; nothing to commit."
+          fi
