@@ -1,0 +1,41 @@
+name: COSMOS v9.5.0 — Metro Layout + Legal Acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate first; apply after review
+        required: true
+        type: choice
+        options: [validate, apply]
+        default: validate
+permissions:
+  contents: write
+jobs:
+  frontend-and-policies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate or apply guarded COSMOS v9.5.0
+        run: python scripts/apply_cosmos_v950.py --mode "${{ inputs.mode }}"
+      - name: Commit only changed frontend/policy files
+        if: inputs.mode == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add -- cosmos-next.html cosmos-terms.html cosmos-privacy.html cosmos-guidelines.html
+          if git diff --cached --quiet; then
+            echo "No changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "COSMOS v9.5.0: separated Metro scroll and versioned legal pages"
+          git push origin HEAD:main
