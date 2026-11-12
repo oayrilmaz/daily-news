@@ -1,0 +1,43 @@
+name: COSMOS v9.4.8 - Simplified Moments and Live News
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Validate first; apply only after validation succeeds'
+        type: choice
+        required: true
+        default: validate
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guarded v9.4.8 validation or apply
+        run: python scripts/apply_cosmos_v948.py --mode "${{ inputs.mode }}"
+      - name: Commit frontend only if apply changed it
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- cosmos-next.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -- cosmos-next.html
+            git commit -m "COSMOS v9.4.8 moments first, persisted news location, fresh discovery"
+            git push origin HEAD:main
+          else
+            echo "Already at v9.4.8; no frontend changes."
+          fi
