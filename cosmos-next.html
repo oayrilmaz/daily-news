@@ -9320,7 +9320,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       <button type="button" data-cosmos947-place-date="${business?'business':'personal'}">+ Leave a moment on this day</button>
       <small>Places a moment on the selected calendar day; no historical hour is fabricated.</small></section>`;
     return heading(`${events.length} ${business?'work':events.some(x=>x._public_editorial)?'COSMOS':'real'} moment${events.length===1?'':'s'} · swipe up or down anywhere · tap a moment`)+
-      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll aria-label="Daily Cosmos Metro. Swipe up or down anywhere, on either side, to scroll through moments.">
+      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Swipe up or down anywhere, on either side, to scroll through moments.">
         <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="--selected-day-trunk:${trunkPct}%">
           <div class="living-trunk" aria-hidden="true"></div>${branches.join('')}${empty}${emptyDayGuide}</div></div>`;
   }
@@ -10315,23 +10315,12 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
  function taggedRegions(x){return Array.isArray(x.regions)?x.regions.filter(v=>typeof v==='string'&&/^[A-Z]{2,3}$/.test(v)):[];}
  function safeUrl(x){try{const u=new URL(x,location.origin);return u.origin===location.origin&&/^\/q\/trends\/global-[a-z0-9-]+\.html$/.test(u.pathname)&&!u.search&&!u.hash?u.pathname:null;}catch{return null;}}
  function updatePublic(){
-   const stack=stage.querySelector('.cosmos929-question')?.closest('.living-day-chart');if(!stack)return;
-   const cards=[...stack.querySelectorAll('.cosmos929-question')];if(!cards.length)return;
-   const container=stack.parentElement;if(!container)return;
-   if(!container.querySelector(':scope > .cosmos929-public-filter')){
-     const categories=unique(cards.map(c=>c.dataset.cosmos929Category));
-     const regions=unique(cards.flatMap(c=>(c.dataset.cosmos929Regions||'').split(',').filter(Boolean)));
-     const bar=document.createElement('div');bar.className='cosmos929-public-filter';
-     bar.innerHTML=`<strong>Public questions · ${cards.length}</strong><label>Category<select data-filter-category><option value="all">All topics</option>${categories.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label>
-      <label>Source region<select data-filter-region ${regions.length?'':'disabled title="No verified region tags in the published feed"'}><option value="all">All tagged regions</option>${regions.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label><button type="button" data-cosmos929-archive>All dates</button>`;
-     container.insertBefore(bar,stack);
-     bar.querySelector('[data-filter-category]').value=categories.includes(rememberedCategory)?rememberedCategory:'all';
-     bar.querySelector('[data-filter-region]').value=regions.includes(rememberedRegion)?rememberedRegion:'all';
-     bar.addEventListener('change',e=>{if(e.target.matches('[data-filter-category]'))rememberedCategory=e.target.value;
-       if(e.target.matches('[data-filter-region]'))rememberedRegion=e.target.value;apply(stack,bar);});
-     bar.querySelector('[data-cosmos929-archive]').onclick=openArchive;
-   }
-   apply(stack,container.querySelector(':scope > .cosmos929-public-filter'));
+   // v9.4.9: Public editorial questions already render in the SAME dated
+   // Metro rows as authorized personal moments. The old in-day filter bar
+   // created a second, Business-inconsistent panel and displaced real moments.
+   // Keep category and region filtering ONLY in the public questions archive.
+   const main=stage.querySelector('#metroMain');
+   main?.querySelectorAll('.cosmos929-public-filter').forEach(el=>el.remove());
  }
  function apply(stack,bar){
    const cat=bar.querySelector('[data-filter-category]').value,region=bar.querySelector('[data-filter-region]').value;
@@ -11301,6 +11290,61 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   #sheet.business-modal[data-business-tab="metro"] .cosmos948-news .cosmos948-preview{grid-template-columns:1fr!important}
   .cosmos948-news .cosmos943-head-actions{gap:6px!important}
   .cosmos948-news .cosmos943-head-actions button{min-height:38px;padding:8px 10px!important}
+}
+</style>
+
+<style id="cosmos949ConsistentMetroDays">
+/* COSMOS v9.4.9: Personal and Business use the same dated moment sequence.
+   Public questions remain source-linked moments under their actual hour, not
+   a separate toolbar or scroll panel between the date and the moments. */
+#app.metro-live #metroMain .cosmos929-public-filter { display:none!important; }
+#app.metro-live #metroMain>.metro-day-heading,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-heading {
+  order:10!important;
+}
+#app.metro-live #metroMain>.metro-day-scroll,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-scroll {
+  order:20!important;
+  width:100%!important;
+  box-sizing:border-box!important;
+  min-height:0!important;
+  padding-bottom:18px!important;
+}
+#app.metro-live #metroMain .cosmos945-public-moment {
+  display:block!important;
+  box-sizing:border-box!important;
+  min-width:0!important;
+  flex:1 1 100%!important;
+  width:100%!important;
+  max-width:100%!important;
+  margin:0!important;
+}
+#app.metro-live #metroMain .cosmos945-public-moment > summary {
+  width:100%!important;
+  box-sizing:border-box!important;
+  border-radius:12px!important;
+  min-height:66px!important;
+  align-items:center!important;
+}
+#app.metro-live #metroMain .cosmos945-public-moment:focus-within {
+  outline:2px solid #55778f;outline-offset:2px;
+}
+#app.metro-live #metroMain .cosmos945-public-details {
+  overflow-wrap:anywhere!important;
+}
+#app.metro-live #metroMain .living-day-chart,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-day-chart {
+  min-height:150px!important;
+}
+/* Keep the same responsive vertical scrolling in both universes. */
+@media (max-width:650px) {
+  #app.metro-live #metroMain .cosmos945-public-moment > summary {
+    min-height:62px!important;
+    padding:11px 10px!important;
+  }
+  #app.metro-live #metroMain .cosmos945-public-details {
+    padding:10px 12px!important;
+  }
 }
 </style>
 </body>
