@@ -8617,6 +8617,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
       close();if(universe==='business')openBusinessHub('profile');else accountButton.click();
     };
   }
+  // v9.4.7: available only through explicit owner profile-menu action.
+  window.cosmos947OpenOwnerProfile=cosmos933OpenProfile;
   async function cosmos933Upload(universe,kind,file,status){
     if(status)status.textContent='Saving edited photo securely (location metadata removed automatically)…';
     try{
@@ -9312,10 +9314,15 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         <div class="living-rail" role="group" aria-label="${items.length} moments at ${escapeHtml(firstStamp)}. Scroll up or down anywhere on this row.">${cards}</div></div>`);
     });
     const empty=rows.length?'':`<div class="living-empty">${business?'No professional posts on this day. Select another day or create a work moment.':friend?'No shared moments on this day. Choose another date or leave a moment.':metroViewFilter==='public'?'No published public moments on this day. Select another date to explore.':metroViewFilter==='all'?'No saved moments for this day. Hold the Cosmos circle to create one.':'No '+metroViewFilter+' moments for this day. Choose All to see everything together.'}</div>`;
+    const emptyDayGuide=rows.length||friend?'':`<section class="cosmos947-day-guide" aria-label="Daily timeline hours">
+      <p>Timeline hours · no recorded moments at these times</p>
+      <div class="cosmos947-hour-guide" aria-hidden="true"><span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span></div>
+      <button type="button" data-cosmos947-place-date="${business?'business':'personal'}">+ Leave a moment on this day</button>
+      <small>Places a moment on the selected calendar day; no historical hour is fabricated.</small></section>`;
     return heading(`${events.length} ${business?'work':events.some(x=>x._public_editorial)?'COSMOS':'real'} moment${events.length===1?'':'s'} · swipe up or down anywhere · tap a moment`)+
-      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll" aria-label="Daily Cosmos Metro. Swipe up or down anywhere, on either side, to scroll through moments.">
+      `<div class="metro-day-scroll compact-no-gaps" id="metroDayScroll aria-label="Daily Cosmos Metro. Swipe up or down anywhere, on either side, to scroll through moments.">
         <div class="living-day-chart ${left?'branch-left':'branch-right'} ${sunday<=1?'trunk-near-left':sunday>=5?'trunk-near-right':''}" style="--selected-day-trunk:${trunkPct}%">
-          <div class="living-trunk" aria-hidden="true"></div>${branches.join('')}${empty}</div></div>`;
+          <div class="living-trunk" aria-hidden="true"></div>${branches.join('')}${empty}${emptyDayGuide}</div></div>`;
   }
   function metroPeekHtml(item,record,extraCount=0,thumbnail=''){
     const headline=record?.sender_name||item.title||'Cosmos';
@@ -9963,6 +9970,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     const layer=cosmos940Layer();layer.hidden=false;
     cosmos940Render();cosmos940Fetch();
   }
+  window.cosmos947TimeForDate=(space,dateText)=>{
+    const parts=String(dateText||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!parts)return;
+    cosmos940.prefillDate={month:Number(parts[2]),day:Number(parts[3])};
+    cosmos940.busy=true; // First render must not consume the prefill before the fetch returns.
+    cosmos940Open(space,{era:'CE',year:String(Number(parts[1]))});
+  };
   async function cosmos940Fetch(append=false){
     const id=++cosmos940.seq;cosmos940.busy=true;
     if(!append){cosmos940.page=0;cosmos940.items=[];cosmos940.older=null;cosmos940.newer=null;}
@@ -10054,6 +10068,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     });
     root.querySelector('#cosmos940More')?.addEventListener('click',()=>{cosmos940.page+=1;cosmos940Fetch(true);});
     root.querySelectorAll('[data-time-media]').forEach(m=>cosmos940Media(m));
+    if(!cosmos940.busy&&!error&&cosmos940.prefillDate){
+      const chosen=cosmos940.prefillDate;cosmos940.prefillDate=null;
+      cosmos940Compose();
+      const month=root.querySelector('#cosmos940Month'),day=root.querySelector('#cosmos940Day');
+      if(month)month.value=String(chosen.month);
+      if(day)day.value=String(chosen.day);
+    }
   }
   async function cosmos940Media(mount){
     if(!mount.isConnected)return;
@@ -10201,12 +10222,12 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   let scheduled=false,lastOrigin=null;
   const actions={
     personal:[
-      ['ask','✧ Ask COSMOS'],['business','◈ Business timeline'],
+      ['owner-profile','My Personal profile'],['news','News & discoveries'],['ask','✧ Ask COSMOS'],['business','◈ Business timeline'],
       ['people','People & Connections'],['together','♫ Together'],
       ['origins','Origins · Original COSMOS'],['marketplace','Personal Marketplace'],['questions','Global questions'],['directory','Search Personal people'],['account','Account & settings'],
     ],
     business:[
-      ['personal','◈ Personal timeline'],['jobs','Jobs & talent'],
+      ['owner-profile','My Business profile'],['news','News & discoveries'],['personal','◈ Personal timeline'],['jobs','Jobs & talent'],
       ['marketplace','Business Marketplace'],['questions','Global questions'],['profile','Business profile'],['visitors','Profile visitors'],['directory','Search Business people'],['account','Account & settings'],
     ],
   };
@@ -10226,6 +10247,8 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!item||item.disabled)return;
     const name=item.dataset.cosmosMenuAction;
     close();
+    if(name==='owner-profile'){window.cosmos947OpenOwnerProfile?.(overlay.dataset.cosmosUniverseV925||'personal');return;}
+    if(name==='news'){window.cosmos947OpenNews?.(overlay.dataset.cosmosUniverseV925||'personal');return;}
     if(name==='directory'){window.cosmosOpenDirectoryV925?.(overlay.dataset.cosmosUniverseV925||'personal','search');return;}
     if(name==='marketplace'){location.assign(overlay.dataset.cosmosUniverseV925==='business'?'/cosmos-market-business.html':'/cosmos-market-personal.html');return;}
     if(name==='questions'){window.cosmos929OpenQuestionArchive?.();return;}
@@ -10521,16 +10544,27 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   if(!container)return;
   let el=container.querySelector(':scope > .cosmos942-discover');
   if(!el){el=document.createElement('section');el.className='cosmos942-discover';el.setAttribute('aria-label',space+' discovery');container.prepend(el);}
+  // Put discovery inside the day's main reading order, not above the weekly time rail.
+  const heading=container.querySelector('.metro-day-heading');
+  if(heading&&heading.nextElementSibling!==el)heading.insertAdjacentElement('afterend',el);
   liveLocal(space);
   const entry=discoverySet(space),status=discoveryMessage(space,entry),loc=entry.loc;
-  const markup='<div class="cosmos942-head"><h3>✦ For you · '+(space==='personal'?'Personal':'Business')+'</h3>'+
+  const chosenLabel=heading?.querySelector('h2')?.textContent||'';
+  const chosen=new Date(chosenLabel);
+  const chosenKey=Number.isFinite(chosen.getTime())?
+    [chosen.getFullYear(),String(chosen.getMonth()+1).padStart(2,'0'),String(chosen.getDate()).padStart(2,'0')].join('-'):'';
+  const selectedItems=chosenKey?entry.items.filter(x=>String(x.published_at||'').slice(0,10)===chosenKey)
+    .sort((a,b)=>String(b.published_at||'').localeCompare(String(a.published_at||''))):[];
+
+  const markup='<div class="cosmos942-head"><h3>✦ News · '+(space==='personal'?'Personal':'Business')+(chosenLabel?' · '+escape(chosenLabel):'')+'</h3>'+
    '<div class="cosmos943-head-actions"><span class="cosmos943-geo-label">'+(loc?'📍 '+escape(loc):'🌐 Worldwide')+'</span>'+
    '<button type="button" data-location>News location</button><button type="button" data-refresh-feed>Refresh news</button><button type="button" data-open-full>All news ↗</button>'+
    '<button type="button" data-edit>Interests ('+state.prefs[space].length+')</button></div></div>'+
    (status?'<p class="cosmos943-feedback" role="status">'+escape(status)+'</p>':
-   '<div class="cosmos942-list">'+entry.items.slice(0,3).map(x=>discoveryCard(x,space)).join('')+'</div>')+
-   '<p>Source-linked news · '+(loc?'Chosen place: '+escape(loc):'Available worldwide sources')+
-   ' · Coverage depends on publishers'+(entry.feed?.updated_at?' · Feed checked '+escape(String(entry.feed.updated_at).slice(0,10)):' · Feed date unavailable')+'. Articles retain their own published dates.</p>';
+   selectedItems.length?'<div class="cosmos942-list" role="list">'+selectedItems.map(x=>discoveryCard(x,space)).join('')+'</div>':
+   '<p class="cosmos947-no-news">No source-linked articles published on this day for your interests. Older articles remain on their actual publication dates. Select a previous day, or open All news.</p>')+
+   '<p class="cosmos947-discovery-foot">Published date determines timeline placement · '+(loc?'Chosen place: '+escape(loc):'Worldwide sources')+
+   (entry.feed?.updated_at?' · Feed checked '+escape(String(entry.feed.updated_at).slice(0,10)):'')+'.</p>';
   if(el._content!==markup){el._content=markup;el.innerHTML=markup;
     el.querySelector('[data-edit]').onclick=()=>openEditor(space);
     el.querySelector('[data-location]').onclick=()=>openLocationEditor(space);
@@ -10558,6 +10592,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   const onKey=e=>{if(e.key==='Escape')dismiss();};document.addEventListener('keydown',onKey);
   view.querySelector('[data-close]').onclick=dismiss;
  }
+ window.cosmos947OpenNews=openDiscoveryFullScreen;
  function openLocationEditor(space){
   document.getElementById('cosmos943LocationEditor')?.remove();
   const view=document.createElement('div');view.id='cosmos943LocationEditor';view.className='cosmos943-loc-modal cosmos944-location-modal';
@@ -11106,6 +11141,93 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   // Profile dialogs are appended to body, not to either Metro.
   new MutationObserver(run).observe(document.body,{childList:true});
   run();
+})();
+</script>
+
+<style id="cosmos947ChronologicalHomeAndOwner">
+/* The header portrait is a direct navigation entry, while the full-page
+   profile remains reachable from the very first menu option. */
+.cosmos933-photo-overlay:has(.cosmos933-profile-dialog){padding:0!important;display:block!important;overflow:hidden!important}
+.cosmos933-photo-overlay .cosmos933-profile-dialog{
+  width:100vw!important;max-width:100vw!important;height:100dvh!important;max-height:100dvh!important;
+  min-height:100dvh!important;border-radius:0!important;box-shadow:none!important;
+}
+.cosmos933-profile-dialog .cosmos933-photo-heading{position:sticky;top:0;z-index:2;background:#fff;padding:14px max(16px,env(safe-area-inset-right))!important}
+.cosmos933-profile-dialog .cosmos933-photo-body{flex:1!important;overflow-y:auto!important;overscroll-behavior:contain!important;padding:clamp(10px,2vw,25px)!important}
+.cosmos933-profile-dialog .cosmos933-profile-backdrop{height:clamp(210px,42vh,550px)!important;border-radius:12px!important}
+.cosmos933-profile-dialog .cosmos933-photo-tools{justify-content:center!important;max-width:1200px;margin:18px auto!important}
+.cosmos933-profile-dialog .cosmos933-profile-name{font-size:clamp(19px,2.4vw,29px)!important}
+/* Dated news lives directly inside the selected day's reading flow. */
+#app.metro-live #metroMain>.cosmos942-discover,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos942-discover{
+  order:0!important;position:relative!important;width:100%!important;max-width:none!important;
+  margin:8px 0 12px!important;padding:10px 14px!important;
+  background:rgba(245,249,251,.55)!important;border-radius:10px!important;
+  border:1px solid rgba(255,255,255,.34)!important;overflow:visible!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+#app.metro-live #metroMain>.cosmos942-discover .cosmos942-list,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos942-discover .cosmos942-list{
+  display:flex!important;flex-direction:column!important;gap:6px!important;overflow:visible!important;
+  width:100%!important;max-width:none!important;scroll-snap-type:none!important;
+}
+#app.metro-live #metroMain>.cosmos942-discover .cosmos942-list>a,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos942-discover .cosmos942-list>a{
+  box-sizing:border-box!important;display:block!important;width:100%!important;max-width:none!important;
+  flex:none!important;min-height:unset!important;padding:12px 15px!important;scroll-snap-align:none!important;
+  border-radius:9px!important;background:rgba(255,255,255,.91)!important;
+}
+.cosmos947-no-news{padding:8px 0!important;margin:0!important;font-size:13px!important}
+.cosmos947-discovery-foot{font-size:11px!important;margin:7px 0 0!important}
+.cosmos947-day-guide{position:relative;z-index:2;margin:10px 14px 15px clamp(45px,9%,100px);
+  padding:14px;border-radius:12px;border:1px solid rgba(210,224,237,.9);background:rgba(255,255,255,.73);
+  display:flex;flex-direction:column;gap:10px;color:#263d50;}
+.cosmos947-day-guide p{margin:0;font-weight:700;font-size:12px}
+.cosmos947-hour-guide{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;
+  padding:12px 0;border-top:1px solid #d7e1ea;border-bottom:1px solid #d7e1ea}
+.cosmos947-hour-guide span{font-size:10px;color:#587185;text-align:center;border-left:1px solid #b4cad9}
+.cosmos947-day-guide button{align-self:flex-start;border-radius:99px;background:#223747;color:white;
+  border:1px solid #223747;padding:9px 15px;min-height:40px;font-weight:800;cursor:pointer}
+.cosmos947-day-guide small{color:#566b7a;font-size:11px}
+/* The legacy empty-state card was positioned absolutely; keep it in flow so
+   it cannot cover the new date-linked action or its hour guide. */
+#app.metro-live .living-day-chart:has(.cosmos947-day-guide) .living-empty,
+#sheet.business-modal[data-business-tab="metro"] .living-day-chart:has(.cosmos947-day-guide) .living-empty{
+  position:relative!important;top:auto!important;bottom:auto!important;left:auto!important;right:auto!important;
+  width:auto!important;max-width:none!important;margin:9px 14px!important;text-align:left!important;
+}
+#app.metro-live .living-day-chart:has(.cosmos947-day-guide),
+#sheet.business-modal[data-business-tab="metro"] .living-day-chart:has(.cosmos947-day-guide){min-height:220px!important;}
+@media(max-width:600px){
+ .cosmos947-day-guide{margin:10px 7px 15px 40px;padding:11px}
+ .cosmos947-hour-guide span{font-size:9px}
+ .cosmos933-profile-dialog .cosmos933-profile-backdrop{height:35dvh!important}
+}
+</style>
+<script id="cosmos947OwnerQuickMenuAndDailyActions">
+(()=>{'use strict';
+ // The original avatar click opens the photo modal. On a Metro, route the
+ // first tap to the existing COSMOS menu instead; its first item opens Profile.
+ document.addEventListener('click',event=>{
+   const avatar=event.target.closest?.('#cosmos933-avatar-personal,#cosmos933-avatar-business');
+   if(!avatar||!avatar.isConnected||window.cosmos947AllowProfileClick)return;
+   const space=avatar.id.endsWith('business')?'business':'personal';
+   const menu=document.querySelector('[data-cosmos-metro-more="'+space+'"]');
+   if(!menu)return;
+   event.preventDefault();event.stopImmediatePropagation();
+   menu.click();
+ },true);
+ document.addEventListener('click',event=>{
+   const action=event.target.closest?.('[data-cosmos947-place-date]');
+   if(!action)return;
+   const space=action.dataset.cosmos947PlaceDate;
+   const main=action.closest('.metro-main');
+   const label=main?.querySelector('.metro-day-heading h2')?.textContent||'';
+   const day=new Date(label);
+   if(!Number.isFinite(day.getTime()))return;
+   const key=[day.getFullYear(),String(day.getMonth()+1).padStart(2,'0'),String(day.getDate()).padStart(2,'0')].join('-');
+   window.cosmos947TimeForDate?.(space,key);
+ });
 })();
 </script>
 </body>
