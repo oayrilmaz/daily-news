@@ -3713,11 +3713,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
         <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
         <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · can be changed later in Profile</div></div>
-        <div id="authRegisterConsent" class="auth-eligibility" hidden>
-          <label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old (if under 18, I have permission from a parent or guardian).</label>
-          <label class="cosmos950-consent"><input type="checkbox" id="authTermsConfirm" required> I agree to the <a href="/cosmos-terms.html" target="_blank" rel="noopener">Terms of Service</a> (v2026-11-12.1), and acknowledge the <a href="/cosmos-privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</label>
-          <p>Read both documents before accepting. One account, two universes. Verification is by email; no phone number is required.</p>
-        </div>
+        <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>One COSMOS account. Email verification is required. Your private moments stay private.</p></div>
         <button type="button" id="sendCodesButton">Sign in</button>
         <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
         <div class="auth-note" id="authIntroNote">Use your email and password. No phone number required.</div>
@@ -3735,8 +3731,6 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   </section>
 </div>
 
-<nav class="cosmos950-legal-links" aria-label="Legal documents"><a href="/cosmos-terms.html" target="_blank" rel="noopener">Terms</a><a href="/cosmos-privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/cosmos-guidelines.html" target="_blank" rel="noopener">Guidelines</a></nav>
-<style>.cosmos950-legal-links{position:fixed;bottom:2px;left:8px;z-index:4;display:flex;gap:10px;opacity:.85;font-size:10px}.cosmos950-legal-links a{color:inherit;text-decoration:underline}@media(max-width:650px){.cosmos950-legal-links{left:4px;font-size:9px;gap:6px}}</style>
 <input id="fileInput" type="file" hidden />
 
 <script>
@@ -4199,50 +4193,12 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     setTimeout(()=>input?.focus(),100);
   }
 
-
-  function cosmos950ShowLegalGate(){
-    auth.hidden=true;
-    let layer=document.getElementById('cosmos950LegalGate');
-    if(layer)return;
-    layer=document.createElement('div');layer.id='cosmos950LegalGate';
-    layer.className='cosmos950-legal-gate';layer.setAttribute('role','dialog');
-    layer.setAttribute('aria-modal','true');layer.setAttribute('aria-label','Review COSMOS Terms');
-    layer.innerHTML=`<div class="cosmos950-legal-panel">
-      <h2>Review the COSMOS Terms</h2>
-      <p>Before continuing, please review the current Terms of Service and Privacy Policy. Your account and existing moments are preserved.</p>
-      <p><a href="/cosmos-terms.html" target="_blank" rel="noopener">Read Terms of Service</a> · <a href="/cosmos-privacy.html" target="_blank" rel="noopener">Read Privacy Policy</a> · <a href="/cosmos-guidelines.html" target="_blank" rel="noopener">Community Guidelines</a></p>
-      <label class="cosmos950-legal-check"><input type="checkbox" id="cosmos950LegalCheckbox"> I agree to the Terms (v2026-11-12.1) and acknowledge the Privacy Policy.</label>
-      <p id="cosmos950LegalError" role="alert" class="cosmos950-legal-error" hidden></p>
-      <div class="cosmos950-legal-actions"><button type="button" id="cosmos950LegalSignout">Sign out</button><button type="button" class="primary" id="cosmos950LegalAccept">Agree &amp; continue</button></div>
-    </div>`;
-    document.body.appendChild(layer);
-    const err=layer.querySelector('#cosmos950LegalError');
-    layer.querySelector('#cosmos950LegalSignout').onclick=()=>{
-      localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);token='';me=null;
-      layer.remove();auth.hidden=false;setEmailAuthMode('login');
-    };
-    layer.querySelector('#cosmos950LegalAccept').onclick=async()=>{
-      if(!layer.querySelector('#cosmos950LegalCheckbox').checked){err.hidden=false;err.textContent='Check the agreement box after reviewing the documents.';return;}
-      const button=layer.querySelector('#cosmos950LegalAccept');button.disabled=true;
-      err.hidden=true;
-      try{
-        const result=await api('/api/legal/accept',{method:'POST',body:JSON.stringify({terms_accepted:true,privacy_acknowledged:true,terms_version:'2026-11-12.1',privacy_version:'2026-11-12.1'})});
-        if(!result.ok)throw new Error('COSMOS did not confirm your acceptance.');
-        layer.remove();await bootstrap();
-      }catch(e){err.hidden=false;err.textContent=String(e.message||'Could not save acceptance. Try again.');}
-      finally{button.disabled=false;}
-    };
-    layer.querySelector('#cosmos950LegalCheckbox').focus();
-  }
-
   async function bootstrap(){
     if(!token){auth.hidden=false;return;}
     try{
       me = await api("/api/me");
       auth.hidden=true;showAuthError('');
       accountButton.textContent=me.display_name|| (me.username?'@'+me.username:'You');
-      const legal=await api('/api/legal/status');
-      if(!legal.accepted){cosmos950ShowLegalGate();return;}
       if(!me.username){showRequiredUsername();return;}
       refreshNoticeBadge();
       if(pendingNoticeId&&!FAMILY_INVITE_CODE)setTimeout(openNotificationMomentFromLink,220);
@@ -4274,7 +4230,6 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   function completeEmailSignIn(r){
     token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;
     auth.hidden=true;accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');
-    if(r.legal_acceptance_required){cosmos950ShowLegalGate();return;}
     if(!me.username){showRequiredUsername();return;}
     // v3.6a.9: sign-in shows a camera-off Metro until the person taps camera.
     refreshNoticeBadge();
@@ -4295,7 +4250,6 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     if(!email){showAuthError('Enter your email address.');return;}
     if(authMode!=='reset' && !password){showAuthError('Enter your password.');return;}
     if(authMode==='register' && !$('authAgeConfirm').checked){showAuthError('An independent account requires the user to be at least 13.');return;}
-    if(authMode==='register' && !$('authTermsConfirm').checked){showAuthError('Please read and agree to the Terms of Service before creating an account.');return;}
     const username=normalizeCosmosHandle($('authUsernameInput').value);
     if(authMode==='register' && !cosmosHandleRule.test(username)){
       showAuthError('Choose a unique username: 3–20 characters, starting with a letter; letters, numbers or underscore.');return;
@@ -4306,7 +4260,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         const r=await api('/api/auth/email/login',{method:'POST',body:JSON.stringify({email,password})});completeEmailSignIn(r);return;
       }
       const url=authMode==='register'?'/api/auth/email/register/start':'/api/auth/email/reset/start';
-      const body=authMode==='register'?{email,password,username,age_13_or_older:true,terms_accepted:$('authTermsConfirm').checked,privacy_acknowledged:true,terms_version:'2026-11-12.1',privacy_version:'2026-11-12.1',invite_code:FAMILY_INVITE_CODE}:{email};
+      const body=authMode==='register'?{email,password,username,age_13_or_older:true,invite_code:FAMILY_INVITE_CODE}:{email};
       const r=await api(url,{method:'POST',body:JSON.stringify(body)});
       authChallengeId=r.challenge_id;authStart.hidden=true;authVerify.hidden=false;
       $('authResetPasswordBlock').hidden=authMode!=='reset';
@@ -11459,24 +11413,6 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
  #app.metro-live #metroMain>.metro-day-heading{margin-bottom:7px!important}
  #app.metro-live #metroMain .living-branch{min-height:82px!important}
 }
-</style>
-
-<style id="cosmos950LegalSignupStyles">
-.auth-eligibility .cosmos950-consent{display:flex;align-items:flex-start;gap:9px;margin:11px 0;line-height:1.5;font-size:13px;color:#203443}
-.auth-eligibility .cosmos950-consent input{flex:none;margin-top:4px}
-.auth-eligibility .cosmos950-consent a,.cosmos950-legal-gate a{text-decoration:underline;color:#1b557b}
-.cosmos950-legal-gate{position:fixed;z-index:999999;inset:0;background:rgba(8,22,31,.82);padding:16px;display:flex;align-items:center;justify-content:center;overscroll-behavior:contain}
-.cosmos950-legal-panel{width:min(540px,100%);max-height:92dvh;overflow:auto;background:white;color:#1f3341;border-radius:21px;padding:clamp(18px,3vw,30px);box-shadow:0 20px 70px #0005}
-.cosmos950-legal-panel h2{margin:0 0 10px;font-size:clamp(19px,3vw,26px)}
-.cosmos950-legal-panel p{font-size:14px;line-height:1.6}
-.cosmos950-legal-check{display:flex;align-items:flex-start;gap:10px;padding:13px;background:#f0f5f8;border-radius:10px;font-size:14px;line-height:1.5}
-.cosmos950-legal-check input{flex:none;margin-top:4px}
-.cosmos950-legal-error{color:#ad2929!important}
-.cosmos950-legal-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}
-.cosmos950-legal-actions button{border-radius:12px;border:1px solid #c5d4df;background:#fff;padding:11px 16px;font-weight:800;color:#203443}
-.cosmos950-legal-actions .primary{background:#24343e;color:white}
-.cosmos950-legal-actions button:disabled{opacity:.6}
-@media(max-width:500px){.cosmos950-legal-panel{max-height:90dvh}.cosmos950-legal-actions button{flex:1 1 140px}}
 </style>
 </body>
 </html>
