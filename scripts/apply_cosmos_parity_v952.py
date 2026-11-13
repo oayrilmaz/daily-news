@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""COSMOS v9.5.2 — guarded one-source Personal & Business parity installer.
+
+Only cosmos-next.html is changed. No API, auth, database, legal or publishing changes.
+Run: python scripts/apply_cosmos_parity_v952.py --mode validate|apply
+"""
+from pathlib import Path
+import argparse,base64,zlib,json,hashlib,sys
+TARGET=Path("cosmos-next.html")
+SOURCE_SHA256="dec1002cb5f4ef2bc865425eaab37c2774d18a29c6963e0a98fcf27420d1f567"
+RESULT_SHA256="e019a95b49386a2caa79b62fa194f5ea615ab410afd3ec7d55d05d10c3b91814"
+PAYLOAD="""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"""
+
+def sha(b): return hashlib.sha256(b).hexdigest()
+def main():
+    a=argparse.ArgumentParser(description=__doc__)
+    a.add_argument('--mode',choices=('validate','apply'),default='validate')
+    args=a.parse_args()
+    if not TARGET.is_file(): raise SystemExit('ERROR: cosmos-next.html missing. No files changed.')
+    before=TARGET.read_bytes(); original_hash=sha(before)
+    if original_hash==RESULT_SHA256:
+        print('ALREADY APPLIED: v9.5.2 source matches expected output. No changes needed.');return
+    if original_hash!=SOURCE_SHA256:
+        raise SystemExit('ERROR: live frontend differs from the known v9.5.1 baseline. No files changed. Do not force; inspect current source and update patch.')
+    try:
+        state=json.loads(zlib.decompress(base64.b64decode(PAYLOAD)).decode('utf-8'))
+        result=before.decode('utf-8')
+        for old,new in state['replacements']:
+            if result.count(old)!=1: raise ValueError('expected code anchor is missing or duplicated')
+            result=result.replace(old,new,1)
+        if result.count('</body>')!=1 or 'id="cosmos952UnifiedMenuAndMetro"' in result:
+            raise ValueError('invalid ending marker')
+        result=result.replace('</body>',state['append']+'</body>',1)
+        if sha(result.encode('utf-8'))!=RESULT_SHA256:raise ValueError('output checksum does not match validated version')
+    except Exception as exc:
+        raise SystemExit('ERROR: patch verification failed: '+str(exc)+'. No files changed.')
+    if args.mode=='validate':
+        print('PASS validate: v9.5.1 matches expected source; all parity replacements and output checksum verified. No files changed.')
+        return
+    TARGET.write_text(result,encoding='utf-8')
+    print('APPLIED COSMOS v9.5.2 Personal & Business Metro/menu parity; only cosmos-next.html modified.')
+if __name__=='__main__':main()
