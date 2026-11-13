@@ -9829,16 +9829,18 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   // COSMOS MATCHED METRO LAYOUT v9.2.3 BRIDGE
   // Menu actions call EXISTING handlers. This does not bypass permission checks.
   window.cosmosMetroShortcutsV923 = {
-    ask:()=>showUnifiedAskComposer(),
+    ask:()=>{if(sheet.classList.contains('business-modal')){
+      businessDraft={kind:'ask',text:'',category:'Insight',media_id:null,content_url:null};businessAskCompose();
+    }else showUnifiedAskComposer();},
     business:()=>enterUniverse('business'),
     personal:()=>enterUniverse('private'),
-    people:()=>openFriends(),
+    people:()=>sheet.classList.contains('business-modal')?openBusinessHub('people'):openFriends(),
     together:()=>openTogetherSpaces(),
     origins:()=>location.assign('/cosmos-original-home.html'),
     jobs:()=>openBusinessJobs('browse'),
     profile:()=>openBusinessHub('profile'),
     visitors:()=>openBusinessHub('visitors'),
-    account:()=>{const inBusiness=document.getElementById('sheet')?.classList.contains('business-modal');const b=document.getElementById(inBusiness?'businessHeaderProfile':'accountButton');b?.click();},
+    account:()=>sheet.classList.contains('business-modal')?openBusinessHub('profile'):$('accountButton')?.click(),
     feed:()=>openBusinessHub('metro'),
   };
   $("jumpDate").addEventListener("click",()=>{
@@ -10220,17 +10222,44 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   const sheet=document.getElementById('sheet');
   if(!stage||!sheet)return;
   let scheduled=false,lastOrigin=null;
-  const actions={
-    personal:[
-      ['owner-profile','My Personal profile'],['news','News & discoveries'],['ask','✧ Ask COSMOS'],['business','◈ Business timeline'],
-      ['people','People & Connections'],['together','♫ Together'],
-      ['origins','Origins · Original COSMOS'],['marketplace','Personal Marketplace'],['questions','Global questions'],['directory','Search Personal people'],['account','Account & settings'],
-    ],
-    business:[
-      ['owner-profile','My Business profile'],['news','News & discoveries'],['personal','◈ Personal timeline'],['jobs','Jobs & talent'],
-      ['marketplace','Business Marketplace'],['questions','Global questions'],['profile','Business profile'],['visitors','Profile visitors'],['directory','Search Business people'],['account','Account & settings'],
-    ],
+  // COSMOS v9.5.2: ONE navigation structure; each universe exposes only the
+  // features its permissions already support. No imaginary groups backend.
+  const menuSections=(kind)=>{
+    const work=kind==='business';
+    return [
+      {heading:'My COSMOS',open:true,items:[
+        ['owner-profile','My profile','Photo, background and profile details'],
+        [work?'personal':'business',work?'Go to Personal':'Go to Business','Switch universes without merging your moments'],
+        ['account','Account & settings','Account, notifications and privacy']
+      ]},
+      {heading:'People & community',open:true,items:[
+        ['people','Connections',work?'Professional connections and invitations':'Accepted connections and invitations'],
+        ['directory','Find people','Search discoverable members and @handles'],
+        ['following','Following & followers','Manage following and discoverability'],
+        ...(work?[['visitors','Profile visitors','Business profile viewer information']]:[]),
+        ['groups','Groups · coming later','Public and paid groups are not live',true]
+      ]},
+      {heading:'Explore',open:true,items:[
+        ['ask','Ask COSMOS',work?'Explore a professional question':'Explore a question and save a moment'],
+        ['news','News & discoveries','Your chosen location and interests'],
+        ['questions','Global questions','Source-linked public questions by category']
+      ]},
+      {heading:'Marketplace & opportunities',open:work,items:[
+        ...(work?[['jobs','Jobs & talent','Open roles, résumés and hiring']]:[]),
+        ['marketplace',work?'Business Marketplace':'Personal Marketplace',work?'Professional listings':'Personal listings']
+      ]},
+      {heading:'Experiences & legacy',open:false,items:[
+        ['together',work?'Together · Personal beta':'Together Spaces','Private shared sessions with accepted Personal connections',work],
+        ['origins','Original COSMOS','Older research experience; optional']
+      ]}
+    ];
   };
+  function renderMenuSections(kind){
+    return menuSections(kind).map(section=>
+      `<details class="cosmos952-menu-section" ${section.open?'open':''}>
+        <summary>${section.heading}</summary><div class="cosmos952-menu-links">${section.items.map(([action,label,hint,disabled])=>
+          `<button class="cosmos-menu-entry" type="button" data-cosmos-menu-action="${action}" ${disabled?'disabled aria-disabled="true"':''}><strong>${label}</strong><small>${hint}</small></button>`).join('')}</div></details>`).join('');
+  }
   let overlay=document.getElementById('cosmosMetroMoreOverlayV923');
   if(!overlay){
     overlay=document.createElement('div');
@@ -10249,7 +10278,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     close();
     if(name==='owner-profile'){window.cosmos947OpenOwnerProfile?.(overlay.dataset.cosmosUniverseV925||'personal');return;}
     if(name==='news'){window.cosmos947OpenNews?.(overlay.dataset.cosmosUniverseV925||'personal');return;}
-    if(name==='directory'){window.cosmosOpenDirectoryV925?.(overlay.dataset.cosmosUniverseV925||'personal','search');return;}
+    if(name==='directory'||name==='following'){
+      window.cosmosOpenDirectoryV925?.(overlay.dataset.cosmosUniverseV925||'personal',name==='following'?'following':'search');return;
+    }
     if(name==='marketplace'){location.assign(overlay.dataset.cosmosUniverseV925==='business'?'/cosmos-market-business.html':'/cosmos-market-personal.html');return;}
     if(name==='questions'){window.cosmos929OpenQuestionArchive?.();return;}
     const handlers=window.cosmosMetroShortcutsV923;
@@ -10259,8 +10290,7 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   function open(kind,origin){
     lastOrigin=origin;overlay.dataset.cosmosUniverseV925=kind;
     document.getElementById('cosmosMetroMoreTitleV923').textContent=kind==='business'?'Business COSMOS':'Personal COSMOS';
-    document.getElementById('cosmosMetroMoreListV923').innerHTML=actions[kind].map(([value,label])=>
-      `<button type="button" class="cosmos-menu-entry" data-cosmos-menu-action="${value}">${label}</button>`).join('');
+    document.getElementById('cosmosMetroMoreListV923').innerHTML=renderMenuSections(kind);
     overlay.hidden=false;
     overlay.querySelector('.cosmos-menu-close').focus();
   }
@@ -11482,5 +11512,189 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   box-sizing:border-box!important;
 }
 </style>
+<style id="cosmos952UnifiedMenuAndMetro">
+/* v9.5.2: parity in actual scroll behavior, not another overlay. */
+#app.metro-live .journey-stage,
+#sheet.business-modal[data-business-tab="metro"] .sheet-inner{
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .sheet-inner{
+  scroll-padding-bottom:150px!important;
+  padding-bottom:calc(160px + env(safe-area-inset-bottom))!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell{
+  display:flex!important;flex-direction:column!important;
+  justify-content:flex-start!important;align-items:stretch!important;
+  min-height:0!important;height:auto!important;max-height:none!important;
+  overflow:visible!important;padding-bottom:0!important;
+}
+/* Unlike the old sticky Business rail, these stay in document order, just
+   like Personal v9.5.1. News can never paint on top of weekdays when scrolling. */
+#sheet.business-modal[data-business-tab="metro"] .business-metro-main-selector,
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro{
+  position:relative!important;top:auto!important;bottom:auto!important;
+  transform:none!important;flex:0 0 auto!important;
+  z-index:1!important;overflow:visible!important;
+  background:transparent!important;backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;box-shadow:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-main-selector{order:0!important;}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro{order:10!important;}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain{
+  order:20!important;display:flex!important;flex-direction:column!important;
+  flex:0 0 auto!important;height:auto!important;min-height:0!important;
+  max-height:none!important;overflow:visible!important;padding:8px 4px 12px!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-heading{
+  order:0!important;position:relative!important;z-index:0!important;
+  margin:8px 0!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-scroll,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain #metroDayScroll,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-day-chart{
+  order:10!important;flex:0 0 auto!important;position:relative!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important;mask-image:none!important;-webkit-mask-image:none!important;
+  padding-bottom:12px!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos948-news{
+  order:90!important;position:relative!important;z-index:0!important;
+  flex:0 0 auto!important;max-height:none!important;
+  margin:20px auto 28px!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-footer{order:30!important;}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-dock{z-index:55!important;}
+/* Business inherits an older ABSOLUTE hourly-branch renderer. Convert
+   those branches to the same normal-flow, full-width cards as Personal. */
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-day-chart{
+  display:block!important;position:relative!important;min-height:0!important;
+  height:auto!important;padding:8px 0 22px!important;
+  --trunk:clamp(18px,5%,32px)!important;
+  --selected-day-trunk:clamp(18px,5%,32px)!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch{
+  display:block!important;position:relative!important;left:auto!important;right:auto!important;
+  top:auto!important;bottom:auto!important;min-height:104px!important;
+  height:auto!important;width:100%!important;margin:9px 0 12px!important;
+  pointer-events:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch::before{
+  content:'';position:absolute;left:var(--trunk);right:3px;top:52px;
+  height:1px;background:rgba(105,131,148,.35);pointer-events:none;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-junction{
+  top:52px!important;pointer-events:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-time-label,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .branch-left .living-time-label{
+  top:1px!important;left:auto!important;right:8px!important;
+  transform:none!important;text-align:right!important;white-space:nowrap!important;
+  width:auto!important;font-size:11px!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-rail,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .branch-left .living-rail{
+  position:relative!important;left:var(--trunk)!important;right:auto!important;
+  top:auto!important;bottom:auto!important;width:calc(100% - var(--trunk))!important;
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  grid-auto-rows:minmax(77px,auto)!important;gap:10px!important;
+  min-height:77px!important;max-height:none!important;
+  padding:24px 6px 12px 16px!important;overflow:visible!important;
+  scroll-snap-type:none!important;touch-action:pan-y!important;
+  pointer-events:auto!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-rail::before{
+  display:none!important;
+}
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-entry{
+  position:relative!important;display:flex!important;align-items:center!important;
+  justify-content:flex-start!important;text-align:left!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  min-height:77px!important;height:auto!important;padding:11px 12px!important;
+  margin:0!important;overflow-wrap:anywhere!important;
+}
+/* Identical readable day headings, cards and news treatments.
+   Wallpapers remain separate and are never reset or copied. */
+#app.metro-live #metroMain>.metro-day-heading,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-heading{
+  background:rgba(247,250,252,.78)!important;
+  border:1px solid rgba(234,240,244,.8)!important;
+  border-radius:13px!important;
+  padding:9px 13px!important;
+}
+#app.metro-live #metroMain>.cosmos948-news,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos948-news{
+  width:min(1150px,calc(100% - 16px))!important;
+  max-width:1150px!important;
+  background:rgba(248,251,253,.38)!important;
+  border:1px solid rgba(255,255,255,.55)!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  border-radius:16px!important;
+}
+#app.metro-live #metroMain .living-entry,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-entry{
+  background:rgba(255,255,255,.88)!important;
+  border:1px solid rgba(221,230,237,.82)!important;
+  border-radius:17px!important;
+  box-shadow:none!important;
+  color:#203241!important;
+}
+#app.metro-live .week-metro .week-navigation,
+#sheet.business-modal[data-business-tab="metro"] .week-metro .week-navigation{
+  font-size:13px!important;
+}
+/* Shared menu presentation: exact same layout Personal and Business. */
+.cosmos-metro-more-overlay{align-items:center!important;justify-content:center!important;
+  padding:max(12px,env(safe-area-inset-top)) 12px max(14px,env(safe-area-inset-bottom))!important;}
+.cosmos-metro-more-panel{width:min(520px,100%)!important;max-height:min(88dvh,780px)!important;
+  padding:17px!important;overflow-y:auto!important;overscroll-behavior:contain!important;
+  border-radius:22px!important;box-sizing:border-box!important;}
+.cosmos-metro-more-panel h2{font-size:19px!important;margin:4px 0 14px!important;}
+.cosmos-metro-more-grid{display:grid!important;gap:9px!important;}
+.cosmos952-menu-section{background:#f9fbfd;border:1px solid #dce5eb;border-radius:13px;
+  overflow:hidden;}
+.cosmos952-menu-section>summary{cursor:pointer;list-style:none;display:flex;
+  align-items:center;justify-content:space-between;min-height:48px;
+  color:#25394b;font-size:13px;font-weight:850;letter-spacing:.01em;
+  padding:12px 14px;}
+.cosmos952-menu-section>summary::-webkit-details-marker{display:none;}
+.cosmos952-menu-section>summary:after{content:'⌄';font-size:19px;color:#74899a;}
+.cosmos952-menu-section[open]>summary:after{content:'⌃';}
+.cosmos952-menu-links{display:grid;gap:6px;padding:0 8px 9px;}
+.cosmos952-menu-links>.cosmos-menu-entry{min-height:52px!important;display:block!important;
+  width:100%!important;text-align:left!important;border:1px solid #dce5eb!important;
+  border-radius:10px!important;background:#fff!important;padding:9px 12px!important;
+  color:#24384a!important;white-space:normal!important;}
+.cosmos952-menu-links>.cosmos-menu-entry strong{display:block;font-size:13px;}
+.cosmos952-menu-links>.cosmos-menu-entry small{display:block;font-size:11px;
+  font-weight:450;color:#667b8b;margin-top:3px;line-height:1.3;}
+.cosmos952-menu-links>.cosmos-menu-entry:disabled{opacity:.60!important;cursor:not-allowed!important;
+  background:#f1f5f8!important;}
+.cosmos952-menu-links>.cosmos-menu-entry:focus-visible,
+.cosmos952-menu-section>summary:focus-visible{outline:3px solid #75a3c8;outline-offset:1px;}
+@media(max-width:650px){
+  #sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro{top:auto!important;}
+  #sheet.business-modal[data-business-tab="metro"] .sheet-inner{padding-bottom:calc(170px + env(safe-area-inset-bottom))!important;}
+  #app.metro-live #metroMain>.cosmos948-news,
+  #sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos948-news{
+    width:calc(100% - 8px)!important;padding:10px!important;}
+  .cosmos-metro-more-panel{max-height:calc(100dvh - 28px)!important;}
+}
+</style>
+<script id="cosmos952BusinessAvatarParity">
+(()=>{'use strict';
+  document.addEventListener('click',event=>{
+    const legacy=event.target.closest?.('#businessHeaderProfile');
+    if(!legacy||!document.getElementById('sheet')?.matches('.business-modal[data-business-tab="metro"]'))return;
+    const more=document.querySelector('[data-cosmos-metro-more="business"]');
+    if(!more)return;
+    event.preventDefault();event.stopImmediatePropagation();more.click();
+  },true);
+})();
+</script>
 </body>
 </html>
