@@ -1,0 +1,40 @@
+name: COSMOS v9.5.3 — Publish Legal Pages THEN Activate Agreement
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Use validate-publish → publish → validate-activate → activate'
+        required: true
+        type: choice
+        default: validate-publish
+        options:
+          - validate-publish
+          - publish
+          - validate-activate
+          - activate
+permissions:
+  contents: write
+jobs:
+  legal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guarded legal publication / activation
+        run: python scripts/publish_cosmos_legal_v953.py --mode "${{ inputs.mode }}"
+      - name: Commit generated pages or legal-aware frontend
+        if: inputs.mode == 'publish' || inputs.mode == 'activate'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ "${{ inputs.mode }}" = 'publish' ]; then
+            git add -- cosmos-terms.html cosmos-privacy.html cosmos-guidelines.html
+          else
+            git add -- cosmos-next.html
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m 'COSMOS v9.5.3 guarded legal ${{ inputs.mode }}'
+            git push origin HEAD:main
+          fi
