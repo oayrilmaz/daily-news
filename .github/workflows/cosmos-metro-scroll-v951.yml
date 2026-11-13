@@ -1,0 +1,42 @@
+name: COSMOS v9.5.1 — One Scroll Metro
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'validate first, then run apply'
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - apply
+permissions:
+  contents: write
+jobs:
+  metro:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check/apply one-scroller correction
+        run: python scripts/apply_cosmos_metro_scroll_v951.py --mode "${{ inputs.mode }}"
+      - name: Commit only frontend, only after apply
+        if: inputs.mode == 'apply'
+        run: |
+          set -e
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- cosmos-next.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'COSMOS v9.5.1 fix Personal Metro vertical scrolling'
+            git push origin HEAD:main
+          else
+            echo 'No frontend changes to commit'
+          fi
