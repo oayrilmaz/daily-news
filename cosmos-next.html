@@ -10248,6 +10248,12 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
         ...(work?[['jobs','Jobs & talent','Open roles, résumés and hiring']]:[]),
         ['marketplace',work?'Business Marketplace':'Personal Marketplace',work?'Professional listings':'Personal listings']
       ]},
+      {heading:'Safety & trust',open:false,items:[
+        ['terms','Terms of Service · coming soon','Publication pending',true],
+        ['privacy','Privacy Policy · coming soon','Publication pending',true],
+        ['guidelines','Community Guidelines · coming soon','Publication pending',true],
+        ['report','Report a safety concern','Contact the COSMOS administrator']
+      ]},
       {heading:'Experiences & legacy',open:false,items:[
         ['together',work?'Together · Personal beta':'Together Spaces','Private shared sessions with accepted Personal connections',work],
         ['origins','Original COSMOS','Older research experience; optional']
@@ -10283,6 +10289,11 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     }
     if(name==='marketplace'){location.assign(overlay.dataset.cosmosUniverseV925==='business'?'/cosmos-market-business.html':'/cosmos-market-personal.html');return;}
     if(name==='questions'){window.cosmos929OpenQuestionArchive?.();return;}
+    if(name==='report'){location.href='mailto:admin@ptdtoday.com?subject=COSMOS%20Safety%20Report';return;}
+    if(name==='terms'||name==='privacy'||name==='guidelines'){
+      const paths={terms:'/cosmos-terms.html',privacy:'/cosmos-privacy.html',guidelines:'/cosmos-guidelines.html'};
+      window.open(paths[name],'_blank','noopener,noreferrer');return;
+    }
     const handlers=window.cosmosMetroShortcutsV923;
     if(handlers&&typeof handlers[name]==='function')handlers[name]();
   });
@@ -11696,5 +11707,150 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   },true);
 })();
 </script>
+<style id="cosmos953TrueMetroParity">
+/* COSMOS v9.5.3 — ONE layout contract across Personal and Business.
+   Wallpapers and account data stay separate; typography, cards and scroll match. */
+#app.metro-live .journey-stage,
+#sheet.business-modal[data-business-tab="metro"] .sheet-inner {
+  box-sizing:border-box!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  scroll-padding-bottom:calc(120px + env(safe-area-inset-bottom))!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;touch-action:pan-y!important;
+  scrollbar-width:thin!important;
+}
+#app.metro-live .journey-stage {
+  /* Main controls stay at top, but the week, moments and news scroll together. */
+  width:calc(100% - 24px)!important;max-width:1480px!important;
+  left:50%!important;right:auto!important;transform:translateX(-50%)!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  top:calc(env(safe-area-inset-top) + 129px)!important;bottom:0!important;
+  height:auto!important;min-height:0!important;overflow:visible!important;
+  /* The stage is the only Personal content scroll surface. */
+  overflow-y:auto!important;overflow-x:hidden!important;
+  padding:5px clamp(4px,1vw,16px) calc(158px + env(safe-area-inset-bottom))!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell {
+  width:100%!important;max-width:1480px!important;margin-inline:auto!important;
+  min-height:0!important;display:flex!important;flex-direction:column!important;
+  align-items:stretch!important;
+}
+#sheet.business-modal[data-business-tab="metro"] .sheet-inner {
+  padding-inline:clamp(8px,2vw,24px)!important;
+  padding-bottom:calc(158px + env(safe-area-inset-bottom))!important;
+}
+#app.metro-live .journey-stage>.week-metro,
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell>.week-metro {
+  box-sizing:border-box!important;width:100%!important;max-width:none!important;
+  position:relative!important;top:auto!important;left:auto!important;
+  transform:none!important;z-index:1!important;flex:0 0 auto!important;
+  padding:0 0 10px!important;margin:0!important;
+  background:transparent!important;backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+#app.metro-live .journey-stage>#metroMain,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain {
+  box-sizing:border-box!important;width:100%!important;max-width:none!important;
+  display:flex!important;flex-direction:column!important;
+  height:auto!important;min-height:0!important;max-height:none!important;
+  flex:0 0 auto!important;position:relative!important;
+  overflow:visible!important;overflow-y:visible!important;
+  padding:5px 0 12px!important;margin:0!important;
+}
+#app.metro-live #metroMain>.metro-day-heading,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-heading {
+  order:0!important;position:relative!important;top:auto!important;
+  margin:7px 0 9px!important;padding:10px 14px!important;
+  width:100%!important;box-sizing:border-box!important;
+  background:rgba(248,251,254,.78)!important;
+  border:1px solid rgba(225,235,243,.78)!important;border-radius:16px!important;
+}
+#app.metro-live #metroMain>.metro-day-scroll,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.metro-day-scroll,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain #metroDayScroll {
+  order:10!important;width:100%!important;box-sizing:border-box!important;
+  flex:0 0 auto!important;max-height:none!important;height:auto!important;
+  min-height:0!important;position:relative!important;overflow:visible!important;
+  padding:1px 0 12px!important;margin:0!important;
+  mask-image:none!important;-webkit-mask-image:none!important;
+}
+#app.metro-live #metroMain .living-day-chart,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-day-chart {
+  display:block!important;width:100%!important;height:auto!important;min-height:0!important;
+  max-height:none!important;padding:6px 0 18px!important;
+  overflow:visible!important;position:relative!important;
+  --trunk:clamp(18px,5%,35px)!important;
+  --selected-day-trunk:clamp(18px,5%,35px)!important;
+}
+/* Same chronological hour rows, not absolute-positioned overlays. */
+#app.metro-live #metroMain .living-branch,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch {
+  display:block!important;position:relative!important;
+  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  width:100%!important;min-height:99px!important;height:auto!important;
+  margin:10px 0 12px!important;pointer-events:none!important;
+}
+#app.metro-live #metroMain .living-branch .living-time-label,
+#app.metro-live #metroMain .branch-left .living-time-label,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-time-label,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .branch-left .living-time-label {
+  position:absolute!important;top:0!important;left:auto!important;right:8px!important;
+  width:auto!important;text-align:right!important;transform:none!important;
+  white-space:nowrap!important;z-index:2!important;font-size:11px!important;
+}
+#app.metro-live #metroMain .living-branch .living-rail,
+#app.metro-live #metroMain .branch-left .living-rail,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-rail,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .branch-left .living-rail {
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  position:relative!important;left:var(--trunk)!important;top:auto!important;
+  right:auto!important;bottom:auto!important;
+  width:calc(100% - var(--trunk))!important;min-height:76px!important;
+  max-height:none!important;height:auto!important;grid-auto-rows:minmax(76px,auto)!important;
+  gap:10px!important;padding:24px 6px 9px 16px!important;overflow:visible!important;
+  scroll-snap-type:none!important;touch-action:pan-y!important;pointer-events:auto!important;
+}
+#app.metro-live #metroMain .living-entry,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-entry,
+#app.metro-live #metroMain details.cosmos945-public-moment {
+  box-sizing:border-box!important;width:100%!important;min-width:0!important;
+  max-width:100%!important;height:auto!important;min-height:76px!important;
+  position:relative!important;top:auto!important;left:auto!important;
+  margin:0!important;padding:10px 12px!important;
+  border:1px solid rgba(221,230,237,.85)!important;
+  border-radius:16px!important;box-shadow:none!important;
+  background:rgba(255,255,255,.91)!important;
+  color:#203241!important;overflow-wrap:anywhere!important;pointer-events:auto!important;
+}
+#app.metro-live #metroMain>.cosmos948-news,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos948-news {
+  position:relative!important;top:auto!important;order:90!important;
+  width:100%!important;max-width:none!important;min-height:0!important;
+  height:auto!important;max-height:none!important;box-sizing:border-box!important;
+  margin:25px 0 45px!important;padding:clamp(12px,1.8vw,22px)!important;
+  background:rgba(248,251,254,.40)!important;border:1px solid rgba(255,255,255,.55)!important;
+  border-radius:17px!important;overflow:visible!important;
+}
+#app.metro-live #metroMain .cosmos948-news .cosmos948-news-list,
+#sheet.business-modal[data-business-tab="metro"] #businessMetroMain .cosmos948-news .cosmos948-news-list {
+  max-height:none!important;overflow:visible!important;
+}
+/* Equal content spacing, and clearance for the creation circle on both views. */
+#app.metro-live .journey-stage::after,
+#sheet.business-modal[data-business-tab="metro"] .business-metro-shell::after {
+  content:'';display:block;flex:0 0 auto;height:55px;pointer-events:none;
+}
+@media(max-width:650px){
+ #app.metro-live .journey-stage{top:calc(env(safe-area-inset-top) + 130px)!important;
+   width:calc(100% - 12px)!important;padding:4px 5px calc(150px + env(safe-area-inset-bottom))!important;}
+ #sheet.business-modal[data-business-tab="metro"] .sheet-inner{
+   padding-inline:6px!important;padding-bottom:calc(150px + env(safe-area-inset-bottom))!important;}
+ #app.metro-live #metroMain>.cosmos948-news,
+ #sheet.business-modal[data-business-tab="metro"] #businessMetroMain>.cosmos948-news{padding:11px!important;}
+ #app.metro-live #metroMain .living-branch .living-rail,
+ #sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-rail{
+   padding-left:10px!important;padding-right:4px!important;}
+}
+</style>
 </body>
 </html>
