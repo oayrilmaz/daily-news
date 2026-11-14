@@ -1,0 +1,38 @@
+name: COSMOS v9.5.5 — Activate Reviewed Legal Agreement
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        required: true
+        default: validate-activate
+        options:
+          - validate-activate
+          - activate
+permissions:
+  contents: write
+jobs:
+  legal-activate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify public policies and compatible Worker before legal UI patch
+        run: python scripts/activate_cosmos_legal_v955.py --mode "${{ inputs.mode }}"
+      - name: Commit legal gate only on authorized activation
+        if: inputs.mode == 'activate'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cosmos-next.html
+          if ! git diff --cached --quiet; then
+            git commit -m "COSMOS v9.5.5 activate current-version reviewed agreement UI"
+            git push origin HEAD:main
+          fi
