@@ -1,0 +1,46 @@
+name: COSMOS v9.5.5 — Privacy & Media Rights (Safe Deployment)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate or apply privacy-safe pages and media upload confirmations
+        type: choice
+        required: true
+        options:
+          - validate
+          - apply
+        default: validate
+permissions:
+  contents: write
+concurrency:
+  group: cosmos-v955-privacy-rights
+  cancel-in-progress: false
+jobs:
+  privacy-and-rights:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate or apply guarded privacy and copyright patch
+        run: python scripts/apply_cosmos_privacy_rights_v955.py --mode "${{ inputs.mode }}"
+      - name: Commit changed files only after apply
+        if: inputs.mode == 'apply'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- cosmos-next.html cosmos-market-business.html cosmos-legal-config.json cosmos-terms.html cosmos-privacy.html cosmos-guidelines.html
+          if ! git diff --cached --quiet; then
+            git commit -m "COSMOS v9.5.5 privacy-safe copyright rules and upload confirmations"
+            git push origin HEAD:main
+          else
+            echo "Nothing to commit"
+          fi
