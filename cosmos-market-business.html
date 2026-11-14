@@ -81,8 +81,10 @@ async function cleanImage(file){
  }finally{img.close();}
 }
 async function uploadPhoto(listingId,file){
+ if(!window.confirm('I confirm this image is my original work or I have permission to upload it. Unlicensed third-party images are prohibited.'))throw new Error('Photo upload cancelled.');
  const cleaned=await cleanImage(file);if(!cleaned)return;
  const form=new FormData();form.set('file',cleaned);
+ form.set('rights_attested','true');form.set('rights_version','2026-11-13.1');
  await api('/api/market/listings/'+listingId+'/photo',{method:'POST',body:form});
 }
 function editListing(x){

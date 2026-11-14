@@ -6894,8 +6894,13 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
     };
   }
 
-  async function uploadFile(file){
-    const fd=new FormData();fd.append("file",file,file.name||"cosmos-media");return await api("/api/media/upload",{method:"POST",body:fd});
+    const RIGHTS_UPLOAD_MESSAGE = 'I confirm that I created this media or have the required rights and permissions to upload it, including music, clips and consent from people shown. Unauthorized third-party videos and music are prohibited. Continue?';
+async function uploadFile(file){
+    // COSMOS v9.5.5 rights declaration: shown for each new upload.
+    if(!window.confirm(RIGHTS_UPLOAD_MESSAGE))throw new Error('Upload cancelled. You must own or have permission to share this media.');
+    const fd=new FormData();fd.append("file",file,file.name||"cosmos-media");
+    fd.set('rights_attested','true');fd.set('rights_version','2026-11-13.1');
+    return await api("/api/media/upload",{method:"POST",body:fd});
   }
 
   let friendsCache={accepted:[],incoming:[],outgoing:[]};
@@ -8622,7 +8627,9 @@ html,body,body>.app,.app.metro-live { background:#fff !important; color:#24282c;
   async function cosmos933Upload(universe,kind,file,status){
     if(status)status.textContent='Saving edited photo securely (location metadata removed automatically)…';
     try{
+      if(!window.confirm(RIGHTS_UPLOAD_MESSAGE))throw new Error('Upload cancelled. You must own or have permission to share this image.');
       const form=new FormData();form.append('file',file);
+      form.set('rights_attested','true');form.set('rights_version','2026-11-13.1');
       await api('/api/identity-media/'+universe+'/'+kind,{method:'POST',body:form});
       const key=universe+':'+kind;
       const old=cosmos929ImageUrls.get(key);if(old)URL.revokeObjectURL(old);
