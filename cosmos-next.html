@@ -3722,6 +3722,34 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
 @media(prefers-reduced-motion:no-preference){#cosmosOneTouchV956 .co-orb{transition:transform .18s ease,background .18s ease}}
 @media(prefers-reduced-motion:reduce){#cosmosOneTouchV956 *{animation:none!important;transition:none!important}}
 
+/* v9.5.6.3: a small month compass and actual saved stations. */
+#cosmosOneTouchV956 .co-grid{top:max(43px,calc(env(safe-area-inset-top) + 25px))}
+#cosmosOneTouchV956 .co-month{position:absolute;z-index:3;top:max(7px,env(safe-area-inset-top));left:50%;
+  transform:translateX(-50%);font-size:clamp(11px,1.1vw,14px);font-weight:750;letter-spacing:.13em;
+  text-shadow:0 1px 7px #071626,0 2px 5px #071626;pointer-events:none;white-space:nowrap;opacity:.97}
+#cosmosOneTouchV956 .co-stations-layer{position:absolute;inset:35px 0 5px 0;z-index:3;
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));pointer-events:none}
+#cosmosOneTouchV956 .co-station-col{position:relative;min-width:0;pointer-events:none}
+#cosmosOneTouchV956 .co-station{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;
+  border:0;background:transparent;padding:0;display:grid;place-items:center;cursor:pointer;pointer-events:auto;
+  color:#142b3f;font:750 10px system-ui,sans-serif;touch-action:manipulation}
+#cosmosOneTouchV956 .co-station::before{content:'';position:absolute;width:15px;height:15px;border-radius:50%;
+  background:#f7fbff;border:3px solid #153049;box-shadow:0 0 0 2px rgba(255,255,255,.72),0 1px 9px #0009}
+#cosmosOneTouchV956 .co-station[data-owned=true]::before{background:#daf7ff;border-color:#114a68}
+#cosmosOneTouchV956 .co-station[data-locked=true]::before{background:transparent;border-style:dashed;border-color:white}
+#cosmosOneTouchV956 .co-station[data-counted=true]::before{width:23px;height:23px}
+#cosmosOneTouchV956 .co-station-count{position:relative;z-index:1;font-size:10px;line-height:1}
+#cosmosOneTouchV956 .co-station:focus-visible{outline:2px solid #fff;border-radius:40px}
+#cosmosOneTouchV956 .co-station:hover::before{box-shadow:0 0 0 4px #fff9,0 2px 10px #0009}
+#cosmosOneTouchV956 .co-moment-choices{display:grid;gap:7px;margin:9px 0}
+#cosmosOneTouchV956 .co-moment-choice{border:1px solid #d9e2e9;border-radius:12px;background:white;
+  color:#233547;padding:12px;text-align:left;font-size:13px;cursor:pointer;line-height:1.4;overflow-wrap:anywhere}
+#cosmosOneTouchV956 .co-moment-choice small{display:block;color:#607486;font-size:11px;margin-bottom:2px}
+#cosmosOneTouchV956 .co-moment-message{color:#536777;font-size:12px;line-height:1.4}
+@media(max-width:600px){#cosmosOneTouchV956 .co-month{font-size:11px;top:max(5px,env(safe-area-inset-top));
+  letter-spacing:.09em}#cosmosOneTouchV956 .co-grid{top:max(34px,calc(env(safe-area-inset-top) + 24px))}
+  #cosmosOneTouchV956 .co-station{width:31px;height:32px}}
+
 </style><!-- /cosmos-v956-css -->
 </head>
 <body>
@@ -10009,6 +10037,81 @@ async function uploadFile(file){
     account:()=>sheet.classList.contains('business-modal')?openBusinessHub('profile'):$('accountButton')?.click(),
     feed:()=>openBusinessHub('metro'),
   };
+// v9.5.6.3: OneTouch reads existing authorized weekly moment APIs.
+// Reuses the native session and permission checks; no cloned auth or D1 access.
+window.cosmosOneTouchBridgeV9563 = {
+  async week(space, fromISO, toISO, fromDay, toDay) {
+    if (!token || !me || !auth.hidden) throw new Error('Sign in to see your moments.');
+    const biz=space==='business';
+    const jobs=[];
+    if(biz){
+      jobs.push({name:'work',run:async()=>{
+        const posts=[];let cursor='';let partial=false;
+        for(let i=0;i<5;i++){
+          const params=new URLSearchParams({start:fromISO,end:toISO,filter:'connections'});
+          if(cursor)params.set('before',cursor);
+          const page=await api('/api/business/metro?'+params.toString());
+          for(const post of page.posts||[]){posts.push(post);businessFeedCache.set(String(post.id),post);}
+          cursor=page.next_cursor||'';
+          if(!cursor)return {posts,partial};
+        }
+        return {posts,partial:true};
+      }});
+    }else{
+      for(const lane of ['mine','connections'])jobs.push({name:lane,run:()=>
+        api('/api/cosmos/metro?'+new URLSearchParams({from:fromISO,to:toISO,dimension:lane}).toString())});
+    }
+    jobs.push({name:'anchors',run:()=>api('/api/time-anchors/window?'+
+      new URLSearchParams({space:biz?'business':'personal',from:fromDay,to:toDay}).toString())});
+    const results=await Promise.allSettled(jobs.map(job=>job.run()));
+    const successful=results.filter(r=>r.status==='fulfilled');
+    const failed=results.filter(r=>r.status==='rejected');
+    if(!successful.length)throw results[0].reason||new Error('The weekly timeline is unavailable.');
+    const normalized=new Map();let partial=successful.length<jobs.length;
+    const add=(m)=>{
+      if(!m?.id || !m.date || !Number.isFinite(Date.parse(m.date)))return;
+      const prior=normalized.get(m.id);
+      if(!prior || (m.is_mine && !prior.is_mine))normalized.set(m.id,m);
+    };
+    results.forEach((result,index)=>{
+      if(result.status!=='fulfilled')return;
+      const value=result.value||{},name=jobs[index].name;
+      if(value.limited||value.partial||value.next_cursor)partial=true;
+      if(name==='work')for(const p of value.posts||[]){
+        add({id:'business:'+p.id,open_id:String(p.id),origin:'business-post',space:'business',
+          date:p.created_at,kind:p.kind||'text',title:String(p.text||p.category||'Work moment').slice(0,125),
+          locked:false,is_mine:Boolean(p.can_delete)});
+      }else if(name==='anchors')for(const a of value.items||[]){
+        if(a.era!=='CE'||!a.month||!a.day)continue;
+        const yyyy=String(a.year).padStart(4,'0');
+        const date=yyyy+'-'+String(a.month).padStart(2,'0')+'-'+String(a.day).padStart(2,'0')+'T12:00:00';
+        add({id:'anchor:'+a.id,open_id:String(a.id),origin:'time-anchor',space,
+          date,kind:a.kind||'text',title:String(a.text||'Placed moment').slice(0,125),
+          locked:false,is_mine:Boolean(a.can_delete),era:a.era,year:String(a.year)});
+      }else for(const m of value.items||[]){
+        add({id:'cosmos:'+m.id,open_id:String(m.open_id||m.id),origin:'private-moment',space:'personal',
+          date:m.date,kind:m.kind||'text',title:m.locked?'A sealed moment':String(m.preview||m.title||'Moment').slice(0,125),
+          locked:Boolean(m.locked),is_mine:Boolean(m.is_author||m.tagged_me),
+          event:String(m.event||'')});
+      }
+    });
+    return {items:[...normalized.values()].sort((a,b)=>Date.parse(a.date)-Date.parse(b.date)),partial,
+      warning:failed.length?'Some authorized moment sources could not be loaded.':(partial?'This week contains additional moments not on the first page.':'')};
+  },
+  async open(item) {
+    if(!item || !token || !me || !auth.hidden)return;
+    if(item.locked)throw new Error('This moment is sealed until its scheduled reveal.');
+    if(item.origin==='time-anchor'){
+      if(window.cosmos947TimeForDate)window.cosmos947TimeForDate(item.space,String(item.date).slice(0,10));
+      else cosmos940Open(item.space,{era:item.era,year:item.year});
+    }else if(item.origin==='business-post'){
+      businessMetroFocus=businessMetroAtNoon(new Date(item.date));
+      businessMetroDay=businessMetroAtNoon(new Date(item.date));
+      openBusinessMetroMoment(item.open_id);
+    }else await openCosmos(item.open_id);
+  }
+};
+
   $("jumpDate").addEventListener("click",()=>{
     openSheet(`<h2>Travel to a date</h2><p>Swipe through real saved stations, or jump near a particular day. No years or memories are invented.</p><div class="field"><label>Date</label><input type="date" id="journeyDate" min="1900-01-01" max="2200-12-31" value="${new Date(journeyAt).toISOString().slice(0,10)}"></div><div class="actions"><button id="cancelJump">Cancel</button><button id="acceptJump" class="primary">Go</button></div>`);
     $("cancelJump").onclick=closeSheet;
@@ -12056,6 +12159,7 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   root.setAttribute('aria-label', 'COSMOS OneTouch time lens');
   root.hidden = true;
   root.innerHTML = `
+    <div class="co-month" id="cosmosV956Month" aria-label="Timeline month"></div>
     <div class="co-lens" id="cosmosV956Lens">
       <div class="co-grid" id="cosmosV956Grid" role="group" aria-label="Seven days and a 24-hour timeline"></div>
     </div>
@@ -12095,6 +12199,13 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   let lastWheelAt = 0;
   let lastWheelShift = 0;
   let monitorLock = false;
+  let momentItems = [];
+  let momentError = '';
+  let momentPartial = false;
+  let momentWarning = '';
+  let momentKey = '';
+  let momentRequestId = 0;
+  let momentLastRequestedAt = 0;
   const liveAnnouncement = document.createElement('span');
   liveAnnouncement.className = 'co-live-announcement';
   liveAnnouncement.setAttribute('role','status');
@@ -12144,21 +12255,127 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
       document.documentElement.classList.remove('cosmos-v956-clean');
       return;
     }
-    currentUniverse = businessMode() ? 'business' : 'personal';
+    const nextUniverse = businessMode() ? 'business' : 'personal';
+    const changed = nextUniverse !== currentUniverse;
+    currentUniverse = nextUniverse;
     root.dataset.universe = currentUniverse;
+    if (force || changed) {momentKey='';momentItems=[];momentError='';momentWarning='';momentRequestId++;}
     root.hidden = false;
     back.hidden = true;
     document.documentElement.classList.add('cosmos-v956-clean');
-    if (force) renderGrid();
+    if (force || changed) renderGrid();
   }
   function weekDays() {
     const sun = dateAtNoon(selected);
     sun.setDate(selected.getDate() - selected.getDay());
     return Array.from({length:7}, (_, i) => {const d = new Date(sun); d.setDate(sun.getDate()+i);return d;});
   }
+function monthHeading(days){
+  const first=days[0],last=days[6];
+  const firstLabel=first.toLocaleDateString(undefined,{month:'long'});
+  const lastLabel=last.toLocaleDateString(undefined,{month:'long'});
+  if(first.getFullYear()!==last.getFullYear())return firstLabel+' '+first.getFullYear()+' – '+lastLabel+' '+last.getFullYear();
+  if(first.getMonth()!==last.getMonth())return firstLabel+' – '+lastLabel+' '+last.getFullYear();
+  return firstLabel+' '+first.getFullYear();
+}
+function timeText(item){return new Date(item.date).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});}
+function dayItems(dayKey){return momentItems.filter(x=>toLocalKey(new Date(x.date))===dayKey);}
+function stationChoices(items){
+  lastFocus=document.activeElement;
+  const title=$('cosmosV956Selection');
+  title.textContent=(currentUniverse==='business'?'Business':'Private')+' · Saved moments';
+  const groups=$('cosmosV956Groups');groups.replaceChildren();
+  const list=document.createElement('div');list.className='co-moment-choices';
+  items.forEach(item=>{
+    const b=document.createElement('button');b.type='button';b.className='co-moment-choice';
+    const stamp=document.createElement('small');
+    stamp.textContent=new Date(item.date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})+' · '+
+      (item.origin==='time-anchor'?'Date placed':timeText(item))+(item.is_mine?' · My moment':'');
+    const name=document.createElement('span');name.textContent=item.locked?'◌ Sealed until reveal':(item.title||'Open moment');
+    b.append(stamp,name);
+    b.addEventListener('click',()=>viewStation(item));list.append(b);
+  });
+  groups.append(list);menu.hidden=false;menuOpen=true;ring.setAttribute('aria-expanded','true');
+  const close=$('cosmosV956Close');close.focus();
+}
+async function viewStation(item){
+  if(item.locked){stationChoices([item]);return;}
+  const bridge=window.cosmosOneTouchBridgeV9563;
+  if(!bridge?.open){momentError='Moment viewer is not ready.';renderMenu();return;}
+  revealWorkspace();
+  try{await bridge.open(item);}catch(error){
+    // The native workspace contains the app's own error/permission handling.
+    // No private content is rendered into this lens after a failed open.
+    console.warn('[COSMOS OneTouch] Moment could not open:',String(error?.message||error));
+    alert(String(error?.message||'Unable to open moment.'));
+  }
+}
+function drawStations(){
+  grid.querySelector('.co-stations-layer')?.remove();
+  const layer=document.createElement('div');layer.className='co-stations-layer';
+  for(const day of weekDays()){
+    const col=document.createElement('div');col.className='co-station-col';
+    const groups=new Map();
+    for(const item of dayItems(toLocalKey(day))){
+      const d=new Date(item.date);const minutes=d.getHours()*60+d.getMinutes();
+      const bucket=Math.floor(minutes/30);
+      if(!groups.has(bucket))groups.set(bucket,[]);
+      groups.get(bucket).push(item);
+    }
+    for(const [bucket,items] of groups){
+      const minute=Math.max(15,Math.min(1425,bucket*30+15));
+      const button=document.createElement('button');button.type='button';button.className='co-station';
+      button.style.top=(minute/1440*100).toFixed(3)+'%';button.style.left='50%';
+      button.dataset.owned=String(items.some(i=>i.is_mine));
+      button.dataset.locked=String(items.every(i=>i.locked));
+      button.dataset.counted=String(items.length>1);
+      button.setAttribute('aria-label',items.length===1?
+        (timeText(items[0])+' · '+(items[0].locked?'Sealed moment':items[0].title||'Moment')):
+        (items.length+' saved moments near '+timeText(items[0])));
+      if(items.length>1){const count=document.createElement('span');count.className='co-station-count';
+        count.textContent=items.length>9?'9+':String(items.length);button.append(count);}
+      button.addEventListener('click',event=>{
+        event.preventDefault();event.stopPropagation();
+        if(items.length===1&&!items[0].locked)void viewStation(items[0]);
+        else stationChoices(items);
+      });
+      col.append(button);
+    }
+    layer.append(col);
+  }
+  grid.append(layer);
+}
+async function loadWeek(force=false){
+  if(root.hidden||nativeWorkspace)return;
+  const days=weekDays(),space=currentUniverse;
+  const key=space+'|'+toLocalKey(days[0]);
+  if(!force && key===momentKey && Date.now()-momentLastRequestedAt<60000)return;
+  momentKey=key;momentLastRequestedAt=Date.now();
+  const id=++momentRequestId;momentError='';momentWarning='';momentPartial=false;momentItems=[];drawStations();
+  const bridge=window.cosmosOneTouchBridgeV9563;
+  if(!bridge?.week){momentError='The saved-moment connection is not installed.';return;}
+  const start=new Date(days[0].getFullYear(),days[0].getMonth(),days[0].getDate());
+  const end=new Date(start);end.setDate(end.getDate()+7);
+  try{
+    const data=await bridge.week(space,start.toISOString(),end.toISOString(),toLocalKey(start),toLocalKey(end));
+    if(id!==momentRequestId||root.hidden||nativeWorkspace||key!==currentUniverse+'|'+toLocalKey(weekDays()[0]))return;
+    momentItems=Array.isArray(data?.items)?data.items:[];
+    momentPartial=Boolean(data?.partial);
+    momentWarning=String(data?.warning||'');
+    drawStations();
+    liveAnnouncement.textContent=momentItems.length+' authorized saved moments found on this week.';
+  }catch(error){
+    if(id!==momentRequestId)return;
+    momentError=String(error?.message||'Could not retrieve saved moments.');
+    momentItems=[];drawStations();
+    console.warn('[COSMOS OneTouch] Weekly moment load:',momentError);
+  }
+}
+
   function percent(hour) { return (hour / 24 * 100).toFixed(4) + '%'; }
   function renderGrid() {
     grid.replaceChildren();
+    $('cosmosV956Month').textContent=monthHeading(weekDays());
     const guide = document.createElement('div');
     guide.className = 'co-hour-guide';
     for (let hour = 0; hour <= 24; hour += 3) {
@@ -12210,6 +12427,8 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
       });
       grid.appendChild(button);
     });
+    drawStations();
+    void loadWeek();
   }
   function shiftWeek(n) {
     const next = dateAtNoon(selected);
@@ -12314,6 +12533,12 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
     $('cosmosV956Selection').textContent = (currentUniverse==='business'?'Business':'Private') + ' · ' + selected.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',year:'numeric'}) + ' · ' + time;
     const groups = $('cosmosV956Groups');
     groups.replaceChildren();
+    const status=document.createElement('div');status.className='co-moment-message';
+    const count=dayItems(toLocalKey(selected)).length;
+    status.textContent=momentError?'Moments unavailable: '+momentError:
+      (momentWarning?momentWarning+' ':'')+
+      (count?count+' saved moment'+(count===1?'':'s')+' on this day.':'No saved moments on this day.');
+    groups.append(status);
     ACTIONS.forEach(group=>{
       const section = document.createElement('section');
       section.className='co-menu-group';
@@ -12472,7 +12697,7 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   // This small poll accounts for legacy business transitions without observing a large DOM subtree.
   setInterval(()=>sync(),1500);
   renderGrid();sync(true);
-  window.cosmosOneTouchV956 = {version:'9.5.6',reset:now,open:openMenu,restore:()=>{nativeWorkspace=false;sync(true);}};
+  window.cosmosOneTouchV956 = {version:'9.5.6.3',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
 })();
 
 </script><!-- /cosmos-v956-js -->
