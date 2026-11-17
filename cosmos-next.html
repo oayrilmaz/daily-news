@@ -3648,7 +3648,21 @@ html.cosmos-v956-clean #sheet.business-modal .sheet-inner,
 html.cosmos-v956-clean #sheet.business-modal .sheet-header,
 html.cosmos-v956-clean #sheet.business-modal .sheet-quickbar,
 html.cosmos-v956-clean #sheet.business-modal .business-metro-dock{visibility:hidden!important;pointer-events:none!important}
+/* v9.5.6.2: prevent the legacy Business calendar, wheel, and panels from
+   showing THROUGH the transparent OneTouch lens. These rules apply only while
+   OneTouch is active; native Business functions remain available from its menu. */
+html.cosmos-v956-clean #sheet.business-modal{visibility:hidden!important;pointer-events:none!important}
 html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events:none!important}
+#cosmosOneTouchV956[data-universe="business"]{
+  background:radial-gradient(circle at 72% 24%,rgba(100,133,156,.26),transparent 60%),
+    linear-gradient(156deg,#102538 0%,#30445b 54%,#12273b 100%);
+}
+#cosmosOneTouchV956 .co-lens,
+#cosmosOneTouchV956 .co-grid,
+#cosmosOneTouchV956 .co-day{touch-action:pan-y;overscroll-behavior-x:contain}
+#cosmosOneTouchV956 .co-live-announcement{position:absolute!important;width:1px!important;height:1px!important;
+  padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;border:0!important}
 #cosmosOneTouchV956[hidden],#cosmosV956Return[hidden],#cosmosOneTouchV956 [hidden]{display:none!important}
 #cosmosOneTouchV956{position:fixed;inset:0;z-index:2147480000;display:block;overflow:hidden;
   font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#fff;
@@ -12074,8 +12088,18 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   let nativeWorkspace = false;
   let currentUniverse = 'personal';
   let lastFocus = null;
-  let swipe = null;
+  let pointerGesture = null;
+  let touchGesture = null;
+  let lastNavigationAt = 0;
+  let horizontalWheel = 0;
+  let lastWheelAt = 0;
+  let lastWheelShift = 0;
   let monitorLock = false;
+  const liveAnnouncement = document.createElement('span');
+  liveAnnouncement.className = 'co-live-announcement';
+  liveAnnouncement.setAttribute('role','status');
+  liveAnnouncement.setAttribute('aria-live','polite');
+  root.appendChild(liveAnnouncement);
 
   function isVisible(element) {
     if (!element || element.hidden || element.closest('[hidden]')) return false;
@@ -12187,7 +12211,15 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
       grid.appendChild(button);
     });
   }
-  function shiftWeek(n) {selected.setDate(selected.getDate()+7*n);renderGrid();}
+  function shiftWeek(n) {
+    const next = dateAtNoon(selected);
+    next.setDate(next.getDate() + 7 * n);
+    selected = next;
+    renderGrid();
+    const days = weekDays();
+    liveAnnouncement.textContent = 'Showing ' + days[0].toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) +
+      ' through ' + days[6].toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  }
   function now() {selected=dateAtNoon(new Date());selectedMinutes=new Date().getHours()*60+new Date().getMinutes();renderGrid();}
   function openMenu() {
     lastFocus = document.activeElement;
@@ -12335,8 +12367,14 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
       closeMenu();
       const destination=currentUniverse==='business'?'personal':'business';
       const fn=window.cosmosMetroShortcutsV923?.[destination];
-      if(typeof fn==='function'){fn(); setTimeout(()=>sync(true),350);}
-      else runNative('switch');
+      if(typeof fn==='function') fn();
+      else {
+        // The fallback must not permanently expose the crowded native workspace.
+        const switcher=$('cosmosUniverseSwitch');
+        if(switcher)switcher.click();
+      }
+      nativeWorkspace=false;
+      setTimeout(()=>{nativeWorkspace=false;sync(true);},320);
       return;
     }
     if (action==='report'){
@@ -12355,18 +12393,66 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
     if (e.key==='ArrowRight'){shiftWeek(-1);e.preventDefault();}
     if (e.key==='Home'){now();e.preventDefault();}
   });
+  // v9.5.6.2: gesture navigation is attached to the foreground OneTouch lens.
+  // Direction: finger right = past, finger left = future. Pointer + touch fallback
+  // covers iOS Safari, desktops, and browsers that cancel pointer gestures.
   const lens = $('cosmosV956Lens');
+  function gestureStart(x,y,id) { return {x,y,id}; }
+  function finishGesture(start,x,y,event) {
+    if (!start || root.hidden || menuOpen || nativeWorkspace) return false;
+    const dx=x-start.x, dy=y-start.y;
+    const threshold=Math.max(42,Math.min(85,lens.clientWidth*.085));
+    if (Math.abs(dx)<threshold || Math.abs(dx)<Math.abs(dy)*1.25) return false;
+    // Both pointerup and touchend may fire for one iOS gesture: move only once.
+    if (Date.now()-lastNavigationAt<330) return true;
+    lastNavigationAt=Date.now();
+    shiftWeek(dx>0?-1:1);
+    if (event && event.cancelable) event.preventDefault();
+    return true;
+  }
+  if (window.PointerEvent) {
+    lens.addEventListener('pointerdown',e=>{
+      if(menuOpen || !e.isPrimary)return;
+      pointerGesture=gestureStart(e.clientX,e.clientY,e.pointerId);
+    },{passive:true});
+    window.addEventListener('pointerup',e=>{
+      if(!pointerGesture || e.pointerId!==pointerGesture.id)return;
+      const start=pointerGesture;pointerGesture=null;
+      finishGesture(start,e.clientX,e.clientY,e);
+    },{capture:true});
+    window.addEventListener('pointercancel',e=>{
+      if(pointerGesture?.id===e.pointerId)pointerGesture=null;
+    },{capture:true});
+  }
   lens.addEventListener('touchstart',e=>{
-    if(e.touches.length!==1||menuOpen)return;
-    swipe={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    if(menuOpen || e.touches.length!==1)return;
+    touchGesture=gestureStart(e.touches[0].clientX,e.touches[0].clientY,0);
   },{passive:true});
   lens.addEventListener('touchend',e=>{
-    if(!swipe||e.changedTouches.length!==1||menuOpen)return;
-    const dx=e.changedTouches[0].clientX-swipe.x;
-    const dy=e.changedTouches[0].clientY-swipe.y;
-    swipe=null;
-    if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.5)shiftWeek(dx>0?-1:1);
-  },{passive:true});
+    if(!touchGesture || e.changedTouches.length!==1)return;
+    const start=touchGesture;touchGesture=null;
+    finishGesture(start,e.changedTouches[0].clientX,e.changedTouches[0].clientY,e);
+  },{passive:false});
+  lens.addEventListener('touchcancel',()=>{touchGesture=null;},{passive:true});
+  // Horizontal two-finger scrolling on trackpads. Ignore vertical page scroll.
+  lens.addEventListener('wheel',e=>{
+    if(menuOpen || root.hidden || nativeWorkspace || e.ctrlKey)return;
+    if(Math.abs(e.deltaX)<Math.abs(e.deltaY)*1.15 || Math.abs(e.deltaX)<2)return;
+    if(e.cancelable)e.preventDefault();
+    const t=Date.now();
+    if(t-lastWheelAt>450)horizontalWheel=0;
+    lastWheelAt=t;
+    horizontalWheel+=e.deltaX;
+    if(Math.abs(horizontalWheel)>65 && t-lastWheelShift>360){
+      shiftWeek(horizontalWheel>0?1:-1);
+      lastWheelShift=t;
+      horizontalWheel=0;
+    }
+  },{passive:false});
+  // Swipes must not also activate the calendar day under the releasing finger.
+  lens.addEventListener('click',e=>{
+    if(Date.now()-lastNavigationAt<360){e.preventDefault();e.stopImmediatePropagation();}
+  },true);
   back.addEventListener('click',()=>{
     // Return only if an authenticated native modal is not currently requesting action.
     if(legalGateVisible())return;
