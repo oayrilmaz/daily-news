@@ -1,0 +1,52 @@
+name: COSMOS v9.5.6.1 — Restore Legal Consent with OneTouch
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate, apply, or roll back the legal UI integration
+        required: true
+        type: choice
+        default: validate
+        options: [validate, apply, rollback]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-next-frontend-v9561
+  cancel-in-progress: false
+
+jobs:
+  legal-onetouch:
+    name: Guarded combined frontend integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Verify exact frontend and all policy pages
+        run: python3 scripts/apply_cosmos_onetouch_legal_v9561.py --mode validate
+      - name: Apply or rollback patch
+        if: ${{ inputs.mode != 'validate' }}
+        run: python3 scripts/apply_cosmos_onetouch_legal_v9561.py --mode "${{ inputs.mode }}"
+      - name: Inspect diff
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          git diff --check -- cosmos-next.html
+          git diff --stat -- cosmos-next.html
+      - name: Commit frontend only
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- cosmos-next.html
+          if git diff --cached --quiet; then
+            echo "Already in the requested state."
+            exit 0
+          fi
+          git commit -m "COSMOS v9.5.6.1 restore legal acceptance with OneTouch"
+          git push origin HEAD:main
