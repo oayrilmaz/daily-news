@@ -1,0 +1,48 @@
+name: COSMOS v9.5.6.5 - OneTouch Feature Popup Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate, apply, or rollback the frontend patch
+        required: true
+        type: choice
+        default: validate
+        options: [validate, apply, rollback]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-onetouch-v9565
+  cancel-in-progress: false
+
+jobs:
+  onetouch-feature-repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Validate guarded v9.5.6.5 update
+        run: python3 scripts/apply_cosmos_onetouch_v9565.py --mode validate
+      - name: Apply or rollback
+        if: ${{ inputs.mode != 'validate' }}
+        run: python3 scripts/apply_cosmos_onetouch_v9565.py --mode "${{ inputs.mode }}"
+      - name: Check git changes
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          git diff --check -- cosmos-next.html
+          git diff --stat -- cosmos-next.html
+      - name: Commit and push
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- cosmos-next.html
+          if git diff --cached --quiet; then echo "No changes needed"; exit 0; fi
+          git commit -m "COSMOS v9.5.6.5 OneTouch real-feature popup repair"
+          git push origin HEAD:main
