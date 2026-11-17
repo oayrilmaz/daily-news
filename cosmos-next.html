@@ -3794,7 +3794,10 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
         <div class="field"><label for="emailInput">Email address</label><input id="emailInput" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required /></div>
         <div class="field" id="authPasswordField"><label for="authPasswordInput">Password</label><input id="authPasswordInput" type="password" autocomplete="current-password" placeholder="At least 12 characters" required /></div>
         <div class="field" id="authUsernameField" hidden><label for="authUsernameInput">Choose your unique @username</label><input id="authUsernameInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="21" placeholder="e.g. cosmos_explorer" inputmode="text" /><div class="micro">3–20 characters · letters, numbers, underscore · can be changed later in Profile</div></div>
-        <div id="authRegisterConsent" class="auth-eligibility" hidden><label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label><p>One COSMOS account. Email verification is required. Your private moments stay private.</p></div>
+        <div id="authRegisterConsent" class="auth-eligibility" hidden>
+          <label><input type="checkbox" id="authAgeConfirm"> I am at least 13 years old</label>
+          <label><input type="checkbox" id="authTermsConfirm" required> I agree to the <a href="/cosmos-terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> (v2026-11-13.1) and acknowledge the <a href="/cosmos-privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.</label>
+          <p>One COSMOS account. Email verification is required. Your private moments stay private.</p></div>
         <button type="button" id="sendCodesButton">Sign in</button>
         <button type="button" class="auth-secondary" id="authForgotButton">Forgot password?</button>
         <div class="auth-note" id="authIntroNote">Use your email and password. No phone number required.</div>
@@ -4274,10 +4277,69 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
     setTimeout(()=>input?.focus(),100);
   }
 
+
+  // COSMOS v9.5.3: legal gate is activated ONLY in the post-publishing
+  // release. Never store an acceptance in the browser alone.
+  function cosmos953LegalReviewGate(message=''){
+    auth.hidden=true;
+    let layer=document.getElementById('cosmos953LegalGate');
+    if(layer){
+      const error=layer.querySelector('#cosmos953LegalError');
+      if(message){error.textContent=message;error.hidden=false;}
+      return;
+    }
+    layer=document.createElement('div');layer.id='cosmos953LegalGate';
+    layer.className='cosmos953-legal-gate';layer.setAttribute('role','dialog');
+    layer.setAttribute('aria-modal','true');layer.setAttribute('aria-label','Review COSMOS Terms');
+    layer.innerHTML=`<div class="cosmos953-legal-panel">
+      <h2>Review the COSMOS Terms</h2>
+      <p>Please read the three documents before continuing. Your account and existing moments are preserved.</p>
+      <p class="cosmos953-legal-links"><a href="/cosmos-terms.html" target="_blank" rel="noopener noreferrer">Terms of Service</a> ·
+        <a href="/cosmos-privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a> ·
+        <a href="/cosmos-guidelines.html" target="_blank" rel="noopener noreferrer">Community Guidelines</a></p>
+      <label class="cosmos953-legal-checkbox"><input type="checkbox" id="cosmos953LegalCheckbox"> I agree to the Terms (v2026-11-13.1), acknowledge the Privacy Policy and will follow the Community Guidelines.</label>
+      <p class="cosmos953-legal-error" id="cosmos953LegalError" role="alert" hidden></p>
+      <div class="cosmos953-legal-actions"><button type="button" id="cosmos953LegalSignout">Sign out</button><button type="button" class="primary" id="cosmos953LegalAccept">Agree & continue</button></div>
+    </div>`;
+    document.body.appendChild(layer);
+    const err=layer.querySelector('#cosmos953LegalError');
+    if(message){err.textContent=message;err.hidden=false;}
+    layer.querySelector('#cosmos953LegalSignout').onclick=()=>{
+      localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(SESSION_RENEW_KEY);
+      token='';me=null;layer.remove();auth.hidden=false;setEmailAuthMode('login');
+    };
+    layer.querySelector('#cosmos953LegalAccept').onclick=async()=>{
+      if(!layer.querySelector('#cosmos953LegalCheckbox').checked){err.textContent='Read the documents and check the agreement box.';err.hidden=false;return;}
+      const button=layer.querySelector('#cosmos953LegalAccept');button.disabled=true;
+      err.hidden=true;
+      try{
+        const result=await api('/api/legal/accept',{method:'POST',body:JSON.stringify({terms_accepted:true,privacy_acknowledged:true,terms_version:'2026-11-13.1',privacy_version:'2026-11-13.1'})});
+        if(!result.ok)throw Error('COSMOS did not confirm your acceptance.');
+        layer.remove();await bootstrap();
+      }catch(e){err.textContent=e.message||'Could not save acceptance. Try again.';err.hidden=false;}
+      finally{button.disabled=false;}
+    };
+    layer.querySelector('#cosmos953LegalCheckbox').focus();
+  }
+  async function cosmos953LegalStatusNeeded(){
+    try{
+      const status=await api('/api/legal/status');
+      if(status.terms_version!=='2026-11-13.1'||status.privacy_version!=='2026-11-13.1'){
+        cosmos953LegalReviewGate('The legal policy version is not synchronized. Contact admin@ptdtoday.com.');return true;
+      }
+      if(!status.accepted){cosmos953LegalReviewGate();return true;}
+      return false;
+    }catch(e){
+      cosmos953LegalReviewGate('Cannot verify your Terms acceptance right now. Your account is safe; retry when the service is available.');
+      return true;
+    }
+  }
+
   async function bootstrap(){
     if(!token){auth.hidden=false;return;}
     try{
       me = await api("/api/me");
+      if(await cosmos953LegalStatusNeeded())return;
       auth.hidden=true;showAuthError('');
       accountButton.textContent=me.display_name|| (me.username?'@'+me.username:'You');
       if(!me.username){showRequiredUsername();return;}
@@ -4308,8 +4370,9 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
     }
   }
 
-  function completeEmailSignIn(r){
+  async function completeEmailSignIn(r){
     token=r.token;localStorage.setItem(TOKEN_KEY,token);localStorage.setItem(SESSION_RENEW_KEY,String(Date.now()));me=r.user;
+    if(await cosmos953LegalStatusNeeded())return;
     auth.hidden=true;accountButton.textContent=me.display_name||(me.username?'@'+me.username:'You');
     if(!me.username){showRequiredUsername();return;}
     // v3.6a.9: sign-in shows a camera-off Metro until the person taps camera.
@@ -4331,6 +4394,7 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
     if(!email){showAuthError('Enter your email address.');return;}
     if(authMode!=='reset' && !password){showAuthError('Enter your password.');return;}
     if(authMode==='register' && !$('authAgeConfirm').checked){showAuthError('An independent account requires the user to be at least 13.');return;}
+    if(authMode==='register' && !$('authTermsConfirm').checked){showAuthError('Read and agree to the published Terms before registering.');return;}
     const username=normalizeCosmosHandle($('authUsernameInput').value);
     if(authMode==='register' && !cosmosHandleRule.test(username)){
       showAuthError('Choose a unique username: 3–20 characters, starting with a letter; letters, numbers or underscore.');return;
@@ -4341,7 +4405,7 @@ html.cosmos-v956-clean #sheetBackdrop{visibility:hidden!important;pointer-events
         const r=await api('/api/auth/email/login',{method:'POST',body:JSON.stringify({email,password})});completeEmailSignIn(r);return;
       }
       const url=authMode==='register'?'/api/auth/email/register/start':'/api/auth/email/reset/start';
-      const body=authMode==='register'?{email,password,username,age_13_or_older:true,invite_code:FAMILY_INVITE_CODE}:{email};
+      const body=authMode==='register'?{email,password,username,age_13_or_older:true,terms_accepted:$('authTermsConfirm').checked,privacy_acknowledged:true,terms_version:'2026-11-13.1',privacy_version:'2026-11-13.1',invite_code:FAMILY_INVITE_CODE}:{email};
       const r=await api(url,{method:'POST',body:JSON.stringify(body)});
       authChallengeId=r.challenge_id;authStart.hidden=true;authVerify.hidden=false;
       $('authResetPasswordBlock').hidden=authMode!=='reset';
@@ -10337,9 +10401,9 @@ async function uploadFile(file){
         ['marketplace',work?'Business Marketplace':'Personal Marketplace',work?'Professional listings':'Personal listings']
       ]},
       {heading:'Safety & trust',open:false,items:[
-        ['terms','Terms of Service · coming soon','Publication pending',true],
-        ['privacy','Privacy Policy · coming soon','Publication pending',true],
-        ['guidelines','Community Guidelines · coming soon','Publication pending',true],
+        ['terms','Terms of Service','Read the published current policy'],
+        ['privacy','Privacy Policy','Read the published current policy'],
+        ['guidelines','Community Guidelines','Read the published current policy'],
         ['report','Report a safety concern','Contact the COSMOS administrator']
       ]},
       {heading:'Experiences & legacy',open:false,items:[
@@ -11939,6 +12003,22 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
  #sheet.business-modal[data-business-tab="metro"] #businessMetroMain .living-branch .living-rail{
    padding-left:10px!important;padding-right:4px!important;}
 }
+</style>
+<nav class="cosmos953-policy-footer" aria-label="Legal documents"><a href="/cosmos-terms.html" target="_blank" rel="noopener noreferrer">Terms</a><a href="/cosmos-privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a><a href="/cosmos-guidelines.html" target="_blank" rel="noopener noreferrer">Community Guidelines</a></nav>
+<style id="cosmos953LegalStyles">
+.cosmos953-legal-gate{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;overflow-y:auto;background:rgba(15,30,39,.78);padding:16px;box-sizing:border-box}
+.cosmos953-legal-panel{background:#fff;color:#243845;width:min(620px,100%);max-height:calc(100dvh - 32px);overflow-y:auto;padding:clamp(18px,4vw,35px);box-sizing:border-box;border-radius:24px;box-shadow:0 14px 45px #0005}
+.cosmos953-legal-panel h2{margin:0 0 18px;font-size:clamp(24px,3vw,32px);line-height:1.2}
+.cosmos953-legal-panel p{line-height:1.55;font-size:14px}
+.cosmos953-legal-panel a{color:#185474;text-decoration:underline}
+.cosmos953-legal-checkbox{display:flex;align-items:start;gap:12px;background:#f1f5f8;padding:14px;border-radius:12px;line-height:1.45;font-size:14px}
+.cosmos953-legal-checkbox input{flex:0 0 20px;width:20px;height:20px;margin-top:1px}
+.cosmos953-legal-error{color:#a1222b;font-size:13px}
+.cosmos953-legal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;flex-wrap:wrap}
+.cosmos953-legal-actions button{border:1px solid #cbd9e2;border-radius:12px;padding:12px 14px;font-size:14px;cursor:pointer}
+.cosmos953-legal-actions button.primary{background:#263b4a;color:#fff}
+.cosmos953-policy-footer{position:fixed;left:10px;bottom:3px;z-index:4;display:flex;gap:14px;font:11px system-ui,sans-serif}
+.cosmos953-policy-footer a{color:inherit;text-decoration:underline}
 </style>
 <script id="cosmos-v956-js">
 /* COSMOS v9.5.6 — OneTouch timeline: presentation only. No API calls,
