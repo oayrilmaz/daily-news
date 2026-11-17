@@ -1,0 +1,51 @@
+name: COSMOS v9.5.6.2 - OneTouch Swipe and Business Parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Validate, apply, or roll back the OneTouch UI fix
+        required: true
+        type: choice
+        default: validate
+        options: [validate, apply, rollback]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cosmos-next-frontend-v9562
+  cancel-in-progress: false
+
+jobs:
+  onetouch-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: true
+      - name: Validate existing frontend and guarded upgrade
+        run: python3 scripts/apply_cosmos_onetouch_v9562.py --mode validate
+      - name: Apply or rollback
+        if: ${{ inputs.mode != 'validate' }}
+        run: python3 scripts/apply_cosmos_onetouch_v9562.py --mode "${{ inputs.mode }}"
+      - name: Inspect changes
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          git diff --check -- cosmos-next.html
+          git diff --stat -- cosmos-next.html
+      - name: Commit frontend only
+        if: ${{ inputs.mode != 'validate' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- cosmos-next.html
+          if git diff --cached --quiet; then
+            echo "Already in requested state."
+            exit 0
+          fi
+          git commit -m "COSMOS v9.5.6.2 repair time swipe and Business lens"
+          git push origin HEAD:main
