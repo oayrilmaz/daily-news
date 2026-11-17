@@ -3813,6 +3813,48 @@ html.cosmos-v956-feature-popup #app > #sheet .co-feature-dismiss{position:absolu
  transform:translateX(-50%)!important;max-height:calc(100dvh - env(safe-area-inset-top) - 24px)!important;border-radius:22px!important}
  html.cosmos-v956-feature-popup #app > #sheet .sheet-inner{max-height:calc(100dvh - env(safe-area-inset-top) - 105px)!important}}
 
+
+/* v9.5.6.5: actual feature dialogs appear above OneTouch, not hidden beneath it. */
+html.cosmos-v956-feature-popup #cosmos940Layer:not([hidden]),
+html.cosmos-v956-feature-popup #cosmos929QuestionsArchive,
+html.cosmos-v956-feature-popup #cosmos943DiscoveryFull,
+html.cosmos-v956-feature-popup #cosmos929RecentWork,
+html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay {
+  z-index:2147481100!important;visibility:visible!important;pointer-events:auto!important;
+}
+html.cosmos-v956-feature-popup #cosmos940Layer:not([hidden]){
+  align-items:center!important;padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))!important;
+  background:rgba(8,19,29,.66)!important;
+}
+html.cosmos-v956-feature-popup #cosmos940Layer .cosmos940-shell {
+  width:min(960px,100%)!important;height:min(90dvh,940px)!important;min-height:0!important;
+  border-radius:24px!important;background:rgba(249,251,253,.97)!important;
+}
+html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay:has(.cosmos933-profile-dialog){
+  display:grid!important;place-items:center!important;overflow:auto!important;
+  padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom))!important;
+}
+html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay .cosmos933-profile-dialog{
+  width:min(940px,100%)!important;max-width:100%!important;height:min(89dvh,900px)!important;
+  max-height:min(89dvh,900px)!important;min-height:0!important;border-radius:24px!important;
+  box-shadow:0 14px 48px #0007!important;
+}
+#cosmosOneTouchV956 .co-embedded{position:absolute;z-index:20;inset:0;display:flex;justify-content:center;align-items:center;
+  padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom));background:rgba(10,21,32,.68);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#cosmosOneTouchV956 .co-embedded-panel{display:flex;flex-direction:column;width:min(1100px,100%);height:min(90dvh,920px);
+  max-height:100%;overflow:hidden;background:#f9fbfd;color:#203446;border-radius:22px;box-shadow:0 18px 70px #0006}
+#cosmosOneTouchV956 .co-embedded-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 15px;background:#f8fafc;border-bottom:1px solid #d5e1e8}
+#cosmosOneTouchV956 .co-embedded-head strong{font-size:14px;font-weight:800}
+#cosmosOneTouchV956 .co-embedded-head .co-embedded-actions{display:flex;gap:9px;align-items:center}
+#cosmosOneTouchV956 .co-embedded-head button,#cosmosOneTouchV956 .co-embedded-head a{padding:9px 11px;
+  border:1px solid #cbd8e2;border-radius:100px;background:white;color:#263d51;font-size:12px;font-weight:750;text-decoration:none;cursor:pointer}
+#cosmosOneTouchV956 .co-embedded iframe{width:100%;height:100%;min-height:0;border:0;background:white;flex:1}
+@media(max-width:600px){#cosmosOneTouchV956 .co-embedded-panel{height:93dvh;border-radius:17px}
+  #cosmosOneTouchV956 .co-embedded-head{padding:9px 11px}
+  html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay .cosmos933-profile-dialog{height:92dvh!important;max-height:92dvh!important}}
+
 </style><!-- /cosmos-v956-css -->
 </head>
 <body>
@@ -12266,6 +12308,7 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   let nativeFeature = false;
   let nativeFeaturePending = false;
   let featureRequest = 0;
+  let embeddedPage = null;
   let currentUniverse = 'personal';
   let lastFocus = null;
   let pointerGesture = null;
@@ -12316,12 +12359,21 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
     lastFocus?.focus?.();
   }
 
-function nativeFeatureVisible(){return !sheet.hidden || isVisible($('panel'));}
+// Native COSMOS has both #app sheets and standalone dialogs. Recognize both.
+const nativeExternalSelector = '#cosmos940Layer:not([hidden]), #cosmos929QuestionsArchive, #cosmos943DiscoveryFull, #cosmos929RecentWork, body > .cosmos933-photo-overlay';
+function activeExternalFeature(){return [...document.querySelectorAll(nativeExternalSelector)].find(isVisible)||null;}
+function nativeFeatureVisible(){return (!sheet.hidden && (!businessMode() || sheet.dataset.businessTab!=='metro')) || isVisible($('panel')) || !!activeExternalFeature();}
+function dismissExternalFeature(){
+ const ext=activeExternalFeature();if(!ext)return false;
+ const button=ext.querySelector('#cosmos940Close, [data-cosmos933-close], [data-close]');
+ if(button){button.click();return true;}
+ return false;
+}
 function closeNativeFeature(){
   featureRequest++;nativeFeaturePending=false;const prior=currentUniverse;
   nativeFeature=false;
   document.documentElement.classList.remove('cosmos-v956-feature-popup');
-  if(!sheet.hidden)$('sheetBackdrop')?.click();
+  if(!dismissExternalFeature() && !sheet.hidden)$('sheetBackdrop')?.click();
   if(isVisible($('panel'))){const p=$('panel');p.hidden=true;}
   if(prior==='business' && !businessMode())window.cosmosMetroShortcutsV923?.business?.();
   sync(true);
@@ -12457,22 +12509,50 @@ async function showRecentNews(){
   }catch(error){if(menuOpen&&request===recentNewsRequest){groups.replaceChildren();
     const p=document.createElement('p');p.className='co-moment-preview';p.textContent=String(error?.message||'News is currently unavailable.');groups.append(p);}}
 }
-function startNativeFeature(run){
+function closeEmbeddedPage(){
+ if(!embeddedPage)return;
+ embeddedPage.remove();embeddedPage=null;ring.focus();
+}
+function openEmbeddedPage(name,path){
+ const approved={'Origins':'/cosmos-original-home.html',
+   'Personal Marketplace':'/cosmos-market-personal.html',
+   'Business Marketplace':'/cosmos-market-business.html'};
+ if(approved[name]!==path)return;
+ closeMenu();closeEmbeddedPage();
+ const overlay=document.createElement('div');overlay.className='co-embedded';
+ overlay.setAttribute('role','presentation');
+ const panel=document.createElement('section');panel.className='co-embedded-panel';
+ panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',name);
+ const header=document.createElement('div');header.className='co-embedded-head';
+ const heading=document.createElement('strong');heading.textContent=name;
+ const actions=document.createElement('div');actions.className='co-embedded-actions';
+ const visit=document.createElement('a');visit.href=path;visit.target='_blank';visit.rel='noopener noreferrer';visit.textContent='Open in new tab';
+ const dismiss=document.createElement('button');dismiss.type='button';dismiss.textContent='Close ×';dismiss.onclick=closeEmbeddedPage;
+ actions.append(visit,dismiss);header.append(heading,actions);
+ const frame=document.createElement('iframe');frame.src=path;frame.title=name;frame.loading='eager';frame.referrerPolicy='same-origin';
+ panel.append(header,frame);overlay.append(panel);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)closeEmbeddedPage();});
+ root.append(overlay);embeddedPage=overlay;dismiss.focus();
+}
+function startNativeFeature(run,label='COSMOS'){
   closeMenu();nativeFeature=true;nativeFeaturePending=true;featureRequest++;
   document.documentElement.classList.add('cosmos-v956-clean','cosmos-v956-feature-popup');
   const request=featureRequest;
   const fail=e=>{if(request!==featureRequest)return;nativeFeaturePending=false;nativeFeature=false;
     document.documentElement.classList.remove('cosmos-v956-feature-popup');sync(true);
-    showInformation('COSMOS',String(e?.message||'The feature is unavailable.'));};
+    showInformation(label,String(e?.message||'The feature is unavailable.'));};
   try{
     Promise.resolve(run()).then(()=>{
       if(request!==featureRequest)return;
       nativeFeaturePending=false;
-      setTimeout(()=>{
-        if(request!==featureRequest||!nativeFeature)return;
-        if(!nativeFeatureVisible())fail(new Error('This feature does not yet have a compact popup.'));
-        else sync();
-      },220);
+let checks=0;
+const confirmOpen=()=>{
+  if(request!==featureRequest||!nativeFeature)return;
+  if(nativeFeatureVisible()){sync();return;}
+  if(++checks<7){setTimeout(confirmOpen,180);return;}
+  fail(new Error('The selected feature did not open. Please check the underlying COSMOS feature.'));
+};
+setTimeout(confirmOpen,160);
     }).catch(fail);
   }catch(e){fail(e);}
 }
@@ -12480,7 +12560,7 @@ async function viewStation(item){
   if(item.locked)return previewStation(item);
   const bridge=window.cosmosOneTouchBridgeV9563;
   if(!bridge?.open)return showInformation('COSMOS','The moment viewer is not ready.');
-  startNativeFeature(()=>bridge.open(item));
+  startNativeFeature(()=>bridge.open(item),'Saved moment');
 }
 function drawStations(){
   grid.querySelector('.co-stations-layer')?.remove();
@@ -12642,34 +12722,13 @@ function runNative(name){
     const selectors={account:'#accountButton',profile:'#accountButton'};
     const el=document.querySelector(selectors[name]||'.__cosmos_nonexistent');
     if(el)return el.click();
-    throw Error('This feature has not been connected to a compact OneTouch popup.');
-  });
+    throw Error('This COSMOS function is not available in the loaded frontend.');
+  },name==='ask'?'Ask COSMOS':name);
 }
 function nativeSelectedDay(){
   const items=dayItems(toLocalKey(selected));
   if(items.length)stationChoices(items);
   else showInformation('Saved moments','No saved moments are available for the selected day.');
-}
-  function findExistingAction(labels) {
-    const targets=[...document.querySelectorAll('button,a,[role="button"]')].filter(el =>
-      !el.closest('#cosmosOneTouchV956') && el !== back && el.getClientRects().length > 0 &&
-      getComputedStyle(el).visibility !== 'hidden');
-    return targets.find(el => labels.some(term => term.test((el.textContent || '').trim())));
-  }
-
-function openNativeSection(action){
-  if(action==='tools')return openMenu();
-  startNativeFeature(()=>{
-    const terms={
-      news:[/^news\s*&\s*discoveries$/i,/^news$/i],
-      questions:[/^global questions$/i],
-      marketplace:[/^(?:personal |business )?marketplace$/i],
-      time:[/^(?:∞\s*)?time(?:\s*lens)?$/i,/^time lens$/i]
-    }[action]||[];
-    const target=findExistingAction(terms);
-    if(!target)throw Error('This section needs a dedicated OneTouch popup.');
-    target.click();
-  });
 }
   function openLegal(page) {
     const allowed = new Set(['cosmos-terms.html','cosmos-privacy.html','cosmos-guidelines.html']);
@@ -12725,7 +12784,10 @@ if(action==='create'){
   });
   return;
 }
-    if (action==='time')return openNativeSection('time');
+    if (action==='time')return startNativeFeature(()=>{
+      if(typeof window.cosmos947TimeForDate!=='function')throw Error('Time Lens is not loaded.');
+      window.cosmos947TimeForDate(currentUniverse,toLocalKey(selected));
+    },'Time Lens');
     if (action==='ask')return runNative('ask');
     if (action==='people')return runNative('people');
     if(action==='directory')return startNativeFeature(()=>{
@@ -12734,13 +12796,20 @@ if(action==='create'){
     });
     if (action==='jobs')return runNative('jobs');
     if (action==='visitors')return runNative('visitors');
-    if (action==='origins')return runNative('origins');
+    if (action==='origins')return openEmbeddedPage('Origins','/cosmos-original-home.html');
     if (action==='together')return runNative('together');
-    if (action==='profile')return runNative(currentUniverse==='business'?'profile':'account');
+    if (action==='profile')return startNativeFeature(()=>{
+      if(typeof window.cosmos947OpenOwnerProfile!=='function')throw Error('Profile viewer is not loaded.');
+      return window.cosmos947OpenOwnerProfile(currentUniverse);
+    },'My profile');
     if (action==='account')return runNative('account');
-    if (action==='news')return openNativeSection('news');
-    if (action==='questions')return openNativeSection('questions');
-    if (action==='marketplace')return openNativeSection('marketplace');
+    if (action==='news')return showRecentNews();
+    if (action==='questions')return startNativeFeature(()=>{
+      if(typeof window.cosmos929OpenQuestionArchive!=='function')throw Error('Global questions are unavailable.');
+      return window.cosmos929OpenQuestionArchive();
+    },'Global questions');
+    if (action==='marketplace')return openEmbeddedPage(currentUniverse==='business'?'Business Marketplace':'Personal Marketplace',
+      currentUniverse==='business'?'/cosmos-market-business.html':'/cosmos-market-personal.html');
     if (action==='tools')return openMenu();
     if (action==='switch'){
       closeMenu();
@@ -12766,6 +12835,7 @@ if(action==='create'){
   $('cosmosV956Close').addEventListener('click',closeMenu);
   menu.addEventListener('click',e=>{if(e.target===menu)closeMenu();});
   document.addEventListener('keydown',e=>{
+    if (e.key==='Escape'&&embeddedPage){e.preventDefault();closeEmbeddedPage();return;}
     if (e.key==='Escape'&&menuOpen){e.preventDefault();closeMenu();}
     if (root.hidden||menuOpen||e.target.closest('input,textarea,select'))return;
     if (e.key==='ArrowLeft'){shiftWeek(1);e.preventDefault();}
@@ -12833,6 +12903,9 @@ if(action==='create'){
     if(Date.now()-lastNavigationAt<360){e.preventDefault();e.stopImmediatePropagation();}
   },true);
   back.addEventListener('click',()=>{if(nativeFeature)closeNativeFeature();else sync(true);});
+  document.addEventListener('pointerdown',e=>{
+    if(nativeFeature && e.target?.id==='cosmos940Layer')closeNativeFeature();
+  },true);
   $('sheetBackdrop').addEventListener('click',()=>{
     if(!nativeFeature)return;featureRequest++;nativeFeaturePending=false;const prior=currentUniverse;nativeFeature=false;
     document.documentElement.classList.remove('cosmos-v956-feature-popup');
@@ -12846,7 +12919,7 @@ if(action==='create'){
   // This small poll accounts for legacy business transitions without observing a large DOM subtree.
   setInterval(()=>sync(),1500);
   renderGrid();sync(true);
-  window.cosmosOneTouchV956 = {version:'9.5.6.4',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
+  window.cosmosOneTouchV956 = {version:'9.5.6.5',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
 })();
 
 </script><!-- /cosmos-v956-js -->
