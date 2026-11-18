@@ -10248,6 +10248,27 @@ window.cosmosOneTouchBridgeV9563 = {
     if(space==='business')return businessBeginDraft();
     return beginCompose();
   },
+  // v9.5.6.8: OneTouch exposes existing camera/capture code without unmasking the legacy dashboard.
+  // Live background camera stays Personal-only. Business photo/video capture is permitted
+  // through its existing composer with a separate, user-initiated camera permission request.
+  cameraStatus(space){
+    return {available:space!=='business',active:space!=='business' &&
+      !preferWhiteMetro && app.classList.contains('cosmos-camera-live'),
+      facing:preferredCameraFacing};
+  },
+  cameraCycle(space){
+    if(space==='business')throw new Error('Live camera background is available in Personal. Use Photo or Video to capture a Business moment.');
+    return cycleMetroCamera();
+  },
+  capture(space,kind){
+    if(!['photo','video'].includes(kind))throw new Error('Choose Photo or Video.');
+    if(space==='business'){
+      businessBeginDraft();
+      return businessChooseKind(kind);
+    }
+    beginCompose();
+    return chooseContent(kind);
+  },
   recent(space){return api('/api/discovery/recent?space='+encodeURIComponent(space==='business'?'business':'personal'));},
   async open(item) {
     if(!item || !token || !me || !auth.hidden)return;
@@ -12785,7 +12806,7 @@ function nativeSelectedDay(){
   }
   const ACTIONS = [
     {group:'Moments',actions:[
-      ['view','View selected day'],['create','Create a moment'],['now','Back to today'],['time','Travel across time']]},
+      ['view','View selected day'],['create','Create a moment'],['camera','Camera & capture'],['now','Back to today'],['time','Travel across time']]},
     {group:'Discover',actions:[
       ['ask','Ask COSMOS'],['news','News & discoveries'],['questions','Global questions'],['origins','Origins']]},
     {group:'People & places',actions:[
@@ -12821,7 +12842,42 @@ function nativeSelectedDay(){
       section.appendChild(options);groups.appendChild(section);
     });
   }
+  // The camera is an explicit user opt-in, never started on sign-in or page load.
+  function showCameraOptions(){
+    const groups=$('cosmosV956Groups');groups.replaceChildren();
+    $('cosmosV956Selection').textContent=(currentUniverse==='business'?'Business':'Personal')+' · Camera & capture';
+    const note=document.createElement('p');note.className='co-moment-preview';
+    note.textContent=currentUniverse==='business' ?
+      'Take a work photo or record a work video. The live Personal camera never runs behind Business.' :
+      'Open the live camera behind your timeline, or capture a photo or video moment. Camera access is requested only when you choose to use it.';
+    groups.append(note);
+    const options=document.createElement('div');options.className='co-menu-options';
+    const add=(name,handler)=>{const button=document.createElement('button');button.type='button';button.textContent=name;button.addEventListener('click',handler);options.append(button);};
+    const bridge=window.cosmosOneTouchBridgeV9563;
+    if(currentUniverse==='personal'){
+      const status=bridge?.cameraStatus?.(currentUniverse);
+      add(status?.active?'Switch camera / White view':'Open live camera',async()=>{
+        closeMenu(false);
+        try {if(!bridge?.cameraCycle)throw Error('Camera controls are not installed.');
+          await bridge.cameraCycle('personal');sync(true);
+        } catch(error){showInformation('Camera unavailable',String(error?.message||'Camera could not be opened.'));}
+      });
+    }
+    add('Take a photo',()=>startNativeFeature(()=>{
+      if(!bridge?.capture)throw Error('Photo composer unavailable.');
+      return bridge.capture(currentUniverse,'photo');
+    },'Take a photo'));
+    add('Record a video',()=>startNativeFeature(()=>{
+      if(!bridge?.capture)throw Error('Video composer unavailable.');
+      return bridge.capture(currentUniverse,'video');
+    },'Record a video'));
+    add('← Back to OneTouch',()=>{renderMenu();$('cosmosV956Close').focus();});
+    groups.append(options);
+    menu.hidden=false;menuOpen=true;ring.setAttribute('aria-expanded','true');
+    $('cosmosV956Close').focus();
+  }
   function dispatch(action) {
+    if (action==='camera')return showCameraOptions();
     if (action==='now'){now();closeMenu();return;}
     if (action==='view'){nativeSelectedDay();return;}
 
@@ -12968,7 +13024,7 @@ if(action==='create'){
   // This small poll accounts for legacy business transitions without observing a large DOM subtree.
   setInterval(()=>sync(),1500);
   renderGrid();sync(true);
-  window.cosmosOneTouchV956 = {version:'9.5.6.7',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
+  window.cosmosOneTouchV956 = {version:'9.5.6.8',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
 })();
 
 </script><!-- /cosmos-v956-js -->
