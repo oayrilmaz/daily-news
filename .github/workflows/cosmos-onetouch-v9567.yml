@@ -1,0 +1,45 @@
+name: COSMOS v9.5.6.7 - Restore Text Entry Focus
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run validate, then apply. Rollback if needed."
+        required: true
+        type: choice
+        default: validate
+        options:
+          - validate
+          - apply
+          - rollback
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply guarded focus fix
+        run: python scripts/apply_cosmos_onetouch_v9567.py --mode "${{ inputs.mode }}"
+      - name: Commit only changed COSMOS HTML
+        if: inputs.mode != 'validate'
+        run: |
+          if git diff --quiet -- cosmos-next.html; then
+            echo 'No COSMOS HTML changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- cosmos-next.html
+          git commit -m "COSMOS v9.5.6.7: fix text editor focus (${{ inputs.mode }})"
+          git push origin HEAD:main
