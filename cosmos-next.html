@@ -3855,6 +3855,41 @@ html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay .cosmos933-profil
   #cosmosOneTouchV956 .co-embedded-head{padding:9px 11px}
   html.cosmos-v956-feature-popup body > .cosmos933-photo-overlay .cosmos933-profile-dialog{height:92dvh!important;max-height:92dvh!important}}
 
+
+/* COSMOS v9.5.6.6 — Solid, keyboard-ready OneTouch feature composer.
+   The owner's Business wallpaper belongs to the timeline, not inside an editor. */
+html.cosmos-v956-feature-popup #app > #sheet.business-modal,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal.cosmos933-has-business-bg {
+  background:#f8fafc!important;background-image:none!important;
+}
+html.cosmos-v956-feature-popup #app > #sheet.business-modal .sheet-inner,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal.cosmos933-has-business-bg .sheet-inner,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal .sheet-quickbar {
+  background:#f8fafc!important;background-image:none!important;
+}
+html.cosmos-v956-feature-popup #app > #sheet.business-modal .sheet-inner {
+  overflow-y:auto!important;overflow-x:hidden!important;
+  overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;
+}
+html.cosmos-v956-feature-popup #app > #sheet.business-modal input,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal select,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal textarea,
+html.cosmos-v956-feature-popup #app > #sheet.business-modal #bizMomentText {
+  box-sizing:border-box!important;max-width:100%!important;
+  background:#fff!important;background-image:none!important;
+  opacity:1!important;color:#1d3041!important;caret-color:#1d3041!important;
+  pointer-events:auto!important;-webkit-user-select:text!important;user-select:text!important;
+}
+html.cosmos-v956-feature-popup #app > #sheet.business-modal #bizMomentText {
+  display:block!important;width:100%!important;min-height:145px!important;
+  padding:14px!important;border:1px solid #bacbd9!important;
+  border-radius:14px!important;font-size:16px!important;line-height:1.5!important;
+  resize:vertical!important;
+}
+html.cosmos-v956-feature-popup #app > #sheet.business-modal #bizMomentText:focus {
+  outline:2px solid #5a93b5!important;outline-offset:1px!important;
+}
 </style><!-- /cosmos-v956-css -->
 </head>
 <body>
@@ -10208,8 +10243,10 @@ window.cosmosOneTouchBridgeV9563 = {
       warning:failed.length?'Some authorized moment sources could not be loaded.':(partial?'This week contains additional moments not on the first page.':'')};
   },
   compose(space){
+    // coreOrb has pointerdown/pointerup handlers, not a click handler.
+    // Invoke the existing private composer directly; do not fake a click.
     if(space==='business')return businessBeginDraft();
-    return $('coreOrb')?.click();
+    return beginCompose();
   },
   recent(space){return api('/api/discovery/recent?space='+encodeURIComponent(space==='business'?'business':'personal'));},
   async open(item) {
@@ -12344,7 +12381,10 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
     return auth.hidden === true && !isVisible(universeEntry) && !legalGateVisible();
   }
   function businessMode() {
-    return sheet.classList.contains('business-modal') && (sheet.dataset.businessTab === 'metro' || !!sheet.querySelector('.business-metro-shell'));
+    // A stale data-business-tab="metro" persists while Business creates a moment.
+    // Only an actual Metro shell is the background; editors are foreground sheets.
+    return !sheet.hidden && sheet.classList.contains('business-modal') &&
+      !!sheet.querySelector('.business-metro-shell');
   }
   function otherNativeSheetOpen() {
     return !sheet.hidden && !businessMode();
@@ -12362,7 +12402,7 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
 // Native COSMOS has both #app sheets and standalone dialogs. Recognize both.
 const nativeExternalSelector = '#cosmos940Layer:not([hidden]), #cosmos929QuestionsArchive, #cosmos943DiscoveryFull, #cosmos929RecentWork, body > .cosmos933-photo-overlay';
 function activeExternalFeature(){return [...document.querySelectorAll(nativeExternalSelector)].find(isVisible)||null;}
-function nativeFeatureVisible(){return (!sheet.hidden && (!businessMode() || sheet.dataset.businessTab!=='metro')) || isVisible($('panel')) || !!activeExternalFeature();}
+function nativeFeatureVisible(){return (!sheet.hidden && !businessMode()) || isVisible($('panel')) || !!activeExternalFeature();}
 function dismissExternalFeature(){
  const ext=activeExternalFeature();if(!ext)return false;
  const button=ext.querySelector('#cosmos940Close, [data-cosmos933-close], [data-close]');
@@ -12919,7 +12959,7 @@ if(action==='create'){
   // This small poll accounts for legacy business transitions without observing a large DOM subtree.
   setInterval(()=>sync(),1500);
   renderGrid();sync(true);
-  window.cosmosOneTouchV956 = {version:'9.5.6.5',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
+  window.cosmosOneTouchV956 = {version:'9.5.6.6',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
 })();
 
 </script><!-- /cosmos-v956-js -->
