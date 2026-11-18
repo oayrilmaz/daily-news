@@ -1,0 +1,45 @@
+name: COSMOS v9.5.6.6 - OneTouch Real Compose and Clear Business Editor
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "validate first, then apply; rollback if needed"
+        required: true
+        type: choice
+        default: validate
+        options:
+          - validate
+          - apply
+          - rollback
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate or update COSMOS frontend
+        run: python scripts/apply_cosmos_onetouch_v9566.py --mode "${{ inputs.mode }}"
+      - name: Commit only an applied / rolled-back HTML change
+        if: inputs.mode != 'validate'
+        run: |
+          if git diff --quiet -- cosmos-next.html; then
+            echo 'No COSMOS HTML changes needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- cosmos-next.html
+          git commit -m "COSMOS v9.5.6.6: restore composers and readable Business editor (${{ inputs.mode }})"
+          git push origin HEAD:main
