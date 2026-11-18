@@ -12392,11 +12392,19 @@ html.cosmos946-business-owner-ready #sheet.business-modal[data-business-tab="met
   function nativeModalOpen() {
     return otherNativeSheetOpen() || isVisible($('panel')) || legalGateVisible();
   }
-  function closeMenu() {
+  function closeMenu(restoreFocus = true) {
+    // v9.5.6.7: This function is called by the periodic OneTouch sync even
+    // while a native textarea is active. Never steal keyboard focus unless
+    // the menu was actually open and the user is deliberately closing it.
+    if (!menuOpen) return;
     menuOpen = false;
     menu.hidden = true;
     ring.setAttribute('aria-expanded', 'false');
-    lastFocus?.focus?.();
+    const previous = lastFocus;
+    lastFocus = null;
+    if (restoreFocus && previous?.isConnected && typeof previous.focus === 'function') {
+      previous.focus({preventScroll:true});
+    }
   }
 
 // Native COSMOS has both #app sheets and standalone dialogs. Recognize both.
@@ -12575,7 +12583,8 @@ function openEmbeddedPage(name,path){
  root.append(overlay);embeddedPage=overlay;dismiss.focus();
 }
 function startNativeFeature(run,label='COSMOS'){
-  closeMenu();nativeFeature=true;nativeFeaturePending=true;featureRequest++;
+  // The destination composer owns the keyboard; do not refocus the old menu.
+  closeMenu(false);nativeFeature=true;nativeFeaturePending=true;featureRequest++;
   document.documentElement.classList.add('cosmos-v956-clean','cosmos-v956-feature-popup');
   const request=featureRequest;
   const fail=e=>{if(request!==featureRequest)return;nativeFeaturePending=false;nativeFeature=false;
@@ -12959,7 +12968,7 @@ if(action==='create'){
   // This small poll accounts for legacy business transitions without observing a large DOM subtree.
   setInterval(()=>sync(),1500);
   renderGrid();sync(true);
-  window.cosmosOneTouchV956 = {version:'9.5.6.6',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
+  window.cosmosOneTouchV956 = {version:'9.5.6.7',reset:now,open:openMenu,refresh:()=>{momentKey='';renderGrid();},restore:()=>{nativeWorkspace=false;sync(true);}};
 })();
 
 </script><!-- /cosmos-v956-js -->
